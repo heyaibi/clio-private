@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100360: Per-File Coverage Guard for the Lines/Functions Floor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100360: Per-File Coverage Guard for the Lines/Functions Floor</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">3 minor · 2 dismissed</span>
+    </div>
+    <p class="sum">The per-file coverage guard is cleanly implemented in stdlib Python, fail-closed, and correctly wired into Makefile and CI without duplicate test runs. All acceptance criteria and test scenarios pass. Minor findings include a missing trailing newline in coverage_guard.py, unhandled --help CLI flags, and host config isolation sensitivity.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-22</span>
+      <span><b>Applies to</b>Phase 100360 staged diff</span>
+      <span><b>Source</b>scripts/coverage_guard.py, Makefile, .github/workflows/ci.yml, coverage.md, roadmap/phase-100360-coverage-guard.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>Phase 100360 Roadmap acceptance criteria (AC-100360-01 through AC-100360-06)</li>
+        <li>Single instrumented test run constraint across Makefile and CI</li>
+        <li>Fail-closed behavior on missing or malformed reports</li>
+        <li>coverage.md documentation and checklist synchronization</li>
+        <li>Zero roadmap or phase leaks into production code and comments</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">6 of 6 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100360-01: Guard fails when any file is under 90% lines or functions</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Synthetic fixtures T100360-01 and T100360-02 in coverage_guard.py --self-test exit 1 and identify offending files.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100360-02: Guard passes on current green tree</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage and make coverage-guard pass with 276 files checked and 0 offenders.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100360-03: Regions never gate</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Fixture T100360-04 with regions at 50.0% and lines/functions at 95.0% exits 0.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100360-04: Aggregate gate unchanged and still enforced</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">--fail-under-lines 90 and --fail-under-functions 90 retained in Makefile and CI; contract test on clio-types with 99.9% exited 1 while writing JSON report.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100360-05: One instrumented run per gate</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Makefile and CI run cargo llvm-cov once with --output-path, followed by python3 scripts/coverage_guard.py on the resulting JSON.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100360-06: coverage.md documents column mapping and guard</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">coverage.md §2 contains new column mapping table and command; §6 checklist updated.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">03</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Missing trailing newline in scripts/coverage_guard.py</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>POSIX standards and standard Git formatting require text files to end with a newline to prevent concatenation defects and diff noise.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Triggers &#39;No newline at end of file&#39; in git diff and some POSIX linters.</dd></div>
+              <div><dt>Evidence</dt><dd>scripts/coverage_guard.py:200</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a trailing newline to the end of scripts/coverage_guard.py.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Standard help flags (--help, -h) fail closed as unreadable report files</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Developers expecting standard CLI ergonomics who run `python3 scripts/coverage_guard.py --help` see a file read error and exit code 3 instead of usage instructions.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Unintuitive CLI behavior for human operators discovering script options.</dd></div>
+              <div><dt>Evidence</dt><dd>python3 scripts/coverage_guard.py --help -&gt; coverage-guard: error: cannot read report --help: [Errno 2] No such file or directory: &#39;--help&#39; (exit 3)</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>In main(), check `if &#39;-h&#39; in argv or &#39;--help&#39; in argv:` and print usage then return EXIT_OK.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Host deployment config leakage requires explicit dummy config file for hermetic testing</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>A host with an active sidecar in ~/.config/am/deployment.json fails embedder offline tests, and setting AM_DEPLOYMENT_CONFIG=&#39;&#39; breaks setup_cli tests.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Local test and coverage runs on developer workstations require AM_DEPLOYMENT_CONFIG pointing to an empty file rather than an empty string.</dd></div>
+              <div><dt>Evidence</dt><dd>setup_cli_fail_tests fail when AM_DEPLOYMENT_CONFIG=&#39;&#39; (&#39;cannot resolve a config directory&#39;); embedder tests fail when AM_DEPLOYMENT_CONFIG is unset on host with sidecar.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update Makefile or test runner to ensure an isolated empty deployment config is automatically supplied when running make coverage.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Failure of per-file guard to execute when cargo llvm-cov aggregate fails: by design, make aborts on first failure and aggregate failure is already a gating condition.</li>
+        <li>No execution bit on scripts/coverage_guard.py: invoked via python3 in both Makefile and ci.yml, consistent with other scripts in scripts/.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Guard passes on the current workspace with 276 files checked — make coverage and make coverage-guard both output &#39;coverage-guard: 276 file(s) checked against 90.0% floors / all reported files meet the per-file floor&#39;.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Synthetic test cases fail closed on sub-90% lines or functions — python3 scripts/coverage_guard.py --self-test passed all 7 test cases including malformed JSON and sub-90% lines/functions.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Aggregate gate still enforced on the same run — Scoped contract run with --fail-under-lines 99.9 on clio-types exited 1 and successfully generated the JSON report.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean, dependency-free Python 3 implementation with thorough self-test suite embedded directly in the script.</li>
+        <li>Efficient single-run design preserving the fast aggregate gate while introducing per-file verification.</li>
+        <li>Clear documentation update in coverage.md clarifying the column mappings for future agent runs.</li>
+      </ul>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Add trailing newline to scripts/coverage_guard.py</li>
+          <li>Add -h/--help handling in scripts/coverage_guard.py to display usage instructions cleanly</li>
+          <li>Add AM_DEPLOYMENT_CONFIG isolation to Makefile coverage targets to avoid host configuration pollution</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Provide a unified test runner environment wrapper in Makefile ensuring full test hermeticity regardless of user host configuration.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100360/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100360/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

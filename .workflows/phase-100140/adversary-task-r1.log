@@ -1,0 +1,14 @@
+2026-09-19T11:29:30 START adversary-task-r1 phase-100140
+2026-09-19T05:59:33Z git status: all 29 non-workflow files staged, 0 unstaged
+2026-09-19T05:59:55Z FINDING F-01: crates/clio-persona/src/observe.rs:7 references "Phase-100090 ownership", violating roadmap isolation
+2026-09-19T06:00:14Z make check: PASS (cargo fmt, clippy -D warnings, workspace tests 0 failures)
+2026-09-19T06:00:55Z make coverage: PASS (aggregate functions=98.50% lines=98.38%, all reported files >= 90% functions and lines)
+2026-09-19T06:05:02Z FINDING F-02: crates/clio-persona/src/observe.rs:120,126-137 pre-admission continuous declaration writes schema before admission evaluation
+2026-09-19T06:05:02Z FINDING F-03: crates/clio-persona/src/observe.rs:198 PersonaEvent.trend hardcoded to None, discarding observed trend
+2026-09-19T06:05:02Z FINDING F-04: crates/clio-types/src/persona.rs:173-178 PersonaPreference::validate() omits finite check on trend
+2026-09-19T06:05:02Z FINDING F-05: sql/001_core.sql:315-322 redundant partial index persona_stable_entries_bank_id_attr_key_open_inx duplicates unique index
+2026-09-19T06:05:02Z FINDING F-06: crates/clio-persona/src/observe.rs:292-298 find_preference calls get_persona_document which decrypts all stable entries via KMS
+2026-09-19T06:05:02Z FINDING F-07: crates/clio-persona/src/lib.rs:73-78 PersonaEvent documents persona_get and read operations but persona_get has no telemetry sink
+2026-09-19T06:05:02Z generate-report.cjs: rendered report.html and style.css in .workflows/phase-100140/
+2026-09-19T06:05:02Z Attribution updated in roadmap/phase-100140-persona-companion-object.md for Adversary r1
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100140/findings.json bfd629bc

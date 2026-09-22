@@ -1,0 +1,19 @@
+2026-09-19T07:51:50Z APPROVER r1 start nonce=5049e11b
+2026-09-19T07:51:50Z reading inputs
+2026-09-19T07:52:01Z running authorized diff reads
+2026-09-19T07:52:07Z diff read: 27 modified files, +673/-150; new sqlite_history_triple.rs is untracked (not in diff)
+2026-09-19T07:52:39Z static checks done: 18 ids in original vs 18 in current; headers OK; sizes OK
+2026-09-19T07:52:47Z findings title sets identical (18/18) - no silent deletions
+2026-09-19T07:55:12Z F-01 VERIFIED: triple_history_at SQL filters axis<=as_of in inner query before LIMIT (sqlite_history_triple.rs:84-90, postgres_history_read.rs:241-263); temporal.rs post-filter removed; t08b (3 versions, limit=2, as_of beyond) passes at runtime
+2026-09-19T07:55:12Z F-02 VERIFIED: all 12 previously bare files + 3 new files (retrieve_isolation_tests, sqlite_history_triple, history_knobs) contain Responsibility/Owns/Does-not-own/Boundary
+2026-09-19T07:55:12Z F-03 VERIFIED: retrieve_isolation_tests.rs:150 t13 composes persona before/after failure, asserts byte-identical persona section; passes
+2026-09-19T07:55:12Z F-04 VERIFIED: retrieve_isolation_tests.rs:56 t11 real HybridRetriever domains=[failure] returns only failure item; :123 t12 source guard + resolve_limit hard cap; both pass
+2026-09-19T07:55:12Z F-05 VERIFIED: sqlite_history_tests.rs:245 history_reads_are_bank_isolated passes (bank B reads None/empty, bank A reads own records)
+2026-09-19T07:55:12Z F-06 VERIFIED: phase file now cites measured numbers; llvm-cov JSON shows temporal.rs 10/10 fns 100.00% / 97.62% lines; totals fns 98.72% lines 98.38%, 137 files, none below 90%
+2026-09-19T07:55:12Z F-07 VERIFIED: clio-config history_knobs.rs + history.* allowlist/validation (validate.rs:36-39,172-196) + Runtime::history_policy(); 5 knob tests pass incl. default_limit>max_limit error path
+2026-09-19T07:55:12Z F-08 VERIFIED: failure.rs:101 attempt_n<1 rejected before gate request; failure_tests.rs:179 asserts admission sink empty; passes
+2026-09-19T07:55:12Z F-09 VERIFIED: what_failed uncapped documented in clio-types/history.rs:225-228 and failure.rs docs; failure_tests.rs:202 proves 2000-char round-trip + over-cap lesson rejected; passes
+2026-09-19T07:55:12Z cross-checks: findings.json 18/18 titles identical to findings.original.json backup (backup is pre-remediation: verdict Adequate, no status/resolution fields); diff touches only remediation-related files; no roadmap/phase-0/crates.md refs in crates/; largest changed file 417 lines (config/tests.rs), new files 152/209/150
+2026-09-19T07:55:03Z local verification: make check exit 0; make coverage exit 0 (aggregate fail-under 90 passed); new regression tests run individually: retrieve_isolation 3 passed, temporal 7 passed incl t08b, sqlite history 6 passed incl bank isolation, config history 5 passed, failure_tests 8 passed
+2026-09-19T07:55:12Z VERDICT: APPROVE - all 9 findings resolved with real code+tests, no regressions, no new issues; Attribution row updated (only file edit made)
+REMEDY_APPROVED 5049e11b

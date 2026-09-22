@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100280 - HTTPS transport and provider configuration plumbing (staged diff)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100280 - HTTPS transport and provider configuration plumbing (staged diff)</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">2 important · 5 minor · 5 dismissed</span>
+    </div>
+    <p class="sum">The core HTTPS transport transition to ureq 3.4.2 and configuration plumbing for embed/rerank providers are implemented cleanly with verified test execution (1316/1316 passing tests) and robust coverage (TOTAL lines 97.88%, functions 98.98%; all 253 reported files &gt;=90%). However, several actionable defects were identified: roadmap isolation leaks referencing &#39;Phases 029/030&#39; in .env.example, README.md, and hardware.md; missing module responsibility header on modified validate_tests.rs; unredacted HTTP response body snippets in error returns risking secret leakage on 401/403 errors; unconditional &#39;sidecar unreachable&#39; tagging on static transport errors causing unneeded retries; bare IPv6 literal rejection in HttpEndpoint::parse; and extreme line count saturation (449/450 lines) on clio-config/src/config/mod.rs.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-21</span>
+      <span><b>Applies to</b>phase-100280 (staged developer snapshot, commit base HEAD)</span>
+      <span><b>Source</b>crates/clio-index/src/{http.rs,http_tests.rs,embed.rs,embed_tests.rs}; crates/clio-config/src/config/{merge.rs,mod.rs,validate.rs,validate_tests.rs,embed_knob_tests.rs}; Cargo.toml; Cargo.lock; .env.example; README.md; hardware.md; roadmap/phase-100280-https-transport-config.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>roadmap/phase-100280-https-transport-config.md - In Scope, Tasks 1-4, Must Not Change, Acceptance Criteria AC-100280-01..06, Definition of Done, Known Limitations</li>
+        <li>AGENTS.md - 450-line per-file limit, exact header structure with truthful ownership, coverage gate (&gt;=90% function and line per file), roadmap isolation (never reference roadmap or phase numbers in code/comments)</li>
+        <li>coverage.md - authoritative gate `make coverage`, per-file &gt;=90% line and function floors</li>
+        <li>requirement.md - §4.9.5.E, FR-32, NFR-6 (no secret leakage)</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">7 of 10 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100280-01: HTTPS transport with verified TLS behind unchanged contract</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-index/src/http.rs implemented over ureq 3.4.2 with rustls-verified TLS and webpki-roots; post_json and get_ok signatures unchanged; 45 clio-index tests pass.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100280-02: TEI wire shapes reachable; retry substrings preserved</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Fake sidecar tests pass in http_tests.rs and embed_tests.rs; connect failed, sidecar unreachable, read timed out, HTTP 429, HTTP 5 preserved.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100280-03: Provider paths allowlisted and validated</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">validate.rs validates embed.provider (tei|openai), rerank.provider (tei|cohere), rerank.url, rerank.model, credentials.rerank_api_key; 114 clio-config tests pass.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100280-04: Keys wired and masked; env knobs reach config</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">apply_process_env wires EMBED_API_KEY, EMBED_PROVIDER, EMBED_DIMS, RERANK_URL, RERANK_MODEL, RERANK_PROVIDER, RERANK_API_KEY; bearer_for implements precedence; credentials.rerank_api_key masked in config_get.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100280-05: Exactly one new dependency (ureq); build green on macOS arm64 and Linux amd64</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Cargo.toml adds ureq = &#39;3&#39;; cargo tree confirms clio-index as sole direct owner; clean build passes on macOS arm64; dep-tree on x86_64 target confirmed identical.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100280-06: No-provider behavior unchanged</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Full workspace regression suite green (1316 passed / 0 failed); defaults keep embed.provider and rerank.* empty.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Roadmap isolation (no phase numbers or roadmap references in code/comments)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">.env.example:59 contains &#39;# NOTE: provider adapters land in Phases 029/030&#39;; README.md:293 and hardware.md:22 contain &#39;Phases 029/030&#39;.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Exact module responsibility header on new/modified Rust files</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-config/src/config/validate_tests.rs was modified (59 lines added) but lacks the required AGENTS.md responsibility and boundary doc header.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: File size &lt;= 450 lines</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All 9 modified Rust files are &lt;= 450 lines; clio-config/src/config/mod.rs is at 449 lines (within boundary but at limit).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>NFR-6: No secret leakage in error text or telemetry</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-index/src/http.rs:211-215 formats raw 200-byte error response body snippets into AmError without secret scrubbing on HTTP 401/403.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Roadmap isolation violation: Phase numbers referenced in .env.example, README.md, and hardware.md</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md strictly prohibits referencing roadmap files or phase numbers in code, comments, or repository artifacts to ensure modular decoupling from the planning roadmap.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Leaks internal phase numbers to external repo documentation and config comments.</dd></div>
+              <div><dt>Evidence</dt><dd>.env.example:59, README.md:293, hardware.md:22 contain &#39;Phases 029/030&#39;</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Replace &#39;Phases 029/030&#39; with &#39;upcoming releases&#39; in .env.example, README.md, and hardware.md.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Unsanitized HTTP response body snippets in error returns risk secret token leakage in AmError</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>External HTTPS endpoints (OpenAI, Cohere, reverse proxies) often echo invalid client credentials in 401/403 error payloads. Embedding the raw body snippet in AmError violates NFR-6.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Exposed API keys may leak into telemetry, log files, or MCP tool errors.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-index/src/http.rs:211-215 formats body[..200] directly into the returned error message.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Mask credentials in error body snippets or omit the response snippet on 401 and 403 status codes.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">05</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Missing AGENTS.md module header on modified crates/clio-config/src/config/validate_tests.rs</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md requires all new and modified Rust files to have truthful responsibility, ownership, and boundary module doc headers.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Header audit inconsistency across modified crate test files.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/config/validate_tests.rs lines 1-4 lack the //! # Responsibility module doc block.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the standard AGENTS.md module doc header to crates/clio-config/src/config/validate_tests.rs.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Unconditional &#39;(sidecar unreachable)&#39; on transport errors misclassifies terminal client errors as retryable</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Errors such as ureq::Error::Tls (certificate verification failure) and BadUri are fatal client errors, not transient network drops.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Retrying permanent failures wastes client time and delays fail-closed error propagation.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-index/src/http.rs:120-125 unconditionally embeds &#39;(sidecar unreachable): {reason}&#39;.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Exclude &#39;(sidecar unreachable)&#39; on ureq::Error::Tls, BadUri, and Protocol variants.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>HttpEndpoint::parse fails on bare bracketed IPv6 literals due to naive colon splitting</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Standard IPv6 addresses like [::1] contain multiple colons. Without an explicit port, rsplit_once(&#39;:&#39;) mistakenly interprets &#39;1]&#39; as the port number.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Localhost IPv6 endpoints like http://[::1]/embed fail to parse with &#39;invalid port 1]&#39;.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-index/src/http.rs:68-77 splits authority with rsplit_once(&#39;:&#39;) without checking bracket boundaries.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Handle IPv6 bracketed hosts before splitting on port colons.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>crates/clio-config/src/config/mod.rs reaches 449 lines (1 line below 450-line hard limit)</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The file is within 1 line of failing the 450-line gate. Any subsequent touch will likely violate the constraint.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Impedes future maintainability and creates high risk of gate failures during remediation.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/config/mod.rs has 449 total lines.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Extract bearer_for or environment overlay mapping into a dedicated submodule (e.g. env.rs or bearer.rs).</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Stale unwired placeholders EMBED_API_BASE and RERANK_API_BASE retained in .env.example</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>apply_process_env wires EMBED_URL and RERANK_URL, not EMBED_API_BASE or RERANK_API_BASE.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Operators copying from .env.example may set unwired variables expecting them to work.</dd></div>
+              <div><dt>Evidence</dt><dd>.env.example:68-69 retains # EMBED_API_BASE= and # RERANK_API_BASE=.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Remove or update legacy placeholders to # EMBED_URL= and # RERANK_URL=.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>ureq 3.4.2 dependency addition was pre-approved by the phase specification and operator rules.</li>
+        <li>All 9 modified Rust files satisfy the &lt;= 450 line constraint at present.</li>
+        <li>The workspace coverage gate (make coverage) and per-file &gt;=90% line and function criteria pass cleanly across all 253 reported files.</li>
+        <li>Compiler checks (cargo fmt and clippy -D warnings) are completely clean across all workspace crates.</li>
+        <li>Per-call ureq agent instantiation without connection pooling is a documented and approved intentional design decision.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Full workspace test suite passes with 1316 tests green and 0 failures — cargo test --workspace --locked and make coverage exit 0 (1316 passed, 0 failed)</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All reported source files maintain &gt;=90% line and function coverage — make coverage exit 0: 253 files checked, 0 below 90% lines or functions (TOTAL 97.88% lines, 98.98% functions)</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Clippy and fmt checks pass with zero warnings — cargo clippy --workspace --all-targets --locked -- -D warnings exit 0; cargo fmt --check exit 0</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All modified Rust files remain at or below 450 total lines — wc -l verification: largest file is crates/clio-config/src/config/mod.rs at 449 lines</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Secret API keys are masked in config_get and effective config serialization — Verified by embed_knob_tests::rerank_api_key_masked_everywhere and embed_rerank_env_knobs_reach_effective_config</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Real network TLS performance and latency against live hosted endpoints</p>
+          <p class="d">No remote API credentials or internet egress configured in test environment · Integration testing against live OpenAI/Cohere endpoints with mock/real API keys in Phase 100290/100300 · Low</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean, disciplined drop-in replacement of the raw TcpStream HTTP transport with ureq 3.4.2 preserving error contracts and retry classifications.</li>
+        <li>Strict test coverage: 100% of modified files have &gt;=93% line and function coverage with extensive test coverage of failure modes, timeouts, and headers.</li>
+        <li>Zero unnecessary dependencies: strictly 1 approved workspace dependency added (ureq).</li>
+        <li>Clean secret masking: credentials.rerank_api_key automatically integrates with the existing masking engine across all configuration views.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Leaking phase numbers into documentation and configuration comments despite strict AGENTS.md isolation rules.</li>
+          <li>Neglecting to add module documentation headers to crates/clio-config/src/config/validate_tests.rs when editing it.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Run automated grep for &#39;phase&#39; or &#39;roadmap&#39; across all staged non-workflow files prior to completion signal.</li>
+          <li>Check header format on all modified test files as part of pre-completion verification.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Scrub &#39;Phases 029/030&#39; references from .env.example, README.md, and hardware.md to satisfy roadmap isolation.</li>
+          <li>Add standard AGENTS.md module header to crates/clio-config/src/config/validate_tests.rs.</li>
+          <li>Sanitize or omit response body snippet on HTTP 401/403 in crates/clio-index/src/http.rs to prevent key leakage in error text.</li>
+          <li>Fix bare IPv6 literal handling in HttpEndpoint::parse and update .env.example placeholders to match apply_process_env.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Decompose clio-config/src/config/mod.rs to restore comfortable headroom below the 450-line limit.</li>
+          <li>Refactor transport_error to classify TLS/protocol errors separately from sidecar connectivity failures.</li>
+          <li>Introduce comprehensive mock TLS integration fixtures using ephemeral in-memory certificates.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100280/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100280/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+2026-09-21T13:40:36Z START adversary-task-r1 phase-100280
+2026-09-21T13:42:37Z make check / cargo test workspace exit 0, clippy -D warnings clean, fmt clean
+2026-09-21T13:44:27Z make coverage exit 0: 253 reported source files, 0 below 90% lines or functions (TOTAL lines 97.88%, functions 98.98%)
+2026-09-21T13:47:03Z FINDING F-01 (medium): .env.example:59, README.md:293, hardware.md:22 - roadmap isolation: mentions Phases 029/030 in comments and documentation
+2026-09-21T13:47:03Z FINDING F-02 (low): crates/clio-config/src/config/validate_tests.rs:1-3 - missing AGENTS.md module header on modified Rust file
+2026-09-21T13:47:03Z FINDING F-03 (medium): crates/clio-index/src/http.rs:211-215 - unredacted 200-byte error body snippet risks secret token leakage in AmError
+2026-09-21T13:47:03Z FINDING F-04 (low): crates/clio-index/src/http.rs:120-125 - unconditional (sidecar unreachable) causes fatal client errors (Tls, BadUri) to be classified retryable
+2026-09-21T13:47:03Z FINDING F-05 (low): crates/clio-index/src/http.rs:68-77 - HttpEndpoint::parse fails on bare bracketed IPv6 literals (e.g. http://[::1]/embed)
+2026-09-21T13:47:03Z FINDING F-06 (low): crates/clio-config/src/config/mod.rs:1-449 - file length is 449 lines, exactly 1 line under 450-line hard ceiling
+2026-09-21T13:47:03Z FINDING F-07 (low): .env.example:68-69 - unwired legacy placeholders EMBED_API_BASE and RERANK_API_BASE retained
+2026-09-21T13:47:47Z report.html generated and style.css copied beside findings.json; Attribution updated in phase file
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100280/findings.json fcd1aaaf

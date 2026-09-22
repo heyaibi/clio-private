@@ -1,0 +1,398 @@
+{
+  "run": "adversary-task-r1",
+  "phase": "100200",
+  "subject": "Phase 100200 — Additive Harness Workspace Tools",
+  "verdict": "Adequate",
+  "verdict_justification": "The phase is broad and largely well-tested: the atomic batch engine, scratchpad, validate, stats, and schema publication all work, and the coverage/size/isolation gates genuinely pass. However two material defects survive: a batch containing two canonical_put operations on the same key commits two simultaneously active revisions (single-slot supersession silently broken), and the shared-bank permission gate is bypassable through the generic/batch tools because it is enforced only on the shared_* wrappers, not on the bank.",
+  "metadata": {
+    "generated": "2026-09-20",
+    "applies_to": "staged diff on master (68 files, +7895/-1182), Phase 100200",
+    "source": "crates/clio-mcp/src/{additive_tools,batch_tools,batch_preflight,batch_preflight_records,schema_additive_defs}.rs, crates/clio-store/src/{batch_model,batch_sqlite,batch_postgres}.rs, crates/clio-compliance/src/{scratchpad,canonical,validate,stats}.rs, crates/clio-mcp/tests/{additive_tools_test,additive_tools_conformance_test}.rs, roadmap/phase-100200-additive-harness-workspace-tools.md"
+  },
+  "standard": [
+    "roadmap/phase-100200-additive-harness-workspace-tools.md — In Scope, Tasks 1-6, Test Scenarios T100200-01..T100200-06, Negative Testing, Acceptance Criteria AC-100200-01..AC-100200-06, Security Constraints",
+    "requirement.md §4.9.5.A (additive tools table), §4.9.6, §4.9.7, FR-10, FR-21, FR-22, FR-23, FR-5/PR-4, FR-15, PR-5, PR-6",
+    "AGENTS.md — 450-line limit, file headers, coverage gate; ./coverage.md — per-file >=90% functions+lines",
+    "Code must work after roadmap/ is deleted (roadmap isolation)",
+    "Staged diff must be the reviewable, complete change set (no unstaged/untracked non-workflow paths)"
+  ],
+  "requirements": [
+    {
+      "requirement": "Task 1: transactional batch wrapping Core write tools; all-or-nothing rollback",
+      "status": "Fully satisfied",
+      "evidence": "clio-store/src/batch_sqlite.rs:47-64 and batch_postgres.rs:48-65 commit every BatchWrite in one tx; batch_test_support_tests.rs:107-149 asserts count_items==0 after a duplicate-id abort; `make test` -> 880 passed, and I re-ran the suites.",
+      "severity": "High",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 1: $ref:<index>.id topological reference resolution",
+      "status": "Fully satisfied",
+      "evidence": "clio-mcp/src/batch_tools.rs:154-201 substitutes refs and fails closed on forward/unknown refs; batch_tools_tests.rs:148-193 covers resolution and forward-ref failure; conformance test links store+triple via $ref.",
+      "severity": "Medium",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 1: max 50 operations cap; dry_run returns would-commit without persisting",
+      "status": "Fully satisfied",
+      "evidence": "batch_tools.rs:67-72 and batch_model.rs:31; batch_tools_tests.rs:137-147/194-208; empirical dry-run leaves 0 rows.",
+      "severity": "Medium",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 2: ephemeral scratchpad 64 KB / 100 keys, TTL, session+bank scope, never durable/indexed",
+      "status": "Fully satisfied",
+      "evidence": "clio-compliance/src/scratchpad.rs:34-39,108-156; scratchpad_tests.rs covers byte/key caps, overwrite, TTL, session/bank isolation; no store dependency in the module.",
+      "severity": "High",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 3: canonical_put/get single-slot with bi-temporal supersession",
+      "status": "Partially satisfied",
+      "evidence": "Single-op path works (canonical_tests.rs:93-143 asserts prior tx_until/valid_until). But batch with two canonical_put on one key leaves two active rows: additive canonical_preflight resolves prior at preflight (batch_preflight.rs:138-141), and I reproduced items_active=2 via `am mcp stdio`.",
+      "severity": "Critical",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 3: canonical_put gated by §4.1 category and §4.2 admission",
+      "status": "Fully satisfied",
+      "evidence": "additive_tools.rs:172-196 uses gated_store_verified; rejection never reaches commit_canonical (canonical.rs:57-71).",
+      "severity": "Medium",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 4: shared_* enforce admission gates, forced shared bank, caller actor",
+      "status": "Fully satisfied",
+      "evidence": "additive_tools.rs:233-275; additive_tools_tests.rs:291-360; empirical peerwrite lands in bank `shared` only.",
+      "severity": "Medium",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 4 / Security: strict tenant boundary; unauthorized callers cannot access shared bank",
+      "status": "Partially satisfied",
+      "evidence": "Gate is only in shared_args (additive_tools.rs:233-255). `batch` with a store op bank=shared COMMITTED while shared_bank_enabled=false, and `stats bank=shared` reported the row. resolve_ctx (runtime.rs:245-259) accepts any bank.",
+      "severity": "High",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 5: validate attest/update/invalidate/discard, note rule, attributable audit",
+      "status": "Fully satisfied",
+      "evidence": "clio-compliance/src/validate.rs:126-297; validate_tests.rs covers all four actions and note-required; additive_tools_test.rs::validate_actions_transcript asserts the validate_invalidate audit row.",
+      "severity": "Medium",
+      "confidence": "High"
+    },
+    {
+      "requirement": "requirement.md §4.9.5.A validate action vocabulary (`attest/update/invalidate/delete`)",
+      "status": "Missed",
+      "evidence": "ValidateAction::parse accepts only attest|update|invalidate|discard (validate.rs:51-62); no `delete` alias. Phase Task 5 names `discard`, requirement names `delete`.",
+      "severity": "Low",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Task 6: publish tool_schema for all additive tools on stdio and HTTP",
+      "status": "Fully satisfied",
+      "evidence": "schema.rs:35-49 catalog_defs merges core+additive; protocol.rs tools_list uses catalog_defs; additive_tools_test.rs::additive_tools_are_registered_and_published checks all 11 names; conformance.rs asserts tools.len()==bound_tools().len().",
+      "severity": "Medium",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Tests pass across Postgres and SQLite backends",
+      "status": "Partially satisfied",
+      "evidence": "batch_pg_tests.rs:41-44 silently `return`s if Postgres is unreachable, so the parity claim can pass without touching PG. Postgres was reachable during my run.",
+      "severity": "Medium",
+      "confidence": "Medium"
+    },
+    {
+      "requirement": "Every Rust file <=450 lines, correct AGENTS.md headers, roadmap isolation",
+      "status": "Fully satisfied",
+      "evidence": "Max changed file 446 lines (sqlite_store.rs); my scan found no file >450 and all new files start with the required copyright header; grep found no roadmap/phase/crates.md references in code.",
+      "severity": "High",
+      "confidence": "High"
+    },
+    {
+      "requirement": "Coverage gate: aggregate and per-file >=90% functions and lines",
+      "status": "Fully satisfied",
+      "evidence": "`make coverage` exit 0; TOTAL lines 94.65%, functions 98.71%; parsing all 182 reported file rows found 0 below 90% on either metric.",
+      "severity": "High",
+      "confidence": "High"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "batch with two canonical_put ops on one key commits two active revisions",
+      "severity": "Critical",
+      "why_it_matters": "canonical_* promises single-slot semantics: a new put must close the prior revision. Inside `batch`, prior resolution runs at pre-flight before the batch's own creates exist, so the second put cannot see (and therefore cannot close) the first put's row. Both rows land with tx_until NULL.",
+      "impact": "Two simultaneously active revisions for the same canonical key. canonical_get returns whichever row `ORDER BY tx_from DESC LIMIT 1` happens to win; when both ops share a timestamp (the default `now` is second-precision) the winner is nondeterministic. Downstream code and audit reconstruction see a slot with no well-defined current value.",
+      "evidence": "crates/clio-mcp/src/batch_preflight.rs:138-141 (prior = get_item_by_subject at preflight); crates/clio-mcp/src/batch_preflight.rs:179-193 stages only CloseItem{prior}+CreateItem. Reproduction: `printf` two canonical_put ops (key k1, values v1/v2) into `am mcp stdio --db /tmp/adv-can.db` -> batch returns both COMMITTED; follow-up `stats bank=bk` returned {\"items_total\":2,\"items_active\":2}. Both staged rows share tx_from \"2026-09-19T19:42:41Z\".",
+      "confidence": "High",
+      "proposed_fix": "Resolve canonical priors at commit time inside the transaction (like triple_add's tx-scoped supersede query), or reject a batch that contains two canonical_put ops for the same (bank,key), or fold same-key puts within a batch so only the last survives."
+    },
+    {
+      "id": 2,
+      "title": "Shared-bank permission gate is bypassable via batch and generic tools",
+      "severity": "Important",
+      "why_it_matters": "The phase introduces shared_* wrappers plus a deployment permission flag as the 'strict tenant boundary'. The check lives only in shared_args, so any caller can reach the same bank through `store`, `canonical_put`, `triple_add`, or a `batch` op with bank=\"shared\", and can read it via `stats`/`inspect`. The boundary is enforced by tool name, not by bank.",
+      "impact": "A deployment that has not enabled the shared surface still accepts writes to and reads from bank `shared`; the documented authorization control does not hold.",
+      "evidence": "crates/clio-mcp/src/additive_tools.rs:233-255 (gate only in shared_args); crates/clio-mcp/src/runtime.rs:245-259 (resolve_ctx trusts args.bank). Reproduction with default McpOpenOptions (shared_bank_enabled=false): batch store op bank=\"shared\" -> status COMMITTED; `stats bank=shared` -> 1 item; `shared_store` -> code \"forbidden\".",
+      "confidence": "High",
+      "proposed_fix": "Enforce the shared-bank permission at the bank-routing layer (reject bank==SHARED_BANK in resolve_ctx unless enabled), or have batch/preflight reject ops targeting the shared bank when the surface is disabled, rather than gating only the three shared_* entry points."
+    },
+    {
+      "id": 3,
+      "title": "Single-op canonical_put supersession is not atomic",
+      "severity": "Important",
+      "why_it_matters": "commit_canonical invalidates the prior row and then inserts the new row as two separate store calls with no surrounding transaction. An error after the invalidate leaves the slot with no active value while the caller's admission telemetry already succeeded.",
+      "impact": "A transient store failure can silently empty a canonical slot; the new value is lost and the old value is closed. The batch path was deliberately made atomic, which highlights the gap in the single-op path.",
+      "evidence": "crates/clio-compliance/src/canonical.rs:72-94: store.invalidate_item(...) then store.create_memory_item(...) then record_audit_event(...), all separate calls.",
+      "confidence": "Medium",
+      "proposed_fix": "Route the single-op put through the batch executor (canonical_batch_writes already exists) or wrap the close+create+audit in one store transaction."
+    },
+    {
+      "id": 4,
+      "title": "AC-100200-03 evidence overstates a vacuous scratchpad-isolation test",
+      "severity": "Important",
+      "why_it_matters": "The phase file claims the test 'writes a marker to the pad and confirms retrieve returns no scratchpad row'. The test never examines the retrieve response for the marker; its only isolation assertion reads key \"zqxj marker\", which was never written (the write used key \"leak\"). The assertion passes for any implementation, including one that leaked.",
+      "impact": "The negative guarantee (T100200-03 / FR-21) has no effective regression test on the retrieve side. A future change that accidentally persisted scratchpad content would not be caught by this test.",
+      "evidence": "crates/clio-mcp/src/additive_tools_tests.rs:154-184; the closing assertion is `s.scratchpad.read(\"default\",\"bank-a\",Some(\"zqxj marker\"),...) .is_err()`. Phase file AC-100200-03 row (roadmap/phase-100200...:435).",
+      "confidence": "High",
+      "proposed_fix": "Assert the retrieve hits contain the stored row but none whose id/content came from the pad, or seed the same marker in a durable row and assert exactly one hit; keep the pad write with a real key and assert it is absent from all hits."
+    },
+    {
+      "id": 5,
+      "title": "Phase negative tests for shared category and canonical admission are missing",
+      "severity": "Important",
+      "why_it_matters": "The phase's Negative Testing section explicitly requires 'shared_store with invalid semantic category is rejected' and 'canonical_put scoring below admission threshold is rejected'. Neither has a direct test.",
+      "impact": "Those specific fail-closed paths are unverified; the category path is only exercised indirectly through the generic store tests, and canonical below-threshold is not exercised at all.",
+      "evidence": "grep over crates/clio-mcp/src/additive_tools_tests.rs and crates/clio-compliance/src/canonical_tests.rs finds no invalid-category shared test and no below-theta canonical test; only batch store/task/persona/failure/triple rejection is covered (batch_tools_tests.rs:311-355).",
+      "confidence": "High",
+      "proposed_fix": "Add one test each: shared_store with category not in the §4.1 whitelist -> rejection; canonical_put under a theta-admit>1 env -> structured rejection with no prior closed."
+    },
+    {
+      "id": 6,
+      "title": "Requirement names validate action `delete`; implementation only accepts `discard`",
+      "severity": "Minor",
+      "why_it_matters": "requirement.md §4.9.5.A lists the validate actions as attest/update/invalidate/delete, while the phase and implementation use discard. A client following the requirement will get invalid_argument for `delete`.",
+      "impact": "Vocabulary drift between the normative requirement table and the exposed tool contract; no alias is provided.",
+      "evidence": "requirement.md:411 vs crates/clio-compliance/src/validate.rs:51-62 and crates/clio-mcp/src/schema_additive_defs.rs:207.",
+      "confidence": "High",
+      "proposed_fix": "Either accept `delete` as a documented alias for discard, or resolve the requirement/phase vocabulary conflict explicitly (per AGENTS.md requirement-edit rules)."
+    },
+    {
+      "id": 7,
+      "title": "canonical_put always stores snapshot=None, so slots are gist-only",
+      "severity": "Minor",
+      "why_it_matters": "Canonical slots are meant for exact single values (e.g. primary_database_host), but the MCP handler hardcodes snapshot: None and the schema offers no snapshot parameter. canonical_get therefore returns only the prose gist for a value that is typically an exact identifier.",
+      "impact": "Tension with FR-5 / PR-4, which say no downstream consumer should be given only the gist when the query concerns a specific value. Callers cannot attach the authoritative snapshot.",
+      "evidence": "crates/clio-mcp/src/additive_tools.rs:148 (snapshot: None) and 134-156; canonical_get surfaces `value: item.gist` (canonical.rs:153-160).",
+      "confidence": "Medium",
+      "proposed_fix": "Accept an optional snapshot/source_text on canonical_put and pass it through (the store path already supports verified snapshots)."
+    },
+    {
+      "id": 8,
+      "title": "validate module doc says notes are masked before storage, but the raw note is persisted",
+      "severity": "Minor",
+      "why_it_matters": "The header claims 'Non-empty reviewer note (masked before storage)', yet the audit detail stores args.note verbatim; only the returned outcome.note is scrubbed.",
+      "impact": "A reviewer note containing a secret is written to durable audit telemetry unmasked, contradicting the module's stated contract.",
+      "evidence": "crates/clio-compliance/src/validate.rs:15-16 vs 147-158, 190-202, 224-235 (raw note in detail) and 245-250 (scrub applied only to outcome).",
+      "confidence": "High",
+      "proposed_fix": "Scrub the note once at entry and use the scrubbed value for both the audit detail and the outcome, or correct the header to say masking is output-only."
+    },
+    {
+      "id": 9,
+      "title": "schema_tests.rs contains a garbled duplicated comment from an incomplete edit",
+      "severity": "Minor",
+      "why_it_matters": "A half-edited comment line repeats a phrase ('...the additive every bound tool: the Core catalog plus the additive') and the test replaced an exact set-equality assertion with a presence loop.",
+      "impact": "Cosmetic, but it signals the test was mechanically weakened when additive tools inflated the catalog; the pack is now only presence-checked, not completeness-checked.",
+      "evidence": "crates/clio-mcp/src/schema_tests.rs:18-33 (the comment and the removed `assert_eq!(tools.len(), catalog.len())`).",
+      "confidence": "High",
+      "proposed_fix": "Fix the comment and assert catalog_defs() names == bound tools (or the expected core+additive set) rather than mere containment."
+    },
+    {
+      "id": 10,
+      "title": "Postgres parity test silently skips when Postgres is unreachable",
+      "severity": "Minor",
+      "why_it_matters": "postgres_batch_parity returns Ok on connection failure, so 'tests pass across Postgres and SQLite' can be reported green without any Postgres coverage.",
+      "impact": "The backend-parity claim in the phase is weaker than it reads. Postgres was reachable during this review, so the claim held here.",
+      "evidence": "crates/clio-store/src/batch_pg_tests.rs:41-44 (`let Ok(pg) = ... else { eprintln!(...); return; }`).",
+      "confidence": "High",
+      "proposed_fix": "Gate the skip behind an explicit env opt-out (e.g. AM_SKIP_PG_TESTS) so CI without the var fails rather than silently passing."
+    }
+  ],
+  "dismissed": [
+    "Two triple_add ops for the same subject+predicate in one batch: investigated as a possible FR-12 supersession bug, but commit_triple_add_tx runs the open-edge query inside the transaction sequentially, so the second op correctly closes the first. Verified empirically: triple_query returned only the final (paris) edge.",
+    "Attribution row agent string mismatch ('Go . Deepseek V4.1 Flash High' in the phase vs 'Together . GLM-5.3 Flash High' in the quoted developer prompt) — treated as a pipeline metadata artifact, not a code defect.",
+    "graph_link included in BATCH_TOOLS even though the In Scope bullet lists six tools: the phase's own Task 1 example uses graph_link, so this is in-spec.",
+    "Scratchpad quota is enforced per (session,bank) rather than as one 64 KB total per session; the phase allows a session-keyed cache and this is a reasonable reading.",
+    "stats(bank?) reports one bank at a time rather than enumerating all banks; 'bank' is the documented optional parameter and the expected outcome reads naturally that way."
+  ],
+  "verification": [
+    {
+      "claim": "`make test` passes with 880 tests in 37 suites",
+      "classification": "Established",
+      "source_note": "Re-ran `make test`: summed all `test result: ok` rows -> 880 passed, 37 suites, exit 0."
+    },
+    {
+      "claim": "`cargo test -p clio-mcp` -> 149 passed",
+      "classification": "Established",
+      "source_note": "Re-ran it: 149 passed over 9 suites."
+    },
+    {
+      "claim": "`make coverage` exits 0 with aggregate lines 94.65% / functions 98.71% and no file below 90%",
+      "classification": "Established",
+      "source_note": "Re-ran `make coverage`: exit 0, TOTAL lines 94.65%, functions 98.71%; parsed all 182 reported file rows, 0 below 90% on lines or functions."
+    },
+    {
+      "claim": "fmt and clippy -D warnings are clean",
+      "classification": "Established",
+      "source_note": "`cargo fmt --all -- --check` exit 0; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` exit 0."
+    },
+    {
+      "claim": "A batch with two canonical_put ops on one key leaves two active revisions",
+      "classification": "Established",
+      "source_note": "Direct `am mcp stdio` JSON-RPC transcript: both ops COMMITTED; `stats` returned items_total=2, items_active=2."
+    },
+    {
+      "claim": "The shared-bank gate is bypassable by batch while the surface is disabled",
+      "classification": "Established",
+      "source_note": "Direct transcript: batch store bank=shared COMMITTED, stats bank=shared showed the row, shared_store returned forbidden."
+    },
+    {
+      "claim": "All changed Rust files are <=450 lines with correct headers",
+      "classification": "Established",
+      "source_note": "Line-count scan over the staged file list; header scan verified the exact copyright first line on every changed .rs file; no roadmap/phase/crates.md strings."
+    },
+    {
+      "claim": "The staged diff is complete with no unstaged/untracked non-workflow paths",
+      "classification": "Established",
+      "source_note": "`git status --porcelain -- . ':!.workflows/'` showed only 'A ' and 'M ' (all staged), no second-column modifications, no untracked."
+    },
+    {
+      "claim": "AC-100200-03's scratchpad-isolation test actually verifies retrieve isolation",
+      "classification": "Contradicted",
+      "source_note": "Read the test: it never inspects the retrieve hits for the marker and asserts on an unwritten key (additive_tools_tests.rs:154-184)."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Whether concurrent batches on the same bank behave as documented under real contention",
+      "why_unknown": "No concurrency/stress test drives two batches in parallel; the phase documents fail-closed lock contention as a known limitation.",
+      "what_would_resolve_it": "A two-thread Postgres test issuing overlapping batches and asserting one rolls back with a lock error.",
+      "materiality": "Low for single-host coding-agent use; matters for the Phase 100210/100220 consumers that may batch."
+    },
+    {
+      "what": "Whether HTTP (not just stdio) publishes the additive tool schemas",
+      "classification_note": "Both transports share McpHandler::tools_list, so it should, but I only exercised stdio directly plus the existing HTTP conformance that checks initialize/auth, not additive names.",
+      "why_unknown": "No additive-specific HTTP tools/list assertion exists.",
+      "what_would_resolve_it": "An HTTP tools/list assertion containing the additive names.",
+      "materiality": "Low; shared code path makes divergence unlikely."
+    }
+  ],
+  "strengths": [
+    "Atomic rollback is genuinely tested against a real duplicate-key failure on SQLite and Postgres, not just asserted.",
+    "Scratchpad isolation is correct by construction (no store dependency) and the quota/TTL/session-bank tests are real.",
+    "Every new Rust file respects the 450-line cap and the required header structure; the batch_tests.rs split was handled cleanly.",
+    "Per-file and aggregate coverage genuinely pass; I independently parsed all 182 file rows.",
+    "batch pre-flight runs the full admission and verification gates without writing, so rejection aborts before any mutation.",
+    "The phase file's completion evidence is mostly accurate and names concrete test functions rather than vague claims."
+  ],
+  "regrets": [
+    "The shared-bank gate was implemented as a per-tool check instead of a bank-level authorization decision, which let the generic and batch surfaces route around it."
+  ],
+  "process_changes": [
+    "For any 'namespace/permission' feature, enforce the boundary at the routing layer and add a negative test that uses a different tool to reach the same namespace.",
+    "When claiming a negative guarantee ('X is never in search results'), assert on the search response itself, not on an unrelated lookup.",
+    "Guard backend-specific parity tests so an unreachable backend fails instead of silently skipping when a parity claim is being made."
+  ],
+  "plan_1hr": [
+    "Fix F-01: resolve canonical priors inside the batch transaction (or reject duplicate-key canonical ops) and add a regression test asserting one active revision after a two-put batch.",
+    "Fix F-02: enforce the shared-bank permission at resolve_ctx / bank routing so batch and generic tools cannot bypass it; add a batch-into-shared negative test.",
+    "Fix F-04: make the scratchpad retrieve-isolation test assert on the retrieve hits, and correct the AC-100200-03 evidence text."
+  ],
+  "plan_unlimited": [
+    "Make canonical single-op puts transactional by routing them through BatchStore, and add a crash/failure injection test between close and create.",
+    "Add an additive-specific HTTP tools/list conformance assertion and a concurrent-batch lock-contention test on Postgres.",
+    "Reconcile the requirement.md §4.9.5.A validate `delete` vocabulary with the implemented `discard` action under the AGENTS.md requirement-consistency process."
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "critical",
+      "title": "batch with two canonical_put ops on one key commits two active revisions",
+      "evidence": "crates/clio-mcp/src/batch_preflight.rs:138-141 and 179-193; reproduced via `am mcp stdio` (two canonical_put key k1 -> both COMMITTED; stats items_active=2, both tx_until NULL, identical tx_from).",
+      "requirement_ref": "roadmap/phase-100200 Task 3; requirement.md §4.9.5.A; AC-100200-04",
+      "recommendation": "Resolve canonical priors at commit time in-transaction, or reject/fold duplicate-key canonical ops within a batch; add a one-active-revision regression test."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Shared-bank permission gate is bypassable via batch and generic tools",
+      "evidence": "crates/clio-mcp/src/additive_tools.rs:233-255 (gate only on shared_*); crates/clio-mcp/src/runtime.rs:245-259; reproduced: batch store bank=shared COMMITTED while shared disabled and shared_store returned forbidden.",
+      "requirement_ref": "roadmap/phase-100200 Task 4 + Security Constraints; requirement.md FR-22 / §4.9.5.A",
+      "recommendation": "Enforce shared-bank authorization at the bank-routing layer (resolve_ctx or preflight), not only in shared_args."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Single-op canonical_put supersession is not atomic",
+      "evidence": "crates/clio-compliance/src/canonical.rs:72-94: invalidate_item then create_memory_item then record_audit_event as separate calls.",
+      "requirement_ref": "roadmap/phase-100200 Task 3 Expected Result; PR-6",
+      "recommendation": "Run the close+create+audit in one transaction (reuse canonical_batch_writes / BatchStore)."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "AC-100200-03 evidence overstates a vacuous scratchpad-isolation test",
+      "evidence": "crates/clio-mcp/src/additive_tools_tests.rs:154-184 never inspects retrieve hits for the marker and asserts on an unwritten key; phase AC-100200-03 row at roadmap/phase-100200...:435.",
+      "requirement_ref": "roadmap/phase-100200 T100200-03 / AC-100200-03; requirement.md FR-21 / PR-1",
+      "recommendation": "Assert on the retrieve response itself (exactly the durable hit, none from the pad) and correct the evidence text."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "Missing negative tests for shared invalid category and canonical below-threshold",
+      "evidence": "No such tests in crates/clio-mcp/src/additive_tools_tests.rs or crates/clio-compliance/src/canonical_tests.rs; only batch store/task/persona/failure/triple rejection is covered.",
+      "requirement_ref": "roadmap/phase-100200 §8 Negative Testing",
+      "recommendation": "Add one test each for the two named negative scenarios."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "validate action vocabulary differs from requirement (delete vs discard)",
+      "evidence": "requirement.md:411 lists invalidate/delete; crates/clio-compliance/src/validate.rs:51-62 accepts discard only.",
+      "requirement_ref": "requirement.md §4.9.5.A",
+      "recommendation": "Accept `delete` as a documented alias or reconcile the requirement under the AGENTS.md process."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "canonical_put stores snapshot=None, so canonical slots are gist-only",
+      "evidence": "crates/clio-mcp/src/additive_tools.rs:148; canonical_get returns item.gist (canonical.rs:153-160).",
+      "requirement_ref": "requirement.md FR-5 / PR-4",
+      "recommendation": "Allow an optional verified snapshot on canonical_put and surface it from canonical_get."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "validate header claims notes are masked before storage but raw notes are persisted",
+      "evidence": "crates/clio-compliance/src/validate.rs:15-16 vs 147-158/190-202 (raw note in audit detail) and 245-250 (scrub output only).",
+      "requirement_ref": "module header contract",
+      "recommendation": "Scrub at entry for both audit detail and outcome, or correct the header."
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "Garbled duplicated comment and weakened assertion in schema_tests.rs",
+      "evidence": "crates/clio-mcp/src/schema_tests.rs:18-33: repeated phrase in comment; exact catalog-size assertion replaced by a presence loop.",
+      "requirement_ref": "code quality",
+      "recommendation": "Fix the comment and restore an exact-set completeness assertion against catalog_defs()."
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "title": "Postgres parity test silently skips when Postgres is unreachable",
+      "evidence": "crates/clio-store/src/batch_pg_tests.rs:41-44 returns Ok after eprintln on open failure.",
+      "requirement_ref": "roadmap/phase-100200 DoD 'Tests pass across Postgres and SQLite backends'",
+      "recommendation": "Require an explicit env opt-out for skipping so CI without Postgres fails rather than passes silently."
+    }
+  ]
+}

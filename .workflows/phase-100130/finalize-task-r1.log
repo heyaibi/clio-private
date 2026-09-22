@@ -1,0 +1,7 @@
+2026-09-18T21:15:44Z START finalize run r1 phase-100130; reading task
+2026-09-18T21:15:56Z ATTRIBUTION: roadmap/phase-100130 rows checked — Developer r1 (Together GLM-5.3 Flash High) done, Adversary r1 done, Remediator r1 done, Remedy Approver r1 approved, Finalize r1 updated to OpenCode CLI (Together . GLM-5.3 Flash High) done
+2026-09-18T21:15:56Z RUNNING make check
+2026-09-18T21:16:28Z MAKE CHECK: exit 0 — 22 test-result lines, all "ok", 0 failed (fmt+clippy+tests pass)
+2026-09-18T21:16:28Z WORKING TREE: changes limited to intended phase-100130 remediation set — crates/clio-config (admission_knobs), crates/clio-retrieve (assoc*, hybrid, hybrid_util, types, finalize, lib, fixtures/assoc tests), crates/clio-store (assoc, sqlite_assoc, postgres_assoc, async/postgres/sqlite stores, assoc edge/policy tests, gate_boundary_tests), crates/clio-write (hub_distill*, memtree*, lib), sql/001_core.sql, roadmap/phase-100130-...md; untracked: crates/clio-retrieve/src/assoc_durable_tests.rs; .workflows/phase-100130/ is pipeline-internal and ignored for this check; nothing unrelated; nothing committed or pushed
+2026-09-18T21:16:28Z CLOSE-OUT: no commit created per task; changes left uncommitted
+FINALIZE_DONE 792c3e19

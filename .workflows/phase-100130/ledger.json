@@ -1,0 +1,66 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver",
+    "finalize"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 1ad111a8",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 2,
+      "output_sha256": "a63611766bde19c29e1ba9608cdfce1f3bcfcb776b3d5ae6afda44a99a966022",
+      "artifacts": {},
+      "git_head": "e6d86b11adbd3b21a7998afd19c50b96bc819fcd"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100130/findings.json a1ca0e5c",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "c30e8acc528710bae17146067e455e2e7ce1337274815b44070e32a04a8ae6b8",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 25976,
+          "sha256": "bf49a240630d24867715bca41597e9d4dde2beb82fb00881ff46403c706684e8"
+        }
+      },
+      "git_head": "e6d86b11adbd3b21a7998afd19c50b96bc819fcd"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 2801c057",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "ea683ad60ee84bc146ad2ed0bf6ddb1218707457ff8824209fc4fd4008800897",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 25976,
+          "sha256": "bf49a240630d24867715bca41597e9d4dde2beb82fb00881ff46403c706684e8"
+        }
+      },
+      "git_head": "e6d86b11adbd3b21a7998afd19c50b96bc819fcd"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 9a4a32cb",
+      "harness": "opencode:together/glm-5.3-flash@max",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash Max)",
+      "visits": 1,
+      "output_sha256": "1ccbaac781120fa64dd2cf6633b0128b4731adf529965d4ea09c62c432160619",
+      "artifacts": {},
+      "git_head": "e6d86b11adbd3b21a7998afd19c50b96bc819fcd"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 792c3e19",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "e15ef8984f65bcf65ef7aaeff08138e5cff1711f0bd82702feae89f6416bf8fc",
+      "artifacts": {},
+      "git_head": "e6d86b11adbd3b21a7998afd19c50b96bc819fcd"
+    }
+  }
+}

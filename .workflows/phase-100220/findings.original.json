@@ -1,0 +1,241 @@
+{
+  "run": "r1",
+  "phase": "100220",
+  "subject": "Phase 100220 JSON Export and Import Implementation (Round 1)",
+  "verdict": "Inadequate",
+  "verdict_justification": "While the implementation delivers all required MCP schemas and achieves >=90% test coverage, workspace make lint fails with a clippy doc-markdown error, live import executes un-batched store mutations during planning that break transaction rollback guarantees, ciphertext backup import double-encrypts ciphertext and drops item metadata, and tombstone records are omitted from array canonicalization.",
+  "metadata": {
+    "generated": "2026-09-20",
+    "applies_to": "staged diff (r1)",
+    "source": "git diff --cached -- . ':!.workflows/'"
+  },
+  "standard": [
+    "FR-29: JSON export with completeness manifest, dsar_plaintext and ciphertext_backup modes, idempotent import enforcing §4.1-§4.2",
+    "NFR-6: All confidence, admission-score, and telemetry fields included in data export",
+    "Phase 100220 Specification & Appendix: Canonical JSON checksum verification before writes, atomic transactional batches on import",
+    "AGENTS.md and Makefile Quality Gates: make lint, make test, make coverage with >=90% line and function coverage per file"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100220-01 Manifest-backed export",
+      "status": "Partially satisfied",
+      "evidence": "Single-file bundle with completeness manifest implemented in crates/clio-compliance/src/export.rs; however, tasks and failures are silently truncated at 10,000 without setting complete=false.",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100220-02 Idempotent gated import",
+      "status": "Partially satisfied",
+      "evidence": "Idempotent skip logic works on clean re-import; however, live import mutations are performed during Planner::run before batch commit, breaking atomicity and transactional rollback.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100220-03 Dry-run zero writes",
+      "status": "Fully satisfied",
+      "evidence": "import(dry_run=true) reports counts without mutating store; verified by dry_run_reports_and_leaves_store_unchanged test.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100220-04 No plaintext secrets",
+      "status": "Fully satisfied",
+      "evidence": "Export masks snapshots via masked_clone and gists via scrub_inline_secrets; verified by t22_06_secrets_never_reach_the_file.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100220-05 Provider stub only (FR-29 carve-out)",
+      "status": "Fully satisfied",
+      "evidence": "import_provider returns PROVIDER_IMPORT_UNSUPPORTED, writes 0, and masks credentials; verified by t22_07 test.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100220-06 assoc_edge included",
+      "status": "Fully satisfied",
+      "evidence": "Export lists assoc edges and includes in bundle; import plans PutAssocEdge batch effects.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100220-07 DSAR plaintext vs ciphertext modes",
+      "status": "Partially satisfied",
+      "evidence": "Export produces opaque items without DEKs, but import calls put_item which double-encrypts ciphertext and drops all NFR-6 metadata.",
+      "severity": "High"
+    },
+    {
+      "requirement": "Definition of Done: Tests pass, clippy clean, files <= 450 lines",
+      "status": "Partially satisfied",
+      "evidence": "All files are <= 450 lines and cargo test passes, but make lint (cargo clippy --all-targets --all-features -D warnings) fails on bundle.rs:238.",
+      "severity": "High"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "critical",
+      "title": "Live import executes un-batched store mutations during `Planner::run`, violating transactional rollback guarantees",
+      "evidence": "In crates/clio-compliance/src/import.rs:138-146, planner.run()? is invoked before args.batch.apply_batch(chunk). In crates/clio-compliance/src/import_apply.rs:151,271,272,286,370,390 and crates/clio-compliance/src/import_rows.rs:250,283, direct store mutations (store.update_memory_item, store.put_item, store.put_assoc_edge, persona.put_preference_state, belief.append_confidence, belief_observe) execute immediately when !args.dry_run. If any subsequent planning step or batch chunk fails, these mutations remain permanently committed to the store without rollback.",
+      "requirement_ref": "Phase 100220 doc §5 Task 2, §10 Rollback Strategy",
+      "recommendation": "Defer all database mutations until after planning succeeds. Either extend BatchWrite and apply_batch to cover preferences, beliefs, and opaque envelopes, or wrap live execution in an explicit database transaction that aborts and rolls back on failure."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "`make lint` fails with clippy doc-markdown error on `crates/clio-compliance/src/bundle.rs:238`",
+      "evidence": "Command `make lint` fails with exit code 101: `error: item in documentation is missing backticks` at `crates/clio-compliance/src/bundle.rs:238:5` (`key/as_of` without backticks). Clippy `-D warnings` is enforced across all workspace targets and features.",
+      "requirement_ref": "Definition of Done, AGENTS.md §Final Verification, Makefile make lint",
+      "recommendation": "Wrap `key/as_of` in backticks in crates/clio-compliance/src/bundle.rs:238 so make lint compiles cleanly."
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "title": "Ciphertext backup import invokes `Store::put_item`, double-encrypting ciphertext and discarding all item metadata",
+      "evidence": "In crates/clio-compliance/src/import_apply.rs:260-287, opaque_items are imported via args.store.put_item(&envelope). In crates/clio-store/src/sqlite_store.rs:38 and postgres_store.rs, put_item treats item.content as plaintext, generating a local DEK and re-encrypting the ciphertext. Furthermore, crates/clio-store/src/envelope_persist.rs:49-55 inserts hardcoded defaults (kind='episodic', category=NULL, episodic_type='temporal', valid_from=now), discarding all preserved OpaqueItem metadata (confidence, admission_score, category, epistemic_kind, valid_from/until). Subsequent get_memory_item calls on restored items fail.",
+      "requirement_ref": "FR-29, NFR-6, Appendix §3, Phase 100220 doc §5 Task 1 & Task 2",
+      "recommendation": "Preserve all OpaqueItem metadata fields and write pre-encrypted ciphertext directly to items.content_ciphertext via a dedicated put_opaque_item store method without re-encrypting through KMS."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "`sort_entity_arrays` omits `ComplianceTombstoneView`, breaking canonical ordering and cross-backend checksum equivalence",
+      "evidence": "crates/clio-compliance/src/bundle.rs:276-288 sorts arrays using fields ['id', 'key', 'as_of']. ComplianceTombstoneView (crates/clio-store/src/compliance_store.rs:80) contains none of these fields, so sort_entity_arrays leaves tombstones in their original order. Furthermore, SQLite orders tombstones NULLs-First (crates/clio-store/src/sqlite_erase.rs:46) while Postgres orders NULLs-Last (crates/clio-store/src/postgres_erase_read.rs:40), causing checksum divergence across backends for identical tombstone datasets.",
+      "requirement_ref": "Appendix §4 item 1, Phase 100220 doc §5 Task 1",
+      "recommendation": "Add tombstone comparator fields (subject_hash, item_id_hash, request_id) to sort_entity_arrays in crates/clio-compliance/src/bundle.rs, and harmonize SQL tombstone ordering between SQLite and Postgres (ORDER BY item_id_hash NULLS LAST)."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "`export` silently truncates tasks and failures at `HISTORY_LIMIT = 10_000` while manifest reports `complete = true`",
+      "evidence": "crates/clio-compliance/src/export.rs:47,288,295 caps task and failure enumeration at HISTORY_LIMIT = 10_000. The manifest builder in export.rs:404-422 only checks ExportFilter flags and does not inspect whether task or failure listings reached HISTORY_LIMIT. If truncated, the manifest is emitted with complete: true and no omission note.",
+      "requirement_ref": "FR-29, Appendix §2, Phase 100220 doc §5 Task 1",
+      "recommendation": "Inspect total task and failure counts or check if list_tasks/list_failures returned HISTORY_LIMIT rows; if so, append an omission note and set complete: false in the manifest."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "`validate_envelope` permits invalid `format_version == 0`",
+      "evidence": "crates/clio-compliance/src/bundle.rs:313 only rejects if envelope.format_version > BUNDLE_FORMAT_VERSION. If an imported bundle supplies format_version: 0, the check passes even though version 0 is unsupported.",
+      "requirement_ref": "Phase 100220 doc §5 Task 1, Appendix §1, §10 Failure Handling",
+      "recommendation": "Reject format_version == 0 by asserting envelope.format_version == BUNDLE_FORMAT_VERSION or envelope.format_version >= 1 in validate_envelope."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Live import executes un-batched store mutations during `Planner::run`, violating transactional rollback guarantees",
+      "severity": "Critical",
+      "why_it_matters": "If import fails partway through execution, partial writes remain committed to the database with no rollback mechanism, causing inconsistent state and corrupted banks.",
+      "impact": "Violates §5 Task 2 and §10 rollback requirements; corrupts state on mid-batch failure.",
+      "evidence": "crates/clio-compliance/src/import.rs:138 calls planner.run()?, which executes direct mutations in import_apply.rs:151,271,272,286,370,390 and import_rows.rs:250,283 before batch commit.",
+      "confidence": "High",
+      "proposed_fix": "Defer all mutations until planning validates the entire bundle, and execute all writes within an atomic batch or transaction."
+    },
+    {
+      "id": 2,
+      "title": "`make lint` fails with clippy doc-markdown error on `crates/clio-compliance/src/bundle.rs:238`",
+      "severity": "Important",
+      "why_it_matters": "Breaks workspace CI and quality gates; cargo clippy --workspace --all-targets --all-features -D warnings exits 101.",
+      "impact": "Codebase fails automated lint verification despite developer sign-off.",
+      "evidence": "crates/clio-compliance/src/bundle.rs:238:5 doc comment contains key/as_of without backticks.",
+      "confidence": "High",
+      "proposed_fix": "Wrap `key/as_of` in backticks on line 238 of crates/clio-compliance/src/bundle.rs."
+    },
+    {
+      "id": 3,
+      "title": "Ciphertext backup import invokes `Store::put_item`, double-encrypting ciphertext and discarding all item metadata",
+      "severity": "Important",
+      "why_it_matters": "Restoring a ciphertext backup produces unusable rows: ciphertext is re-encrypted with local KMS DEK, item columns are wiped, and get_memory_item fails.",
+      "impact": "ciphertext_backup round-trip claims are broken; restored data is unreadable.",
+      "evidence": "crates/clio-compliance/src/import_apply.rs:260-287 passes opaque ciphertext to Store::put_item, which encrypts it again and inserts dummy episodic rows in envelope_persist.rs:49-55.",
+      "confidence": "High",
+      "proposed_fix": "Persist OpaqueItem rows directly to items table preserving metadata and writing pre-encrypted content_ciphertext without re-encryption."
+    },
+    {
+      "id": 4,
+      "title": "`sort_entity_arrays` omits `ComplianceTombstoneView`, breaking canonical ordering and cross-backend checksum equivalence",
+      "severity": "Important",
+      "why_it_matters": "Tombstone arrays are not canonically ordered, causing checksum mismatches on cross-backend import and non-deterministic bundle hashes.",
+      "impact": "Breaks Appendix §4 canonical JSON checksum verification when tombstones are present.",
+      "evidence": "crates/clio-compliance/src/bundle.rs:276-288 only inspects id, key, and as_of; ComplianceTombstoneView has none of these, leaving tombstones in raw database order (which differs between SQLite and Postgres).",
+      "confidence": "High",
+      "proposed_fix": "Add tombstone comparator fields (subject_hash, item_id_hash, request_id) to sort_entity_arrays and align SQLite/Postgres tombstone SQL order."
+    },
+    {
+      "id": 5,
+      "title": "`export` silently truncates tasks and failures at `HISTORY_LIMIT = 10_000` while manifest reports `complete = true`",
+      "severity": "Important",
+      "why_it_matters": "Completeness manifests must truthfully report complete=false when data is truncated. Silent truncation produces incomplete exports falsely certified as complete.",
+      "impact": "Violates FR-29 manifest integrity contract on large task/failure stores.",
+      "evidence": "crates/clio-compliance/src/export.rs:47 caps history queries at 10,000, but completeness() in export.rs:404-422 never checks if truncation occurred.",
+      "confidence": "High",
+      "proposed_fix": "Detect if task/failure count equals HISTORY_LIMIT and mark complete=false with an explanatory omission note."
+    },
+    {
+      "id": 6,
+      "title": "`validate_envelope` permits invalid `format_version == 0`",
+      "severity": "Minor",
+      "why_it_matters": "Version gate should reject unsupported version numbers strictly.",
+      "impact": "format_version 0 is improperly accepted instead of rejected.",
+      "evidence": "crates/clio-compliance/src/bundle.rs:313 checks `envelope.format_version > BUNDLE_FORMAT_VERSION` which evaluates false for version 0.",
+      "confidence": "High",
+      "proposed_fix": "Change version validation condition to `envelope.format_version == 0 || envelope.format_version > BUNDLE_FORMAT_VERSION`."
+    }
+  ],
+  "dismissed": [
+    "Suspected 450-line violation on export_tests.rs: File is exactly 450 lines by POSIX newline count (wc -l), complying with the hard ceiling.",
+    "Suspected missing MCP tool export: Removed placeholder in schema_read_defs.rs was intentionally relocated to schema_portability_defs.rs and bound in bound_write_tools."
+  ],
+  "verification": [
+    {
+      "claim": "Workspace tests pass across all crates",
+      "classification": "Established",
+      "source_note": "Executed `make test`: 39 test suites, all passed."
+    },
+    {
+      "claim": "Workspace clippy lint passes cleanly",
+      "classification": "Contradicted",
+      "source_note": "Executed `make lint`: Failed with exit code 101 on bundle.rs:238."
+    },
+    {
+      "claim": "Aggregate and per-file coverage >= 90%",
+      "classification": "Established",
+      "source_note": "Executed `make coverage`: 98.60% functions, 97.74% lines; 0 files below 90%."
+    },
+    {
+      "claim": "Every Rust file <= 450 lines",
+      "classification": "Established",
+      "source_note": "Scanned all staged .rs files with wc -l: max line count is 450 (export_tests.rs)."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Behavior of downstream node-restore with double-encrypted ciphertext",
+      "why_unknown": "Node-restore phase is not yet implemented",
+      "what_would_resolve_it": "Inspection of Phase 100230/100240 restore specifications",
+      "materiality": "High impact for ciphertext_backup recovery"
+    }
+  ],
+  "strengths": [
+    "All staged Rust source files strictly respect the 450-line limit, with comprehensive decomposition into dedicated submodules.",
+    "Full coverage gate passes with 98.60% functions and 97.74% lines across the workspace, with every single file >= 90%.",
+    "Defensive secret-stripping (masked_clone and scrub_inline_secrets) is thoroughly implemented and tested across all export and stub diagnostic paths.",
+    "MCP schema definitions on stdio and HTTP match exactly, with import_provider properly registered as a non-writing stub."
+  ],
+  "regrets": [
+    "Developer did not run `make lint` (`--all-features`) before declaring DONE.",
+    "Developer allowed un-batched direct store writes inside `Planner::run()` instead of routing through atomic batch commits."
+  ],
+  "process_changes": [
+    "Always run `make lint` exactly as defined in the workspace Makefile rather than manual cargo clippy invocations.",
+    "Enforce transactional boundaries by forbidding direct store writes in planning modules."
+  ],
+  "plan_1hr": [
+    "Fix clippy doc-markdown backticks error on `crates/clio-compliance/src/bundle.rs:238` so `make lint` passes cleanly.",
+    "Fix `validate_envelope` in `crates/clio-compliance/src/bundle.rs:313` to reject `format_version == 0`.",
+    "Add tombstone sorting fields to `sort_entity_arrays` in `crates/clio-compliance/src/bundle.rs:277` and align SQLite/Postgres tombstone SQL order.",
+    "Fix manifest completeness calculation in `crates/clio-compliance/src/export.rs` to detect when tasks or failures hit `HISTORY_LIMIT = 10_000` and mark `complete = false` with an omission note.",
+    "Wrap live import execution in a rollback-capable transaction or defer direct store writes until after batch commit to prevent partial corrupt states on mid-import failure."
+  ],
+  "plan_unlimited": [
+    "Extend `BatchWrite` enum and `BatchStore::apply_batch` with variants for `PutPreferenceState`, `AppendBeliefConfidence`, and `PutOpaqueItem`, unifying all import operations under a single atomic transaction.",
+    "Implement dedicated `put_opaque_item` storage primitive that stores pre-encrypted ciphertext directly into `items` without double-encryption and retains all `OpaqueItem` NFR-6 metadata.",
+    "Stream large export payloads instead of in-memory buffering, eliminating arbitrary caps like `HISTORY_LIMIT = 10_000`.",
+    "Add property-based testing and cross-backend round-trip fuzzing for canonical JSON checksum verification across SQLite and Postgres."
+  ]
+}

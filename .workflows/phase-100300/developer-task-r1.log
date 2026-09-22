@@ -1,0 +1,11 @@
+2026-09-21T16:37:00Z start: phase 100300 r1 developer, read task/phase/coverage files, discovery done (rerank.rs 167L, hybrid_rank.rs fail-open caller, config paths confirmed)
+2026-09-21T16:37:04Z baseline gate saved to /tmp/cov-baseline.json
+2026-09-21T16:37:08Z baseline gate saved to /tmp/cov-baseline.json (after installing llvm-tools-preview)
+2026-09-21T16:38:31Z baseline gate saved to /tmp/cov-baseline.json (LLVM_COV/LLVM_PROFDATA pointed at rustup llvm-tools)
+2026-09-21T16:38:52Z baseline per-file check: all reported files >=90% functions and lines (0 offenders, 261 files)
+2026-09-21T16:44:36Z implemented CohereReranker + build_reranker/build_reranker_from in rerank.rs (324L), tests in rerank_tests.rs (269L), capture fixture, README + .env.example docs; fmt/clippy -D warnings clean; cargo test -p clio-retrieve green
+2026-09-21T16:46:12Z fixed bearer-header case + TEI permutation assertions; cargo test -p clio-retrieve green, clippy -D warnings clean, fmt clean
+2026-09-21T16:56:36Z workspace JSON coverage run complete; per-file scan done
+2026-09-21T16:56:56Z workspace JSON: rerank.rs 17/17 fns 181/181 lines (100%); workspace 98.92% fns / 97.89% lines; 0 files below 90; clio-retrieve 141 tests green; fmt+clippy -D warnings clean; file sizes rerank.rs 324 / rerank_tests.rs 327 / fixtures_tests.rs 338 / lib.rs 119 (all <=450)
+2026-09-21T16:58:44Z final full gate: make coverage exit 0 (aggregate 98.95% fns / 97.89% lines, floors enforced); phase file updated (AC/DoD/evidence/attribution/known limitations); staged with git add -- . ':!.workflows/'; note: cargo-llvm-cov 0.9.0 needed LLVM_COV/LLVM_PROFDATA pointed at rustup llvm-tools (component installs as llvm-tools, detector expects llvm-tools-preview); scoped --package/--lib reports over-count generic instantiations (single-run object-merge quirk) — workspace JSON is the authoritative per-file view
+DEVELOPER_DONE 2b121b89

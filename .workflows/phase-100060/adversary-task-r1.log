@@ -1,0 +1,20 @@
+2026-09-18T01:05:15+05:30 START Adversarial review resumed for phase-100060 (committed range 804952d9..HEAD)
+2026-09-18T01:05:16+05:30 CMD git status -> 4 modified, 3 untracked in .workflows/
+2026-09-18T01:05:17+05:30 CMD git diff --stat 804952d9..HEAD -> 27 files changed, 3226 insertions(+), 178 deletions(-)
+2026-09-18T01:05:27+05:30 CMD make check -> FAIL (clippy default-constructed-unit-structs in crates/clio-write/src/maintenance_tests.rs:56:16)
+2026-09-18T01:05:33+05:30 CMD cargo test -> PASS (clio root package passed)
+2026-09-18T01:05:40+05:30 CMD cargo test --workspace -> PASS (136 tests passed, 64 in clio-write)
+2026-09-18T01:05:45+05:30 CMD make lint -> FAIL (exit code 101, clippy error in crates/clio-write/src/maintenance_tests.rs:56)
+2026-09-18T01:06:01+05:30 CMD wc -l crates/clio-write/src/*.rs -> PASS (all files <= 450 lines, max 396 lines in ingest_leaf_tests.rs)
+2026-09-18T01:06:04+05:30 CMD make coverage -> PASS (total lines 99.12%, functions 99.84%; all reported files >= 90%)
+2026-09-18T01:07:54+05:30 CMD make cov-lcov -> PASS (saved to target/coverage/lcov.info)
+2026-09-18T01:08:14+05:30 CMD make coverage-html -> PASS (saved to target/coverage/html/index.html)
+2026-09-18T01:08:20+05:30 CMD cp target/coverage/html/index.html .workflows/phase-100060/coverage.html -> PASS
+2026-09-18T01:08:36+05:30 CMD python3 -m json.tool .workflows/phase-100060/findings.json -> PASS (valid JSON)
+2026-09-18T01:08:45+05:30 FINDING F-01 crates/clio-write/src/maintenance_tests.rs:56:16 (critical: make check fails on clippy error)
+2026-09-18T01:08:46+05:30 FINDING F-02 crates/clio-write/src/chunk.rs:16, crates/clio-write/src/consolidate.rs:17, crates/clio-write/src/ingest.rs:16, crates/clio-write/src/parallel.rs:16, crates/clio-write/src/maintenance.rs:16 (medium: truncated boundary header structure)
+2026-09-18T01:08:47+05:30 FINDING F-03 crates/clio-write/src/ingest_leaf_tests.rs:235-275 (medium: T100060-08 admission gate test fudged and duplicates T100060-09 cross-bank check)
+2026-09-18T01:08:48+05:30 FINDING F-04 crates/clio-write/src/ingest.rs:261, crates/clio-write/src/ingest_leaf_tests.rs:144-156 (medium: synchronous maintenance handoff on write path untested for non-blocking execution)
+2026-09-18T01:08:49+05:30 FINDING F-05 crates/clio-write/src/ingest.rs:70-75, crates/clio-write/src/ingest_leaf_tests.rs:173-190 (low: WriteIngestConfig::for_profile does not configure profile-specific parameters)
+2026-09-18T01:08:50+05:30 FINDING F-06 crates/clio-write/src/consolidate.rs:186-201, crates/clio-write/src/ingest.rs:207-220 (low: post-merge span re-verification is unreachable dead code)
+2026-09-18T01:08:55+05:30 FINISH Adversarial review completed; findings written to .workflows/phase-100060/findings.json

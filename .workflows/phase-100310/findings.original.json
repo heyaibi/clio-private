@@ -1,0 +1,249 @@
+{
+  "run": "r1",
+  "phase": "100310",
+  "subject": "Phase 100310: Zero-Config Default Database Path with Full Precedence",
+  "verdict": "Adequate",
+  "verdict_justification": "Core database path resolution, CLI precedence chain, parent directory creation, help masking, and coverage thresholds were implemented and verified with green test suites. However, 48 binary LLVM profiling dumps (~18.5 MB) were staged in the git index, config system defaults hardcode SQLite backend even when DATABASE_URL infers Postgres, and one new Rust source file omitted the mandatory AGENTS.md responsibility header.",
+  "metadata": {
+    "generated": "2026-09-21",
+    "applies_to": "Phase 100310 r1 (git staged diff)",
+    "source": "git diff --cached -- . ':!.workflows/'"
+  },
+  "standard": [
+    "AGENTS.md core principles, git hygiene, header structure, and 450-line file limit",
+    "coverage.md aggregate >=90% and per-file >=90% lines and functions gate",
+    "Phase 100310 Objective, Scope boundaries, and Acceptance Criteria (AC-100310-01 to AC-100310-08)",
+    "requirement.md §4.9.5.E (effective configuration consistency) and FR-32"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100310-01: No-flag am mcp stdio persists to XDG default database path",
+      "status": "Fully satisfied",
+      "evidence": "t31_01_no_flags_persists_to_xdg_default passes; creates ~/.local/share/am/clio.db and data persists across process restart",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100310-02: AM_DATA_DIR and XDG_DATA_HOME overrides honored",
+      "status": "Fully satisfied",
+      "evidence": "t31_02_am_data_dir_override_creates_parent and t31_03_xdg_data_home_override pass; unit tests in db_path_tests.rs pass",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100310-03: DATABASE_URL opens Postgres with inferred backend",
+      "status": "Fully satisfied",
+      "evidence": "t31_04_database_url_infers_postgres_backend passes in default_db_path_test; infer_backend unit tests pass",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100310-04: --db and --backend flags win over environment; sqlite::memory: preserved",
+      "status": "Fully satisfied",
+      "evidence": "t31_05_db_flag_wins_over_env_url, t31_06_explicit_backend_and_db_win, and t31_07_memory_db_stays_volatile pass",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100310-05: Parent directory auto-created on first open",
+      "status": "Fully satisfied",
+      "evidence": "t31_01 and t31_02 verify parent creation with multi-level directories; create_parent_dir names offending path on error",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100310-06: Help displays resolved default; config and CLI agree",
+      "status": "Partially satisfied",
+      "evidence": "CLI help output displays default and precedence; config_get for store.sqlite_path and store.database_url matches resolver, but system_defaults hardcodes backend: sqlite even when DATABASE_URL infers postgres",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "AC-100310-07: No regression in existing test suites and coverage >=90%",
+      "status": "Fully satisfied",
+      "evidence": "make coverage passes with 97.92% line coverage and 98.98% function coverage across 262 reported files; all 262 files >=90%",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100310-08: Malformed data dir fails closed without credential leakage",
+      "status": "Fully satisfied",
+      "evidence": "t31_09_data_dir_that_is_a_file_fails_closed asserts non-zero exit; database_help_block_masks_credentials asserts userinfo redacted",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md: Git hygiene - no build or profiling artifacts staged",
+      "status": "Missed",
+      "evidence": "48 binary .profraw files (~18.5 MB) generated in crates/clio-lib/ during test execution are staged in the git index",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "AGENTS.md: Every Rust source file must have standard responsibility header",
+      "status": "Partially satisfied",
+      "evidence": "crates/clio-config/src/db_path_tests.rs lacks the required # Responsibility, ## Owns, ## Does not own, and ## Boundary sections",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "AGENTS.md: Source file size constraint <= 450 total lines",
+      "status": "Fully satisfied",
+      "evidence": "All 13 new or modified Rust files are <= 450 lines (largest is crates/clio-config/src/config/mod.rs at 389 lines)",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "48 binary LLVM profiling dumps (.profraw) staged in Git index",
+      "severity": "Important",
+      "why_it_matters": "Committing binary build/profiling artifacts bloats repository history, pollutes git status/diffs, and breaks repository hygiene standards.",
+      "impact": "18.5 MB of unneeded binary machine-specific profile data is staged in git and would be committed to the repository.",
+      "evidence": "git diff --cached --name-only | grep '\\.profraw$' lists 48 files in crates/clio-lib/ (e.g., crates/clio-lib/default_12130406370214325728_0_89478.profraw).",
+      "confidence": "High",
+      "proposed_fix": "Unstage and delete all crates/clio-lib/*.profraw files. Add `*.profraw` to `.gitignore`. In `crates/clio-lib/tests/default_db_path_test.rs`, ensure subprocesses run with LLVM_PROFILE_FILE directed to a temp dir or filtered from workspace tracking."
+    },
+    {
+      "id": 2,
+      "title": "Config system defaults hardcode backend: sqlite ignoring scheme inference",
+      "severity": "Important",
+      "why_it_matters": "When DATABASE_URL=postgres://... is configured, the CLI infers Postgres, but effective config defaults backend to sqlite, causing StoreOpenOptions::from_effective to open SQLite rather than Postgres.",
+      "impact": "Downstream phases relying on StoreOpenOptions::from_effective (such as Phase 100330 am setup, guaranteed in §12) or inspecting config_get(\"backend\") observe a backend/database mismatch where store.database_url points to Postgres while backend remains sqlite.",
+      "evidence": "crates/clio-config/src/config/merge.rs:35-43 calls resolve_database(get, None, None) which infers backend=\"postgres\", but line 39 hardcodes `\"backend\": \"sqlite\"` in system_defaults.",
+      "confidence": "High",
+      "proposed_fix": "Update `system_defaults` in `crates/clio-config/src/config/merge.rs` to set `\"backend\": resolved.backend` instead of `\"backend\": \"sqlite\"`, and ensure `Runtime::apply_process_env` sets `backend` when inferred from `DATABASE_URL`."
+    },
+    {
+      "id": 3,
+      "title": "Missing standard AGENTS.md responsibility header in db_path_tests.rs",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md strictly mandates that every Rust source file, including test files, use the standard header with Responsibility, Owns, Does not own, and Boundary sections.",
+      "impact": "Inconsistent module documentation and breach of repository AGENTS.md style contract.",
+      "evidence": "crates/clio-config/src/db_path_tests.rs:1-4 contains only copyright and a single summary line without the required sections.",
+      "confidence": "High",
+      "proposed_fix": "Add the standard AGENTS.md header structure with truthful Responsibility, Owns, Does not own, and Boundary doc comments to `crates/clio-config/src/db_path_tests.rs`."
+    },
+    {
+      "id": 4,
+      "title": "Developer attribution agent moniker discrepancy in phase document",
+      "severity": "Minor",
+      "why_it_matters": "Automated workflow tooling parses phase attribution rows to track which agent model completed each round.",
+      "impact": "Potential inconsistency if pipeline audit checks expect the exact moniker specified in task prompts.",
+      "evidence": "roadmap/phase-100310-default-database-path.md:7 records `OpenCode CLI (Go . Deepseek V4.1 Flash High)` whereas task instructions specified `OpenCode CLI (Together . GLM-5.3 Flash High)`.",
+      "confidence": "High",
+      "proposed_fix": "Update line 7 of `roadmap/phase-100310-default-database-path.md` if the pipeline mandates the exact prompt-specified moniker."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "48 binary LLVM profiling dumps (.profraw) staged in Git index",
+      "evidence": "git diff --cached --name-only | grep '\\.profraw$' lists 48 files in crates/clio-lib/ totalling ~18.5 MB",
+      "requirement_ref": "AGENTS.md Git hygiene and repository cleanliness",
+      "recommendation": "Unstage and delete crates/clio-lib/*.profraw files; add *.profraw to .gitignore."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Config system defaults hardcode backend: sqlite ignoring scheme inference",
+      "evidence": "crates/clio-config/src/config/merge.rs:39 hardcodes `\"backend\": \"sqlite\"` in system_defaults even when resolved.backend is \"postgres\"",
+      "requirement_ref": "Phase 100310 §1 Expected Outcome, §5 Task 2, and §12 Exit Guarantees",
+      "recommendation": "Set `\"backend\": resolved.backend` in `system_defaults` in crates/clio-config/src/config/merge.rs."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Missing standard AGENTS.md responsibility header in db_path_tests.rs",
+      "evidence": "crates/clio-config/src/db_path_tests.rs:1-4 lacks # Responsibility, ## Owns, ## Does not own, and ## Boundary sections",
+      "requirement_ref": "AGENTS.md File Header rule",
+      "recommendation": "Add the AGENTS.md header structure to crates/clio-config/src/db_path_tests.rs."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Developer attribution agent moniker discrepancy in phase document",
+      "evidence": "roadmap/phase-100310-default-database-path.md:7 has 'OpenCode CLI (Go . Deepseek V4.1 Flash High)' vs task 'OpenCode CLI (Together . GLM-5.3 Flash High)'",
+      "requirement_ref": "Phase 100310 Developer Task Attribution instruction",
+      "recommendation": "Align Developer attribution row in roadmap/phase-100310-default-database-path.md if required by workflow harness."
+    }
+  ],
+  "dismissed": [
+    "Precedence order implementation: confirmed exactly matching specification (--db > DATABASE_URL/AM_DATABASE_URL > AM_DATA_DIR > XDG_DATA_HOME > HOME > ./clio.db).",
+    "Source file line length limits: confirmed all 13 new/modified files remain <= 450 lines after decomposition.",
+    "Help output credential safety: confirmed database_help_block masks credentials via redact_credentials with dedicated test assertions."
+  ],
+  "verification": [
+    {
+      "claim": "make test passes full workspace suite cleanly",
+      "classification": "Established",
+      "source_note": "Independently executed make test; 110 passed, 0 failed."
+    },
+    {
+      "claim": "make lint (clippy -D warnings) is clean",
+      "classification": "Established",
+      "source_note": "Independently executed cargo clippy --workspace --all-targets --all-features --locked -- -D warnings with exit code 0."
+    },
+    {
+      "claim": "make check (fmt + clippy + workspace tests) is clean",
+      "classification": "Established",
+      "source_note": "Independently executed make check with exit code 0."
+    },
+    {
+      "claim": "make coverage meets >=90% aggregate and per-file floors",
+      "classification": "Established",
+      "source_note": "Independently executed make coverage; 262 reported files all >=90% functions and lines, aggregate 97.92% lines and 98.98% functions."
+    },
+    {
+      "claim": "am CLI help subcommands show default and masked credentials",
+      "classification": "Established",
+      "source_note": "Independently executed am help, am mcp stdio --help, am mcp http --help, and am ops --help."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Whether child processes spawned in default_db_path_test require LLVM profile dumping during test runs",
+      "why_unknown": "cargo llvm-cov instruments binaries, but tests use cmd.env_clear() which drops LLVM_PROFILE_FILE causing default fallback drops",
+      "what_would_resolve_it": "Forwarding LLVM_PROFILE_FILE into child process or setting it to a temporary discard file in test helper",
+      "materiality": "High for git staging cleanliness"
+    }
+  ],
+  "strengths": [
+    "Pure, injectable resolver design allowing deterministic unit testing without host env pollution",
+    "Clean decomposition of main.rs and ops_cli.rs maintaining <450 line limit while keeping >93% coverage",
+    "End-to-end integration tests in default_db_path_test verifying actual file creation, persistence across restart, and fail-closed error reporting",
+    "Comprehensive coverage across all 262 source files in the workspace with zero files below 90%"
+  ],
+  "regrets": [
+    "Developer ran git add without excluding *.profraw profiling dumps",
+    "Developer did not verify config backend default when DATABASE_URL is set to postgres"
+  ],
+  "process_changes": [
+    "Add *.profraw to root .gitignore immediately so llvm-cov test runs never leave untracked/staged profile files",
+    "Include config consumer tests for StoreOpenOptions::from_effective when modifying store connection defaults"
+  ],
+  "plan_1hr": [
+    "Unstage and remove all 48 .profraw files from crates/clio-lib/",
+    "Add *.profraw to .gitignore",
+    "Update system_defaults in crates/clio-config/src/config/merge.rs to use resolved.backend",
+    "Add AGENTS.md responsibility header to crates/clio-config/src/db_path_tests.rs"
+  ],
+  "plan_unlimited": [
+    "Wire config file loading into the CLI resolver as planned for Phase 100330",
+    "Implement Windows %APPDATA% / %LOCALAPPDATA% resolution beyond HOME fallback",
+    "Harmonize StoreOpenOptions::from_effective and McpOpenOptions to share a single backend configuration parser"
+  ]
+}

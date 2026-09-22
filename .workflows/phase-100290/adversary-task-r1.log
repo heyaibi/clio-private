@@ -1,0 +1,22 @@
+2026-09-21T15:41:28Z START phase-100290 adversary r1 (nonce ae706189)
+2026-09-21T15:56:20Z SCOPE review of staged diff only (git status: all non-workflow changes staged; only .workflows/ paths unstaged/untracked)
+2026-09-21T15:56:20Z READ phase doc roadmap/phase-100290-multi-model-embeddings.md (516 lines), AGENTS.md, coverage.md; enumerated In-Scope bullets and T100290-01..T100290-14
+2026-09-21T15:56:20Z DIFF: 52 non-workflow files, +3274/-275; new files embedding_space.rs, vector_ddl.rs, space_reconcile.rs, postgres_coverage.rs, openai.rs, provider.rs, ops_embedder.rs + test modules
+2026-09-21T15:56:20Z CMD make coverage -> TOTAL functions 98.91% / lines 97.88%, 261 reported files, 0 below 90% on either metric (matches developer claim)
+2026-09-21T15:56:20Z CMD cargo test --locked --workspace -> all green (clio-store 230, clio-mcp 202, clio-config 115, clio-index 58, clio-ops 47)
+2026-09-21T15:56:20Z CMD cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> clean; cargo fmt --check -> clean
+2026-09-21T15:56:20Z CMD find crates -name *.rs | xargs wc -l -> no file >450 lines
+2026-09-21T15:56:20Z CMD cargo test -p clio-store pg_space_tests -- --nocapture -> 6 pass; plain plan at 3072 is Seq Scan; recall printed 1.0000 (100/100)
+2026-09-21T15:56:20Z FINDING F-01 high: model_id not validated against active space on write; sqlite_store.rs:215/:231, postgres_store.rs:198/:216; phase admits at phase doc:440
+2026-09-21T15:56:20Z FINDING F-02 high: recall@10=1.0000 measured seq-scan-vs-seq-scan; pg_space_tests.rs:380-393 never forces the index; phase doc:383/:398 cite it as ANN precision
+2026-09-21T15:56:20Z FINDING F-03 medium: fresh DB at non-default width refused as destructive switch; sql/001_core.sql:36-41 seeds 384, sqlite.rs:126-128 refuses
+2026-09-21T15:56:20Z FINDING F-04 medium: T100290-13 bootstrap refusal not tested end-to-end; pg_space_tests.rs:406-412 tests helper only; phase doc:435 concedes
+2026-09-21T15:56:20Z FINDING F-05 medium: unknown embed.provider via env silently disables ops embedder; env.rs:61-64, ops_embedder.rs:107-114 (.ok())
+2026-09-21T15:56:20Z FINDING F-06 medium: no explicit rebuild-required marker on switch; sqlite.rs:201-211 / postgres.rs:236-247; grep finds no flag
+2026-09-21T15:56:20Z FINDING F-07 low: README.md:322 names internal phase number (isolation rule)
+2026-09-21T15:56:20Z FINDING F-08 low: openai_tests.rs:1 header uses singular Developer
+2026-09-21T15:56:20Z FINDING F-09 low: model.rs:285 stale doc comment pins EMBEDDING_DIMS
+2026-09-21T15:56:20Z FINDING F-10 low: phase doc:429 lists model.rs modified but it is not in staged diff
+2026-09-21T15:56:20Z WROTE .workflows/phase-100290/findings.json (10 findings; JSON validated by python3 json.load)
+2026-09-21T15:56:20Z EDITED phase file Attribution: Adversary row -> OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | done (only phase-file edit)
+ ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100290/findings.json ae706189

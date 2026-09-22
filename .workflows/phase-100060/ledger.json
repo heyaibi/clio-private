@@ -1,0 +1,52 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE",
+      "harness": "cursor_cli:auto",
+      "visits": 1,
+      "output_sha256": "123a45f82a9d75b6f306069d6cb1cc3ce5953cbc268930bc0776013408977b11",
+      "artifacts": {},
+      "git_head": "35c4841a23e7c04c3f6991c4f9995cabf5a2e2fa"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100060/findings.json",
+      "harness": "antigravity_cli:gemini-3.8-flash-high",
+      "visits": 1,
+      "output_sha256": "14f5b4d44fc11c992a8253a8cf6846ca26ea1d89da04ea62801641d6d5daf27e",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 6212,
+          "sha256": "76466ce5c903df4d1da01d180097cc4056ef78e7a53d62870f676e03f0d10b4e"
+        }
+      },
+      "git_head": "35c4841a23e7c04c3f6991c4f9995cabf5a2e2fa"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE",
+      "harness": "opencode_cli:togetherai/deepseek-ai/DeepSeek-V4.1-Flash",
+      "visits": 1,
+      "output_sha256": "81e5f2d5aa9a31314da7360a20e03f478ac788d0b6bef15bb216218967d98cdc",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 6212,
+          "sha256": "76466ce5c903df4d1da01d180097cc4056ef78e7a53d62870f676e03f0d10b4e"
+        }
+      },
+      "git_head": "35c4841a23e7c04c3f6991c4f9995cabf5a2e2fa"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED",
+      "harness": "antigravity_cli:gemini-3.8-flash-high",
+      "visits": 1,
+      "output_sha256": "f48e23a706c5fe2def5cdee51d130a7ebfdd29866912b9d74bbb3d7b95da124e",
+      "artifacts": {},
+      "git_head": "35c4841a23e7c04c3f6991c4f9995cabf5a2e2fa"
+    }
+  }
+}

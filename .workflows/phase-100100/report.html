@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100100 — Fact/Belief epistemic_kind and confidence trajectories (staged diff)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100100 — Fact/Belief epistemic_kind and confidence trajectories (staged diff)</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">3 important · 7 minor · 6 dismissed</span>
+    </div>
+    <p class="sum">The core behavior is implemented and independently verified: belief objects, append-only history, create-vs-append gating, as-of reads, dual-backend parity, encryption at rest, and the frozen read contract all pass real tests, clippy, fmt, and per-file coverage (all 84 reported files &gt;=90% functions and lines). The gaps are concurrency (create is check-then-insert outside a transaction), an unconfigurable belief admission key whose doc claims the opposite, and thinner-than-claimed durable telemetry; none is data-corrupting on the happy path.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-18</span>
+      <span><b>Applies to</b>staged diff against HEAD 812ed2fcef3c4680908b54f436a2f2fd398afa22</span>
+      <span><b>Source</b>git diff --cached (non-workflow paths); crates/clio-belief, crates/clio-store belief modules, crates/clio-types belief/read, crates/clio-admission/decision.rs, sql/001_core.sql</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>requirement.md §4.9.3 belief-writes row, §4.10 belief objects, §4.11 fact/belief, FR-13, FR-14, FR-15, NFR-4, PR-8</li>
+        <li>Phase 100100 acceptance criteria AC-100100-01..AC-100100-09 and required scenarios T100100-01..T100100-13</li>
+        <li>AGENTS.md: &lt;=450 lines/file, exact file header structure, coverage gate, roadmap isolation</li>
+        <li>Verified independently: cargo fmt --check, clippy -D warnings, cargo test --locked --workspace, make coverage</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">6 of 8 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>FR-13 append-only belief confidence history via belief_observe/belief_history</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">observe.rs:223-241 appends via store.append_confidence; history rows are INSERT-only (sqlite_belief.rs:330-364, postgres_belief.rs:320-354); tests t03/t04 and run_belief_suite assert first entry byte-identical after append</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Create passes five-factor admission; append does not re-admit</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">signals.rs:84-93 -&gt; decide_ungated (no category gate); observe.rs:223-241 append branch bypasses scoring; t03b and t09 pass</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Create-vs-append identity is stable under concurrent first observes</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">observe.rs:223-268 is check-then-insert outside a transaction; unique index at sql/001_core.sql beliefs_bank_id_proposition_key_uix maps the loser to InvalidArgument (belief_store.rs:135-152)</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>FR-14 epistemic_kind surfaced on reads; facts carry no trajectory</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">read.rs:61-95 RetrieveHit; item.rs:318-335 rejects source_type on facts; golden JSON read_tests.rs</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>NFR-4 point-in-time belief confidence (as_of)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">history.rs:63-72; SQL e.as_of &lt;= ?3 ordered (sqlite_belief.rs:235-240, postgres_belief.rs:230-235); t05 passes</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Security: proposition encrypted under DEK, cross-bank fail-closed</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">belief_store.rs:112-132 seal/open; run_belief_suite asserts ciphertext hides plaintext, wrong-bank reads empty, destroyed DEK returns Forbidden</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>FR-15-sufficient durable telemetry for belief writes</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">sqlite_belief.rs:94-107 / postgres_belief.rs:93-106 write detail_json only {&quot;created&quot;:true}|{&quot;appended&quot;:true}; confidence/source_type live only in the in-memory BeliefVecSink (observe.rs:79-100)</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Coverage gate and 450-line cap</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage exit 0, TOTAL 96.04% lines / 99.30% funcs, all 84 reported files &gt;=90% funcs+lines; every new/modified Rust file &lt;=450 lines (max 393)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">03</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Concurrent first observes race: create is check-then-insert outside a transaction</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>belief_observe decides create-vs-append with a read (find_belief_by_proposition), then inserts in a separate transaction. Two observes of the same proposition that both read &#39;missing&#39; both run the create path; the second violates the unique index and returns InvalidArgument instead of appending. The phase failure table expects concurrent observes to serialize as append.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A legitimate second observation is dropped as an error under concurrency on a new belief identity (no data corruption, but lost evidence and a spurious failure).</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-belief/src/observe.rs:223-268; crates/clio-store/src/sqlite_belief.rs:74-92; crates/clio-store/src/belief_store.rs:135-152; sql/001_core.sql beliefs_bank_id_proposition_key_uix</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Make create-or-append atomic: either INSERT ... ON CONFLICT DO NOTHING then append when zero rows inserted, or catch the duplicate-key error and re-run the append branch, inside the store transaction.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Belief admission threshold/prior cannot be configured, yet docs claim the key selects an override</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>signals.rs documents BELIEF_KEY as selecting both the type prior and theta_admit override, but &#39;belief&#39; is not in KNOWN_ADMISSION_KEYS and validate_override_map rejects unknown keys. The belief create gate silently uses the global theta and the fallback prior 0.5 with no way to tune it.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Operators cannot tune belief admission as the code comments promise; belief create behavior diverges from the documented policy surface.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-belief/src/signals.rs:24-28 (doc); crates/clio-config/src/admission_knobs.rs:43-54 (KNOWN_ADMISSION_KEYS), :134-141 (unknown key rejected), :198-203 (prior fallback 0.5)</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add &#39;belief&#39; to KNOWN_ADMISSION_KEYS with a documented default prior, or correct the signals.rs doc and explicitly state belief create uses the global theta/prior.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Durable audit rows omit confidence/source_type; no production sink persists BeliefEvent</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AC-100100-08 cites durable audit_events rows as the telemetry evidence, but those rows carry only {created:true}/{appended:true} in detail_json. FR-15 expects events sufficient to reconstruct the operation (including confidence). The rich BeliefEvent (with confidence and admission_score) is only emitted to an in-memory sink, so a real deployment records no confidence in the durable trail.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The audit trail cannot reconstruct the confidence change of a belief observe; FR-15 reconstruction is weaker than the phase evidence claims.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_belief.rs:94-107; crates/clio-store/src/postgres_belief.rs:93-106; crates/clio-belief/src/observe.rs:44-100</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Write confidence, source_type, and entry_count into audit_events.detail_json (the columns confidence/source_type already exist), and provide a durable BeliefSink adapter or document the in-memory-only limitation.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">07</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>beliefs.updated_at column is never updated on append and goes stale</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>create_belief sets beliefs.updated_at to the first entry&#39;s as_of; append_confidence only inserts the entry and an audit row, never touching the belief row. get_belief derives updated_at from the last history entry, so the API and the durable column disagree after any append. The phase &#39;Known limitations&#39; says updated_at is &#39;derived rather than stored&#39;, which misdescribes a column that is stored and stale.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Any raw-SQL or future consumer reading beliefs.updated_at gets an out-of-date value; the documented limitation is inaccurate.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_belief.rs:55-60 (create sets), :113-160 (append does not update), :190-194 (read derives); crates/clio-store/src/postgres_belief.rs:55-60, :112-158, :184-188</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>UPDATE beliefs SET updated_at = entry.as_of in the append transaction, or drop the column and document derive-only reads.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>AC-100100-01/T100100-07 evidence overstates: no test rejects a fact carrying a confidence trajectory</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase maps T100100-07 (&#39;Fact with confidence_history attach -&gt; Rejected&#39;) to AC-100100-01 and cites clio-types/src/belief_tests.rs::fact_items_never_carry_a_trajectory. That test builds a fact item with a scalar confidence and asserts validate() passes; it never attempts to attach a trajectory, and MemoryItem has no such field. The requirement is protected structurally, but the cited evidence does not exercise the stated rejection.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The acceptance-criterion evidence overstates test coverage for a negative case; a reviewer trusting the table would believe a rejection path is tested when it is only type-impossible.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-types/src/belief_tests.rs:133-157; crates/clio-types/src/item.rs:224-268 (no confidence_history field); roadmap/phase-100100...md AC-100100-01 row</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Reword AC-100100-01 to cite the type structure as the guarantee, or add a serialization-boundary test that a fact payload carrying confidence_history is rejected.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>§4.10 belief object omits epistemic_kind in the struct and table</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The normative §4.10 example JSON carries &#39;epistemic_kind&#39;: &#39;belief&#39;. BeliefObject (and the serialized belief_history response) expose no epistemic_kind field, and the beliefs table has no such column. Only RetrieveHit carries it. Under Option B a belief is implicitly a belief, so this may be intentional, but it is an undocumented divergence from the §4.10 shape and from FR-14&#39;s &#39;stored ... carries epistemic_kind&#39;.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Consumers reading the concrete belief object (not the RetrieveHit) cannot see the epistemic kind field; the divergence from the normative shape is not stated.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-types/src/belief.rs:110-127; crates/clio-belief/src/history.rs:30-44; sql/001_core.sql beliefs table columns</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Document in the header/identity rule that belief objects are implicitly belief and not &#39;items&#39;, or add an epistemic_kind field to the object.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Nine new production files omit the AGENTS.md-mandated closing header line</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md requires the exact header structure ending in &#39;Keep this module focused on &lt;a single responsibility&gt;&#39;. Nine new production files stop at the Boundary paragraph; only clio-belief/src/lib.rs includes it. (Some pre-existing files such as clio-types/src/item.rs also omit it, so the convention is inconsistent.)</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Header-structure compliance gap; no functional impact.</dd></div>
+              <div><dt>Evidence</dt><dd>Missing in crates/clio-belief/src/{history,observe,signals}.rs, crates/clio-types/src/{belief,read}.rs, crates/clio-store/src/{belief_reshape,belief_store,postgres_belief,sqlite_belief}.rs</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Append the &#39;Keep this module focused on ...&#39; line to each new file&#39;s module doc, matching clio-belief/src/lib.rs.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>belief_history not-found uses InvalidArgument rather than a not-found code</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>An unknown belief/proposition returns ErrorCode::InvalidArgument with a &#39;not found&#39; message. No dedicated NotFound code exists yet, so this is acknowledged in the phase&#39;s Known limitations, but callers cannot distinguish malformed input from a missing belief by code.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Weak error discrimination for the read API; acknowledged, low impact.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-belief/src/history.rs:78-93; crates/clio-types/src/error.rs ErrorCode variants</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a NotFound error code and use it here (or keep InvalidArgument and state the caller contract explicitly).</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">09</span>
+          <div>
+            <div class="ihead">
+              <h3>belief reshape can silently drop orphaned belief_confidence_entries</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>reshape_beliefs_sqlite/pg guard destructive drops only by counting rows in the stale beliefs table. If beliefs is empty but belief_confidence_entries holds rows (possible when foreign keys were not enforced), the drop of both tables discards those entries without the ConfigCorrupt guard firing.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Silent loss of orphaned history rows during an undeployed-schema reshape; narrow but real.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/belief_reshape.rs:104-123 and :129-148 (count beliefs only); :53-58 / :90-98 drop both tables</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Also count belief_confidence_entries rows (when the table exists) and refuse the drop when either is non-empty.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">10</span>
+          <div>
+            <div class="ihead">
+              <h3>belief_history as_of filtering relies on free-form string ordering</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Entries and the as_of filter are stored/compared as text (e.as_of &lt;= ?3). Mixed date-only (&#39;2026-06-01&#39;) and timestamp (&#39;2026-06-01T12:00:00Z&#39;) values compare lexicographically, so a same-day timestamp entry can be excluded or misordered relative to a date-only query. The format contract is undocumented.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Point-in-time results are ambiguous when callers mix date-only and timestamp formats; only affects NFR-4 reads at same-day boundaries.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_belief.rs:235-240; crates/clio-store/src/postgres_belief.rs:230-235; crates/clio-types/src/belief.rs:169-176</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Document the accepted as_of format and normalize to a single canonical form on write, or compare parsed instants.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>decide() losing its category gate: verification shows the whitelist lived in decide_raw via typed Candidate parsing, not in decide; the refactor to decide_ungated is behavior-preserving and all admission tests pass.</li>
+        <li>ConfidenceEntry/BeliefObject array-order current_confidence vs as_of ordering: stored histories are loaded ORDER BY as_of, so current_* is correct on every read path; only a hand-built out-of-order BeliefObject could differ, and no production caller does that.</li>
+        <li>Cross-subject evidence mixing on a shared proposition key: identity is (bank_id, proposition_key) by documented design, and subject_id only selects the DEK; bank remains the isolation boundary.</li>
+        <li>No DB trigger enforcing append-only history: the trait exposes only append/create with no UPDATE/DELETE path, so the API boundary is append-only.</li>
+        <li>Schema version bump 4-&gt;5 with fail-closed ConfigCorrupt on non-empty legacy beliefs: the phase explicitly permits fail-closed for pre-epistemic rows and the tables are undeployed.</li>
+        <li>roadmap-isolation: no references to roadmap/, phase numbers, or crates.md found in crates/ or sql/.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo test --locked --workspace is green — Ran it: TEST_EXIT=0; 18 &#39;test result: ok&#39; summaries, 0 failed (including postgres_belief_parity and pg_beliefs_reshape_guard with Compose Postgres on :34310).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>clippy -D warnings and cargo fmt --check are clean — Ran both: fmt exit 0 with empty diff; clippy --workspace --all-targets --all-features --locked -- -D warnings exit 0.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage passes with every reported file &gt;=90% functions and lines — Ran make coverage: exit 0; TOTAL 96.04% lines / 99.30% functions; parsed all 84 file rows, 0 below 90% on functions or lines. Only region coverage dips below 90 (not gated).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-blue">Supported</span>
+          <p>Facts cannot carry a confidence trajectory — MemoryItem has no confidence_history field and item.validate rejects source_type on facts; the cited test only checks a scalar confidence, so the guarantee is structural, not test-exercised.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Dual-backend parity for belief storage — run_belief_suite executes identically on SqliteStore and PostgresStore; both tests passed in the workspace run.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All new/modified Rust files are &lt;=450 lines — wc -l over each new/modified file: max 393 (schema_reshape.rs), all under 450.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>AC-100100-08 durable audit_events rows are sufficient for FR-15 reconstruction — Rows write detail_json {&quot;created&quot;:true}|{&quot;appended&quot;:true}; confidence and source_type are absent, contrary to FR-15&#39;s reconstruction intent.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Real-world concurrency frequency and severity of the create race</p>
+          <p class="d">No multi-threaded observe test exists; only sequential store-level duplicate-create is tested · Add a concurrent first-observe test (two threads, same proposition) and observe whether the loser errors or appends · Determines whether F-01 stays high or should be downgraded to an edge case</p>
+        </div>
+        <div class="card unk">
+          <p class="t">Whether any production host wires a durable BeliefSink</p>
+          <p class="d">The crate ships only BeliefVecSink; the deployment binding is out of phase scope · Inspect the eventual MCP/tool binding (slice 100160-17) for a persistent sink · Affects whether F-03 is a real telemetry gap or a documented in-process limitation</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Append-only history holds at both the API and SQL layers; prior entries are asserted byte-identical after append on both backends.</li>
+        <li>Encryption-at-rest and crypto-shredding fail-closed behavior is genuinely tested (ciphertext hides plaintext, destroyed DEK returns Forbidden).</li>
+        <li>Create/append admission split is implemented as specified: no category gate on create, no re-scoring on append.</li>
+        <li>The frozen RetrieveHit contract and its golden JSON fixtures make the fact-vs-belief read shape unambiguous for slice 100120.</li>
+        <li>Claims in the phase file were independently reproducible: tests, clippy, fmt, and per-file coverage all match.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>The review is diff-centered; broader pre-existing assumptions (e.g., item-level epistemic enforcement owned by Phase 100030) were spot-checked rather than exhaustively traced.</li>
+          <li>No live concurrency probe was run for F-01; the finding rests on code reading plus the documented failure-mode table.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Add a concurrent create-or-append test to the belief suite so the race is observable rather than inferred.</li>
+          <li>Treat &#39;durable telemetry&#39; claims as requiring inspection of the actual durable row contents, not just the in-memory event struct.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>F-01: make create-or-append atomic in sqlite_belief/postgres_belief (or retry-on-duplicate in observe.rs) and add a concurrent test.</li>
+          <li>F-02: add &#39;belief&#39; to KNOWN_ADMISSION_KEYS with a default prior (or fix the signals.rs doc).</li>
+          <li>F-03: include confidence/source_type/entry_count in the durable audit detail_json.</li>
+          <li>F-07: append the mandated &#39;Keep this module focused&#39; header line to the nine new production files.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Design a durable, ordered audit stream for belief observes that survives process restart and supports FR-15 reconstruction, then wire a real BeliefSink.</li>
+          <li>Introduce a NotFound error code and a unified temporal_history API so belief as_of and triple as_of share one canonical time parser.</li>
+          <li>Add a single atomic upsert path for identity-bearing writes and property-test it under concurrency.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/opencode/phase010-adversary/report.html</span>
+          <span><b>Findings:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/opencode/phase010-adversary/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

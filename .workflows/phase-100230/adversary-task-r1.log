@@ -1,0 +1,19 @@
+2026-09-20T10:27:55Z START adversary r1 phase-100230 review. Reviewing staged diff (42 files, non-workflow).
+2026-09-20T10:35:52Z CMD: git status + git diff --cached --stat: 42 non-workflow files staged (A/M), .workflows/ untracked. All Rust files <=450 lines.
+2026-09-20T10:35:52Z CMD: launched independent full coverage gate (cargo llvm-cov --workspace --locked --json --fail-under-lines 90 --fail-under-functions 90, DATABASE_URL=compose pg) -> /tmp/cov-adversary.json (background).
+2026-09-20T10:56:36Z CMD: cargo fmt --all -- --check -> exit 0.
+2026-09-20T10:56:36Z CMD: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> exit 0.
+2026-09-20T10:56:36Z CMD: cargo test --locked --workspace (DATABASE_URL=compose pg) -> exit 0, 41 "test result: ok" suites, 0 failures.
+2026-09-20T10:56:36Z CMD: independent coverage gate cargo llvm-cov --workspace --locked --json --fail-under-lines 90 --fail-under-functions 90 -> exit 0; 220 files 0 below 90%; totals fn 98.75% / ln 97.84%.
+2026-09-20T10:56:36Z CMD: live CLI transcripts ./target/debug/am ops ... -> diagnose/verify/doctor exit 0; repair no-confirm exit 2 (CONFIRM_REQUIRED); reindex --target bogus exit 3; reindex dry exit 0.
+2026-09-20T10:56:36Z FINDING F-01 high: ops_cli.rs:156 failed-verify exit-1 branch uncovered; no CLI test exercises verify failure (ops_cli.rs:313-421); phase:308,324,341.
+2026-09-20T10:56:36Z FINDING F-02 medium: ops_tools.rs:145-158 + repair.rs:280,325 emit raw error text; only CLI redacts (ops_cli.rs:283-290).
+2026-09-20T10:56:36Z FINDING F-03 medium: rebuild.rs:100 whole-store cleanup_orphans (index_store.rs:141-145; sqlite_index.rs:333-349) on bank-scoped reindex.
+2026-09-20T10:56:36Z FINDING F-04 medium: ops_tools.rs:109-122 resolve_ctx result discarded; bank-less reindex (rebuild.rs:75-78) rebuilds all banks including shared.
+2026-09-20T10:56:36Z FINDING F-05 low: rebuild.rs:174-191 bypasses worker.rs:257-282 embed_and_observe; drops rolling latency/error observability.
+2026-09-20T10:56:36Z FINDING F-06 low: runtime_tests.rs:302-315 opens shared Postgres without PG_TEST_LOCK (coverage.md 4.4).
+2026-09-20T10:56:36Z FINDING F-07 low: report.rs:26-32 no MemTree ancestor target; phase Known Limitations 428-431 omits it.
+2026-09-20T10:56:36Z FINDING F-08 low: phase:6 Developer attribution label differs from developer task instruction.
+2026-09-20T10:56:36Z FINDING F-09 low: schema_ops_defs.rs:39,79 bank-scope text mismatch vs ops_tools.rs:62-69 / repair.rs:272-275.
+2026-09-20T10:56:36Z DELIVERABLE: findings.json + report.html + style.css written to .workflows/phase-100230/ (27KB JSON, generator ok). Phase Attribution Adversary row appended (only phase-file edit). Nothing staged/committed/restaged.
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100230/findings.json 0511a65b

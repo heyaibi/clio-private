@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100210 Hygiene Audit and Confirmed Cleanup Implementation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100210 Hygiene Audit and Confirmed Cleanup Implementation</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">3 important · 2 minor · 4 dismissed</span>
+    </div>
+    <p class="sum">Core noise scoring, read-only audit scanning, confirmed cleanup with dry-run default, secret masking on previews/logs, and durable log persistence are implemented and tested on both backends. However, duplicate target IDs cause an unhandled database primary key collision in clean, preflight validation for discard reasons misses the keep action, and 8 new Rust files omit the mandatory AGENTS.md responsibility header block.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-20</span>
+      <span><b>Applies to</b>Phase 100210 r1 staged diff (48 files, 4237 insertions)</span>
+      <span><b>Source</b>48 staged files across clio-hygiene, clio-store, clio-config, clio-mcp, clio-retrieve, clio-lib, and sql/001_core.sql</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>requirement.md FR-33 / §4.9.5.A: hygiene_audit, hygiene_clean, secret masking, durable log, and hygiene_log_list</li>
+        <li>requirement.md PR-6 / §7.4 / FR-23: operations removal only, never compliance erasure or DEK destruction</li>
+        <li>phase-100210-appendix-noise-scoring.md: deterministic scoring, 0.90 secret floor, 5-weight default profile, and suggested action bands</li>
+        <li>AGENTS.md: file size ≤ 450 lines, required module responsibility header, no roadmap references in code/comments</li>
+        <li>coverage.md: ≥ 90% aggregate and per-file lines + functions gate on all reported files</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">6 of 8 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Read-only hygiene_audit scanner with pagination, bank scope, min_score, and deterministic ranking</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-hygiene::audit::hygiene_audit implemented and tested in audit_tests.rs (t21_01); read-only behavior, descending score sorting, and pagination verified</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Deterministic noise scoring per phase-100210-appendix-noise-scoring.md with secret floor 0.90</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-hygiene::scoring::score_noise implements appendix weights (0.35/0.25/0.15/0.15/0.10) and secret override; verified in scoring_tests.rs</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Confirmed hygiene_clean with dry-run default when confirm is absent/false</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">clean.rs implements dry-run counting and confirmed flag/archive/discard/keep; however, duplicate target IDs cause database primary key collisions</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Secret detection and masking on responses, dry-run reports, and hygiene audit logs</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">detect.rs masked_preview redacts secret candidates to [REDACTED]; hygiene_tools.rs applies masked_clone defensively to log entries</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Durable hygiene_audit_log and callable hygiene_log_list tool registered on stdio and Streamable HTTP</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">hygiene_audit_logs table queried via HygieneStore trait on SQLite and Postgres; schema registered and bound on both MCP transports in clio-mcp</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Hygiene operations removal only, never compliance erasure or DEK destruction</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Discard reuses ops discard without KMS shredding (t21_04); erase_request action rejected (t21_06)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>All Rust files at or below 450 total lines</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All 40 touched Rust files verified &lt;= 450 lines (hybrid.rs and sqlite_store.rs at exactly 450, ranking.rs at 434)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md module responsibility and ownership header on every Rust file</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-store/src/hygiene_seq.rs and 7 newly created test files omit the mandatory //! # Responsibility header block</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">03</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Primary key collision in append_log on duplicate target item IDs crashes clean</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>append_log generates entry IDs as format!(&quot;hlg-{}-{}&quot;, args.batch_id, target.item_id). If a target item ID appears multiple times in args.targets, the second insert into hygiene_audit_logs violates the primary key constraint.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>In dry-run mode, clean fails with an unhandled database error instead of returning counts. In confirmed mode, an unhandled database error bubbles up via ? after previous mutations were committed, leaving mutations applied without structured abort reporting.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-hygiene/src/clean.rs:301: id: format!(&quot;hlg-{}-{}&quot;, args.batch_id, target.item_id); verified with sqlite UNIQUE constraint failed on duplicate insertion.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Include the target iteration index in the generated log ID (format!(&quot;hlg-{}-{}-{index}&quot;, args.batch_id, target.item_id)) or deduplicate target item IDs during preflight validation.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Preflight validation for confirmed discard reason bypasses CleanAction::Keep</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Line 165 only checks args.action == CleanAction::Discard when validating non-empty reason. When action is Keep, individual targets can resolve to Discard.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>If an operator calls confirmed clean with keep and an empty reason, validation passes initially, but when the first target resolved to Discard is processed, store.discard_item fails, aborting the batch mid-flight after earlier targets were mutated.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-hygiene/src/clean.rs:165: if args.confirm &amp;&amp; args.action == CleanAction::Discard &amp;&amp; args.reason.trim().is_empty()</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Extend preflight check to verify non-empty reason if args.action == CleanAction::Discard || (args.action == CleanAction::Keep &amp;&amp; args.targets.iter().any(|t| t.suggested_action.as_deref() == Some(&quot;discard&quot;))).</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Missing AGENTS.md responsibility and boundary header in production module and new test files</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md mandates the standard header structure (//! # Responsibility, ## Owns, ## Does not own, ## Boundary) for every Rust source file created or refactored.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Violates repository architectural conventions and AGENTS.md hard constraints. New production module crates/clio-store/src/hygiene_seq.rs and 7 new test files omit the header block.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/hygiene_seq.rs:1-15 contains only a one-line doc comment. Test files audit_edge_tests.rs, audit_tests.rs, clean_tests.rs, detect_tests.rs, scoring_tests.rs, hygiene_tools_tests.rs, and pg_hygiene_tests.rs lack the Responsibility block.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the full AGENTS.md header block with module responsibility and ownership boundaries to crates/clio-store/src/hygiene_seq.rs and the new test files.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">02</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>AuditReport omits incomplete signal and deadline handling on large bank scans</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Phase 100210 Section 10 states: Scorer timeout on huge bank -&gt; Deadline / pagination -&gt; Return partial page + incomplete signal; do not mutate.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>On banks with many items, hygiene_audit performs sequential N+1 item fetches without deadline enforcement or an incomplete status flag on AuditReport.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-hygiene/src/audit.rs:55-65: AuditReport struct lacks an incomplete field.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add incomplete: bool to AuditReport and support deadline/cancellation handling.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Divergence in hygiene log list field naming from requirement.md §4.9.5.A specification</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>requirement.md §4.9.5.A defines the hygiene log entry shape as {timestamp, actor, bank, action, item_ids[], noise_scores?, confirm, dry_run, result}.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Tool output returns database column names (created_at, bank_id, confirmed, item_id, detail.result) instead of the exact logical names defined in §4.9.5.A.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/hygiene_store.rs:40-61, crates/clio-mcp/src/hygiene_tools.rs:109-115.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add timestamp and bank aliases to HygieneLogEntry serialization or hygiene_log_list tool response.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Investigated whether clio-retrieve/src/hybrid.rs violates the 450-line limit: wc -l reports exactly 450 lines; hybrid.rs satisfies the hard constraint.</li>
+        <li>Investigated whether Store::item_is_archived probe allows archived items into search results: verified both SQLite FTS and Postgres TSVECTOR queries include items.archived_at IS NULL.</li>
+        <li>Investigated whether hygiene_clean could accidentally destroy DEKs or emit compliance tombstones: verified no crypto-shredding code or tombstone SQL is reachable from the hygiene crate.</li>
+        <li>Investigated whether roadmap isolation was violated: grep confirmed zero references to roadmap, phase numbers, or crates.md in production code or comments.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make check passes with 0 compiler warnings, clippy clean, and all workspace tests green — make check exited 0 on workspace test suite (109 passed in clio-write, 31+3+34 in clio-hygiene, 11 in clio-mcp, SQLite and Postgres parity)</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage passes with aggregate &gt;=90% and all 194 reported files &gt;=90% lines and functions — make coverage exited 0 with 94.68% lines (38229 total, 2034 missed) and 98.69% functions (2365 total, 31 missed); python scan confirmed 0 of 194 files below 90%</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Every Rust file created or modified stays at or below 450 total lines — wc -l verified on all 40 touched Rust files (largest: hybrid.rs 450, sqlite_store.rs 450, store.rs 450, postgres_store.rs 449, ranking.rs 434)</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Both stdio and Streamable HTTP MCP transports bind hygiene tools identically — Both transports route through shared McpHandler, which binds hygiene_audit, hygiene_clean, and hygiene_log_list from bound_tools()</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Performance of hygiene_audit on banks with &gt;100k items</p>
+          <p class="d">Test suite tests banks with tens to hundreds of items; near-duplicate comparison is O(n^2) with 64-token sketch · Large-bank stress benchmark with dedicated token inverted index · Low for first release; phase doc already notes 5k ceiling</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean, robust implementation of deterministic noise scoring with exact appendix default weights and secret score floor</li>
+        <li>Comprehensive test coverage across both SQLite and Postgres backends with 100% of reported files meeting the &gt;=90% function and line floors</li>
+        <li>Full roadmap isolation strictly preserved with zero roadmap or phase references across code and comments</li>
+        <li>Strict adherence to the 450-line file limit across all 40 touched Rust source files</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Did not catch the primary key collision vulnerability on duplicate target IDs during development tests</li>
+          <li>Omitted the required AGENTS.md Responsibility header block from hygiene_seq.rs and new test files</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Add an automated pre-commit hook or test assertion verifying that all new .rs files contain the required //! # Responsibility header block</li>
+          <li>Add test scenarios covering duplicate item IDs in batch and target parameters across all mutating tools</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix append_log in clean.rs to include the target iteration index or a monotonic sequence counter in the hygiene_audit_logs.id to prevent primary key collisions on duplicate target item IDs.</li>
+          <li>Update preflight validation in clean.rs to check whether any target resolves to Discard when reason is empty under CleanAction::Keep.</li>
+          <li>Add the required AGENTS.md responsibility and ownership header block to crates/clio-store/src/hygiene_seq.rs and the new test modules.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Add an explicit batch item fetcher or join in hygiene_audit to eliminate the N+1 get_memory_item query pattern over scanned active items.</li>
+          <li>Expose an unarchive action in hygiene_clean / HygieneStore over MCP so operators can reverse accidental item archiving directly via tool dispatch.</li>
+          <li>Implement deadline and pagination cancellation in hygiene_audit returning an incomplete status signal as specified in Section 10.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100210/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100210/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

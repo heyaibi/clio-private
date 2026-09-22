@@ -1,0 +1,10 @@
+2026-09-20 00:57:19 START adversary-task-r1 phase-100200 (run id phase-100200)
+2026-09-20 01:21:34
+findings so far: F-01 batch double-canonical two active rows; F-02 shared bank gate bypassed by batch/store; F-03 canonical single-op non-atomic; F-04 vacuous scratchpad-isolation test; F-05 missing negative tests; F-06 validate discard vs requirement delete; F-07 canonical gist-only; F-08 validate doc vs raw note storage; F-09 garbled schema_tests comment; F-10 pg test silent skip
+2026-09-20 01:28:12 re-verified gates: make test 880/37 suites exit0; cargo test -p clio-mcp 149; fmt --check exit0; clippy -D warnings exit0
+2026-09-20 01:28:12 re-ran make coverage: exit0 aggregate lines 94.65% funcs 98.71%; parsed 182 file rows, 0 below 90%
+2026-09-20 01:28:13 F-01 critical: batch two canonical_put same key -> stats items_active=2 (batch_preflight.rs:138-141)
+2026-09-20 01:28:13 F-02 high: batch store bank=shared COMMITTED while shared disabled; shared_store forbidden (additive_tools.rs:233-255, runtime.rs:245-259)
+2026-09-20 01:28:13 F-03..F-10 medium/low: canonical non-atomic; vacuous AC-100200-03 test; missing negative tests; validate delete/discard; gist-only canonical; header mismatch; schema_tests garble; pg silent skip
+2026-09-20 01:28:13 wrote findings.json + report.html + style.css to .workflows/phase-100200; appended Adversary attribution row to phase file
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100200/findings.json 7b1a187a

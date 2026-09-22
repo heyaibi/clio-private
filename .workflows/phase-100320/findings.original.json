@@ -1,0 +1,261 @@
+{
+  "run": "r1",
+  "phase": "100320",
+  "subject": "Phase 100320: Embedded Docker Lifecycle (am compose up|down)",
+  "verdict": "Adequate",
+  "verdict_justification": "The compose lifecycle implementation successfully delivers embedded asset materialization, OS/arch detection, Docker CLI integration, and pgvector image pinning with high unit test coverage. However, the test suite contains a high-severity defect where compose_cli_fail_tests.rs blocks indefinitely on process stdin during make check or cargo test in interactive environments, along with avoidable panics on I/O error paths and CLI formatting glitches.",
+  "metadata": {
+    "generated": "2026-09-22",
+    "applies_to": "staged diff (15 files)",
+    "source": "crates/clio-lib/src/compose_*, compose.yml, .env.example, README.md, hardware.md"
+  },
+  "standard": [
+    "AGENTS.md core principles: honesty, proper completion, <=450 lines per file, accurate module headers",
+    "coverage.md gate: >=90% function and line coverage per file and aggregate",
+    "phase-100320-compose-lifecycle.md Acceptance Criteria AC-100320-01 through AC-100320-08 and test scenarios T100320-01 through T100320-12",
+    "rust-best-practices: avoid avoidable panics in production I/O boundaries",
+    "Security constraints: owner-only .env permissions and secret hygiene"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100320-01: am compose up materializes project-root compose + arch overlay and starts selection",
+      "status": "Fully satisfied",
+      "evidence": "compose_cli_tests.rs::up_materializes_and_runs_the_selected_profile verified; compose.yml, compose.arm64.yml, sql/*, models/README.md materialized with correct arguments",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100320-02: am compose down stops the environment",
+      "status": "Fully satisfied",
+      "evidence": "compose_cli_tests.rs::down_reverses_up_using_the_recorded_selection and down_is_idempotent_on_a_stopped_stack verified",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100320-03: OS/arch and Docker preconditions fail closed",
+      "status": "Fully satisfied",
+      "evidence": "detect_unsupported_fails_closed and failed_probe_leaves_no_files verify refusal before any file writes",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100320-04: Secrets never printed; files restricted",
+      "status": "Partially satisfied",
+      "evidence": "env_contents_hold_compose_variables_only verified; however write_env uses non-atomic write followed by chmod",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100320-05: User-edited files are protected",
+      "status": "Fully satisfied",
+      "evidence": "user_edited_compose_file_is_backed_up_before_overwrite and existing_user_env_is_never_overwritten verified",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100320-06: Existing Make/Compose workflow unchanged",
+      "status": "Fully satisfied",
+      "evidence": "Makefile untouched; compose profile membership preserved; workspace tests pass",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100320-07: An empty directory becomes a working, schema-initialized stack",
+      "status": "Fully satisfied",
+      "evidence": "Empty-dir materialization and bind mount verification tested; prototype run recorded in phase evidence",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100320-08: The pgvector image is pinned and its extension version recorded",
+      "status": "Fully satisfied",
+      "evidence": "compose.yml pinned to pgvector/pgvector:0.8.6-pg16 shipping pgvector 0.8.6",
+      "severity": "High"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Test prompt_tty_false_is_non_interactive_and_true_reads_stdin hangs indefinitely on unclosed stdin",
+      "severity": "Important",
+      "why_it_matters": "Running make check or cargo test in any interactive terminal or runner with inherited, unclosed stdin hangs indefinitely on read_line, freezing CI / local test runs.",
+      "impact": "Prevents automated or interactive test runs from completing without explicit </dev/null stdin redirection.",
+      "evidence": "crates/clio-lib/src/compose_cli_fail_tests.rs:144 calls prompt_tty(true), invoking std::io::stdin().read_line(). Task-56 running make check hung for over 6 minutes until cancelled.",
+      "confidence": "High",
+      "proposed_fix": "Do not call prompt_tty(true) on process stdin in unit tests. Parameterize the reader in prompt_tty(is_tty, reader) or test read_answer with in-memory buffers."
+    },
+    {
+      "id": 2,
+      "title": "Avoidable panics in file backup and .env permission error paths",
+      "severity": "Important",
+      "why_it_matters": "Production CLI commands should return Result rather than crashing with unhandled thread panics on filesystem errors.",
+      "impact": "If a user runs am compose up on a read-only directory, a full disk, or a filesystem that does not support Unix file modes (exFAT/FAT32/SMB), the command crashes with a panic.",
+      "evidence": "crates/clio-lib/src/compose_assets.rs:144 uses .expect(\"back up user-edited compose file\"); crates/clio-lib/src/compose_env.rs:85 uses .expect(\"restrict generated .env permissions\").",
+      "confidence": "High",
+      "proposed_fix": "Propagate io::Error as Result<(), String> in backup_edited and restrict_owner_only, returning clear error messages if backup or permission changes fail."
+    },
+    {
+      "id": 3,
+      "title": "CLI help text formatting corrupted in main.rs",
+      "severity": "Minor",
+      "why_it_matters": "Formatting defect in primary user-facing am help output reduces CLI polish and consistency.",
+      "impact": "am help output has misaligned command entries (3 spaces on am compose and am retention schema) and Exit codes: stripped of indentation.",
+      "evidence": "crates/clio-lib/src/main.rs:276-281: Exit codes: lost indent, am compose has 3 leading spaces, am retention schema has 3 leading spaces.",
+      "confidence": "High",
+      "proposed_fix": "Restore 2-space command indent and 23-space description indent in print_help() in main.rs."
+    },
+    {
+      "id": 4,
+      "title": "Non-atomic .env file creation introduces brief world-readable window before chmod",
+      "severity": "Minor",
+      "why_it_matters": "Security guidelines require owner-only permissions on sensitive files. Writing then chmodding leaves a race window where other local users can open the file.",
+      "impact": "Other local processes or users on a multi-user machine could open .env before restrict_owner_only executes.",
+      "evidence": "crates/clio-lib/src/compose_env.rs:72-73: std::fs::write(&path, contents) followed by restrict_owner_only(&path).",
+      "confidence": "High",
+      "proposed_fix": "Use std::fs::OpenOptions with Unix mode(0o600) to create the file atomically with mode 0600 on Unix platforms."
+    },
+    {
+      "id": 5,
+      "title": "Executing am compose with no subcommand produces awkward error message",
+      "severity": "Minor",
+      "why_it_matters": "Poor user experience when invoking the command without subcommands.",
+      "impact": "Users running am compose see unknown compose command ``; try am compose up|down.",
+      "evidence": "crates/clio-lib/src/compose_cli.rs:62-63: sub.as_str() matches empty string as other -> eprintln!(\"unknown compose command `{other}`; try `am compose up|down`\").",
+      "confidence": "High",
+      "proposed_fix": "Check if sub.is_empty() and print help with exit code 0 or return missing compose subcommand; try am compose up|down."
+    },
+    {
+      "id": 6,
+      "title": "Traceability table incorrectly cites NFR-6 for secret hygiene",
+      "severity": "Minor",
+      "why_it_matters": "Documentation traceability must cite the accurate requirement IDs per AGENTS.md rules.",
+      "impact": "phase-100320-compose-lifecycle.md:340 cites NFR-6 / secret hygiene, but NFR-6 in requirement.md specifies audit export completeness.",
+      "evidence": "requirement.md:612 defines NFR-6 as: 'All confidence, admission-score, and telemetry fields SHALL be included in any data export...'; secret masking is in §4.9.5.B, FR-29, FR-32.",
+      "confidence": "High",
+      "proposed_fix": "Update Section 11 traceability to cite §4.9.5.B / FR-29 / FR-32 instead of NFR-6."
+    },
+    {
+      "id": 7,
+      "title": "Overstated project isolation in documentation given hardcoded compose project name",
+      "severity": "Minor",
+      "why_it_matters": "Users or downstream agents may assume multiple compose roots can run simultaneously without interference.",
+      "impact": "Because compose.yml hardcodes name: clio and .env has fixed host ports 34310-34313, running am compose down in one directory tears down containers started from another directory.",
+      "evidence": "phase-100320-compose-lifecycle.md:363 states running from different directories targets different roots, but compose.yml:20 hardcodes name: clio.",
+      "confidence": "High",
+      "proposed_fix": "Clarify in hardware.md and phase doc that the stack uses project name clio and fixed ports, so concurrent stacks across directories require COMPOSE_PROJECT_NAME / port overrides."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Test prompt_tty_false_is_non_interactive_and_true_reads_stdin hangs indefinitely on unclosed stdin",
+      "evidence": "crates/clio-lib/src/compose_cli_fail_tests.rs:144 calls prompt_tty(true), which reads from std::io::stdin().lock() and blocks during make check / cargo test unless stdin is redirected from /dev/null.",
+      "requirement_ref": "Test Strategy §8 / T100320-04 / Clean Test Execution",
+      "recommendation": "Parameterize prompt reader in prompt_tty or test prompt parsing via in-memory readers; remove direct call to prompt_tty(true) in unit test."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Avoidable panics in file backup and .env permission error paths",
+      "evidence": "crates/clio-lib/src/compose_assets.rs:144 (.expect(\"back up user-edited compose file\")) and crates/clio-lib/src/compose_env.rs:85 (.expect(\"restrict generated .env permissions\")) panic on expected I/O failures (disk full, read-only dirs, unsupported chmod filesystems).",
+      "requirement_ref": "rust-best-practices / Error handling with Result types / Section 10 Failure Handling",
+      "recommendation": "Return Result<(), String> from backup_edited and restrict_owner_only and propagate errors cleanly to the CLI."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "CLI help text formatting corrupted in main.rs",
+      "evidence": "crates/clio-lib/src/main.rs:276-281: Exit codes: indentation was stripped to 0 spaces, am compose and am retention schema were shifted to 3 spaces.",
+      "requirement_ref": "Task 1 / CLI Usability",
+      "recommendation": "Restore uniform 2-space command indent and 23-space description indent in print_help()."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Non-atomic .env file creation introduces brief world-readable window before chmod",
+      "evidence": "crates/clio-lib/src/compose_env.rs:72-73: std::fs::write(&path, contents) creates file with default umask (0644) before restrict_owner_only chmod 0600.",
+      "requirement_ref": "Section 7 Security Constraints / T100320-06",
+      "recommendation": "Use OpenOptions with Unix mode(0o600) to create .env atomically with mode 0600."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Executing am compose with no subcommand produces awkward error message",
+      "evidence": "crates/clio-lib/src/compose_cli.rs:62-63: running `am compose` prints `unknown compose command ``; try `am compose up|down``.",
+      "requirement_ref": "Task 1 / CLI Usability",
+      "recommendation": "Check if sub.is_empty() and print help with exit 0 or emit clean 'missing subcommand' message."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Traceability table incorrectly cites NFR-6 for secret hygiene",
+      "evidence": "roadmap/phase-100320-compose-lifecycle.md:340 cites NFR-6 for secret hygiene, whereas requirement.md:612 defines NFR-6 as audit data export completeness.",
+      "requirement_ref": "requirement.md:612 vs phase file §11 Traceability",
+      "recommendation": "Update Section 11 traceability to cite §4.9.5.B / FR-29 / FR-32 instead of NFR-6."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Overstated project isolation in documentation given hardcoded compose project name",
+      "evidence": "roadmap/phase-100320-compose-lifecycle.md:363 states running from different directories targets different roots, but compose.yml:20 hardcodes name: clio.",
+      "requirement_ref": "Section 12 Known Limitations / AC-100320-01",
+      "recommendation": "Clarify in hardware.md and phase doc that the stack uses fixed project name clio and ports."
+    }
+  ],
+  "dismissed": [
+    "Selection of single services (e.g. --services embed) activating paired profiles: dismissed because compose profiles are intentionally coarse-grained per compose.yml design.",
+    "Data volumes preserved across am compose down: dismissed because preserving volumes without an explicit -v flag is standard compose behavior and documented in §1.2.",
+    "Lack of Docker SDK: dismissed because shelling out to docker CLI is an explicit architectural decision in §2 and §5."
+  ],
+  "verification": [
+    {
+      "claim": "All unit tests pass with clean cargo test",
+      "classification": "Contradicted",
+      "source_note": "Running cargo test in interactive shells hangs on compose_cli_fail_tests.rs:144 prompt_tty(true) until stdin is redirected with </dev/null."
+    },
+    {
+      "claim": "All reported Rust source files have >=90% line and function coverage",
+      "classification": "Established",
+      "source_note": "cargo llvm-cov reports: compose_assets.rs 100% funcs/98.65% lines; compose_cli.rs 90.00%/96.17%; compose_docker.rs 92.31%/99.15%; compose_env.rs 100%/100%."
+    },
+    {
+      "claim": "All Rust source files are <= 450 lines",
+      "classification": "Established",
+      "source_note": "All production and test files are well under 450 lines (compose_cli.rs is 305 lines; compose_cli_fail_tests.rs is 275 lines)."
+    },
+    {
+      "claim": "pgvector/pgvector:0.8.6-pg16 is valid and ships pgvector 0.8.6",
+      "classification": "Established",
+      "source_note": "Docker Hub official tag verified and confirmed to package pgvector 0.8.6 with halfvec support."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Behavior on non-standard Unix mount options (e.g., nodev/noexec on /tmp)",
+      "why_unknown": "Not tested on restricted tmpfs mounts",
+      "what_would_resolve_it": "Integration test on restricted mount filesystem",
+      "materiality": "Low: developer machines typically have standard /tmp permissions"
+    }
+  ],
+  "strengths": [
+    "Clean modular decomposition across compose_assets, compose_cli, compose_docker, and compose_env.",
+    "Comprehensive coverage of happy and failure paths with stubbed Docker runners avoiding container leaks.",
+    "Precondition checks (platform detection, daemon probe) run strictly before any file writes, ensuring zero partial state.",
+    "Accurate AGENTS.md ownership headers and strict adherence to <=450 lines constraint.",
+    "Zero external crate dependencies added."
+  ],
+  "regrets": [
+    "Directly invoking prompt_tty(true) on process global stdin in a unit test, causing make check to freeze in interactive terminals.",
+    "Using .expect() in backup and chmod error paths rather than propagating Result errors.",
+    "Sloppy indentation formatting edits in main.rs help text."
+  ],
+  "process_changes": [
+    "Never attach unit tests directly to process-global stdin or stdout streams without mock abstractions.",
+    "Always run make check in an interactive terminal before staging to catch blocking tests."
+  ],
+  "plan_1hr": [
+    "Fix compose_cli_fail_tests.rs:144 to not call prompt_tty(true) on real stdin, unfreezing make check.",
+    "Fix indentation in crates/clio-lib/src/main.rs:276-281 for Exit codes: and am compose entries.",
+    "Replace .expect() in compose_assets.rs:144 and compose_env.rs:85 with Result error propagation."
+  ],
+  "plan_unlimited": [
+    "Create .env atomically using OpenOptionsExt::mode(0o600) on Unix.",
+    "Handle empty subcommand in am compose to print help or a clean 'missing subcommand' message.",
+    "Correct NFR-6 traceability citation in phase documentation.",
+    "Document compose project name and port constraints across multiple working directories."
+  ]
+}

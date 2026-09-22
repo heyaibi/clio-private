@@ -1,0 +1,14 @@
+2026-09-22T18:26:44Z START remediator-task-r1 phase 100362; backup findings.original.json pre-exists (sha256 0d653949...) matching findings.json
+2026-09-22T18:26:44Z triage: F-01 high (status creates 512KB db on missing sqlite path) CONFIRMED by repro; F-02 medium (cargo fmt --check fails 5 files) CONFIRMED; F-03 low (masking only WATCHED_FIELDS) -> fix via overlay-key accessor; F-04 low (port test ephemeral only) -> add contract-port test. All coupled around status_cli.rs => fix directly, no workers.
+2026-09-22T18:26:44Z F-01 repro before fix: `clio status --backend sqlite --db /tmp/nonexistent-remed-test.db` exit 0, created 512000-byte file
+2026-09-22T18:34:36Z F-01 fix: status_cli.rs:207 open_chosen rejects missing sqlite file via Path::exists -> AmError(NotFound). Repro after: exit 1, ls shows No such file. No worker (coupled slice, done directly).
+2026-09-22T18:34:36Z F-02 fix: cargo fmt --all applied; cargo fmt --all -- --check exits 0.
+2026-09-22T18:34:36Z F-03 fix: added Runtime::deployment_keys() (clio-config/src/config/mod.rs:221); build_setup masks all secret overlay keys. Evidence: extract.token->****mnop, custom.secret->****7890, raw grep 0.
+2026-09-22T18:34:36Z F-04 fix: port_scan_tests.rs listener_on_contract_port_is_reported binds 34300 and asserts listening_ports contains it.
+2026-09-22T18:34:36Z tests: cargo test --package clio --bin clio -> 180 passed/0 failed (was 177, +3); clio-config 147 passed/0 failed; clippy clio+clio-config -D warnings clean.
+2026-09-22T18:34:36Z make check -> exit 0 (no failures).
+2026-09-22T18:34:36Z make coverage -> exit 0: 279 files, TOTAL lines 97.91% functions 98.87%, all per-file >=90%. Scoped: status_cli.rs 97.76%/93.33%, config/mod.rs 99.18%/100%, port_scan.rs 100%/100% (lines/functions).
+2026-09-22T18:34:36Z all touched Rust files <=450 lines (status_cli 382, config/mod 430, status_probe_tests 286, port_scan_tests 87).
+2026-09-22T18:34:36Z updated findings.json (F-01..F-04 resolved with evidence; AC-100362-04 -> Fully satisfied; plan_1hr resolved; plan_unlimited[1] done, [0] deferred with rationale) and phase Attribution Remediator row + Known Limitations + Remedy Round note. No git add (changes left unstaged).
+2026-09-22T18:34:36Z FINISH round 1: 4/4 findings fixed, 0 refuted, make check exit 0, coverage exit 0.
+REMEDIATOR_DONE d12bca3c

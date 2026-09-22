@@ -1,0 +1,261 @@
+{
+  "run": "r1",
+  "phase": "100110",
+  "subject": "Phase 100110: Dense and Lexical Index Pipelines",
+  "verdict": "Good",
+  "verdict_justification": "The developer delivered all core Phase 100110 capabilities: the clio-index crate with sidecar HTTP client, transactional outbox worker, rebuild hooks, and dual-backend vector/lexical search with extensive test coverage meeting all gates (98.85% functions, 98.50% lines aggregate, 0 files below 90%). The adversarial review identified two important functional/operational edge-case issues (zero-limit search returns 1 hit on IndexStore, and single-IP DNS resolution in HTTP connect failing on dual-stack localhost) and four minor issues (module headers on 7 test files, dead widening loop, eager rebuild page buffering, and missing Content-Length parsing).",
+  "metadata": {
+    "generated": "2026-09-18",
+    "applies_to": "master (staged phase-100110 diff)",
+    "source": "crates/clio-index, crates/clio-store, crates/clio-config, crates/clio-types, crates/clio-lib, sql/001_core.sql"
+  },
+  "standard": [
+    "PR-9 / FR-3: Decoupled write and structural maintenance; leaf write durability never blocks on embedding.",
+    "Dual backend parity: SQLite (sqlite-vec + FTS5) and Postgres (pgvector + FTS) support identical search semantics.",
+    "Profile C packaging: remote HTTP sidecar only; zero host-process ML model loading.",
+    "Coverage gate: >=90% function and line coverage workspace aggregate and per-file.",
+    "Hard constraints: <=450 lines per Rust file; AGENTS.md file headers; roadmap isolation preserved."
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100110-01: Embedding pipeline via sidecar/stub",
+      "status": "Fully satisfied",
+      "evidence": "TeiEmbedder and std::net::TcpStream HTTP client implemented in clio-index; verified by T100110-01, T100110-02, T100110-08, T100110-11 test scenarios.",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100110-02: Dense search both backends",
+      "status": "Partially satisfied",
+      "evidence": "Dense cosine search implemented on SQLite vec0 and Postgres pgvector with domain filters; IndexStore returns 1 hit when limit is 0 (F-01).",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100110-03: Lexical search both backends",
+      "status": "Partially satisfied",
+      "evidence": "SQLite FTS5 bm25 and Postgres tsvector/GIN implemented; IndexStore returns 1 hit when limit is 0 (F-01).",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100110-04: Index separable from leaf write success",
+      "status": "Fully satisfied",
+      "evidence": "Leaf write durably enqueues in transactional outbox index_pending; ACK under 500ms verified with 700ms-delayed sidecar in T100110-11.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100110-05: Rebuild hooks",
+      "status": "Fully satisfied",
+      "evidence": "IndexCoordinator::rebuild_indexes supports dry-run, confirmed apply, dense/lexical/all targets, and orphan cleanup.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100110-06: Bank isolation",
+      "status": "Fully satisfied",
+      "evidence": "Search primitives fail closed on empty bank and reject cross-bank retrieval (verified in T100110-10 and contract tests).",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100110-07: Phase 100020 appendix ceilings respected",
+      "status": "Fully satisfied",
+      "evidence": "SQLite dense retrieval remains exact KNN over vec0 with widening fetch; no ANN dependency added.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Rule: Line count <= 450 lines per Rust source file",
+      "status": "Fully satisfied",
+      "evidence": "All 34 staged Rust files verified <=450 lines (largest is sqlite_store.rs at 438 lines).",
+      "severity": "High"
+    },
+    {
+      "requirement": "Rule: AGENTS.md file header structure",
+      "status": "Partially satisfied",
+      "evidence": "Seven newly created test and support files omit the Responsibility/Owns/Boundary docblocks (F-03).",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Rule: Coverage >= 90% lines and functions per file and aggregate",
+      "status": "Fully satisfied",
+      "evidence": "make coverage exit 0: 98.85% functions, 98.50% lines aggregate; 0 files below 90%.",
+      "severity": "High"
+    },
+    {
+      "requirement": "Rule: Roadmap isolation",
+      "status": "Fully satisfied",
+      "evidence": "Zero references to roadmap/ or phase numbers found in staged code or comments outside roadmap/ dir.",
+      "severity": "Medium"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "IndexStore search primitives return 1 hit when limit is 0",
+      "evidence": "crates/clio-store/src/sqlite_index.rs:148, crates/clio-store/src/sqlite_index.rs:187, crates/clio-store/src/postgres_index.rs:146, crates/clio-store/src/postgres_index.rs:195",
+      "requirement_ref": "§4.5 / AC-100110-02, AC-100110-03",
+      "recommendation": "Add an early guard checking `if limit == 0 { return Ok(Vec::new()); }` at the start of `dense_search` and `lexical_search` on both SqliteStore and PostgresStore."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "HTTP client connects only to first resolved IP address, failing on dual-stack localhost",
+      "evidence": "crates/clio-index/src/http.rs:91-96",
+      "requirement_ref": "AC-100110-01 / Task 1",
+      "recommendation": "Iterate through all candidate addresses returned by `to_socket_addrs()` and try `TcpStream::connect_timeout` on each candidate until one succeeds or all fail."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Missing AGENTS.md mandatory module header structure in 7 newly created Rust files",
+      "evidence": "crates/clio-config/src/config/embed_knob_tests.rs:1-3, crates/clio-index/src/embed_test_support.rs:1-3, crates/clio-index/src/embed_tests.rs:1-3, crates/clio-index/src/http_tests.rs:1-3, crates/clio-index/src/rebuild_tests.rs:1-3, crates/clio-index/src/worker_tests.rs:1-3, crates/clio-store/src/index_store_tests.rs:1-3",
+      "requirement_ref": "AGENTS.md (File Header)",
+      "recommendation": "Add the required module header format (`//! # Responsibility`, `//! ## Owns`, `//! ## Does not own`, `//! ## Boundary`) to all newly created test and test-support modules."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Dead widening loop and potential duplicate accumulation in SqliteStore::lexical_search",
+      "evidence": "crates/clio-store/src/sqlite_index.rs:148-175",
+      "requirement_ref": "AC-100110-03 / Task 3",
+      "recommendation": "Remove the redundant loop or initialize `out` inside the loop body, relying on SQL-level filtering and limits."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Eager full-bank ID buffering in visible_pages during rebuild sweeps",
+      "evidence": "crates/clio-index/src/worker.rs:364-377",
+      "requirement_ref": "Task 4 / Phase 100020 vector ceilings",
+      "recommendation": "Stream or paginate item IDs on demand rather than buffering all pages for the entire bank into memory upfront."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "HTTP client reads until EOF without checking Content-Length header",
+      "evidence": "crates/clio-index/src/http.rs:162-187",
+      "requirement_ref": "AC-100110-01 / Task 1",
+      "recommendation": "Parse `Content-Length` from the HTTP response head and terminate reading once the exact byte count is received."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "IndexStore search primitives return 1 hit when limit is 0",
+      "severity": "Important",
+      "why_it_matters": "Callers requesting zero results (e.g. for existence checks or pagination probes) receive an unexpected match.",
+      "impact": "Violates expected query limit semantics for callers directly invoking IndexStore trait methods.",
+      "evidence": "crates/clio-store/src/sqlite_index.rs:148, crates/clio-store/src/sqlite_index.rs:187, crates/clio-store/src/postgres_index.rs:146, crates/clio-store/src/postgres_index.rs:195",
+      "confidence": "High",
+      "proposed_fix": "Add an early check `if limit == 0 { return Ok(Vec::new()); }` at the start of dense_search and lexical_search on both SqliteStore and PostgresStore."
+    },
+    {
+      "id": 2,
+      "title": "HTTP client connects only to first resolved IP address, failing on dual-stack localhost",
+      "severity": "Important",
+      "why_it_matters": "Connecting to http://localhost:<port> fails if localhost resolves to IPv6 ::1 first while the sidecar is bound only to IPv4 127.0.0.1.",
+      "impact": "Standard development and container setups where TEI listens on 127.0.0.1 fail to connect if host is specified as 'localhost'.",
+      "evidence": "crates/clio-index/src/http.rs:91-96",
+      "confidence": "High",
+      "proposed_fix": "Iterate through the SocketAddr iterator from to_socket_addrs() and attempt connect_timeout on each until one succeeds."
+    },
+    {
+      "id": 3,
+      "title": "Missing AGENTS.md mandatory module header structure in 7 newly created Rust files",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md mandates the Responsibility/Owns/Boundary docblock header on every Rust file.",
+      "impact": "Non-compliance with repository file header standards.",
+      "evidence": "crates/clio-config/src/config/embed_knob_tests.rs:1-3, crates/clio-index/src/embed_test_support.rs:1-3, crates/clio-index/src/embed_tests.rs:1-3, crates/clio-index/src/http_tests.rs:1-3, crates/clio-index/src/rebuild_tests.rs:1-3, crates/clio-index/src/worker_tests.rs:1-3, crates/clio-store/src/index_store_tests.rs:1-3",
+      "confidence": "High",
+      "proposed_fix": "Add the required module header format including //! # Responsibility, //! ## Owns, //! ## Does not own, and //! ## Boundary to all 7 files."
+    },
+    {
+      "id": 4,
+      "title": "Dead widening loop and potential duplicate accumulation in SqliteStore::lexical_search",
+      "severity": "Minor",
+      "why_it_matters": "The loop in sqlite_index.rs::lexical_search is dead code because SQL filtering handles limits directly. If ever reached, it would duplicate results.",
+      "impact": "Misleading code structure that mimics dense vector widening where it does not apply.",
+      "evidence": "crates/clio-store/src/sqlite_index.rs:148-175",
+      "confidence": "High",
+      "proposed_fix": "Remove the loop and query directly with limit as parameter."
+    },
+    {
+      "id": 5,
+      "title": "Eager full-bank ID buffering in visible_pages during rebuild sweeps",
+      "severity": "Minor",
+      "why_it_matters": "Rebuilding indexes for a bank with tens of thousands of items buffers all item IDs in memory at once.",
+      "impact": "Unnecessary memory consumption during reindex operations on large banks.",
+      "evidence": "crates/clio-index/src/worker.rs:364-377",
+      "confidence": "Medium",
+      "proposed_fix": "Stream or paginate item IDs lazily during rebuild sweeps."
+    },
+    {
+      "id": 6,
+      "title": "HTTP client reads until EOF without checking Content-Length header",
+      "severity": "Minor",
+      "why_it_matters": "If a sidecar server sends a full Content-Length response but delays socket shutdown, read_response blocks until the timeout.",
+      "impact": "Potential latency spikes if connected to HTTP/1.1 servers that don't immediately close sockets on Connection: close.",
+      "evidence": "crates/clio-index/src/http.rs:162-187",
+      "confidence": "High",
+      "proposed_fix": "Parse Content-Length from response headers and terminate reading once expected bytes have been consumed."
+    }
+  ],
+  "dismissed": [
+    "ANN support on SQLite: Confirmed Phase 100020 appendix allows exact KNN for SQLite vec0 at current scale ceiling.",
+    "Postgres ts_rank_cd difference from BM25: Documented as expected; rank fusion will be used in slice 100120.",
+    "Missing external HTTP library: Zero new external dependencies is a stated constraint; custom std::net::TcpStream transport is compliant."
+  ],
+  "verification": [
+    {
+      "claim": "All workspace tests pass (409 passed, 0 failed)",
+      "classification": "Established",
+      "source_note": "Re-executed make test: 409 passed across all crates."
+    },
+    {
+      "claim": "Workspace aggregate line and function coverage >=90%",
+      "classification": "Established",
+      "source_note": "Re-executed make coverage: 98.85% functions, 98.50% lines aggregate."
+    },
+    {
+      "claim": "Every reported file achieves >=90% line and function coverage",
+      "classification": "Established",
+      "source_note": "Inspected all files in make coverage output: 0 files below 90% on either metric."
+    },
+    {
+      "claim": "All Rust files remain <=450 lines",
+      "classification": "Established",
+      "source_note": "Scanned all 34 staged Rust files: all <=450 lines."
+    },
+    {
+      "claim": "Roadmap isolation preserved in code and comments",
+      "classification": "Established",
+      "source_note": "Scanned staged non-roadmap files: 0 references to roadmap or phase numbers."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Behavior of TEI sidecar when encountering non-English documents",
+      "why_unknown": "No multilingual test fixture was included in unit tests.",
+      "what_would_resolve_it": "Integration test with multi-language token sets against live TEI sidecar.",
+      "materiality": "Low for Phase 100110 English baseline model."
+    }
+  ],
+  "strengths": [
+    "Strict compliance with zero-new-dependencies rule by implementing a clean std::net::TcpStream HTTP client.",
+    "Strong decoupling of leaf write path from sidecar embedding via transactional outbox (index_pending).",
+    "Comprehensive unit and integration test coverage for failure modes, backoff, and dimension mismatches.",
+    "Dual-backend parity test suite executing identical contract assertions on both SQLite and Postgres."
+  ],
+  "regrets": [
+    "Did not add module header documentation to the test files before completing developer turn."
+  ],
+  "process_changes": [
+    "Automate pre-commit verification of file headers across all files including test modules."
+  ],
+  "plan_1hr": [
+    "Fix F-01 by adding `if limit == 0 { return Ok(Vec::new()); }` to `dense_search` and `lexical_search` in `sqlite_index.rs` and `postgres_index.rs`.",
+    "Fix F-02 in `crates/clio-index/src/http.rs` by looping over `to_socket_addrs()` candidates in `connect()`.",
+    "Fix F-03 by adding the mandatory AGENTS.md module header docblocks to all 7 newly created Rust files.",
+    "Fix F-04 by cleaning up the dead widening loop in `SqliteStore::lexical_search`."
+  ],
+  "plan_unlimited": [
+    "Implement streaming rebuild sweeps in `IndexCoordinator` that process pages lazily without full-bank buffering in memory.",
+    "Enhance the raw TCP HTTP client to parse Content-Length headers and reuse connections with keep-alive, or adopt an approved minimal HTTP library like `ureq`."
+  ]
+}

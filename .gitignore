@@ -1,3 +1,12 @@
 .*
 !.gitignore
 !.vscode
+!.workflows
+!.workflows/**
+__pycache__/
+.workflows/_old/
+.workflows/.harness-rotation-*.json
+.workflows/.driver/
+.workflows/.driver-cron.log
+*.tui.log
+*.profraw

@@ -1,0 +1,14 @@
+2026-09-17T19:43:25Z START remediator phase-100060 r1; findings.original.json already present (identical backup). 6 findings (F-01 critical, F-02..F-06).
+2026-09-17T19:50:00Z Fixed F-01..F-06 in code+tests; now running make check (single verify pass).
+2026-09-17T19:52:00Z F-01 fixed maintenance_tests.rs:56 NoopMaintenance::default() -> NoopMaintenance.
+2026-09-17T19:52:30Z F-02 headers completed: chunk.rs, consolidate.rs, ingest.rs, parallel.rs, maintenance.rs.
+2026-09-17T19:55:00Z F-04 maintenance.rs: SharedMaintenanceHook + dispatch_async (detached thread); ingest.rs removed sync on_leaf_attached (was :266), added dispatch_async after admit; MaintenanceHook contract documented.
+2026-09-17T19:55:30Z F-05 ingest.rs for_profile concurrency A=1/B=2/C=4 from hardware.md vCPU budgets; profile_configs_are_distinct test.
+2026-09-17T19:56:00Z F-06 removed dead reverify_if_needed + branch; documented immutable canonical snapshot; gated_store_verified is the post-merge verify authority.
+2026-09-17T19:57:00Z F-03 new crates/clio-write/src/ingest_gate_tests.rs: genuine t08_admission_reject (theta pinned + mirror novelty) and own-body t09 cross-bank; declared in ingest.rs.
+2026-09-17T20:00:00Z make check attempt 1 FAILED: t05 detected a leftover synchronous on_leaf_attached call. Fixed by removing ingest.rs sync call.
+2026-09-17T20:05:00Z make check PASS (fmt + clippy -D warnings + workspace tests; 65 clio-write lib tests).
+2026-09-17T20:12:00Z make coverage PASS: TOTAL lines 99.17%, functions 99.84%; min per-file lines 93.28% (parallel.rs), min functions 91.67% (verify_date.rs). No file < 90%.
+2026-09-17T20:15:00Z findings.json updated: all F-01..F-06 resolved with evidence; plan_1hr/plan_unlimited marked resolved; remediation summary added. Phase file attribution + evidence updated.
+2026-09-17T20:16:00Z cargo test -p clio-write PASS (65 passed) after adding header to ingest_gate_tests.rs.
+2026-09-17T20:18:00Z FINISH all 6 findings resolved; make check PASS; make coverage PASS (lines 99.17%, functions 99.84%); phase file attribution/evidence and findings.json updated; changes left unstaged (no git add). REMEDIATOR_DONE.

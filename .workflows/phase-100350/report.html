@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100350: Wire Dense Indexing, Reranking, and Extraction into the Live MCP Runtime</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100350: Wire Dense Indexing, Reranking, and Extraction into the Live MCP Runtime</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">4 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">The developer successfully wired the outbox drain, lexical-only fallback, reranker attachment, and library raw-ingest pipeline without blocking the write path. All 276 files meet the &gt;=90% coverage threshold (97.88% lines / 98.94% functions aggregate) and the 450-line limit. Four minor issues were identified: an omitted AGENTS.md responsibility header in a new test file, silent fallback on partial embed configurations, lack of an end-to-end retrieve assertion in raw ingest tests, and a superficial readiness check for extract_available.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-22</span>
+      <span><b>Applies to</b>git staged diff (Phase 100350 r1)</span>
+      <span><b>Source</b>25 staged files across crates/clio-mcp, clio-index, clio-write, clio-lib, clio-config, clio-store</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>Phase 100350 implementation specification (roadmap/phase-100350-live-index-extraction-wiring.md)</li>
+        <li>AGENTS.md core principles, file header rules, and 450-line source file limit</li>
+        <li>coverage.md gate: &gt;=90% lines and functions aggregate and per-file</li>
+        <li>PR-9 / FR-3 (leaf queryable before structural maintenance), NFR-2 (bounded retrievability &lt; 2s)</li>
+        <li>FR-4 (verified extraction), FR-28 (maintenance_status inspection)</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">7 of 9 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Construct and run index drain in MCP runtime with lexical-only fallback (Task 1)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">IndexCoordinator decoupled; IndexDrain and background sweeper running in clio-mcp; t35_01, t35_03, t35_13, t35_14 all pass</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Non-blocking write path meeting NFR-2 (Task 1)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Write tools nudge sweeper flag; t35_09 verifies 3 stores complete in &lt;500ms without embedding; t35_13 verifies retrievability &lt;2s</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Attach configured reranker to retriever (Task 2)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">McpState::build resolves reranker via build_reranker_from and attaches to retriever; t35_04_and_05 tests both active and unset cases</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Resolve providers from effective config with fail-closed behavior (Task 3)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Effective config resolved for embed/rerank/extract; rerank and extract fail closed, but build_ops_embedder_from silently returns Ok(None) when embed.model is omitted</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Library-level raw-turn ingest API with extraction and span verification (Task 4)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-write::raw_ingest (ingest_raw / ingest_raw_with_extractor) runs chunk -&gt; extract -&gt; span verify -&gt; gated store; raw_ingest_tests pass</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Observability and pipeline status in maintenance_status (Task 5)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">maintenance_status exposes index status with counts and pipeline flags; verified in t35_maintenance_status_reports_index_pipeline</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md 450-line maximum per Rust file</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All 21 modified/created Rust files are &lt;= 450 lines (largest is worker.rs at 427 lines, mod.rs at 424 lines, runtime.rs at 408 lines)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md structured file header on new/modified files</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">index_drain_tests.rs omitted the required Responsibility/Owns/Does not own/Boundary header sections</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Coverage gate &gt;=90% lines and functions per file</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">cargo llvm-cov verified: 97.88% lines, 98.94% functions aggregate; 0 of 276 files below 90%</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">04</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Missing structured AGENTS.md responsibility header in crates/clio-mcp/src/index_drain_tests.rs</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md strictly mandates the responsibility/ownership header structure on every Rust source file.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Codebase standards drift and potential compliance violation.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/index_drain_tests.rs:1-7</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the standard 4-part AGENTS.md responsibility comment block at the top of crates/clio-mcp/src/index_drain_tests.rs.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Partial embed configuration silently disables dense indexing instead of failing closed</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Phase 100350 Task 3 mandates that partially configured providers fail closed rather than silently disabling service.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Operator misconfiguration (e.g. Setting URL without model) silently falls back to lexical-only search without notifying the operator.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/ops_embedder.rs:104-115; crates/clio-mcp/src/runtime.rs:225-226</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>In build_ops_embedder_from, return Err(AmError::new(ErrorCode::ConfigCorrupt, ...)) When URL is present but model or dims are invalid.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Raw ingest test verifies outbox enqueue but not end-to-end retrievability</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 4 and required scenarios T100350-06 / T100350-15 define the expected result as stored and retrievable.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Verification claim overstates what is directly tested by raw_ingest_tests (which only asserts outbox job insertion).</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/raw_ingest_tests.rs:75-93; roadmap/phase-100350-live-index-extraction-wiring.md:305,314,338</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a cross-component test in clio-mcp that ingests raw turns, executes drain_index, and retrieves the admitted memory item.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>extract_available reports true when hosted provider URL is set but API key is missing</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>maintenance_status is intended to surface trustworthy operational readiness for operators.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Readiness indicator reports true even though any call to ingest_raw will fail closed on missing credentials.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/runtime.rs:312-317; crates/clio-mcp/src/runtime_index.rs:123</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Verify that bearer_for_effective is Some when provider is openai before marking extract_available as true.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Pre-existing test flake in clio-compliance stats_tests counts_reflect_created_items_per_bank and clio-ops reindex_space_tests: both are due to timestamp/socket concurrency in test fixtures, not regressions introduced by Phase 100350.</li>
+        <li>Lack of Postgres integration test for the runtime drain: the underlying outbox and store queries are backend-shared in clio-store and already covered on Postgres; this is documented in Known Limitations.</li>
+        <li>Omission of MCP tool wrapper for raw ingest: Phase 100350 explicitly scoped the library API as the required deliverable and deferred the MCP tool wrapper pending tool_schema publish approval.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Stored items become retrievable without manual seeding — Verified via t35_01_store_drain_retrieve_lexical_only in clio-mcp</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Write response is not blocked by embedding (&lt;500ms) — Verified via t35_09_write_response_is_not_blocked_by_embedding</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Configured reranker is attached and active in retrieval — Verified via t35_04_and_05_rerank_attach_decision with mock HTTP server</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All 276 files meet &gt;=90% line and function coverage — Verified via full cargo llvm-cov JSON run (TOTAL: lines=97.88%, funcs=98.94%, 0 files &lt;90%)</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All modified Rust files remain &lt;=450 lines — Verified via wc -l across all 21 staged Rust files (max is 427 lines)</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Behavior of background sweeper thread under heavy outbox contention across multiple processes</p>
+          <p class="d">Agent Memoir runtime is tested as a single-process MCP server; multi-process concurrency on shared SQLite DBs relies on WAL mode and lock timeouts · Multi-process stress benchmark against shared SQLite database · Low for stdio MCP single-client deployment</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean architectural separation: outbox processing semantics stay in clio-index, raw ingest stays in clio-write, and runtime scheduling/status stays in clio-mcp.</li>
+        <li>Strict line budget adherence: decomposed runtime.rs from 590 to 408 lines by cleanly extracting runtime_context.rs and runtime_index.rs.</li>
+        <li>Solid non-blocking design: write tools nudge a condition variable flag with zero synchronous network I/O, safely satisfying NFR-2.</li>
+        <li>Thorough test suite: 8 integration tests in index_drain_tests covering lexical fallback, retry backoff, NFR-2 cadence, bounded backlog, and status reporting.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Would have included a multi-crate integration test combining raw_ingest -&gt; drain_index -&gt; retrieve to formally close the loop between Task 4 and Task 1.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Add a linter or check script to verify AGENTS.md responsibility header format on all new Rust files before submission.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Add AGENTS.md header to crates/clio-mcp/src/index_drain_tests.rs.</li>
+          <li>Update build_ops_embedder_from in ops_embedder.rs to fail closed with ConfigCorrupt if embed.url is non-empty but model/dims are invalid.</li>
+          <li>Tighten extract_available in McpState::build to require credentials for hosted OpenAI provider.</li>
+          <li>Add an integration test in clio-mcp connecting ingest_raw to retrieve.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Implement an event-driven backpressure mechanism for the sweeper to loop immediately while backlog &gt; batch_size without waiting for the 500ms timeout.</li>
+          <li>Add Postgres end-to-end integration test suite for the live MCP runtime drain.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-o66FHA/report.html</span>
+          <span><b>Findings:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-o66FHA/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+[2026-09-21 04:00] START finalize r1 phase-100250. Reading remedy approver approval and working tree.
+[2026-09-21 04:00] attribution check: roadmap/phase-100250-per-bank-retention-profiles.md §Attribution rows present and well-formed - Developer r1 done, Adversary r1 done, Remediator r1 blocked, Remediator r2 done, Remedy Approver r1 approved; each round has a matching <step>-task-r<N>.log (developer r1, adversary r1, remediator r1/r2, approver r1). Finalize row agent was [TBD]; set to OpenCode CLI (Go . Deepseek V4.1 Flash High).
+[2026-09-21 04:00] DoD checkbox: line 375 already `- [x] Required approval is obtained.` (checked before this stage; phase-100250 uses the short form without the "(downstream pipeline step)" parenthetical). No unchecked approval box remains in the active roadmap; no edit required.
+[2026-09-21 04:00] final `make check`: exit 0. cargo fmt --check clean, clippy -D warnings clean, workspace test suites green, 0 failed (no FAILED/error[ lines in the captured output).
+[2026-09-21 04:01] staged scope: all modified Rust crates (clio-admission, clio-config, clio-lib, clio-mcp, clio-store, clio-write), requirement.md, roadmap/phase-100250-per-bank-retention-profiles.md, and the full .workflows/phase-100250/ pipeline folder.
+FINALIZE_DONE 7e0667b3

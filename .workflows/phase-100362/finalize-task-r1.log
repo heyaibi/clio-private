@@ -1,0 +1,7 @@
+2026-09-22T18:40:24Z START finalize-task-r1 phase 100362; begin close-out
+2026-09-22T18:40:55Z attribution: Finalize r1 row filled (OpenCode CLI (Together . GLM-5.3 Flash High), done); approval checkbox added as [x] (unchecked line was absent from this phase file, added per close-out contract)
+2026-09-22T18:42:29Z make check: exit 0 (fmt, clippy, 47 test-result ok blocks, all suites pass)
+2026-09-22T18:42:46Z staged 31 paths: 9 new/modified Rust files (status_cli, status_report, port_scan + tests, config/mod.rs, main.rs), roadmap/phase-100362, .workflows/phase-100362/* (tui logs gitignored by repo config); status shows only intended changes
+2026-09-22T18:42:49Z commit created and pushed: 6055bbf -> master
+2026-09-22T18:42:58Z push verified: 86e8783..6055bbf master -> master, 30 files, 4447 insertions; working tree clean after commit
+FINALIZE_DONE 53c744fb

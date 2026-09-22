@@ -1,0 +1,9 @@
+2026-09-21T14:25:09Z START phase-100290 developer r1 (nonce e754e7ba)
+2026-09-21T14:27:00Z BASELINE coverage clean: aggregate lines 97.89 / functions 98.98; 254 files; 0 files <90% (JSON /tmp/cov-baseline.json)
+2026-09-21T14:46:17Z clio-store core done: embedding_space.rs + vector_ddl.rs + parameterized DDL on both backends + confirmed space switch; clio-store tests 223 pass incl. 5 new pg space/calibration tests (pgvector 0.8.6; halfvec recall@10@3072=1.0000)
+2026-09-21T15:11:24Z clio-index+clio-ops+clio-mcp+clio-config+clio-lib done: OpenAI adapter + provider factory (tei/openai/empty) + dims gate vs active space + index_mode in status/diagnose + embed.switch_space knob (dims ceiling 16000) + ops/runtime space reconciliation; reindex E2E across TEI@768 and OpenAI@1536 passes
+2026-09-21T15:18:04Z docs updated (README/hardware.md/.env.example); workspace tests + clippy clean; starting scoped coverage
+2026-09-21T15:31:59Z FINAL GATE: running make coverage (full workspace, aggregate + per-file)
+2026-09-21T15:39:42Z FINAL GATE PASSED: make coverage aggregate lines 97.88% / functions 98.91%; 261 reported files; 0 below 90% on either metric. cargo clippy -D warnings clean; cargo fmt --check clean; cargo test --workspace green.
+2026-09-21T15:39:42Z Phase file updated: Attribution Developer row done, evidence + Task 6 calibration + DoD + Completion Evidence + Final Status PASS.
+DEVELOPER_DONE e754e7ba

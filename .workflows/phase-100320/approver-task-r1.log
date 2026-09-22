@@ -1,0 +1,10 @@
+2026-09-22 01:33:15 START phase-100320 remedy approver r1: initializing validation of 7 findings
+2026-09-22 01:34:00 VERIFY F-01 crates/clio-lib/src/compose_cli_fail_tests.rs:152: UNRESOLVED. prompt_tty_false_is_non_interactive_and_true_reads_input calls read_prompt_line(), which invokes prompt_tty(stdin().is_terminal(), &mut stdin().lock()). When stdin is a TTY (interactive shells/PTYs), this calls read_line on process stdin and blocks indefinitely. make check and cargo test hung until killed (PID 17854, PID 18774).
+2026-09-22 01:34:08 VERIFY F-02 crates/clio-lib/src/compose_assets.rs:130-151, crates/clio-lib/src/compose_env.rs:69-73: RESOLVED. backup_edited propagates io errors via Result; restrict_owner_only (.expect) removed; a_failed_backup_is_reported_not_silently_overwritten passes.
+2026-09-22 01:34:14 VERIFY F-03 crates/clio-lib/src/main.rs:276-281: RESOLVED. Restored 23-space indent on Exit codes and 2-space command indent on am compose and am retention. Help tests pass.
+2026-09-22 01:34:17 VERIFY F-04 crates/clio-lib/src/compose_env.rs:78-96: RESOLVED. create_env_file creates .env atomically with mode 0600 on Unix via OpenOptionsExt; test write_env_is_owner_only_on_unix passes.
+2026-09-22 01:34:20 VERIFY F-05 crates/clio-lib/src/compose_cli.rs:61-64: RESOLVED. Missing subcommand handled explicitly with clean error message and ExitCode 2; test compose_dispatcher_prints_help_and_rejects_unknown_subcommands passes.
+2026-09-22 01:34:23 VERIFY F-06 roadmap/phase-100320-compose-lifecycle.md:340: RESOLVED. Traceability row citations corrected from NFR-6 to FR-32 / §4.9.5.E.
+2026-09-22 01:34:25 VERIFY F-07 hardware.md:219, roadmap/phase-100320-compose-lifecycle.md:363: RESOLVED. Fixed project name and port constraints across directories documented in both files.
+2026-09-22 01:35:10 VERDICT: REJECT. F-01 remains unresolved; test suite hangs in interactive terminal runs.
+REMEDY_REJECTED: F-01 42ca41f0

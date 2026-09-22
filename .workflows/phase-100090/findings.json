@@ -1,0 +1,278 @@
+{
+  "run": "r1",
+  "phase": "100090",
+  "subject": "Phase 100090: Shared Continuous EMA Update Engine",
+  "verdict": "Good",
+  "verdict_justification": "The Phase 100090 implementation successfully delivers the shared continuous EMA and trend engine, durable definition-time update_rule declarations with epistemic_kind column separation, dual-backend persistence (SQLite and Postgres) with serializable concurrency, and the generic update rule splitter. All workspace test suites and the >=90% per-file line/function coverage gate pass cleanly. Five non-blocking findings were identified: an addressability mismatch in the update facade, header boundary compliance, discarded discrete new_value, empty-window recovery bypass, and unparameterized SQL LIMIT in SQLite. Remediation r1 addressed all five: F-02/F-04/F-05 fixed in code, F-03 resolved by documenting the gated-write contract, and F-01 resolved by documenting the addressability model as intentional/deterministic with both structural alternatives rejected with reasons; make check and make coverage both pass afterward.",
+  "metadata": {
+    "generated": "2026-09-18",
+    "applies_to": "master (staged)",
+    "source": "crates/clio-types, crates/clio-store, crates/clio-write, sql/001_core.sql"
+  },
+  "standard": [
+    "AGENTS.md: Core principles, communication, file header structure, 450-line limit per Rust file, coverage gate >=90% lines and functions per file",
+    "requirement.md: PR-2, §2.2, §4.6 continuous EMA + trend formulas, §4.7 preferences, §4.9.4.A update, FR-11 update_rule declarations, FR-15 audit",
+    "roadmap/phase-100090-shared-continuous-ema-update-engine.md: Tasks 1-5, T100090-01 through T100090-14 test scenarios, AC-100090-01 through AC-100090-08",
+    "roadmap/phase-100090-appendix-ema-formulas.md: Normative formulas, cold start, bounds handling, defaults (alpha=0.3, N=10)"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100090-01: Attribute update_rule declaration at definition time (FR-11 / PR-2)",
+      "status": "Fully satisfied",
+      "evidence": "clio-types::AttributeSchema and attribute_schemas table persist update_rule in attr_class (distinct from items.epistemic_kind); verified by attribute_tests::t01_declaration_roundtrip_not_epistemic_column and attribute_tests::t13_epistemic_kind_is_not_update_rule",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100090-02: §4.6 EMA + trend formulas and appendix worked fixture",
+      "status": "Fully satisfied",
+      "evidence": "clio-types::attribute::apply_observation verified against appendix fixture (alpha=0.5, N=3, obs 1.0/0.0/1.0 -> states 1.0/0.5/0.75, trends 1.0/0.75/0.75) in attribute_tests::t02_t03_appendix_fixture and store-level attribute_tests::t02_t04_appendix_fixture_through_store",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100090-03: FR-11 update rule split both directions (discrete vs continuous)",
+      "status": "Fully satisfied",
+      "evidence": "clio-write::update::update routes continuous to EMA and discrete to invalidate; rejects mismatched rules with WrongUpdateRule; rejects fact/belief wire values; verified in update_tests::t05-t08, t13",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100090-04: Continuous series retained for trajectories (§4.8 / NFR-4)",
+      "status": "Fully satisfied",
+      "evidence": "Append-only continuous_observations table stores full point history; as_of filtering verified in attribute_tests::t10_series_retention_and_as_of",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100090-05: Dual-backend behavioral parity (SQLite + Postgres)",
+      "status": "Fully satisfied",
+      "evidence": "clio-store::pg_attribute_tests::t09_parity_with_sqlite passes against compose Postgres DB (127.0.0.1:34310), producing identical state and trend numbers to SQLite",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100090-06: Shared engine + persona adapter contract",
+      "status": "Fully satisfied",
+      "evidence": "clio-write::persona::observe_continuous is a thin wrapper over store observe_continuous; verified in persona_tests::t12_adapter_calls_shared_engine",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100090-07: Telemetry on continuous mutators (FR-15 spirit)",
+      "status": "Fully satisfied",
+      "evidence": "ContinuousEvent emitted to ContinuousSink on every successful observe; continuous_observe audit events recorded in audit_events; verified in persona_tests and update_tests",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100090-08: Concurrent observes on the same key are serializable",
+      "status": "Fully satisfied",
+      "evidence": "SQLite TransactionBehavior::Immediate and Postgres per-key advisory lock serialize same-key observes without lost updates; verified in attribute_tests::t14 (8 threads) and pg_attribute_tests::t14 (4 clients)",
+      "severity": "High"
+    },
+    {
+      "requirement": "AGENTS.md line count constraint (<= 450 lines per Rust file)",
+      "status": "Fully satisfied",
+      "evidence": "All 18 modified or created Rust source files are <= 422 lines (largest is sqlite_store.rs at 422 lines)",
+      "severity": "High"
+    },
+    {
+      "requirement": "AGENTS.md and coverage.md gate (>= 90% function and line coverage per file)",
+      "status": "Fully satisfied",
+      "evidence": "make coverage exits 0: aggregate 98.68% lines / 99.22% functions; all reported Rust files >= 90% lines and >= 90% functions (lowest new file: postgres_attribute.rs 95.83% functions / 98.40% lines)",
+      "severity": "High"
+    },
+    {
+      "requirement": "Roadmap isolation: no references to roadmap or phase numbers in code/comments",
+      "status": "Fully satisfied",
+      "evidence": "grep across crates/ and sql/ confirmed zero occurrences of roadmap/, phase-*, or crates.md",
+      "severity": "Medium"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Inconsistent addressability between continuous and discrete update paths in update facade",
+      "status": "Resolved (documented intent; both structural alternatives rejected with reasons)",
+      "evidence": "crates/clio-write/src/update.rs:98-100,118-150,193-201",
+      "requirement_ref": "requirement.md §4.9.4.A, FR-11, Phase 100090 Task 3",
+      "recommendation": "Standardize target addressability across both paths; either allow discrete updates to accept attribute keys and look up current open items, or enable items to reference their declared attr_key so caller update_rule can be validated against item attribute schema.",
+      "resolution": "Resolved by documenting the addressability contract as intentional and making it deterministic, then rejecting both structural alternatives with reasons. `update_rule` scopes the target namespace (continuous → declared attribute key; discrete → item id), attribute lookup wins over an item-id collision, and the declared-discrete-key-on-discrete-path case now returns a structured `InvalidArgument` that explains the ambiguity (update.rs:98-100,118-150,193-201). A dedicated contract test pins the resolution order and rejection (clio-write::update_tests::t_addressability_precedence_and_discrete_key_rejection). Option 1 (accept attribute keys on the discrete path and look up open items) is unsafe as specified: `update` carries no subject and an attribute key is a bank-wide predicate, so invalidating \"by key\" would close every subject's open edge; doing it safely needs an API change (add subject) = public-contract change outside Phase 100090 scope. Option 2 (items carry a declared attr_key) is a Phase 100030/100040/100080 schema and write-path change, also outside Phase 100090 scope."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Missing boundary focus statement in newly added module headers",
+      "status": "Resolved",
+      "evidence": "crates/clio-types/src/attribute.rs:22-23, crates/clio-store/src/attribute_map.rs:20-21, crates/clio-store/src/sqlite_attribute.rs:20-21, crates/clio-store/src/postgres_attribute.rs:20-21, crates/clio-write/src/update.rs:21-23, crates/clio-write/src/persona.rs:20-21",
+      "requirement_ref": "AGENTS.md (File Header section)",
+      "recommendation": "Add the mandatory '//! Keep this module focused on <responsibility>.' closing line under ## Boundary in all newly created Rust source files.",
+      "resolution": "Added the mandatory closing line under '## Boundary' in all 6 named files: attribute.rs:23, attribute_map.rs:21, sqlite_attribute.rs:21, postgres_attribute.rs:21, update.rs:23, persona.rs:21."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Discrete update routing silently discards new_value",
+      "status": "Resolved (documented; replaced-by-gated-write contract)",
+      "evidence": "crates/clio-write/src/update.rs:101-107,217-223",
+      "requirement_ref": "requirement.md §4.9.4.A, §4.9.3, §4.2–4.4",
+      "recommendation": "Document why new_value cannot be admitted directly on the discrete branch without bypassing Phase 100040 admission gates, or accept an optional replacement ID for gated replacement.",
+      "resolution": "Documented at the API boundary: `UpdateArgs::new_value` (update.rs:101-107) and the discrete arm of `route_unregistered` (update.rs:217-223) now state that the discrete path only closes the target's bi-temporal interval and deliberately does not admit `new_value`, because doing so would bypass the §4.2–4.4 admission gates every long-term write must pass. Replacement content is written through the normal gated create tools; `invalidate` accepts `replacement_id` directly for explicit linkage. Programmatic replacement was not added here: `update` receives a value, not an id, so accepting a replacement would require changing the public signature (out of scope; Phase 100040 gated-write ownership)."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "parse_window treats empty array '[]' as valid rather than falling back to series reconstruction",
+      "status": "Resolved",
+      "evidence": "crates/clio-store/src/attribute_map.rs:88-97,178",
+      "requirement_ref": "Phase 100090 §10 Failure Handling and Recovery",
+      "recommendation": "Update parse_window to return None when the parsed array has zero elements, ensuring an empty window row triggers history rebuild from continuous_observations.",
+      "resolution": "`parse_window` now returns `None` for an empty array (`if arr.is_empty() || ...`) (attribute_map.rs:97), so a corrupt `[]` window follows the same rebuild-from-`continuous_observations` path as malformed JSON. Both backends consume this shared helper (sqlite_attribute.rs, postgres_attribute.rs), so the fix applies to both. A stored window always has ≥1 state after any applied observation, so `[]` is a corrupt/truncated row, not a valid cold start. Regression assertion added at attribute_map.rs:178 (`parse_window(\"[]\", 3).is_none()`)."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Unparameterized LIMIT string formatting in sqlite_attribute.rs",
+      "status": "Resolved",
+      "evidence": "crates/clio-store/src/sqlite_attribute.rs:313-329",
+      "requirement_ref": "Repository SQL guidelines / best practices",
+      "recommendation": "Parameterize the LIMIT clause as LIMIT ?4 with params![bank_id, attr_key, as_of, capped as i64], matching postgres_attribute.rs.",
+      "resolution": "`continuous_series_impl` now binds the cap as a positional parameter (`LIMIT ?4` with `params![bank_id, attr_key, as_of, capped]`) instead of `format!`-interpolating it; `capped` is `limit.min(10_000) as i64` (sqlite_attribute.rs:313-329), matching the Postgres `$4` binding."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Inconsistent addressability between continuous and discrete update paths in update facade",
+      "severity": "Important",
+      "why_it_matters": "The generic update(item_id, new_value, update_rule) entrypoint specified in §4.9.4.A takes target as item_id, but the implementation bifurcates target semantics: for continuous updates, target must be an attr_key; for discrete updates, target must be an item_id. Calling update with an attribute key for discrete updates returns ErrorCode::InvalidArgument ('discrete updates are item-addressed'), while calling update with an item_id for continuous updates fails with WrongUpdateRule.",
+      "impact": "Callers cannot use a uniform identifier scheme across update rules, and discrete updates on items cannot verify whether the item belongs to a continuous or discrete attribute schema.",
+      "evidence": "crates/clio-write/src/update.rs:97,138-171,173-198",
+      "confidence": "High",
+      "proposed_fix": "Standardize target addressability across both paths; either allow discrete updates to accept attribute keys and look up current open items, or enable items to reference their declared attr_key so caller update_rule can be validated against item attribute schema.",
+      "status": "Resolved (documented intent; both structural alternatives rejected with reasons)",
+      "resolution": "Same fix as F-01: addressability contract documented as intentional and deterministic, and the two structural options rejected (option 1 would over-close every subject's edges because `update` has no subject and attr_key is bank-wide; option 2 is a Phase 100030/100040/100080 schema change). See crates/clio-write/src/update.rs:98-100,118-150,193-201 and test clio-write::update_tests::t_addressability_precedence_and_discrete_key_rejection."
+    },
+    {
+      "id": 2,
+      "title": "Missing boundary focus statement in newly added module headers",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md defines a strict module header template requiring '//! Keep this module focused on <responsibility>.' under the '## Boundary' section. All newly created production modules in clio-types, clio-store, and clio-write omit this closing sentence.",
+      "impact": "Minor style and governance compliance defect against the repository's AGENTS.md rules.",
+      "evidence": "crates/clio-types/src/attribute.rs:18-22, crates/clio-store/src/attribute_map.rs:16-19, crates/clio-store/src/sqlite_attribute.rs:16-19, crates/clio-store/src/postgres_attribute.rs:16-19, crates/clio-write/src/update.rs:18-21, crates/clio-write/src/persona.rs:16-19",
+      "confidence": "High",
+      "proposed_fix": "Add the mandatory '//! Keep this module focused on <responsibility>.' closing line under ## Boundary in all newly created Rust source files.",
+      "status": "Resolved",
+      "resolution": "Same fix as F-02: boundary focus line added under '## Boundary' in all 6 files (attribute.rs:23, attribute_map.rs:21, sqlite_attribute.rs:21, postgres_attribute.rs:21, update.rs:23, persona.rs:21)."
+    },
+    {
+      "id": 3,
+      "title": "Discrete update routing silently discards new_value",
+      "severity": "Minor",
+      "why_it_matters": "The update facade takes new_value as an argument. In the continuous path, new_value is parsed into float and smoothed via EMA. In the discrete path, new_value is completely ignored and None is passed as replacement_id to invalidate(). While closing the prior item satisfies invalidation without bypassing Phase 100040 admission gates, discarding new_value silently without error or replacement linkage is unexpected.",
+      "impact": "Callers passing a new value expecting it to replace the discrete fact will only invalidate the existing fact without creating or linking a replacement.",
+      "evidence": "crates/clio-write/src/update.rs:186-195",
+      "confidence": "High",
+      "proposed_fix": "Document why new_value cannot be admitted directly on the discrete branch without bypassing Phase 100040 admission gates, or accept an optional replacement ID for gated replacement.",
+      "status": "Resolved (documented; replaced-by-gated-write contract)",
+      "resolution": "Same fix as F-03: rationale documented at `UpdateArgs::new_value` (update.rs:101-107) and the discrete arm of `route_unregistered` (update.rs:217-223). Programmatic replacement deferred: `update` carries a value, not an id, so adding replacement linkage would change the public signature (out of Phase 100090 scope; Phase 100040 owns gated writes)."
+    },
+    {
+      "id": 4,
+      "title": "parse_window treats empty array '[]' as valid rather than falling back to series reconstruction",
+      "severity": "Minor",
+      "why_it_matters": "In parse_window, '[]' parses successfully as Some(vec![]). If continuous_state.window_json is corrupted with '[]' while continuous_observations has retained history points, observe_continuous_impl uses an empty prior window instead of triggering rebuild_window_from_points, resetting the EMA to cold start.",
+      "impact": "A corrupted empty window array causes unnecessary cold-start reset despite available historical observations.",
+      "evidence": "crates/clio-store/src/attribute_map.rs:89-105, crates/clio-store/src/sqlite_attribute.rs:204-229, crates/clio-store/src/postgres_attribute.rs:208-230",
+      "confidence": "High",
+      "proposed_fix": "Update parse_window to return None when the parsed array has zero elements (if window.is_empty() { return None; }), ensuring an empty window row triggers history rebuild from continuous_observations.",
+      "status": "Resolved",
+      "resolution": "Same fix as F-04: attribute_map.rs:97 returns None for an empty array, routing both backends to rebuild from continuous_observations; regression assertion at attribute_map.rs:178."
+    },
+    {
+      "id": 5,
+      "title": "Unparameterized LIMIT string formatting in sqlite_attribute.rs",
+      "severity": "Minor",
+      "why_it_matters": "continuous_series_impl in sqlite_attribute.rs formats capped as i64 directly into the SQL string via format!(... LIMIT {}, capped as i64) rather than binding it as a positional parameter LIMIT ?4.",
+      "impact": "Minor inconsistency with postgres_attribute.rs (which binds $4) and SQL formatting best practices.",
+      "evidence": "crates/clio-store/src/sqlite_attribute.rs:313-321",
+      "confidence": "High",
+      "proposed_fix": "Parameterize the LIMIT clause as LIMIT ?4 with params![bank_id, attr_key, as_of, capped as i64], matching postgres_attribute.rs.",
+      "status": "Resolved",
+      "resolution": "Same fix as F-05: sqlite_attribute.rs:313-329 binds `LIMIT ?4` with `params![bank_id, attr_key, as_of, capped]`; no string interpolation."
+    }
+  ],
+  "dismissed": [
+    "Non-encrypted numeric states in continuous_state/continuous_observations: Reviewed against §7.4 and Phase 100090 scope. DEK encryption applies to content-bearing payloads in items, whereas continuous scalar state is structured metadata; compliance erase of continuous series is explicitly scoped to slice 100190.",
+    "Postgres hashtext 32-bit advisory lock: Checked for collision impact. A 32-bit advisory lock hash collision only introduces brief lock serialization between different keys; data integrity is maintained by transactional WHERE bank_id AND attr_key clauses."
+  ],
+  "verification": [
+    {
+      "claim": "make check passes all formatting, clippy, and 16 workspace test suites",
+      "classification": "Established",
+      "source_note": "Re-verified locally: make check exited 0 with 28 clio-types, 94 clio-write, 91 clio-store tests passing"
+    },
+    {
+      "claim": "make coverage passes aggregate and per-file >=90% lines and functions",
+      "classification": "Established",
+      "source_note": "Re-verified locally: make coverage exited 0 with 98.68% lines and 99.22% functions; all reported files >= 90% on both gated metrics"
+    },
+    {
+      "claim": "All modified and created Rust files are <= 450 lines",
+      "classification": "Established",
+      "source_note": "Re-verified locally via wc -l: largest modified file is sqlite_store.rs at 422 lines"
+    },
+    {
+      "claim": "Roadmap isolation preserved in code and comments",
+      "classification": "Established",
+      "source_note": "Re-verified via grep: no references to roadmap/, phase-*, or crates.md in crates/ or sql/"
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Downstream temporal_history tool query integration",
+      "why_unknown": "Slice 100150 owns the temporal_history packaging; only the underlying continuous_series data seam was verified in this slice.",
+      "what_would_resolve_it": "Execution of Phase 100150 with history tool tests.",
+      "materiality": "Low for Phase 100090 exit."
+    }
+  ],
+  "strengths": [
+    "Rigorous dual-backend testing including 8-thread SQLite and 4-client Postgres concurrency tests that verify mathematical serializability via observation reconstruction",
+    "Faithful reproduction of appendix worked examples with float epsilon comparisons",
+    "Self-healing corrupt window recovery mechanism using retained observation points in continuous_observations",
+    "Complete column separation between attribute_schemas.attr_class and items.epistemic_kind, preventing vocabulary confusion"
+  ],
+  "regrets": [
+    "The dual addressability model (target as attr_key vs item_id) could have been unified or abstracted earlier during existing-system discovery.",
+    "Header boundary focus sentences were omitted across all newly created files despite developer run log indicating headers were checked."
+  ],
+  "process_changes": [
+    "Automate header linting in make lint to ensure all sections and closing boundary sentences required by AGENTS.md are mechanically checked.",
+    "Add explicit schema-link tests between items and attribute schemas when designing mutator facades."
+  ],
+  "plan_1hr": [
+    "F-02: DONE — boundary focus line added to all 6 new module headers (attribute.rs:23, attribute_map.rs:21, sqlite_attribute.rs:21, postgres_attribute.rs:21, update.rs:23, persona.rs:21).",
+    "F-04: DONE — parse_window returns None on an empty array (attribute_map.rs:97), so a corrupt '[]' window rebuilds from continuous_observations; regression assertion at attribute_map.rs:178.",
+    "F-05: DONE — LIMIT bound as ?4 in sqlite_attribute.rs:313-329, matching postgres_attribute.rs."
+  ],
+  "plan_unlimited": [
+    "F-01: RESOLVED BY DESIGN (recommendation adjusted) — addressability made explicit and deterministic instead of unified. Rejected option A (discrete accepts attribute keys and looks up open items): `update` has no subject and an attribute key is a bank-wide predicate, so it would close every subject's open edge; a safe version needs a public API change (add subject) outside Phase 100090 scope. Rejected option B (items store declared attr_key): Phase 100030/100040/100080 schema+write-path change, outside Phase 100090 scope. Evidence: crates/clio-write/src/update.rs:98-100,118-150,193-201; test clio-write::update_tests::t_addressability_precedence_and_discrete_key_rejection.",
+    "F-03: RESOLVED BY DOCUMENTATION (programmatic replacement deferred) — rationale documented at crates/clio-write/src/update.rs:101-107 and 217-223. Accepting a replacement payload on the discrete path would bypass the §4.2–4.4 gated write path; `update` receives a value, not an id, so adding replacement linkage needs a public signature change (Phase 100040 / outside scope). Callers write replacements through the gated create tools and may link via `invalidate` directly."
+  ],
+  "remediation_r1": {
+    "round": 1,
+    "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+    "date": "2026-09-18",
+    "findings_addressed": 5,
+    "code_changes": [
+      "crates/clio-types/src/attribute.rs — boundary focus line",
+      "crates/clio-store/src/attribute_map.rs — boundary focus line; parse_window rejects empty array; regression assertion",
+      "crates/clio-store/src/sqlite_attribute.rs — boundary focus line; parameterized LIMIT ?4",
+      "crates/clio-store/src/postgres_attribute.rs — boundary focus line",
+      "crates/clio-write/src/update.rs — boundary focus line; addressability contract; new_value rationale; clearer discrete-key rejection",
+      "crates/clio-write/src/persona.rs — boundary focus line",
+      "crates/clio-write/src/update_tests.rs — addressability precedence contract test"
+    ],
+    "validation": {
+      "make_check": "PASS — fmt + clippy -D warnings + workspace tests (clio-write 95 passed; all suites report ok; doc-tests ok)",
+      "make_coverage": "PASS — exit 0; aggregate 96.14% lines / 99.22% functions (regions 96.14%, informational); per-file scan: no file below 90% on functions or lines",
+      "line_limit": "PASS — all modified Rust files <= 450 lines (largest modified: update.rs 260, postgres_attribute.rs 378)",
+      "roadmap_isolation": "PASS — comments reference neither roadmap/ nor phase numbers"
+    }
+  }
+}

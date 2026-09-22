@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100190: Compliance Erase Path</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100190: Compliance Erase Path</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">2 important · 2 minor</span>
+    </div>
+    <p class="sum">Core compliance crypto-shredding, KMS DEK destruction, and content-free tombstones are functional with high test coverage, but a hard AGENTS.md 450-line file size limit was violated, a cross-bank subject erasure desynchronization edge case exists, and Required Test Scenario T100190-03 (retrieve exclusion) was skipped.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-19</span>
+      <span><b>Applies to</b>Phase 100190 Developer r1</span>
+      <span><b>Source</b>git diff --cached -- . :!.workflows/</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md hard constraint: every Rust file &lt;= 450 total lines</li>
+        <li>requirement.md FR-19, §7.4, PR-6, PR-8, PR-9: verified compliance crypto-shredding and derived structure purge</li>
+        <li>phase-100190-compliance-erase-path.md: Acceptance criteria AC-100190-01 through AC-100190-06 and required test scenarios T100190-01 through T100190-06</li>
+        <li>coverage.md: &gt;= 90% line and function coverage overall and per-file</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">4 of 6 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>KMS DEK Destruction &amp; Crypto-Shred Verification (AC-100190-01)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio_store::dek::DekProvider::destroy_dek and ensure_dek probe returning ErrorCode::ErasedSubject verified in clio-store/src/erase_tests.rs and compliance_erase_test.rs</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Dirty-Path Derived Structure Invalidation &amp; Regeneration (AC-100190-02, AC-100190-03)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio_write::MemTreeMaint::detach_erased clears ancestor summaries and marks dirty; vector embeddings, outbox, and FTS deleted</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Content-Free Tombstone Ledger (AC-100190-04)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">compliance_tombstones table stores 64-character salted SHA-256 hashes, category, and timestamps; verified zero plaintext in serialized tombstones</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Read Operations Fail-Closed Safely (AC-100190-05)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">get, get_snapshot, and get_gist return structured erased_subject error without panicking, but retrieve post-erasure was not tested in conformance suite</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Operational Removal Boundary Isolation (AC-100190-06)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">discard_does_not_destroy_dek test in clio-compliance verifies discard does not trigger key destruction</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Source File Size Constraint (AGENTS.md)</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">crates/clio-store/src/erase_tests.rs is 453 lines, exceeding the 450-line maximum</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>File size limit violation in newly created crates/clio-store/src/erase_tests.rs (453 lines &gt; 450 lines)</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md defines a mandatory 450-line limit per Rust file as a hard constraint to prevent unmaintainable code bloat. The phase Definition of Done checkbox was marked complete despite this violation.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Code style and project gate violation; increases maintenance complexity.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/erase_tests.rs: 453 lines (wc -l crates/clio-store/src/erase_tests.rs)</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Split crates/clio-store/src/erase_tests.rs into separate test modules or extract common test helper functions.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Cross-bank subject erasure desynchronization: unpartitioned key_exists check allows global DEK shredding from empty bank without purging derived structures in target banks</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>When subject_id exists in bank A and erase_request is executed in bank B, the key_exists check succeeds on the unpartitioned subject_keys table. The DEK is destroyed globally, but derived structures (embeddings, FTS, edges, MemTree) in bank A are never purged.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Derived index data and summaries continue describing personal data after legal crypto-shredding, violating FR-19 / GDPR Art. 17 guarantees.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_erase.rs:71-86, crates/clio-store/src/postgres_erase.rs:69-82, and sql/001_core.sql:592.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Ensure bank isolation by checking that items exist within the requested bank before proceeding, or fan out derived structure purges across all banks containing the subject.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">02</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Required Test Scenario T100190-03 (retrieve post-erasure exclusion) omitted from test suite</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Phase 100190 §8 and Task 5 explicitly mandate verifying that retrieve queries never return shredded items in candidate lists.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Regression risk on retrieval candidate ranking following crypto-shredding.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/tests/compliance_erase_test.rs:108-112 checks only get, get_snapshot, and get_gist; zero references to retrieve.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add an assertion in compliance_erase_test.rs invoking retrieve on the erased item keywords and confirming zero matches.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Incomplete Known Limitations documentation: missing debt-owning phase numbers</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The workflow rules require every limitation to name what is missing, why, and which phase owns the debt.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Untracked architectural debt without clear phase ownership.</dd></div>
+              <div><dt>Evidence</dt><dd>roadmap/phase-100190-compliance-erase-path.md:501-504.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Assign specific phase numbers to the deferred asynchronous scheduling and anonymization evidence capabilities.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Refactor crates/clio-store/src/erase_tests.rs to bring line count strictly &lt;= 450 lines (currently 453 lines).</li>
+          <li>Add retrieve post-erasure assertion to crates/clio-mcp/tests/compliance_erase_test.rs satisfying Required Test Scenario T100190-03.</li>
+          <li>Fix erase_subject bank validation to reject cross-bank desynchronization when a bank contains 0 items for the subject.</li>
+          <li>Update roadmap/phase-100190-compliance-erase-path.md Known Limitations with explicit debt-owning phase numbers.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Implement global cross-bank derived-structure discovery and purge orchestration so an authorized GDPR Art. 17 erasure request cleanly purges derived embeddings, FTS rows, edges, and MemTree leaves across all banks before destroying the subject DEK.</li>
+          <li>Implement asynchronous dirty-path ancestor recomputation for large MemTree forests with background worker tracking and status reporting.</li>
+          <li>Implement affirmative anonymization stamping at distillation time (§7.4.5) to allow retaining non-identifying aggregate hub items while purging non-anonymized derivatives.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100190/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100190/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

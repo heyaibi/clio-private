@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100362: Unified Read-Only clio status Health Command</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100362: Unified Read-Only clio status Health Command</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">2 important · 2 minor · 2 dismissed</span>
+    </div>
+    <p class="sum">Phase 100362 successfully implements the core clio status health command, port scanning over 34300-34309, Compose ps integration, and ops diagnose aggregation with clean exit code semantics (0/1/2) and 100% test pass rate. However, two material issues were identified: nonexistent SQLite DB paths cause a 512KB schema bootstrap creation violating read-only non-mutation constraints, and 5 source files fail cargo fmt checking.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-22</span>
+      <span><b>Applies to</b>staged diff (phase 100362)</span>
+      <span><b>Source</b>crates/clio-lib/src/{main,port_scan,status_cli,status_report,tests}.rs</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>Phase 100362 specification and Acceptance Criteria (AC-100362-01 through 05)</li>
+        <li>Non-mutation guarantee: status never writes to store or configuration under any circumstances</li>
+        <li>AGENTS.md hard constraints: file size &lt;= 450 lines, per-file coverage &gt;= 90% lines and functions</li>
+        <li>Code formatting and linting: make check / cargo fmt cleanliness</li>
+        <li>Sensitive data protection: credential redaction in URLs and config secret masking</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">6 of 7 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100362-01: One read-only command reports setup, DB, ports, Compose, diagnose</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio status command dispatches and renders setup, database, port scan, compose services, and diagnose view across both text and json output modes.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100362-02: Secrets masked everywhere</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">DB URL userinfo is redacted to postgres://***@host and setup secrets are masked with mask_secret (last-4 suffix); raw planted secret grep count is 0.</td>
+              <td><span class="badge">Critical</span></td>
+            </tr>
+            <tr>
+              <td>AC-100362-03: Exit codes 0 healthy, 1 degraded, 2 usage</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Exit code 0 on healthy stack, exit code 1 on degraded backend or unreachable DB, exit code 2 on unknown --output flag or bad usage.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100362-04: No writes (store/config unchanged)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Config and existing stores remain untouched; however, passing a nonexistent SQLite database path causes SqliteStore::open to create a 512KB database file and execute schema migrations on disk.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100362-05: No stdio status added</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio mcp status returns unknown command exit 2; stdio framing purity is preserved.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: &lt;= 450 lines per Rust source file</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All 9 touched Rust files are at or below 450 lines (main.rs: 322, status_cli.rs: 372, status_report.rs: 282, port_scan.rs: 64, test files: 66, 100, 235, 266, 268).</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md &amp; coverage.md: Aggregate and per-file &gt;= 90% lines and functions coverage</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage reports 279 files meeting floor; new files: port_scan.rs 100%/100%, main.rs 97.75%/100%, status_cli.rs 97.69%/93.33%, status_report.rs 98.37%/92.86%.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Read-only clio status creates a 512KB database and runs schema migrations on nonexistent SQLite path</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The command is explicitly specified as read-only with a hard guarantee that it never mutates or writes to disk (AC-100362-04). A user inspecting status with a misspelled or not-yet-created database path will find a brand new 512KB SQLite database populated on their filesystem.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Violates non-mutation contract (§1, §2, §7, AC-100362-04). If clio status is run by monitoring daemons before initialization, it prematurely boots schemas and creates unexpected files.</dd></div>
+              <div><dt>Evidence</dt><dd>Running `target/debug/clio status --backend sqlite --db /tmp/nonexistent-test-123456.db` creates `/tmp/nonexistent-test-123456.db` (512,000 bytes) on disk. In `crates/clio-lib/src/status_cli.rs:207`, `SqliteStore::open(Path::new(&amp;resolved.url), kms)` is called without checking `Path::new(&amp;resolved.url).exists()`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>In `open_chosen` (`crates/clio-lib/src/status_cli.rs:207`), check `Path::new(&amp;resolved.url).exists()` before calling `SqliteStore::open`. If the file does not exist, return `Err(AmError::new(ErrorCode::NotFound, &quot;database file does not exist&quot;))`, causing status to report a degraded verdict (exit 1) without creating any files.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Staged files fail cargo fmt --all -- --check, causing make check to dirty working copy</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Running `make check` executes `cargo fmt --all`, which mutates 5 source files on disk. Automated CI pipelines checking `cargo fmt --check` will fail.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Breaks clean checkout consistency and CI formatting verification across 5 newly introduced or modified files.</dd></div>
+              <div><dt>Evidence</dt><dd>`cargo fmt --all -- --check` fails with 11 diff blocks in `crates/clio-lib/src/port_scan.rs:56`, `crates/clio-lib/src/status_cli_fault_tests.rs:70`, `crates/clio-lib/src/status_cli_tests.rs:245`, `crates/clio-lib/src/status_probe_tests.rs:67`, `:105`, and `crates/clio-lib/src/status_report_tests.rs:36`, `:120`, `:151`, `:177`, `:204`, `:250`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Format all files with `cargo fmt --all` and include the formatted files in the staged commit.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">02</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>SetupView secret masking only scans setup_config::WATCHED_FIELDS rather than all deployment overlay keys</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>If deployment.json contains other sensitive credentials (such as custom extract or API keys), they are not detected or masked under SetupView.secrets.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Uncommon custom deployment secrets may not appear in the masked secrets list in status output.</dd></div>
+              <div><dt>Evidence</dt><dd>`crates/clio-lib/src/status_cli.rs:309-319` loops over `crate::setup_config::WATCHED_FIELDS` which only contains embed and rerank credentials.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Either expose an iterator/accessor for all overlay keys on `clio_config::Runtime` or document the limitation in Phase 100362 Known Limitations.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Unit test occupied_port_is_reported does not test port within 34300-34309 range</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Scenario T100362-03 specifies verifying &#39;A listener bound on 34300&#39;. The test binds port 0 to avoid host port collisions, leaving the actual boundary port 34300 covered only by range bounds checks.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Slight test contract gap between scenario specification and test fixture.</dd></div>
+              <div><dt>Evidence</dt><dd>`crates/clio-lib/src/port_scan_tests.rs:33` binds to ephemeral port 0 (`TcpListener::bind(&quot;127.0.0.1:0&quot;)`).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add an integration test that attempts binding to 34300 and scans `listening_ports()` if the port is free.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Checking whether positional arguments like &#39;clio status foo&#39; should be rejected with exit code 2: dismissed because parse_flags ignores non-flag arguments across clio subcommands unless specifically validated.</li>
+        <li>Checking whether Docker ps failure crashes the status command: dismissed because probe_compose gracefully falls back to ComposeView::Unavailable.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>clio status exits 0 and reports status on healthy store — Verified with real execution against in-memory store and live repository stack</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>clio status redacts DB URL credentials — Verified with postgres://alice:secretpw@127.0.0.1:1/none -&gt; postgres://***@127.0.0.1:1/none</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All touched Rust files &lt;= 450 lines — Verified with wc -l (maximum file size 372 lines in status_cli.rs)</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Aggregate and per-file coverage &gt;= 90% — Verified with make coverage; all 279 files pass guard floors</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>clio status does not mutate the store or create files — Contradicted when run against a nonexistent SQLite database path: SqliteStore::open creates a 512KB database file</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Staged files pass standard formatting check — Contradicted by cargo fmt --all -- --check failure across 5 files</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean architecture and clear separation of concerns between status_cli, status_report, and port_scan</li>
+        <li>Excellent test coverage (&gt;97% lines and &gt;92% functions on all new files)</li>
+        <li>Strict adherence to line-count constraints (all files &lt;= 372 lines)</li>
+        <li>Thorough credential redaction in URLs and error messages</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Developer relied on FakeDeps in status_does_not_write_config_or_store, missing the fact that real SqliteStore::open creates files on nonexistent paths</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Ensure `cargo fmt --all -- --check` is run during pre-completion verification before staging</li>
+          <li>Test negative filesystem side effects with real file-backed stores rather than solely in-memory/mock dependencies</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix SqliteStore::open invocation in status_cli.rs: verify Path::new(&amp;resolved.url).exists() before opening file-backed SQLite stores</li>
+          <li>Add a unit/integration test asserting that clio status --backend sqlite --db /path/to/missing.db reports degraded exit 1 and creates zero files on disk</li>
+          <li>Run cargo fmt --all across the workspace and stage the formatting fixes</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Provide a dedicated read-only Store::open_read_only seam in clio-store that uses SQLITE_OPEN_READONLY and never creates files or executes migrations</li>
+          <li>Expose an overlay key iterator in clio_config::Runtime to discover and mask all secret keys dynamically</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-mpvX4O/report.html</span>
+          <span><b>Findings:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-mpvX4O/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+2026-09-20T11:36:15 START remediator-task-r1 phase-100210; backup findings.original.json created
+2026-09-20T11:45:20 triage complete: F-01..F-05 fix in own hands (same files, no split); plan_unlimited #1 (batch fetch) and #2 (unarchive MCP) deferred with reasons; #3 = F-04 fix
+2026-09-20T11:52:05 F-01 fixed clean.rs:301 log id now hlg-<batch>-<index>-<item>; F-03 fixed clean.rs:165 preflight rejects confirmed keep resolving discard with empty reason
+2026-09-20T11:58:10 F-04 fixed audit.rs: DEFAULT_MAX_SCAN=5000, AuditArgs.max_scan, AuditReport.incomplete; hygiene_tools passes default
+2026-09-20T12:00:05 F-05 fixed hygiene_tools.rs hygiene_log_list rows carry timestamp/bank aliases; F-02 fixed: full AGENTS.md header block added to hygiene_seq.rs + 7 test files
+2026-09-20T12:02:00 new tests: clean_batch_tests.rs (batch abort moved + duplicate-target log rows + keep-preflight), audit_tests scan_budget_sets_incomplete, mcp alias assertions
+2026-09-20T12:10:00 scoped tests: clio-hygiene 37 passed; clio-mcp 130+5+8+2+6 passed; clio-store pg_hygiene parity passed. cargo check clean; all touched files <=450 lines
+2026-09-20T12:20:30 fmt+clippy fixed (doc-comment on expr, map_or->is_none_or, clean() extracted confirmed_discard_requested helper to stay <=100 clippy lines); clippy 0 warnings, fmt clean
+2026-09-20T12:25:10 scoped llvm-cov (clio-hygiene+clio-mcp+clio-store, profraw-cleaned first): clean.rs 95.52%/100%, audit.rs 91.69%/94.12%, hygiene_tools.rs 98.29%/100%, hygiene_seq.rs+hygiene_store.rs 100%/100% - all >=90 floors
+2026-09-20T12:25:30 starting single end-of-round make check
+2026-09-20T12:40:10 make check (single end-of-round pass): exit 0, 997 tests passed across 39 suites, 0 warnings
+2026-09-20T12:55:00 make coverage (single full gate): exit 0; aggregate 94.68% lines / 98.69% functions; per-file scan: 194 reported files, 0 below 90% lines or functions
+2026-09-20T13:00:00 findings.json updated (F-01..F-05 resolved with evidence; plan_1hr all implemented; plan_unlimited: #3 implemented via F-04, #1 batch-fetch and #2 unarchive-MCP deferred with reasons; remediation_verification + deferred blocks added); backup findings.original.json untouched
+2026-09-20T13:00:20 phase-100210 Attribution: Remediator r1 row set to done; changes left UNSTAGED (no git add per rules); out-of-scope check: all 5 findings are code findings, none confined to .workflows/
+2026-09-20T13:01:00 FINISH: 5/5 findings fixed (log-id collision index, 8 header blocks, keep->discard preflight reason gate, scan budget + incomplete signal, timestamp/bank aliases); make check exit 0 (997 passed, 0 warnings); make coverage exit 0 (94.68%/98.69%, 0/194 files below floors)
+REMEDIATOR_DONE 36ef0af3

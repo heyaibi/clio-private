@@ -1,0 +1,23 @@
+[2026-09-21T21:14Z] START adversary r1 phase-100330 review. Initialized review log.
+[2026-09-21T21:15Z] Inspected git status and staged diff (`git diff --cached --stat`). 29 files staged.
+[2026-09-21T21:16Z] Verified Rust file line counts across all created/modified files. Finding F-01: `crates/clio-config/src/config/tests.rs` is 469 lines (AGENTS.md hard constraint <=450 lines violated).
+[2026-09-21T21:17Z] Verified AGENTS.md headers on all new/modified Rust files. All headers present and accurate.
+[2026-09-21T21:18Z] Scanned diff for roadmap isolation violations. Finding F-03: `crates/clio-lib/src/setup_wizard.rs:304` ('compose phase') and `crates/clio-lib/src/setup_wizard_tests.rs:69` ('this phase').
+[2026-09-21T21:19Z] Ran `cargo fmt --all -- --check`: clean (exit 0).
+[2026-09-21T21:20Z] Ran `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`: clean (exit 0).
+[2026-09-21T21:21Z] Ran `cargo test --locked --workspace` in terminal environment: task hung on `tests::setup_usage_errors_exit_2` in `crates/clio-lib/src/main_tests.rs:61-68`.
+[2026-09-21T21:22Z] Finding F-02: `crates/clio-lib/src/main_tests.rs:61-68` unmocked `is_terminal()` in `setup_cli::setup` prompts and blocks indefinitely on `std::io::stdin()` during tests run in interactive terminals.
+[2026-09-21T21:23Z] Ran `cargo test --locked --workspace </dev/null`: passed 110/110 tests (exit 0).
+[2026-09-21T21:24Z] Ran `make coverage </dev/null`: passed (exit 0). Aggregate 97.91% lines, 98.96% functions. All touched files exceed 90% floor (setup_config.rs 97.7%l/100%f, setup_wizard.rs 99.0%l/100%f, setup_cli.rs 97.0%l/100%f, setup_cli_flows.rs 96.6%l/100%f, config/persist.rs 95.3%l/93.5%f, config/mod.rs 99.1%l/100%f). No reported file below 90%.
+[2026-09-21T21:25Z] Ran `make check </dev/null`: clean (exit 0).
+[2026-09-21T21:26Z] Executed `am setup --type zero-dependency` end-to-end: verified written config at 0600 mode and loaded without env.
+[2026-09-21T21:27Z] Finding F-04: `crates/clio-lib/src/setup_wizard.rs:198-210` `Plan::local_services()` unconditionally includes `postgres`, printing `local services: postgres` for zero-dependency installs.
+[2026-09-21T21:28Z] Finding F-05: `crates/clio-lib/src/setup_config.rs:104-114` switching install types merges over existing overlay without pruning unselected provider credentials, leaking hosted API keys into airgapped configs.
+[2026-09-21T21:29Z] Finding F-06: `crates/clio-config/src/config/persist.rs:74-77` HOME fallback lacks `is_absolute()` check contrary to XDG doc comment.
+[2026-09-21T21:30Z] Finding F-07: `crates/clio-config/src/config/persist.rs:207-213` static `.{name}.tmp` file in atomic write risks race conditions under concurrent operations.
+[2026-09-21T21:31Z] Generated adversarial review report using `scripts/generate-report.cjs`.
+[2026-09-21T21:32Z] Copied `report.html` and `style.css` to `.workflows/phase-100330/`.
+[2026-09-21T21:33Z] Validated `findings.json` against both schema definitions with python jsonschema.
+[2026-09-21T21:34Z] Updated Attribution table in `roadmap/phase-100330-am-setup-wizard.md` with Adversary done entry.
+[2026-09-21T21:35Z] FINISH adversary r1 review. Writing final signal line.
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100330/findings.json 17252516

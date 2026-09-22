@@ -1,0 +1,18 @@
+2026-09-18T20:54:47Z START adversary r1 phase-100130: review staged diff + surrounding code
+2026-09-18T20:54:47Z scope: git status shows all phase changes staged (M/A), only .workflows untracked; reviewed git diff --cached -- . :!.workflows/ (35 files, 3792+/299-)
+2026-09-18T20:54:47Z read roadmap/phase-100130 AC table, requirement.md 4.5/4.9.4/7.4.5/FR-17/FR-18, AGENTS.md constraints
+2026-09-18T20:54:47Z make test: 531 passed, 0 failed across all suites
+2026-09-18T20:54:47Z make lint: cargo clippy --workspace --all-targets --all-features -D warnings clean
+2026-09-18T20:54:47Z make coverage: exit 0; TOTAL fn 98.54% / lines 98.42%; parsed 113 files, none below 90% fn or line
+2026-09-18T20:54:47Z cargo fmt --all -- --check: exit 0
+2026-09-18T20:54:47Z F-01 medium: ranking-env assoc knobs not consumed; hybrid.rs:83-86 AssocPolicy::default(); assoc.rs:47-51; no non-test caller of from_coactivation/set_assoc_policy; assoc_tests.rs:188-202 sets policy directly
+2026-09-18T20:54:47Z F-02 medium: 7.4.5 derivative log error swallowed at hub_distill.rs:361-368 (`let _ = record_assoc_audit`)
+2026-09-18T20:54:47Z F-03 medium: expand_ids skips min_weight for explicit edges (assoc_graph.rs:267-289, comment at :271; assoc.rs:138-139 returns Some at any weight)
+2026-09-18T20:54:47Z F-04 medium: no durable hub_distill queue; consolidate_hubs recomputes eligibility inline (hub_distill.rs:242-261); no reinforce telemetry
+2026-09-18T20:54:47Z F-05 low: t05 only tests invalid-eta validation, not durable handoff failure (assoc_tests.rs:163-185)
+2026-09-18T20:54:47Z F-06 low: test files lack full AGENTS.md header (assoc_policy_tests.rs:1-3; assoc_edge_tests.rs:1-2; pg_assoc_edge_tests.rs:1-2)
+2026-09-18T20:54:47Z F-07 low: phase attribution string mismatch (phase file line 6 vs instructed Together/GLM-5.3)
+2026-09-18T20:54:47Z F-08 low: coactivation uniqueness only via deterministic id; sql/001_core.sql:423 UNIQUE includes NULL relationship
+2026-09-18T20:54:47Z verdict Adequate; wrote .workflows/phase-100130/findings.json (8 findings) + report.html + style.css
+2026-09-18T20:54:47Z appended Adversary r1 attribution row to roadmap/phase-100130 (only phase-file edit)
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100130/findings.json a1ca0e5c

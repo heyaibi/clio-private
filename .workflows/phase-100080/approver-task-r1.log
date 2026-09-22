@@ -1,0 +1,17 @@
+2026-09-18T11:53:35+05:30 START approver-task-r1 Phase 100080 remedy approval
+2026-09-18T11:53:40+05:30 Read findings.original.json (8 findings), findings.json, phase-100080 roadmap, and unstaged diff
+2026-09-18T11:53:50+05:30 Verification gate: cargo fmt --all -- --check PASS
+2026-09-18T11:53:55+05:30 Verification gate: cargo clippy --workspace --all-targets --all-features -- -D warnings PASS (0 warnings)
+2026-09-18T11:54:02+05:30 Verification gate: make check PASS (all tests green)
+2026-09-18T11:54:20+05:30 Verification gate: make coverage PASS (TOTAL fn 99.38% / lines 98.61%, every reported file >=90% fn and lines)
+2026-09-18T11:54:25+05:30 Verification gate: Rust file size check PASS (all touched files <= 391 lines, limit <= 450 lines)
+2026-09-18T11:54:30+05:30 F-01 PASS: crates/clio-store/src/pg_triple_tests.rs:42 open_pg converted to let-else; lines 165-220 decompose postgres_invalidate_and_guards into sub-functions under 100 lines; clippy clean
+2026-09-18T11:54:35+05:30 F-02 PASS: crates/clio-store/src/triple_tests.rs (352 lines) decomposed with crates/clio-store/src/triple_edge_tests.rs (311 lines), registered in crates/clio-store/src/lib.rs:91; cargo fmt passes
+2026-09-18T11:54:40+05:30 F-03 PASS: AGENTS.md headers verified on crates/clio-store/src/pg_triple_tests.rs:1-19, crates/clio-store/src/triple_tests.rs:1-19, crates/clio-store/src/triple_edge_tests.rs:1-19, crates/clio-types/src/triple_tests.rs:1-18, and crates/clio-write/src/triple_tests.rs:1-19
+2026-09-18T11:54:45+05:30 F-04 FAIL: .workflows/ files remain staged in git index (.workflows/instruction.md, .workflows/phase-100080/developer-task-r1.log, .workflows/phase-100080/developer-task-r1.md, .workflows/phase-100080/resume.json); remediator skipped resolution claiming git policy prohibition
+2026-09-18T11:54:50+05:30 F-05 PASS: crates/clio-write/src/triple.rs:39-45 unique_id with AtomicU64 seq + nanos + pid generates collision-resistant edge_id (line 150) and item_id (line 151); tested in crates/clio-write/src/triple_tests.rs:58
+2026-09-18T11:54:55+05:30 F-06 FAIL: crates/clio-store/src/sqlite_triple_read.rs:77-90 and crates/clio-store/src/postgres_triple_read.rs:71-85 push subject/predicate/object to SQL, but interval constraints (valid_from/valid_until/tx_from/tx_until) are not pushed to SQL; marked partially_resolved in findings.json:152; partial resolution is a reject per approver rules
+2026-09-18T11:55:35+05:30 F-07 PASS: crates/clio-store/src/triple_map.rs:74 defaults omitted as_of to now_iso8601() (crates/clio-store/src/migrate.rs:63); future facts excluded from current query; tested in crates/clio-store/src/triple_tests.rs:328
+2026-09-18T11:55:45+05:30 F-08 PASS: crates/clio-store/src/sqlite_triple.rs:97 and crates/clio-store/src/postgres_triple.rs:94 query open edges by tx_until IS NULL and close with valid_until = COALESCE(valid_until, ?1); triple_end aligned in sqlite_triple_read.rs:156 and postgres_triple_read.rs:141; tested in crates/clio-store/src/triple_edge_tests.rs:252
+2026-09-18T11:56:00+05:30 FINISH approver-task-r1 verdict REJECT: unresolved F-04, F-06
+REMEDY_REJECTED: F-04, F-06

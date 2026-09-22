@@ -1,0 +1,17 @@
+2026-09-20T06:19:13Z START approver-task-r1 phase-100210; validating remediator r1 claim
+2026-09-20T06:19:19Z diff captured: 610 lines, 14 files (13 code + 1 phase doc), .workflows/ diff ignored per rules
+2026-09-20T06:20:23Z F-01..F-05 source-verified in unstaged diff; clean_batch_tests.rs present (untracked, 173 lines, full header); all 14 touched files <=450 lines; starting my own make check
+2026-09-20T06:21:17Z my make check: exit 0, 39 suites, 944 passed 0 failed, 0 warnings (remediator reported 997 passed; suite count matches, count discrepancy noted, gate is exit 0 + 0 failed)
+2026-09-20T14:05:00Z F-01 PASS: clean.rs:312 append_log id now hlg-<batch>-<index>-<item>; both dry-run (clean.rs:185) and confirmed (clean.rs:246) loops enumerate targets; clean_batch_tests.rs:173 has duplicate_targets_write_distinct_log_rows; make check green
+2026-09-20T14:05:10Z F-02 PASS: full Responsibility/Owns/Does-not-own/Boundary headers verified in unstaged diff on hygiene_seq.rs + 7 test files; new untracked clean_batch_tests.rs (173 lines) also fully headered; referenced by lib.rs, compiles
+2026-09-20T14:05:20Z F-03 PASS: clean.rs:165-174 preflight uses confirmed_discard_requested (clean.rs:265-276: explicit Discard OR Keep with any target suggested_action=="discard"), rejects confirmed empty-reason before any mutation; preflight test passes in make check
+2026-09-20T14:05:20Z F-04 PASS: audit.rs DEFAULT_MAX_SCAN=5000, AuditArgs.max_scan, AuditReport.incomplete; budget loop breaks with incomplete=true on partial page (audit.rs:146-155); scan_budget_sets_incomplete_and_stays_read_only verifies masked previews, zero mutations, no false truncation at exact budget
+2026-09-20T14:05:30Z F-05 PASS: hygiene_tools.rs:113-127 adds timestamp/bank aliases of created_at/bank_id after masked_clone; hygiene_tools_tests.rs:151-152 asserts equality; make check green
+2026-09-20T14:06:00Z gates (my own runs): make check exit 0, 39 suites, 944 passed / 0 failed, 0 warnings; make coverage exit 0, aggregate lines 97.84% (27989/604), functions 98.69% (2367/31), 188 per-file rows, 0 below 90% lines or functions
+2026-09-20T14:06:10Z touched-file coverage: audit.rs 91.30% lines/94.12% funcs, clean.rs 97.70%/100%, hygiene_tools.rs 99.22%/100%, hygiene_seq.rs + hygiene_store.rs 100%/100% - all >=90 floors
+2026-09-20T14:06:20Z size constraint: all 14 touched + new files <=450 lines (max clean_tests.rs 414)
+2026-09-20T14:06:30Z report integrity: findings.original.json pristine (5 findings F-01..F-05, zero resolution blocks, same titles, shasum 19e1e89a...); findings.json marks all 5 resolved with matching evidence, no findings deleted; unstaged diff = remediation + headers + tests + roadmap attribution row only, no unrelated changes; .workflows/ paths absent from code diff
+2026-09-20T14:06:40Z notes (non-blocking): remediator's "94.68% lines" aggregate is actually the regions column (lines aggregate is 97.84%); remediator's "997 tests passed" vs my 944 (same 39 suites, exit 0 both); clean_batch_tests.rs is untracked so absent from git diff
+2026-09-20T14:07:00Z VERDICT: APPROVE - 5/5 findings resolved, no regressions, gates green
+2026-09-20T06:23:51Z approval record written to roadmap/phase-100210-hygiene-audit-confirmed-cleanup.md Attribution (Remedy Approver r1 approved); finishing
+REMEDY_APPROVED 9b58a6a1

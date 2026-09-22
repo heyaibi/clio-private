@@ -1,0 +1,104 @@
+{
+  "run_id": "phase-100220",
+  "phase": "100220",
+  "state": "completed",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "DEVELOPER_DONE 0e03ad82"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/findings.json ae54f9ca"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "signal": "REMEDIATOR_DONE ab213343"
+    },
+    {
+      "step": "approver",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "signal": "REMEDY_APPROVED 0c428d78"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "FINALIZE_DONE 103f637e"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/developer-task-r1.md",
+      "prompt_sha256": "85a330b314043b62623e6dbd1eb6dda6ac5c2a1aba1dc209629b8daa29097a2c",
+      "duration_s": 7016.013,
+      "visits": 1,
+      "signal": "DEVELOPER_DONE 0e03ad82",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/developer-task-r1.tui.log",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/adversary-task-r1.md",
+      "prompt_sha256": "69bdba82586da22c5cbd95d7e5773bb66b840c08c6a1e74f5174c0ed09333df7",
+      "duration_s": 604.553,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/findings.json ae54f9ca",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/adversary-task-r1.tui.log",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/remediator-task-r1.md",
+      "prompt_sha256": "502a25421e64a13455346379fe05b51af4213831bac16bd92eee1491ba612a12",
+      "duration_s": 2528.022,
+      "visits": 1,
+      "signal": "REMEDIATOR_DONE ab213343",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/remediator-task-r1.tui.log",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/approver-task-r1.md",
+      "prompt_sha256": "b52f8cd6f3b5e2be9f9e78a99c0d0f96baab40e593539c39690db5113a65fb52",
+      "duration_s": 337.059,
+      "visits": 1,
+      "signal": "REMEDY_APPROVED 0c428d78",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/approver-task-r1.tui.log",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/finalize-task-r1.md",
+      "prompt_sha256": "598606155960f3164c10cb67e7541a7fd310effcf8ac2412dbc849a8d721522a",
+      "duration_s": 125.559,
+      "visits": 1,
+      "signal": "FINALIZE_DONE 103f637e",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/finalize-task-r1.tui.log",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ]
+}

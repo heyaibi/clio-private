@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100120: intent gate, hybrid retrieve, and compose_context (clio-retrieve)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100120: intent gate, hybrid retrieve, and compose_context (clio-retrieve)</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">4 important · 8 minor · 8 dismissed</span>
+    </div>
+    <p class="sum">The new clio-retrieve crate is well-structured and almost every phase acceptance criterion is backed by a real, passing test; I independently reran the full suite (487 passed), clippy, fmt, per-file coverage (all &gt;=90%), and the opt-in Postgres parity test and they hold. The weaknesses are honesty/process rather than runtime correctness: the Definition of Done marks independent approval and verification as complete while the sign-off rows are still pending, one phase Expected Result (hybrid beats dense-only/lexical-only on a labeled fixture, with a documented metric) has no evidence, and retrieve can exceed its optional budget for a single oversized hit.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-19</span>
+      <span><b>Applies to</b>unstaged working tree (nothing staged); crates/clio-retrieve + tracked edits</span>
+      <span><b>Source</b>crates/clio-retrieve/**/*.rs, Cargo.toml, Cargo.lock, crates.md, crates/clio-index/src/lib.rs, crates/clio-lib/{Cargo.toml,src/lib.rs}, roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md, roadmap/phase-100120-appendix-hybrid-fusion-and-budgets.md, requirement.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md: Rust file header structure, &lt;=450 lines/file, coverage gate (&gt;=90% function and line per reported file), no comments unless required, requirement.md consistency</li>
+        <li>requirement.md: FR-6, FR-7, FR-24, FR-28, NFR-1, NFR-3, PR-1, PR-4, PR-7, section 2.7, section 4.5, section 4.9.4.B, section 8 retrieval-skip precision</li>
+        <li>phase-100120 intent gate / hybrid retrieve / compose acceptance criteria (AC-100120-01..AC-100120-10), required tests T100120-01..T100120-14, and Task Expected Results</li>
+        <li>Phase 100110 index-lag contract, Phase 100080 bitemporal semantics, Phase 100100 belief/fact read contract</li>
+        <li>Developer task: implementation scope, staging via git add, phase-file evidence honesty</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">11 of 16 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>FR-6 intent gate + NFR-1 (AC-100120-01)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">intent_tests::{t01_gate_on_greeting_skips, t01_gate_on_acknowledgement_skips, t02_gate_on_memory_needed_turn_retrieves_with_domains, t03_gate_latency_budget} pass; gate is pure normalize+substring (intent.rs:127-171), no embed/graph. Verified: cargo test --workspace --locked 487 passed.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>FR-24 explicit retrieve runs after gate skip (AC-100120-02)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">hybrid_tests::t04_explicit_retrieve_runs_after_gate_skip passes; retrieve() never consults the gate (hybrid.rs:130-186).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>FR-7 / section 2.7 persona never gated; compose explicit vs auto (AC-100120-03)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">compose_tests::{t05_auto_path_skips_memory_but_keeps_persona, t05b_explicit_compose_after_gate_skip_still_retrieves} and surface_tests::compose_tool_auto_path_honors_skip pass; persona section always emitted (compose.rs:225-234).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Hybrid dense+lexical(+graph) with RRF (AC-100120-04) and phase Task 2 Expected Result (hybrid beats dense-only/lexical-only with a documented metric)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">T100120-06/T100120-07/T100120-12 and graph expansion tests pass and weighted RRF is correct (fusion_tests). But no test or metric compares hybrid against dense-only and lexical-only; the phase&#39;s Task 2 Expected Result has no evidence (grep for dense-only/lexical-only/metric across *_tests.rs finds only assertion strings).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Rerank optional, fail-open (AC-100120-05)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">hybrid_tests::{t08_reverse_reranker_reverses_fused_order, t08_rerank_failure_keeps_fused_order, t08_rerank_sidecar_down_keeps_fused_order} and rerank_tests pass; dead-sidecar keeps fused order (hybrid.rs:374-380).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Bi-temporal as_of + time_axis (AC-100120-06)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">hybrid_tests::t09_as_of_and_time_axis_filter_candidates and filter_tests::temporal_visibility_valid_and_transaction_axes pass; uses clio_types::interval_contains.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Belief/fact fields on hits, Phase 100100 contract (AC-100120-07)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">surface_tests::belief_and_fact_fields_serialize_per_contract passes; RetrieveHit flattening (types.rs:104-121) exposes epistemic_kind/source_type/confidence.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>PR-1 bounded compose injection (AC-100120-08)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">compose_tests::{t11_oversize_bank_respects_budget, total_tokens_never_exceeds_budget_across_sizes} pass, so compose injection is bounded. However retrieve&#39;s optional budget is not strictly honored: finalize.rs:50-55 admits the first hit unconditionally, so retrieve(budget_tokens=1) can return estimated_tokens&gt;1. compose re-truncates in pack_memory, so the injection bound itself is safe.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>ranking_env integration (AC-100120-09)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">hybrid_tests::t14_weight_change_changes_order_deterministically and fusion_tests::weight_change_changes_scores_deterministically pass; dense/lexical normalized as list weights (hybrid.rs:385-392).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Bank isolation (AC-100120-10)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">hybrid_tests::t13_bank_isolation_returns_no_cross_bank_hits passes; empty bank fails closed (hybrid.rs:188-207), store access is bank-scoped (hybrid.rs:283).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Dual-backend hit-id parity (AC-100120-11)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Verified by rerun: DATABASE_URL=postgres://agentmemoir:... AM_PG_RETRIEVE_PARITY=1 cargo test -p clio-retrieve postgres_and_sqlite_hit_id_parity -&gt; 1 passed.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Coverage gate: &gt;=90% functions and lines on every reported file</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage exit 0: TOTAL 98.55% lines / 98.87% functions; parsed every file row, zero files below 90% on either gated metric. clio-retrieve files: compose 100/100, filter 100/100, finalize 96.97/100, fusion 100/100, hybrid 98.46/100, intent 99.47/100, rerank 100/100, surface 98.68/100, token 100/100, types 100/100.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Rust file size &lt;=450 total lines</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">wc -l: hybrid.rs 446, hybrid_tests.rs 449, all other new files smaller; tracked edits are single-line additions.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md header structure on every Rust source file</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Production files and fixtures_tests.rs / pg_parity_tests.rs have the full Responsibility/Owns/Does not own/Boundary header. Seven new test files have only a copyright + one-line //! doc: intent_tests.rs:1-4, compose_tests.rs:1-4, hybrid_tests.rs:1-4, surface_tests.rs:1-4, fusion_tests.rs:1-4, filter_tests.rs:1-4, rerank_tests.rs:1-4.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Phase Definition of Done honesty (approval/verification)</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">roadmap/phase-100120...md:412-422 marks &#39;Verification is completed.&#39; and &#39;Required approval is obtained.&#39; as [x], while :7-10 show Adversary/Remediator/Remedy Approver/Finalize as pending and :515 says &#39;Verifier: [pending - Adversary r1]&#39;.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>section 8 retrieval-skip precision: false-negative rate tracked separately from false-positive rate (stricter bound)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">requirement.md:681 is normative (&#39;SHALL be tracked separately and held to a stricter bound&#39;). GateMetrics (intent.rs:90-123) stores only evaluated/skipped counts; it cannot distinguish a false negative from a correct skip and there is no false-positive counter or bound. The phase appendix only required a &#39;false-negative monitoring note (even if only a test harness counter)&#39;, which is met.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">04</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Definition of Done overclaims independent approval and verification</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The DoD is the phase&#39;s completion contract; checking &#39;Required approval is obtained&#39; and &#39;Verification is completed&#39; before the adversary and human approve turns an unverified state into a claimed one, which is the exact failure mode the review pipeline exists to prevent.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Pipeline and human reviewers may treat phase 100120 as approved when only the developer&#39;s self-check has happened.</dd></div>
+              <div><dt>Evidence</dt><dd>roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md:412-422 (all [x]) vs :7-10 (Adversary/Remediator/Approver/Finalize pending) and :515 (&#39;Verifier: [pending - Adversary r1]&#39;).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Uncheck &#39;Verification is completed&#39; and &#39;Required approval is obtained&#39; until the adversary/human rows complete; or relabel them as &#39;self-verification completed; independent verification pending&#39;.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>retrieve() can exceed its requested budget_tokens for a single oversized hit</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 4 requires retrieve to honor budgets when trimming the returned pack. The `&amp;&amp; !hits.is_empty()` guard means the first candidate is admitted even when it alone is larger than the budget, so the optional budget is a soft floor, not a cap.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A caller passing a small budget_tokens can receive a hit whose estimated_tokens exceeds it. The PR-1 injection bound is still safe because compose re-truncates in pack_memory (compose.rs:289-316), so this is a retrieve-contract issue, not an injection leak.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/finalize.rs:50-55: `if let Some(budget) = args.req.budget_tokens &amp;&amp; estimated_tokens + tokens &gt; budget &amp;&amp; !hits.is_empty() { break; }`. No test exercises a single hit larger than the budget (budget_tokens_trims_returned_hits uses two 8-token hits with budget 8).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Either drop/skip a candidate that alone exceeds the remaining budget, or explicitly document and test that at least one hit is always returned as a deliberate behavior with its budget consequence stated.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Phase Task 2 Expected Result (&#39;hybrid beats dense-only and lexical-only on a labeled fixture, document metric&#39;) has no evidence</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase states this as the outcome that proves Task 2. AC-100120-04 only checks that a lexical-only exact hit is included; it does not measure any quality lift, so the substantive claim about hybrid retrieval is unverified.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Phase 100120 is accepted without demonstrating the core value proposition of hybrid retrieval; a regression that drops lexical recall below dense-only would still pass every test.</dd></div>
+              <div><dt>Evidence</dt><dd>hybrid_tests.rs:40-63 (t06 asserts only membership of the lexical-only hit plus candidate counts); no fixture computes a dense-only or lexical-only baseline. grep across *_tests.rs for &#39;dense-only|lexical-only|metric&#39; finds no comparison.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a small labeled fixture with a documented metric (e.g. recall@k or MRR) and assert hybrid &gt;= dense-only and hybrid &gt;= lexical-only, or downgrade the phase Expected Result to match what is actually tested.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>section 8 normative false-negative tracking is reduced to a generic skip counter</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>requirement.md:681 says the intent gate&#39;s false-negative rate SHALL be tracked separately from, and held to a stricter bound than, its false-positive rate. evaluated/skipped counters cannot express either rate because there is no ground truth attached to a decision.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The system cannot currently demonstrate the stricter false-negative bound the spec demands; a gate that skips many memory-needed turns looks identical to a well-calibrated one in metrics.</dd></div>
+              <div><dt>Evidence</dt><dd>intent.rs:90-123 (GateMetrics: evaluated, skipped only); intent_tests.rs:108-116 asserts only those two counters. No false_negative/false_positive symbol exists anywhere in crates/.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a labeled evaluation hook that records expected_needed vs decision (FN/FP counters) and a documented stricter FN bound, or explicitly scope this metric to a later offline-evaluation phase and say so in the phase file.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">08</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Seven new test source files omit the AGENTS.md-mandated header structure</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md states every Rust source file MUST use the Responsibility / Owns / Does not own / Boundary header. Test files are Rust source files.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Rule non-compliance across seven files; inconsistent documentation conventions for the new crate.</dd></div>
+              <div><dt>Evidence</dt><dd>intent_tests.rs:1-4, compose_tests.rs:1-4, hybrid_tests.rs:1-4, surface_tests.rs:1-4, fusion_tests.rs:1-4, filter_tests.rs:1-4, rerank_tests.rs:1-4 each have only copyright + SPDX + one-line //! doc. fixtures_tests.rs:1-18 and pg_parity_tests.rs:1-20 have the full structure.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the full header block to the seven test files.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Nothing is staged, contradicting the review premise that the developer staged the changes</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The reviewer instructions say to review `git diff --cached`; that diff is empty, and the new crate is entirely untracked. The developer&#39;s own log states they deliberately skipped git add due to a global rule, so the intended pipeline step cannot run as specified.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Automated review of the staged diff sees no code; the changes could be missed or duplicated if the pipeline stages later.</dd></div>
+              <div><dt>Evidence</dt><dd>`git diff --cached -- . &#39;:!.workflows/&#39;` -&gt; empty. `git diff --stat` shows 7 tracked files; `git ls-files --others` lists 21 untracked files under crates/clio-retrieve/. Developer log line: &#39;did not run git add ... changes are unstaged&#39;.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Pipeline (or user) stages with the documented pathspec, or the conflict between the global no-git rule and the developer-task staging instruction is resolved explicitly.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>clio-retrieve&#39;s in-process tool schema requires `bank`, which is absent from the published section 4.9.4.B signature</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>requirement.md:342-344 and phase Task 4 list retrieve(query, domains?, limit?, as_of?, time_axis?, expand_graph?, budget_tokens?) and compose_context(query?, domains?, budget_tokens) with no bank argument. The schema adds a required bank.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Slices 100160-17 MCP binding must invent a bank-injection convention or change the schema; a generated tool catalog from the requirement would not match the implementation.</dd></div>
+              <div><dt>Evidence</dt><dd>surface.rs:50-53 (RetrieveArgs.bank required) and surface.rs:77-79 + 165-170 (ComposeArgs.bank optional then rejected if missing).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Document that bank is supplied by the transport/session binding and make it explicit in the phase evidence, or align the argument contract with the requirement.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>Retrieve and compose measure different text when applying the same token budget</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>finalize measures lexical/book text; compose measures the hit&#39;s gist (or snapshot ref / id). The same hit has two different token costs, so retrieve&#39;s budget trimming can be much more aggressive than the memory section needs, and estimated_tokens in RetrieveOutcome does not describe the composed pack.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Under-filled memory sections and a metric (estimated_tokens) whose meaning differs between retrieve and compose; both remain bounded, so no injection overrun.</dd></div>
+              <div><dt>Evidence</dt><dd>finalize.rs:49 uses doc_text(Some(item)) = clio_index::lexical_text (hybrid.rs:419-421). compose.rs:289-326 pack_memory uses hit_text = gist | snapshot_ref | item_id (compose.rs:318-326).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Pick one canonical budgeted representation, or document the two and report both sizes.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">09</span>
+          <div>
+            <div class="ihead">
+              <h3>T100120-03 latency test cannot fail on any realistic machine and is presented as NFR-1 evidence</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The gate runs in-memory with no I/O; a p95 threshold of 50,000 microseconds over 2000 calls is trivially met, so the test is a smoke test rather than a bound. Labelling it as satisfying NFR-1 overstates the evidence.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A future change that adds real work to the gate (e.g. a classifier call) could still pass this test up to ~50 ms per call.</dd></div>
+              <div><dt>Evidence</dt><dd>intent_tests.rs:91-106: samples 2000 gate calls per microsecond clock, asserts p95 &lt;= 50_000 us. The gate itself (intent.rs:127-171) does only string ops.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>State in the phase file that this is a smoke check and that the real NFR-1 guard is the absence of I/O in the gate; optionally add a tighter sanity bound (e.g. &lt;1 ms) plus a structural test that the gate has no embedder/graph dependency.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">10</span>
+          <div>
+            <div class="ihead">
+              <h3>graph_expanded metric counts candidates that were already returned by dense/lexical legs</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The metric is meant to report how many genuinely graph-expanded candidates entered the result set; counting ids that were already candidates overstates graph contribution and will mislead slice 100130 tuning.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Diagnostic only; no ranking or budget impact.</dd></div>
+              <div><dt>Evidence</dt><dd>hybrid.rs:164: `let graph_expanded = fused.iter().filter(|h| expanded.contains(&amp;h.id)).count();` — `expanded` ids are appended to candidate_ids (hybrid.rs:151-155) but an id present in both lists is still counted.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Count only expanded ids that were absent from the dense and lexical filtered lists.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">11</span>
+          <div>
+            <div class="ihead">
+              <h3>Completion evidence test count does not match a rerun (486 vs 487)</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Evidence numbers should be reproducible; an off-by-one suggests the recorded output predates a final change or was transcribed inaccurately.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Low: the actual suite has one more passing test than claimed, so nothing is hidden, but the evidence is not an exact reproduction.</dd></div>
+              <div><dt>Evidence</dt><dd>phase-100120...md:432 claims &#39;cargo test --workspace --locked -&gt; 486 passed&#39;; rerun prints &#39;487 passed (22 suites, 5.74s)&#39;.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Refresh the evidence line from a fresh run.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">12</span>
+          <div>
+            <div class="ihead">
+              <h3>AC-100120-11 was added to the acceptance table beyond the phase&#39;s original AC-100120-01..AC-100120-10 set</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The AC table and the traceability section are the phase&#39;s contract. Adding a row is not itself wrong, but AC-100120-11 has no row in the section 11 traceability table, so the required Requirement -&gt; Capability -&gt; Implementation -&gt; Test -&gt; Evidence chain is incomplete for it.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Traceability gap for the dual-backend parity requirement.</dd></div>
+              <div><dt>Evidence</dt><dd>diff shows AC-100120-01..AC-100120-10 were the original rows and AC-100120-11 was added; section 11 (phase-100120...md:464-474) has no AC-100120-11 row.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the AC-100120-11 traceability row, or fold dual-backend parity under an existing AC.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Raw-score averaging across dense and lexical legs: not done; weighted RRF on ranks only (fusion.rs:58-86) is correct and matches the appendix.</li>
+        <li>Persona gated by intent gate: not done; persona section is always emitted and gate skip only omits the memory section (compose.rs:196-217).</li>
+        <li>Roadmap/phase-number references in clio-retrieve code or comments: none found (grep clean); the pre-existing &#39;Slices 100120, 13&#39; line in crates.md is unchanged context.</li>
+        <li>Cross-bank leakage: none; store access and both search legs are bank-scoped, and the adversarial t13 test passes.</li>
+        <li>Unsafe code / panics in production paths: none; crate has forbid(unsafe_code) and no unwrap/expect/panic outside tests.</li>
+        <li>Secret logging: no secrets are logged; compose warnings carry only error messages, not content or credentials.</li>
+        <li>Appendix T100120-07 &#39;A/B tie&#39; prose vs formula: the developer documented and tested the formula-derived B&gt;A&gt;D&gt;C order honestly; this is a strength, not a defect.</li>
+        <li>Postgres parity being opt-in: acceptable; coverage.md documents serialized Postgres suites and the opt-in test passes when enabled.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo test --workspace --locked passes — Rerun: &#39;487 passed (22 suites, 5.74s)&#39;.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo clippy --workspace --all-targets --all-features --locked -- -D warnings is clean — Rerun exit 0, no warnings.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo fmt --all is clean — cargo fmt --all -- --check exit 0.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage exit 0 with every reported file &gt;=90% functions and lines — Rerun: TOTAL 98.55% lines / 98.87% functions; parsed all file rows, none below 90% on either gated metric.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Opt-in dual-backend parity passes — DATABASE_URL=... AM_PG_RETRIEVE_PARITY=1 cargo test -p clio-retrieve postgres_and_sqlite_hit_id_parity -&gt; 1 passed.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All new/modified Rust files are &lt;=450 lines — wc -l: hybrid.rs 446, hybrid_tests.rs 449, others smaller.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Files are staged for review — git diff --cached is empty; new crate is untracked.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-amber">Uncertain</span>
+          <p>NFR-1 p95 &lt;= 50 ms is meaningfully verified — The test passes but can only fail under extreme scheduling pressure; it is a smoke test given the gate performs no I/O.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Retrieval false-negative rate is tracked separately with a stricter bound (requirement section 8) — Only evaluated/skipped counters exist; no ground-truth-based FN/FP measurement.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether the intent-gate heuristics generalize beyond the three fixture turns</p>
+          <p class="d">No labeled corpus, precision/recall not measured; only unit fixtures exist. · An offline evaluation set of turns labeled memory-needed vs self-contained, with FN/FP reported. · Medium: gate quality is the main behavioral risk (wrong answers on skipped memory).</p>
+        </div>
+        <div class="card unk">
+          <p class="t">Whether the Postgres and SQLite rank orderings agree beyond hit ids</p>
+          <p class="d">Parity test compares sorted ids only; rank differences are explicitly allowed but not characterized. · A fixture that logs rank divergence and asserts a bounded difference. · Low: spec allows rank differences.</p>
+        </div>
+        <div class="card unk">
+          <p class="t">Whether retrieve&#39;s budget-first-hit behavior is intentional</p>
+          <p class="d">No comment or test marks it deliberate. · A comment or a test asserting the at-least-one-hit policy and its budget consequence. · Medium: affects the retrieve budget contract.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Weighted RRF is implemented exactly as documented and reduced to classic Cormack RRF when weights are 1; the appendix tie discrepancy is documented and tested against the formula.</li>
+        <li>Fail-open behavior is real and tested three ways (failing reranker, dead HTTP sidecar, malformed response) and dense-leg outages degrade to lexical-only with structured warnings.</li>
+        <li>Bank isolation, bi-temporal filtering, and domain filtering are enforced on every path and covered by adversarial tests.</li>
+        <li>Compose dual-budget packing is genuinely bounded across budgets from 9 to 2048 tokens, and the persona channel is emitted even on the auto-skip path.</li>
+        <li>Independent verification replicates every headline claim: 487 tests, clean clippy/fmt, 98.55/98.87 coverage with no file below 90%, and a passing Postgres parity run.</li>
+        <li>Production code has no unwrap/expect/panic, forbids unsafe, and keeps every file under the 450-line cap.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>The review could not inspect a staged diff because nothing was staged; I derived staged-vs-unstaged from git diff variants instead of git status (global rule).</li>
+          <li>I could not construct a runtime counterexample for the retrieve budget overrun without editing the repository, so finding 2 rests on code inspection of finalize.rs.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>When a phase adds a new crate, require the developer to run `git add -- . &#39;:!.workflows/&#39;` or record an explicit, approved exception so reviewers get a staged diff.</li>
+          <li>Require completion evidence to include the exact reproducible command output (test count) and to leave approval/verification rows pending until the independent roles complete.</li>
+          <li>Require every phase Task &#39;Expected Result&#39; to map to a test or to be explicitly descoped in the AC table.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Correct the phase DoD and attribution so &#39;Verification is completed&#39; and &#39;Required approval is obtained&#39; are not claimed before independent sign-off.</li>
+          <li>Resolve the retrieve budget overrun in finalize.rs (enforce the cap or document/test the at-least-one-hit policy).</li>
+          <li>Add the missing hybrid-vs-dense-only/lexical-only labeled fixture (or descope the Task 2 Expected Result in the phase file).</li>
+          <li>Add the full AGENTS.md header to the seven test files.</li>
+          <li>Add a traceability row for AC-100120-11 and refresh the test-count evidence line.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Build a labeled gate evaluation harness that reports false-negative and false-positive rates separately and enforces the stricter false-negative bound from requirement section 8.</li>
+          <li>Wire a genuine automatic path (turn text -&gt; intent_gate -&gt; compose) and back the GraphExpander seam with real assoc_edge reads so expand_graph is not a no-op.</li>
+          <li>Reconcile the in-process tool schema with requirement section 4.9.4.B (bank injection strategy) ahead of the MCP binding slices.</li>
+          <li>Unify retrieve/compose token accounting on one canonical budgeted representation and document the estimator&#39;s error bars against a real tokenizer sample.</li>
+          <li>Resolve the global no-git rule versus the pipeline staging requirement with a scoped, approved mechanism.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100155 Operations discard tool (Gap Remediation)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100155 Operations discard tool (Gap Remediation)</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">2 important · 2 minor · 1 dismissed</span>
+    </div>
+    <p class="sum">The core in-process discard tool, dual-backend store operations, and visibility exclusion are cleanly implemented with full test coverage (95.38% lines, 98.85% functions, zero files below 90%) and all checks passing. Minor issues identified include a roadmap isolation violation in discard.rs comments, a dry-run false positive on already-discarded items, and a test gap for episodic items.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-19</span>
+      <span><b>Applies to</b>r1</span>
+      <span><b>Source</b>13 staged files (clio-store, clio-write, clio-retrieve, phase-100155)</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md: Hard rules on file size (&lt;= 450 lines), coverage gate (&gt;= 90% per-file func and line), file headers, and roadmap isolation.</li>
+        <li>requirement.md: §4.9.4.A discard tool, §4.9.2 destructive confirmation, PR-6 supersession separation, FR-15 telemetry.</li>
+        <li>roadmap/phase-100155-ops-discard-tool.md: AC-100155-01 through AC-100155-06, dual-backend parity, bank isolation, visibility exclusion.</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">6 of 7 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100155-01: In-process discard tool with §4.9.2 confirmation semantics</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-write/src/discard_tests.rs: dry_run_writes_nothing and confirmed_emits_one_pii_safe_event pass.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100155-02: Dual-backend store mutation with parity</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-store/src/discard_tests.rs: sqlite_discard_contract and postgres_discard_contract pass identical parity suites.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100155-03: FR-15 telemetry on mutating path</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">DiscardEvent records operation, bank, actor, timestamp, item_id, category, epistemic_kind, reason_len; verified in confirmed_emits_one_pii_safe_event.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100155-04: Visibility exclusion proven end-to-end</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">suite_visibility in discard_tests.rs tests lexical, dense, indexable_items, count_indexable_items, and index_coverage.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100155-05: PR-6/§7.4 boundaries held (no supersession, no key interaction)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">suite_discard and invalidate_and_discard_are_independent verify content ciphertext and time axes are untouched.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100155-06: Coverage gate (aggregate and per-file &gt;= 90% lines and functions)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage exit 0; TOTAL lines 95.38%, funcs 98.85%; 0 files below 90%.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Roadmap isolation: no phase or slice numbers in code comments</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-write/src/discard.rs:16 contains slice-16 reference.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Roadmap isolation violation in discard.rs doc comment</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md and the task rules enforce strict roadmap isolation: code and comments must never reference roadmap phases, slices, or files so the codebase remains self-contained after roadmap/ is deleted.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Breaks roadmap isolation and leaks roadmap slice numbering into production code comments.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/discard.rs:16: `//! - Transport-level confirmation plumbing (slice-16 MCP binding) and compliance`</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Remove `(slice-16 MCP binding)` and replace with `(transport-level MCP binding)`.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Dry-run reports success on already-discarded items</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Destructive confirmation dry-run (§4.9.2) should validate whether a discard will succeed. Because get_item_identity does not filter discarded_at IS NULL, an unconfirmed call on an already-discarded item returns DryRun(identity) indicating it would be discarded, but the subsequent confirmed call fails with InvalidArgument.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Inconsistency between dry-run and execution paths; false confidence given to callers during dry run.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/discard.rs:160-166: `let identity = args.store.get_item_identity(bank, args.item_id)?.ok_or_else(...); DiscardOutcome::DryRun(identity)` combined with `SELECT category, epistemic_kind FROM items WHERE id = ?1 AND bank_id = ?2` in crates/clio-store/src/sqlite_discard.rs:36.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update get_item_identity SQL to include `AND discarded_at IS NULL`, or have ItemIdentity include a discarded flag so the dry-run path rejects already-discarded items with the same error as confirmed discard.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">02</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Concurrent discard race returns ErrorCode::Internal</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>In a race condition where two callers attempt to discard the same item concurrently, both may pass the initial lookup, but only one will update the row. The loser encounters n == 0 and receives an Internal server error instead of the expected InvalidArgument (already discarded) error.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Surfaces misleading 500/Internal errors to operators or callers under concurrent access.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_discard.rs:100-105: `if n == 0 { return Err(AmError::new(ErrorCode::Internal, &quot;discard update matched zero rows&quot;)); }`</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>On n == 0, query the item again to confirm if it was discarded by a concurrent transaction, and return ErrorCode::InvalidArgument if so.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Test suite lacks coverage for discarding episodic items</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Episodic memory items have NULL category in the database schema. All existing tests in discard_tests.rs exclusively test semantic items with a populated category (ToolConfig). Although the code uses Option&lt;String&gt;, this path is not exercised by tests.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Testing gap for episodic memory item discard lifecycle.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/discard_tests.rs:45-67 only constructs semantic items via sample_semantic; crates/clio-write/src/discard_tests.rs:37-59 only constructs semantic items.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add an episodic item creation and discard test case to discard_tests.rs in both clio-store and clio-write.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Gated region coverage: clio-store/src/sqlite_triple_read.rs had 83.57% region coverage, but AGENTS.md explicitly states region coverage is not gated and line (96.80%) and function (93.33%) coverage are well above 90%.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make check passes (26 test binaries, fmt, clippy clean) — make check executed independently and exited 0 with all 26 binaries passing.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage meets &gt;= 90% aggregate and per-file threshold — make coverage executed independently; total line coverage is 95.38% and function coverage is 98.85%; 0 files below 90%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All modified and new Rust files are &lt;= 450 lines — wc -l verified all 12 Rust files are under 450 lines (largest is postgres_store.rs at 398 lines).</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Long-term index maintenance strategy for discarded items</p>
+          <p class="d">Physical index cleanup was deferred per the phase scope allowance. · A future maintenance phase hooking background worker compaction for discarded rows. · Low - read paths filter discarded_at IS NULL, preventing leakage.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean dual-backend implementation with identical contract tests running on SQLite and Postgres.</li>
+        <li>Zero schema migrations needed; leverages pre-existing discarded_at/discard_reason columns.</li>
+        <li>Strict adherence to PR-6 and §7.4 boundaries: zero DEK or content interaction.</li>
+        <li>PII-safe telemetry implementation recording reason length while omitting reason content.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Dry-run behavior on already-discarded items was not tested during development, leaving a minor semantic gap.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Include automated grep for slice and phase keywords in git pre-commit hooks to avoid roadmap isolation leaks.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix roadmap isolation comment in crates/clio-write/src/discard.rs:16 by removing (slice-16 MCP binding).</li>
+          <li>Update get_item_identity in SQLite and Postgres to filter WHERE id = ?1 AND bank_id = ?2 AND discarded_at IS NULL so dry-run rejects already-discarded items consistently with confirmed discard.</li>
+          <li>Add test cases for dry-run on already-discarded item and discard on episodic items in clio-store and clio-write.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Refactor discard_item on Postgres to use atomic UPDATE ... RETURNING to eliminate the separate SELECT lookup query and eliminate the race condition completely.</li>
+          <li>Integrate discard event emission into uniform audit_trail event logging once slice 100180 is implemented.</li>
+          <li>Add automatic background index cleanup hooks for discarded items across dense vector and lexical index stores.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100155/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100155/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

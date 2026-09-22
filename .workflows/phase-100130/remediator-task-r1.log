@@ -1,0 +1,9 @@
+2026-09-18T21:00:58Z START remediator run r1 phase-100130; findings.original.json backup present; read 8 findings + plan_1hr/plan_unlimited
+2026-09-18T21:05:05Z fixes applied: F-01 with_ranking_env+set_ranking_env (hybrid.rs), F-02 audit->Result (hub_distill.rs), F-03 expand_ids w_min (assoc_graph.rs), F-04 reinforce+hub telemetry, F-05 FaultyStore double (assoc_durable_tests.rs), F-06 headers, F-07 attribution, F-08 partial unique index+test; fmt applied; running make check
+2026-09-18T21:06:52Z make check: exit 0 (fmt + clippy --all-targets --all-features -D warnings + test all clean)
+2026-09-18T21:06:52Z cargo test --workspace --locked: 536 passed, 0 failed (22 suites; +5 new tests)
+2026-09-18T21:06:52Z cargo clippy --workspace --all-targets --all-features --locked -D warnings: exit 0
+2026-09-18T21:06:52Z make coverage: exit 0; aggregate regions 95.68% / functions 98.54% / lines 98.41%; parsed 113 files, 0 below 90% fn or lines
+2026-09-18T21:06:52Z file sizes: hybrid.rs 437, assoc_graph.rs 334, hub_distill.rs 396, assoc_durable_tests.rs 199, assoc_edge_tests.rs 402, pg_assoc_edge_tests.rs 408 (all <=450)
+2026-09-18T21:06:52Z findings.json updated: 8/8 resolved (F-04 partial w/ documented non-conformance); roadmap phase-100130 Attribution + AC evidence + Known Limitations updated; no git add (changes unstaged)
+REMEDIATOR_DONE 2801c057

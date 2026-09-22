@@ -1,0 +1,109 @@
+{
+  "run": "phase-100160-adversary-r1",
+  "phase": "100160",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "stdio_tests.rs is never compiled: the module is not declared, so the stdio unit tests (T100160-04, T100160-13, EOF) never run; Completion Evidence test counts are false",
+      "evidence": "crates/clio-mcp/src/stdio.rs ends at line 55 with no `#[cfg(test)] #[path = \"stdio_tests.rs\"] mod stdio_tests;` (rg 'stdio_tests' over the crate matches only the file itself). `cargo test -p clio-mcp --locked --lib -- --list` returns 68 tests (http 11, mutator_tools 12, protocol 12, runtime 10, schema 7, write_tools 16) and zero stdio tests. The phase doc (roadmap/phase-100160-mcp-schemas-write-surface.md, Completion Evidence) claims '74 unit (schema 7, write_tools 15, mutator 12, protocol 12, stdio 3, http 14, runtime 9 …) + conformance 6'; actual is 68 unit + 6 conformance, and stdio 3 does not exist.",
+      "requirement_ref": "Phase 100160 Task 3 / T100160-13 stdout purity; Completion Evidence claims",
+      "recommendation": "Add `#[cfg(test)] #[path = \"stdio_tests.rs\"] mod stdio_tests;` to crates/clio-mcp/src/stdio.rs so the three tests compile and run, then correct the test counts in the phase Completion Evidence."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "dry_run is absent from 11 of 12 mutating tool schemas, contradicting the phase's common-parameter requirement",
+      "evidence": "`am mcp schema-export` pack scan: only `store` exposes `dry_run`; `discard` exposes `confirm`; update, invalidate, consolidate, persona_put_stable, persona_observe_preference, task_upsert, failure_record, triple_add, triple_end, belief_observe and graph_link expose neither. Phase Expected Outcome: 'Common params `bank`, `actor`, `dry_run` available per §4.9.4.G on mutating tools'; requirement.md §4.9.4.G lists `dry_run` for all core tools. The developer documents this as known limitation (d), but that limitation names no owning phase and reads as an implemented boundary ('defined where the mutator defines it') while it actually means not implemented for most tools.",
+      "requirement_ref": "requirement.md §4.9.4.G; Phase 100160 Expected Outcome",
+      "recommendation": "Either implement dry_run for the remaining mutating tools (routing to in-process no-write paths) or escalate the scope conflict explicitly and name the owning phase for the debt; do not mark the phase complete with the requirement silently unmet."
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "title": "graph_link bypasses bank/actor injection: the published schema marks bank optional but the handler requires it, so a schema-conformant call fails",
+      "evidence": "crates/clio-mcp/src/write_tools.rs:384-387 calls `clio_retrieve::graph_link_from_json(&state.assoc, args)` directly with no `state.resolve_ctx`. crates/clio-retrieve/src/assoc_surface.rs:40-42 declares `pub bank: String` with no serde default, so a call without `bank` fails deserialization. The published schema (crates/clio-mcp/src/schema_defs.rs:424-437) requires only source_id/target_id/relationship and adds bank as optional. Phase Task 2: 'Inject bank / actor from args or connection context (document precedence)'. No test exercises graph_link without bank.",
+      "requirement_ref": "Phase 100160 Task 2; requirement.md §4.9.4.E graph_link",
+      "recommendation": "Route graph_link through resolve_ctx and inject the connection default bank/actor (or make bank required in the schema and document it); add a test that graph_link works when bank is omitted."
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "title": "The required CI schema check does not exist: clio-mcp library/schema tests never run in CI",
+      "evidence": ".github/workflows/ci.yml:53 runs `cargo test --locked`, which uses `default-members = [\"crates/clio-lib\"]` (Cargo.toml:17; coverage.md warns store tests never run without --workspace). The new job at ci.yml:83 runs only `cargo test -p clio-mcp --locked --test conformance` (integration target), so the clio-mcp lib unit tests in src/schema_tests.rs (T100160-01/T100160-02/T100160-14, catalog membership, hash determinism) are never executed in CI. Phase Task 1 Required Changes item 2: 'CI check: catalog tools ⊆ schemas; write-set schemas valid JSON Schema'. Completion Evidence claims 'CI check = schema tests', which is not true in CI.",
+      "requirement_ref": "Phase 100160 Task 1 Required Changes item 2; AC-100160-01 (Artifacts + CI)",
+      "recommendation": "Add a CI step that runs `cargo test -p clio-mcp --locked` (all targets) or `cargo test --workspace --locked`, and add an explicit pack-validation step, so schema drift fails CI as AC-100160-01 requires."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "store/admit_preview result shape diverges from the normative catalog and the phase's own expected result",
+      "evidence": "crates/clio-mcp/src/write_tools.rs:247-258 returns `{decision: {pass, admission_score, factors, rejection_reason}, id, dry_run?}`. The test confirms nesting (crates/clio-mcp/src/write_tools_tests.rs:42 `out[\"decision\"][\"pass\"]`). requirement.md §4.9.4.A specifies `admit_preview` returns `{pass, admission_score, factors, rejection_reason?}` and `store` returns `{id, admission_score}` at top level. Phase Task 3 Expected Result: 'receive `{id, admission_score}`'. A harness reading `admission_score` at the top level gets null.",
+      "requirement_ref": "requirement.md §4.9.4.A; Phase 100160 Task 3 Expected Result",
+      "recommendation": "Flatten the decision fields into the tool result (or add top-level `admission_score`/`pass`) so the MCP payload matches the catalog, and assert the shape in a test."
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "title": "Roadmap-isolation violation: comments reference roadmap slice numbers",
+      "evidence": "crates/clio-mcp/src/schema_read_defs.rs:25: '/// Schema-published read tools (bound on the shared dispatcher later; slice 100170).' and crates/clio-mcp/src/schema_defs.rs:187: '/// on the shared dispatcher in a later slice).' The task's hard rule: 'never reference ./roadmap/, phase numbers, or roadmap files from code or comments. The codebase must work after roadmap/ is deleted.'",
+      "requirement_ref": "Phase 100160 hard rules — roadmap isolation",
+      "recommendation": "Remove the slice/phase references (e.g. say 'bound on this dispatcher by a later change') so the code does not depend on roadmap numbering."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Documented `--path` export flag does not exist; the pack silently goes to stdout",
+      "evidence": "crates/clio-lib/src/main.rs:187 help text and crates/clio-mcp/README.md:10 document `am mcp schema-export [--path FILE]`, but `mcp_schema_export` reads `flags.get(\"out\")` (main.rs:76-96). Verified: `am mcp schema-export --path /tmp/am-pack-path.json` exits 0, writes no file, and prints 22433 bytes to stdout.",
+      "requirement_ref": "Phase 100160 Task 1 (export command); operator documentation",
+      "recommendation": "Accept `--path` as an alias (or change the docs/help to `--out`) and add a test for the documented flag."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "HTTP error responses advertise a Content-Length for a body that is never written",
+      "evidence": "crates/clio-mcp/src/http.rs:361-373 `write_simple` builds `body = format!(\"{{\\\"error\\\":\\\"{message}\\\"}}\")` and sets `Content-Length: body.len()`, then writes the body only `if !message.is_empty()`. crates/clio-mcp/src/http.rs:121-123 calls `write_simple(status, \"\")` for 400/413 parse failures, producing Content-Length: 11 with zero body bytes. Strict clients see a truncated response.",
+      "requirement_ref": "Phase 100160 Task 4 (HTTP transport correctness)",
+      "recommendation": "Either always write the body or set Content-Length to 0 when the message is empty; add an assertion on the error body length."
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "Published schemas mark normatively-optional parameters required",
+      "evidence": "crates/clio-mcp/src/schema_defs.rs:313-318 requires task_upsert `definition` and `status`; requirement.md §4.9.4.D gives `task_upsert(task_id, definition?, steps?, status?, evidence_ref?)`. crates/clio-mcp/src/schema_defs.rs:381 requires triple_end `valid_until`; requirement.md §4.9.4.E gives `triple_end(subject, predicate, object?, valid_until?)`. The in-process structs do require them (crates/clio-history/src/task.rs:43-48; crates/clio-write/src/triple.rs:254), so the schema faithfully mirrors the implementation but contradicts the normative signature.",
+      "requirement_ref": "requirement.md §4.9.4.D, §4.9.4.E",
+      "recommendation": "Reconcile requirement.md with the implemented contract (or relax the in-process contract); at minimum record the deviation so slice 100170 does not propagate the mismatch."
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "title": "MCP admission path uses an empty signal source, so admission scoring diverges from any real signal-backed in-process store",
+      "evidence": "crates/clio-mcp/src/runtime.rs:268-290 defines `NoSignals` returning empty neighbors and no prior age; crates/clio-mcp/src/write_tools.rs:233 passes `&NoSignals` into `gated_store_verified`. The developer documents this as known limitation (c) and names slice 100170 for the embed-backed source, but the phase's Task 5 requires each bound tool to 'match in-process semantics', which holds only in shape, not in scoring, while the placeholder is in use.",
+      "requirement_ref": "Phase 100160 Task 5; requirement.md §4.9.3 admission",
+      "recommendation": "Bind a real SignalSource as soon as one exists (already owned by slice 100170) and keep the limitation explicit; consider a test documenting the expected score behavior under empty signals."
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "title": "Bearer token compared with non-constant-time equality and session ids are predictable",
+      "evidence": "crates/clio-mcp/src/http.rs:288-297 `check_auth` compares `a == expected` (byte-wise, non-constant-time). crates/clio-mcp/src/http.rs:340-352 `mint_session` builds ids as `sess-{counter}-{nanos}`, which are guessable. Impact is limited because non-loopback binds require the token and sessions are optional, but both weaken the transport security posture.",
+      "requirement_ref": "Phase 100160 §7 Security Constraints (auth hook; session handling)",
+      "recommendation": "Use a constant-time comparison for the token and generate session ids from a CSPRNG (e.g. random 128-bit hex); add a test asserting ids are not trivially sequential."
+    }
+  ],
+  "plan_1hr": [
+    "F-01: declare the stdio_tests module in stdio.rs and fix the phase Completion Evidence counts (10 min).",
+    "F-07: accept `--path` alias in mcp_schema_export and align help/README with the actual flag (10 min).",
+    "F-04: add a CI step that runs `cargo test -p clio-mcp --locked` so schema_tests execute in CI (15 min).",
+    "F-06: strip roadmap slice references from schema_defs.rs and schema_read_defs.rs (5 min).",
+    "F-08: fix write_simple to write the body or set Content-Length 0 (10 min)."
+  ],
+  "plan_unlimited": [
+    "F-03: route graph_link through resolve_ctx (bank/actor injection), make the schema consistent, and add an omitted-bank test.",
+    "F-02: implement dry_run for the remaining mutating tools or formally escalate and record the owning phase; update schemas and parity fixtures.",
+    "F-05: flatten the store/admit_preview decision payload to match §4.9.4.A and assert the shape over both transports.",
+    "F-09: reconcile the task_upsert/triple_end required-vs-optional signatures between requirement.md and the in-process contracts.",
+    "F-10/F-11: bind a real signal source when available; harden token comparison and session id generation.",
+    "Re-run make test, make lint, make check and make coverage after remediation and re-verify per-file thresholds."
+  ]
+}

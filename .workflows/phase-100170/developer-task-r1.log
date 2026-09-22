@@ -1,0 +1,12 @@
+2026-09-19T11:23:45Z START developer r1 phase-100170 MCP read surface
+2026-09-19T11:23:45Z read task file, phase file, crates.md, coverage.md; clio-mcp phase-100160 present with write_tools/mutator_tools/protocol/stdio/http + schema_read_defs
+2026-09-19T12:02:34Z DISCOVERY phase-100160 bound 14 write tools; read schemas published but unbound; read_tools/read_retrieve/read_history added
+2026-09-19T12:02:34Z clio-types: added ItemNotFound + CoactivationHandoffFailed error codes
+2026-09-19T12:02:34Z clio-store: added Store::inspect_items + InspectValidity/ItemInspectFilter/ItemInspectRow; inspect_query compiler + sqlite_inspect + postgres_inspect impls; pg_inspect_tests parity
+2026-09-19T12:02:34Z clio-mcp: bound 19 read tools; McpState now holds Arc<dyn IndexStore> + Arc<HybridRetriever>; protocol maps FR-17 handoff to -32001; tools/list = 33
+2026-09-19T12:02:34Z CMD cargo test --workspace --locked -> all suites green (clio-mcp lib 83, mcp_read_conformance 10, mcp_read_mock 5, clio-store lib 138)
+2026-09-19T12:02:34Z CMD cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> clean; cargo fmt --all --check -> clean
+2026-09-19T12:02:34Z CMD make coverage -> TOTAL functions 98.63% (1939/1966), lines 98.15% (21294/21696); no per-file <90%
+2026-09-19T12:02:34Z SCHEMA APPROVAL REQUESTED (phase rule): read tools gained bank/actor/explain; inspect.filter string->object; memtree_query.time_range string->object. Documented in phase section 9.
+2026-09-19T12:02:34Z LIMITATION (documented): MCP retrieval runs without an Embedder (lexical + optional graph, no rerank); dense sidecar wiring is deployment config not owned by this phase.
+DEVELOPER_DONE 79522674

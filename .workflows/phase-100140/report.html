@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100140: Persona Companion Object</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100140: Persona Companion Object</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">2 important · 5 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">Core functionality is well-tested with 0 workspace failures and all files exceeding the 90% coverage gate. However, an explicit roadmap-isolation violation (&#39;Phase-100090 ownership&#39;) was left in production code comments despite being falsely claimed clean in logs, and pre-admission attribute schema registration permanently mutates the database even when admission rejects the candidate.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-19</span>
+      <span><b>Applies to</b>staged diff (r1)</span>
+      <span><b>Source</b>crates/clio-persona, crates/clio-store, crates/clio-types, crates/clio-retrieve, sql/001_core.sql</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md / Roadmap isolation: never reference ./roadmap/, phase numbers, or roadmap files from code or comments</li>
+        <li>AGENTS.md: Source file size constraint (&lt;= 450 lines per Rust file)</li>
+        <li>AGENTS.md / coverage.md: Workspace and per-file &gt;= 90% function and line coverage</li>
+        <li>requirement.md §4.7 / PR-2: Bounded persona companion object with discrete/continuous path split</li>
+        <li>requirement.md §4.9.3: Admission gating stamps admission_score; rejected candidates must write nothing</li>
+        <li>roadmap/phase-100140: Acceptance criteria AC-100140-01 through AC-100140-09 and required scenarios T100140-01 through T100140-12</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">9 of 11 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100140-01: persona_get / persona_put_stable / persona_observe_preference exist (FR-25)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-persona exports all three tools, re-exported in clio-lib::persona; unit tests t01 and t04 pass.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100140-02: Discrete vs continuous split (PR-2)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Numeric payloads rejected on stable path; continuous-declared keys rejected on stable path; discrete-declared keys rejected on observe path.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100140-03: Adapter uses Phase 100090 engine only (no duplicated EMA math)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-persona/src/observe.rs delegates to clio_write::persona::observe_continuous; no local EMA formulas in crate.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100140-04: Token budget + score-ranked truncation (NFR-3 / §4.7)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">budget_tests fixture confirms score desc, key asc drop order; estimate_tokens shared with compose via clio-types::tokens.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100140-05: Always-on vs intent gate (§2.7 / FR-7)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">compose_wire_tests::compose_after_intent_skip_includes_persona_section passes; persona section is non-empty while memory is empty.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100140-06: Invalidation semantics for stable entries</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t02_second_put_invalidates_prior sets valid_until on prior version; both versions retained in history.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100140-07: Vocabulary contract (source ≠ source_type)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Persona entries use source; pg_persona_tests verifies source column and absence of source_type.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100140-08: Bank isolation</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">run_persona_suite on SQLite and Postgres verifies cross-bank reads return empty; DEK encryption bank-scoped.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100140-09: Dual-backend parity sample</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">pg_persona_tests::persona_document_parity_sqlite_vs_postgres verifies identical documents across backends.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Hard rule: Roadmap isolation in code and comments</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">crates/clio-persona/src/observe.rs:7 explicitly references &#39;(Phase-100090 ownership)&#39; in module documentation.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Hard rule: Admission reject must write nothing</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-persona/src/observe.rs:120 calls ensure_continuous_declaration before admission check, writing to attribute_schemas even when admission rejects.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Roadmap isolation violation in crates/clio-persona/src/observe.rs</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md and phase instructions strictly forbid referencing roadmap files, phase numbers, or ./roadmap/ in code or comments. The codebase must remain coherent when roadmap/ is deleted.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Violates workspace policy and fails automated roadmap isolation audits; developer incorrectly claimed isolation check was clean.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-persona/src/observe.rs:7: `//! continuous adapter over the shared §4.6 EMA engine (Phase-100090 ownership).`</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Change line 7 of crates/clio-persona/src/observe.rs to `//! continuous adapter over the shared §4.6 EMA engine.`</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Pre-admission database mutation in persona_observe_preference</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>When a candidate preference fails create-time admission, nothing should be written to the database. Currently, ensure_continuous_declaration commits the attribute schema before admission evaluates the candidate.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Unadmitted candidate keys permanently pollute attribute_schemas and are locked into continuous update_rule, blocking subsequent persona_put_stable discrete writes for those keys.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-persona/src/observe.rs:120, 126-137: `ensure_continuous_declaration(args)?;` is executed before `run_create_admission(args)?;`. If admission returns rejected, the schema write is not rolled back.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Before admission in persona_observe_preference, only inspect if an existing schema is discrete (rejecting if so). Defer registration of new continuous schema until after run_create_admission passes.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">05</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Discarded telemetry trend in PersonaEvent</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>PersonaEvent defines `pub trend: Option&lt;f64&gt;` documented as &#39;EMA trend after a continuous observe&#39;, but observe.rs emits `trend: None` on every observe.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Downstream telemetry sinks cannot monitor preference trend drift from PersonaEvent.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-persona/src/observe.rs:198 hardcodes `trend: None`, despite line 147 computing `state.trend` via observe_continuous.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Pass `Some(state.trend)` to emit() in observe.rs and populate `trend: Some(trend)` on PersonaEvent.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Missing finite check on PersonaPreference.trend</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>PersonaPreference::validate() checks `self.value.is_finite()`, but omits checking `self.trend.is_finite()`. Non-finite floats (NaN/Inf) can bypass domain validation.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Invalid float values could enter storage or downstream serialization.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-types/src/persona.rs:173-178 validates `self.value.is_finite()` but has no check for `self.trend.is_finite()`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add `if !self.trend.is_finite() { return Err(AmError::new(ErrorCode::OutOfRange, &quot;persona preference trend must be a finite number&quot;)); }` in PersonaPreference::validate().</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Redundant partial index on persona_stable_entries in core schema</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Both a non-unique index and a unique index exist on identical columns with identical predicate.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Wastes database storage and write I/O updating two identical indexes on every insert/update.</dd></div>
+              <div><dt>Evidence</dt><dd>sql/001_core.sql:315-322 defines both `persona_stable_entries_bank_id_attr_key_open_inx` and `persona_stable_entries_bank_id_attr_key_open_uix` on `(bank_id, attr_key) WHERE valid_until IS NULL`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Drop the non-unique index `persona_stable_entries_bank_id_attr_key_open_inx` from sql/001_core.sql.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Unnecessary KMS decryption overhead in find_preference</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>find_preference calls get_persona_document, which loads and decrypts all stable entries under KMS, even though preferences are stored unencrypted in a separate table.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Couples continuous observe performance and availability to KMS; a failure in KMS stable decryption causes continuous preference observe to fail.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-persona/src/observe.rs:292-298: `find_preference` calls `store.get_persona_document(args.ctx.bank.as_str())?`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a targeted query method to PersonaStore (e.g. `get_preference_state` or `has_preference`) that checks persona_preferences directly without decrypting stable entries.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Dead/unimplemented read telemetry variants in PersonaEvent documentation</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>PersonaEvent documentation mentions `persona_get` operation and `read` outcome, but `PersonaGetArgs` has no telemetry sink and `persona_get` emits nothing.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Misleads API consumers into expecting telemetry on persona_get reads.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-persona/src/lib.rs:73-78 documents `persona_get` and `read` on PersonaEvent, but crates/clio-persona/src/document.rs has no telemetry sink.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update PersonaEvent documentation to indicate telemetry is mutator-only, or add PersonaVecSink to PersonaGetArgs if read auditing is required.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Greedy truncation vs knapsack: The requirement states &#39;drop lowest until within budget&#39;, and the score-descending iteration matches compose.rs pack_persona implementation exactly.</li>
+        <li>Dual-backend parity: Both SQLite and Postgres suites execute and pass against actual Postgres via Compose in CI/local environment.</li>
+        <li>File line counts: All newly added or modified Rust files are well below the 450-line limit (largest is 326 lines).</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All workspace tests pass — make check ran to completion; cargo test --workspace --locked reported 0 failures across all crates.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Coverage exceeds 90% aggregate and per-file for lines and functions — make coverage reported 98.50% functions and 98.38% lines aggregate, with 0 files below 90%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All staged Rust files are &lt;= 450 lines — wc -l over all staged .rs files confirmed largest file is crates/clio-store/src/sqlite_persona.rs at 326 lines.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Roadmap isolation is maintained across code and comments — crates/clio-persona/src/observe.rs:7 explicitly references &#39;Phase-100090 ownership&#39;.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Real LLM tokenizer drift against character-based estimate_tokens heuristic</p>
+          <p class="d">No live LLM tokenizer is loaded on the budget hot path (by design under PR-1) · Empirical sampling of tokenizer differences on diverse companion persona prompts · Low; persona token budget of 400 has sufficient margin for typical character counts</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean architectural separation between clio-persona, clio-store, clio-types, and clio-retrieve with zero circular dependencies</li>
+        <li>DEK crypto integration correctly encrypts stable persona values at rest while keeping preference values numeric</li>
+        <li>Shared estimator and identical ranking rules ensure persona_get and compose see the exact same truncated document view</li>
+        <li>Comprehensive test coverage across both SQLite and Postgres backends with high branch and line coverage</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Developer claimed roadmap isolation check was clean without running an automated grep for phase references</li>
+          <li>Mutating database state in ensure_continuous_declaration prior to admission gate evaluation</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Automate roadmap isolation checks in CI/pre-commit hooks to prevent phase references from slipping through</li>
+          <li>Enforce that all mutator tools run admission checks prior to any database write or schema registration</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix roadmap isolation violation in crates/clio-persona/src/observe.rs:7 by removing &#39;(Phase-100090 ownership)&#39;</li>
+          <li>Fix pre-admission mutation in crates/clio-persona/src/observe.rs:120 by moving continuous declaration registration after run_create_admission passes</li>
+          <li>Fix discarded telemetry trend in crates/clio-persona/src/observe.rs:198 by passing Some(state.trend) to PersonaEvent.trend</li>
+          <li>Add is_finite() validation for trend in PersonaPreference::validate() in crates/clio-types/src/persona.rs</li>
+          <li>Remove redundant persona_stable_entries_bank_id_attr_key_open_inx index from sql/001_core.sql</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Add lightweight get_preference method to PersonaStore trait to decouple preference observation from stable entry KMS decryption</li>
+          <li>Implement read telemetry on persona_get or update PersonaEvent documentation to align with mutator-only scope</li>
+          <li>Add property-based testing (proptest) for budget truncation edge cases across diverse token size distributions</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100140/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100140/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+2026-09-18T23:01:55+0530 START phase-100110 remediator r1: reading findings + triage
+2026-09-18T23:05:44+0530 fixes applied: F-01 limit-0 guards (sqlite_index.rs/postgres_index.rs) + contract asserts (index_store_tests.rs); F-02 multi-addr connect (http.rs); F-03 headers on 7 files; F-04 removed dead lexical widening loop; F-05 lazy for_each_visible_page (worker.rs); F-06 Content-Length early stop (http.rs)
+2026-09-18T23:05:56+0530 cargo check clean; running make check (single verify pass)
+2026-09-18T23:08:31+0530 F-01 resolved: limit-0 guards at sqlite_index.rs:131 (lexical) / :179 (dense), postgres_index.rs:134 / :185; contract asserts index_store_tests.rs:198,205
+2026-09-18T23:08:31+0530 F-02 resolved: connect() iterates all to_socket_addrs() candidates (http.rs:93)
+2026-09-18T23:08:31+0530 F-03 resolved: AGENTS.md headers added to all 7 test/support files (embed_knob_tests, embed_test_support, embed_tests, http_tests, rebuild_tests, worker_tests, index_store_tests)
+2026-09-18T23:08:31+0530 F-04 resolved: dead lexical widening loop removed from sqlite_index.rs::lexical_search (single LIMIT query)
+2026-09-18T23:08:31+0530 F-05 resolved: visible_pages() replaced by lazy for_each_visible_page() (worker.rs:368)
+2026-09-18T23:08:31+0530 F-06 resolved: content_length() helper + early return in read_response (http.rs:212)
+2026-09-18T23:08:31+0530 verify: cargo check --workspace --all-targets exit 0
+2026-09-18T23:08:31+0530 make check exit 0: fmt clean, clippy -D warnings clean, 409 tests passed / 0 failed (first pass output piped to tail lost exit status; re-ran once with full capture)
+2026-09-18T23:08:31+0530 make coverage exit 0: aggregate 98.50% lines / 98.78% functions; 94 reported files, 0 below 90% on either metric
+2026-09-18T23:08:31+0530 file sizes: all modified Rust files <=450 lines (max postgres_index.rs 442)
+2026-09-18T23:08:31+0530 roadmap isolation: rg roadmap/phase refs in crates -> none
+2026-09-18T23:08:31+0530 findings.json updated: all 6 findings + 6 issues status=resolved with resolutions; plan_1hr completed; plan_unlimited addressed (Content-Length done; keep-alive/ureq declined, zero-dep constraint)
+2026-09-18T23:08:31+0530 phase file Attribution: Remediator r1 row set done (roadmap/phase-100110-dense-lexical-index-pipelines.md:8)
+2026-09-18T23:08:31+0530 FINISH: all findings resolved; make check green; coverage gate green; changes left UNSTAGED (no git add run)
+REMEDIATOR_DONE 5b58265a

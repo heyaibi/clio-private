@@ -1,0 +1,237 @@
+{
+  "run": "r1",
+  "phase": "100090",
+  "subject": "Phase 100090: Shared Continuous EMA Update Engine",
+  "verdict": "Good",
+  "verdict_justification": "The Phase 100090 implementation successfully delivers the shared continuous EMA and trend engine, durable definition-time update_rule declarations with epistemic_kind column separation, dual-backend persistence (SQLite and Postgres) with serializable concurrency, and the generic update rule splitter. All workspace test suites and the >=90% per-file line/function coverage gate pass cleanly. Five non-blocking findings were identified: an addressability mismatch in the update facade, header boundary compliance, discarded discrete new_value, empty-window recovery bypass, and unparameterized SQL LIMIT in SQLite.",
+  "metadata": {
+    "generated": "2026-09-18",
+    "applies_to": "master (staged)",
+    "source": "crates/clio-types, crates/clio-store, crates/clio-write, sql/001_core.sql"
+  },
+  "standard": [
+    "AGENTS.md: Core principles, communication, file header structure, 450-line limit per Rust file, coverage gate >=90% lines and functions per file",
+    "requirement.md: PR-2, §2.2, §4.6 continuous EMA + trend formulas, §4.7 preferences, §4.9.4.A update, FR-11 update_rule declarations, FR-15 audit",
+    "roadmap/phase-100090-shared-continuous-ema-update-engine.md: Tasks 1-5, T100090-01 through T100090-14 test scenarios, AC-100090-01 through AC-100090-08",
+    "roadmap/phase-100090-appendix-ema-formulas.md: Normative formulas, cold start, bounds handling, defaults (alpha=0.3, N=10)"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100090-01: Attribute update_rule declaration at definition time (FR-11 / PR-2)",
+      "status": "Fully satisfied",
+      "evidence": "clio-types::AttributeSchema and attribute_schemas table persist update_rule in attr_class (distinct from items.epistemic_kind); verified by attribute_tests::t01_declaration_roundtrip_not_epistemic_column and attribute_tests::t13_epistemic_kind_is_not_update_rule",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100090-02: §4.6 EMA + trend formulas and appendix worked fixture",
+      "status": "Fully satisfied",
+      "evidence": "clio-types::attribute::apply_observation verified against appendix fixture (alpha=0.5, N=3, obs 1.0/0.0/1.0 -> states 1.0/0.5/0.75, trends 1.0/0.75/0.75) in attribute_tests::t02_t03_appendix_fixture and store-level attribute_tests::t02_t04_appendix_fixture_through_store",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100090-03: FR-11 update rule split both directions (discrete vs continuous)",
+      "status": "Fully satisfied",
+      "evidence": "clio-write::update::update routes continuous to EMA and discrete to invalidate; rejects mismatched rules with WrongUpdateRule; rejects fact/belief wire values; verified in update_tests::t05-t08, t13",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100090-04: Continuous series retained for trajectories (§4.8 / NFR-4)",
+      "status": "Fully satisfied",
+      "evidence": "Append-only continuous_observations table stores full point history; as_of filtering verified in attribute_tests::t10_series_retention_and_as_of",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100090-05: Dual-backend behavioral parity (SQLite + Postgres)",
+      "status": "Fully satisfied",
+      "evidence": "clio-store::pg_attribute_tests::t09_parity_with_sqlite passes against compose Postgres DB (127.0.0.1:34310), producing identical state and trend numbers to SQLite",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100090-06: Shared engine + persona adapter contract",
+      "status": "Fully satisfied",
+      "evidence": "clio-write::persona::observe_continuous is a thin wrapper over store observe_continuous; verified in persona_tests::t12_adapter_calls_shared_engine",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100090-07: Telemetry on continuous mutators (FR-15 spirit)",
+      "status": "Fully satisfied",
+      "evidence": "ContinuousEvent emitted to ContinuousSink on every successful observe; continuous_observe audit events recorded in audit_events; verified in persona_tests and update_tests",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100090-08: Concurrent observes on the same key are serializable",
+      "status": "Fully satisfied",
+      "evidence": "SQLite TransactionBehavior::Immediate and Postgres per-key advisory lock serialize same-key observes without lost updates; verified in attribute_tests::t14 (8 threads) and pg_attribute_tests::t14 (4 clients)",
+      "severity": "High"
+    },
+    {
+      "requirement": "AGENTS.md line count constraint (<= 450 lines per Rust file)",
+      "status": "Fully satisfied",
+      "evidence": "All 18 modified or created Rust source files are <= 422 lines (largest is sqlite_store.rs at 422 lines)",
+      "severity": "High"
+    },
+    {
+      "requirement": "AGENTS.md and coverage.md gate (>= 90% function and line coverage per file)",
+      "status": "Fully satisfied",
+      "evidence": "make coverage exits 0: aggregate 98.68% lines / 99.22% functions; all reported Rust files >= 90% lines and >= 90% functions (lowest new file: postgres_attribute.rs 95.83% functions / 98.40% lines)",
+      "severity": "High"
+    },
+    {
+      "requirement": "Roadmap isolation: no references to roadmap or phase numbers in code/comments",
+      "status": "Fully satisfied",
+      "evidence": "grep across crates/ and sql/ confirmed zero occurrences of roadmap/, phase-*, or crates.md",
+      "severity": "Medium"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Inconsistent addressability between continuous and discrete update paths in update facade",
+      "evidence": "crates/clio-write/src/update.rs:97,138-171,173-198",
+      "requirement_ref": "requirement.md §4.9.4.A, FR-11, Phase 100090 Task 3",
+      "recommendation": "Standardize target addressability across both paths; either allow discrete updates to accept attribute keys and look up current open items, or enable items to reference their declared attr_key so caller update_rule can be validated against item attribute schema."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Missing boundary focus statement in newly added module headers",
+      "evidence": "crates/clio-types/src/attribute.rs:18-22, crates/clio-store/src/attribute_map.rs:16-19, crates/clio-store/src/sqlite_attribute.rs:16-19, crates/clio-store/src/postgres_attribute.rs:16-19, crates/clio-write/src/update.rs:18-21, crates/clio-write/src/persona.rs:16-19",
+      "requirement_ref": "AGENTS.md (File Header section)",
+      "recommendation": "Add the mandatory '//! Keep this module focused on <responsibility>.' closing line under ## Boundary in all newly created Rust source files."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Discrete update routing silently discards new_value",
+      "evidence": "crates/clio-write/src/update.rs:186-195",
+      "requirement_ref": "requirement.md §4.9.4.A",
+      "recommendation": "Document why new_value cannot be admitted directly on the discrete branch without bypassing Phase 100040 admission gates, or accept an optional replacement ID for gated replacement."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "parse_window treats empty array '[]' as valid rather than falling back to series reconstruction",
+      "evidence": "crates/clio-store/src/attribute_map.rs:89-105, crates/clio-store/src/sqlite_attribute.rs:204-229, crates/clio-store/src/postgres_attribute.rs:208-230",
+      "requirement_ref": "Phase 100090 §10 Failure Handling and Recovery",
+      "recommendation": "Update parse_window to return None when the parsed array has zero elements, ensuring an empty window row triggers history rebuild from continuous_observations."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Unparameterized LIMIT string formatting in sqlite_attribute.rs",
+      "evidence": "crates/clio-store/src/sqlite_attribute.rs:313-321",
+      "requirement_ref": "Repository SQL guidelines / best practices",
+      "recommendation": "Parameterize the LIMIT clause as LIMIT ?4 with params![bank_id, attr_key, as_of, capped as i64], matching postgres_attribute.rs."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Inconsistent addressability between continuous and discrete update paths in update facade",
+      "severity": "Important",
+      "why_it_matters": "The generic update(item_id, new_value, update_rule) entrypoint specified in §4.9.4.A takes target as item_id, but the implementation bifurcates target semantics: for continuous updates, target must be an attr_key; for discrete updates, target must be an item_id. Calling update with an attribute key for discrete updates returns ErrorCode::InvalidArgument ('discrete updates are item-addressed'), while calling update with an item_id for continuous updates fails with WrongUpdateRule.",
+      "impact": "Callers cannot use a uniform identifier scheme across update rules, and discrete updates on items cannot verify whether the item belongs to a continuous or discrete attribute schema.",
+      "evidence": "crates/clio-write/src/update.rs:97,138-171,173-198",
+      "confidence": "High",
+      "proposed_fix": "Standardize target addressability across both paths; either allow discrete updates to accept attribute keys and look up current open items, or enable items to reference their declared attr_key so caller update_rule can be validated against item attribute schema."
+    },
+    {
+      "id": 2,
+      "title": "Missing boundary focus statement in newly added module headers",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md defines a strict module header template requiring '//! Keep this module focused on <responsibility>.' under the '## Boundary' section. All newly created production modules in clio-types, clio-store, and clio-write omit this closing sentence.",
+      "impact": "Minor style and governance compliance defect against the repository's AGENTS.md rules.",
+      "evidence": "crates/clio-types/src/attribute.rs:18-22, crates/clio-store/src/attribute_map.rs:16-19, crates/clio-store/src/sqlite_attribute.rs:16-19, crates/clio-store/src/postgres_attribute.rs:16-19, crates/clio-write/src/update.rs:18-21, crates/clio-write/src/persona.rs:16-19",
+      "confidence": "High",
+      "proposed_fix": "Add the mandatory '//! Keep this module focused on <responsibility>.' closing line under ## Boundary in all newly created Rust source files."
+    },
+    {
+      "id": 3,
+      "title": "Discrete update routing silently discards new_value",
+      "severity": "Minor",
+      "why_it_matters": "The update facade takes new_value as an argument. In the continuous path, new_value is parsed into float and smoothed via EMA. In the discrete path, new_value is completely ignored and None is passed as replacement_id to invalidate(). While closing the prior item satisfies invalidation without bypassing Phase 100040 admission gates, discarding new_value silently without error or replacement linkage is unexpected.",
+      "impact": "Callers passing a new value expecting it to replace the discrete fact will only invalidate the existing fact without creating or linking a replacement.",
+      "evidence": "crates/clio-write/src/update.rs:186-195",
+      "confidence": "High",
+      "proposed_fix": "Document why new_value cannot be admitted directly on the discrete branch without bypassing Phase 100040 admission gates, or accept an optional replacement ID for gated replacement."
+    },
+    {
+      "id": 4,
+      "title": "parse_window treats empty array '[]' as valid rather than falling back to series reconstruction",
+      "severity": "Minor",
+      "why_it_matters": "In parse_window, '[]' parses successfully as Some(vec![]). If continuous_state.window_json is corrupted with '[]' while continuous_observations has retained history points, observe_continuous_impl uses an empty prior window instead of triggering rebuild_window_from_points, resetting the EMA to cold start.",
+      "impact": "A corrupted empty window array causes unnecessary cold-start reset despite available historical observations.",
+      "evidence": "crates/clio-store/src/attribute_map.rs:89-105, crates/clio-store/src/sqlite_attribute.rs:204-229, crates/clio-store/src/postgres_attribute.rs:208-230",
+      "confidence": "High",
+      "proposed_fix": "Update parse_window to return None when the parsed array has zero elements (if window.is_empty() { return None; }), ensuring an empty window row triggers history rebuild from continuous_observations."
+    },
+    {
+      "id": 5,
+      "title": "Unparameterized LIMIT string formatting in sqlite_attribute.rs",
+      "severity": "Minor",
+      "why_it_matters": "continuous_series_impl in sqlite_attribute.rs formats capped as i64 directly into the SQL string via format!(... LIMIT {}, capped as i64) rather than binding it as a positional parameter LIMIT ?4.",
+      "impact": "Minor inconsistency with postgres_attribute.rs (which binds $4) and SQL formatting best practices.",
+      "evidence": "crates/clio-store/src/sqlite_attribute.rs:313-321",
+      "confidence": "High",
+      "proposed_fix": "Parameterize the LIMIT clause as LIMIT ?4 with params![bank_id, attr_key, as_of, capped as i64], matching postgres_attribute.rs."
+    }
+  ],
+  "dismissed": [
+    "Non-encrypted numeric states in continuous_state/continuous_observations: Reviewed against §7.4 and Phase 100090 scope. DEK encryption applies to content-bearing payloads in items, whereas continuous scalar state is structured metadata; compliance erase of continuous series is explicitly scoped to slice 100190.",
+    "Postgres hashtext 32-bit advisory lock: Checked for collision impact. A 32-bit advisory lock hash collision only introduces brief lock serialization between different keys; data integrity is maintained by transactional WHERE bank_id AND attr_key clauses."
+  ],
+  "verification": [
+    {
+      "claim": "make check passes all formatting, clippy, and 16 workspace test suites",
+      "classification": "Established",
+      "source_note": "Re-verified locally: make check exited 0 with 28 clio-types, 94 clio-write, 91 clio-store tests passing"
+    },
+    {
+      "claim": "make coverage passes aggregate and per-file >=90% lines and functions",
+      "classification": "Established",
+      "source_note": "Re-verified locally: make coverage exited 0 with 98.68% lines and 99.22% functions; all reported files >= 90% on both gated metrics"
+    },
+    {
+      "claim": "All modified and created Rust files are <= 450 lines",
+      "classification": "Established",
+      "source_note": "Re-verified locally via wc -l: largest modified file is sqlite_store.rs at 422 lines"
+    },
+    {
+      "claim": "Roadmap isolation preserved in code and comments",
+      "classification": "Established",
+      "source_note": "Re-verified via grep: no references to roadmap/, phase-*, or crates.md in crates/ or sql/"
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Downstream temporal_history tool query integration",
+      "why_unknown": "Slice 100150 owns the temporal_history packaging; only the underlying continuous_series data seam was verified in this slice.",
+      "what_would_resolve_it": "Execution of Phase 100150 with history tool tests.",
+      "materiality": "Low for Phase 100090 exit."
+    }
+  ],
+  "strengths": [
+    "Rigorous dual-backend testing including 8-thread SQLite and 4-client Postgres concurrency tests that verify mathematical serializability via observation reconstruction",
+    "Faithful reproduction of appendix worked examples with float epsilon comparisons",
+    "Self-healing corrupt window recovery mechanism using retained observation points in continuous_observations",
+    "Complete column separation between attribute_schemas.attr_class and items.epistemic_kind, preventing vocabulary confusion"
+  ],
+  "regrets": [
+    "The dual addressability model (target as attr_key vs item_id) could have been unified or abstracted earlier during existing-system discovery.",
+    "Header boundary focus sentences were omitted across all newly created files despite developer run log indicating headers were checked."
+  ],
+  "process_changes": [
+    "Automate header linting in make lint to ensure all sections and closing boundary sentences required by AGENTS.md are mechanically checked.",
+    "Add explicit schema-link tests between items and attribute schemas when designing mutator facades."
+  ],
+  "plan_1hr": [
+    "F-02: Add missing '//! Keep this module focused on <responsibility>.' boundary lines to all 6 new module headers.",
+    "F-04: Update parse_window in attribute_map.rs to return None on empty array to trigger series reconstruction on empty window.",
+    "F-05: Parameterize LIMIT ?4 in sqlite_attribute.rs to align with postgres_attribute.rs."
+  ],
+  "plan_unlimited": [
+    "F-01: Redesign the update facade addressability: either allow discrete updates to accept an attribute key and look up the current active item, or store the declared attr_key on memory items so both discrete and continuous updates can be validated against declared schemas uniformly.",
+    "F-03: Extend discrete update routing to accept an optional replacement payload that interfaces with the Phase 100040 gated admission pipeline."
+  ]
+}

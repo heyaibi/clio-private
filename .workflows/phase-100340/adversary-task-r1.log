@@ -1,0 +1,23 @@
+12:28:50 START adversary r1 phase-100340: initializing run log and verifying staged diff
+12:28:57 git diff --cached: reviewed staged diff across 17 files in crates/clio-write, crates/clio-config, and docs
+12:30:07 cargo clippy --workspace --all-targets --all-features: clean with exit code 0
+12:30:15 cargo fmt --all -- --check: FAILED (diff in crates/clio-write/src/extract_chat.rs:133 and extract_chat_tests.rs:231,239)
+12:31:41 cargo test --locked --workspace: ok (132 tests passed; 0 failed)
+12:33:03 make coverage: ok (TOTAL 98.90% fns, 97.89% lines; 0 files below 90%)
+12:33:40 line count check: ok (all files <= 450 lines, max 423 lines in crates/clio-config/src/config/mod.rs)
+12:34:10 header check: FAILED (extract_chat_tests.rs:1-8 and extract_factory_tests.rs:1-8 missing Owns/Boundary blocks)
+12:34:23 roadmap isolation check: ok (no unauthorized roadmap references)
+12:35:42 make check: modified working tree with cargo fmt; restored working tree cleanly to match staged diff
+12:37:33 config knob check: extract.provider, extract.url, extract.model, extract.temperature, credentials.extract_api_key allowlisted and masked
+12:38:00 adversarial-review self-check: ok
+12:38:48 generate-report.cjs: rendered report.html (23112 bytes)
+12:38:53 cp report artifacts: copied findings.json, report.html, style.css to .workflows/phase-100340/
+12:39:02 findings.json validation: ok (5 findings parsed cleanly)
+12:39:10 phase doc attribution update: updated Adversary r1 row to done
+12:39:20 FINDING F-01 (medium): crates/clio-write/src/extract_chat.rs:133, crates/clio-write/src/extract_chat_tests.rs:231,239 - cargo fmt check failure
+12:39:20 FINDING F-02 (medium): crates/clio-write/src/extract_chat_tests.rs:1-8, crates/clio-write/src/extract_factory_tests.rs:1-8 - missing AGENTS.md header ownership/boundary sections
+12:39:20 FINDING F-03 (low): crates/clio-write/src/extract_chat_tests.rs:76,158 - test ID collision (t34_03_) and missing explicit t34_04_ test symbol
+12:39:20 FINDING F-04 (low): crates/clio-write/src/extract_chat.rs:62-88 - unescaped XML delimiters in prompt interpolation
+12:39:20 FINDING F-05 (low): crates/clio-write/src/extract_chat.rs:70-76 - tool_payload unscrubbed before egress
+12:39:25 FINISH adversary r1 phase-100340: audit report generated, findings.json emitted
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100340/findings.json 7a90df4a

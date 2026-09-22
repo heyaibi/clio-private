@@ -1,0 +1,66 @@
+{
+  "run": "phase-100060",
+  "phase": "100060",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "critical",
+      "title": "make check / make lint fails due to clippy warning on NoopMaintenance::default()",
+      "evidence": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings fails with `error: use of default to create a unit struct` at crates/clio-write/src/maintenance_tests.rs:56:16",
+      "requirement_ref": "AGENTS.md line 163 ('Verify the relevant tests and checks'), Makefile line 71",
+      "recommendation": "Replace `let noop = NoopMaintenance::default();` with `let noop = NoopMaintenance;` in crates/clio-write/src/maintenance_tests.rs:56."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Module header boundary structure truncated across all new clio-write modules",
+      "evidence": "crates/clio-write/src/chunk.rs:16, crates/clio-write/src/consolidate.rs:17, crates/clio-write/src/ingest.rs:16, crates/clio-write/src/parallel.rs:16, and crates/clio-write/src/maintenance.rs:16 omit the required negative boundary clause ('Changes to <other concern> should not require changes here.') and single responsibility closing clause ('Keep this module focused on <a single responsibility>.')",
+      "requirement_ref": "AGENTS.md line 105 ('File Header')",
+      "recommendation": "Update the module doc headers of all 5 newly created modules to strictly follow the AGENTS.md header template."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "T100060-08 admission gate test is fudged and duplicates T100060-09 cross-bank check",
+      "evidence": "crates/clio-write/src/ingest_leaf_tests.rs:235-275: t08_cannot_skip_gates() only tests bank_guard (item.bank_id != ctx.bank), and t09_cross_bank_rejected() merely delegates to t08_cannot_skip_gates(). Neither test exercises admission gate rejection (e.g. invalid category or score below admission threshold) to verify unadmitted canonical units are omitted from LeafIndex.",
+      "requirement_ref": "FR-21, roadmap/phase-100060.md §8 (T100060-08, T100060-09) and §9 (AC-100060-05)",
+      "recommendation": "Add a negative admission test for T100060-08 where a candidate unit fails admission policy scoring or category gating, asserting admitted is empty, write is not called, and no item is published to LeafIndex."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "Maintenance hook handoff is synchronous during ingest and untested for non-blocking execution",
+      "evidence": "crates/clio-write/src/ingest.rs:261 invokes args.maintenance.on_leaf_attached(signal.clone()) synchronously within admit_canonical_units on the write thread. In crates/clio-write/src/ingest_leaf_tests.rs:144-156, run_ingest is passed BufferMaintenance, and SlowMaintenance(200ms) is only invoked manually after run_ingest has returned, masking the fact that a slow hook passed to parallel_ingest would block the write path.",
+      "requirement_ref": "FR-3, NFR-2, roadmap/phase-100060.md §5 Task 4",
+      "recommendation": "Ensure parallel_ingest provides non-blocking maintenance handoff or explicitly specify the buffer/async contract for MaintenanceHook, and add a test verifying that parallel_ingest latency is unaffected by a slow maintenance hook."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "WriteIngestConfig::for_profile does not configure profile-specific parameters",
+      "evidence": "crates/clio-write/src/ingest.rs:70-75: WriteIngestConfig::for_profile merely assigns profile_label and reuses default settings (concurrency: 4, max_turns: 2). In crates/clio-write/src/ingest_leaf_tests.rs:173-190, testing profiles A, B, C, and reference executes identical configs.",
+      "requirement_ref": "roadmap/phase-100060.md §12 (NFR-2 timing harness Profile A/B/C config switches)",
+      "recommendation": "Configure distinct profile parameters in for_profile (or accept runtime profile configs) so that concurrency and chunk limits reflect the Profile A/B/C deployment specifications."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Post-merge span re-verification is unreachable dead code",
+      "evidence": "crates/clio-write/src/consolidate.rs:186-201: merge_into retains the first candidate's snapshot unmodified. Consequently, reverify_if_needed in crates/clio-write/src/ingest.rs:207-220 never inspects a modified snapshot, and the false branch at line 232 is never reached or tested.",
+      "requirement_ref": "roadmap/phase-100060.md §5 Task 3",
+      "recommendation": "Either implement snapshot reconciliation across merged candidates and test re-verification failures, or remove the dead re-verification branch and document that snapshots are immutable from the initial candidate."
+    }
+  ],
+  "plan_1hr": [
+    "Fix clippy error in crates/clio-write/src/maintenance_tests.rs:56 by replacing NoopMaintenance::default() with NoopMaintenance so make check and make lint pass.",
+    "Complete the module headers in crates/clio-write/src/{chunk.rs, consolidate.rs, ingest.rs, parallel.rs, maintenance.rs} to include negative boundary and single responsibility clauses required by AGENTS.md.",
+    "Implement genuine negative admission test for T100060-08 in crates/clio-write/src/ingest_leaf_tests.rs verifying that candidate items failing admission score threshold are rejected without being written or added to LeafIndex.",
+    "Decouple t09_cross_bank_rejected from T100060-08 so it specifically tests mixed-bank or cross-bank chunk isolation as intended."
+  ],
+  "plan_unlimited": [
+    "All items from the 1-hour plan.",
+    "Refactor maintenance handoff in crates/clio-write/src/ingest.rs to guarantee non-blocking dispatch even if MaintenanceHook::on_leaf_attached executes heavy work, and add a test verifying ingest latency under a blocking hook.",
+    "Bind WriteIngestConfig::for_profile to actual profile parameters (e.g. concurrency limits and batch sizes matching deployment profiles A, B, and C).",
+    "Either implement snapshot field merging across near-duplicate candidates with comprehensive re-verification tests (pass/fail), or explicitly document the invariant that the initial chunk snapshot is canonical and simplify reverify_if_needed."
+  ]
+}

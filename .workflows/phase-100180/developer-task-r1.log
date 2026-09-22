@@ -1,0 +1,16 @@
+2026-09-19_18:53:01 start: read task + phase file
+2026-09-19_18:53:04 listed repo root
+2026-09-19_18:54:23 baseline coverage: all files >=90% functions and lines (per-file check clean)
+2026-09-19_19:02:18 discovery done: audit_events table exists (create/update/belief/attr/triple/history writers in-tx); gaps = discard+invalidate telemetry rows, immutability triggers, lineage columns, correct tool, audit_trail reader, inspect discarded validity+limit cap; plan = clio-compliance crate + clio-store correct/audit methods + MCP bindings
+2026-09-19_19:13:25 clio-store compiles clean
+2026-09-19_19:18:55 clio-compliance crate + tests green
+2026-09-19_19:30:21 make check (fmt+clippy+test workspace) passed
+2026-09-19_19:30:28 file sizes verified (all <=450)
+2026-09-19_19:31:18 coverage: TOTAL lines 97.66% functions 98.23%; per-file >=90% check below
+2026-09-19_19:34:30 coverage gate: aggregate lines 97.93% / functions 98.42%; per-file >=90% clean
+2026-09-19_19:44:37 final coverage gate: aggregate lines/functions above floors; per-file >=90% verified
+2026-09-19_19:45:09 make check passed
+2026-09-19_19:48:14 phase file updated; end-to-end stdio verification done
+2026-09-19_19:50:03 final verify: make check green, coverage gate green after file split
+2026-09-19_19:50:50 staged 48 files via git add -- . ':!.workflows/'; summary: telemetry rows on discard/invalidate/correct in same tx, lineage columns+indexes, append-only triggers, clio-compliance crate (audit_trail+correct), MCP bindings+schemas, inspect discarded validity + 50/200 page cap; make check green, make coverage aggregate lines 97.98% functions 98.62%, per-file >=90% verified
+DEVELOPER_DONE f89e2793

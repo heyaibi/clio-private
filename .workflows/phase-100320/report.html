@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100320: Embedded Docker Lifecycle (am compose up|down)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100320: Embedded Docker Lifecycle (am compose up|down)</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">2 important · 5 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">The compose lifecycle implementation successfully delivers embedded asset materialization, OS/arch detection, Docker CLI integration, and pgvector image pinning with high unit test coverage. However, the test suite contains a high-severity defect where compose_cli_fail_tests.rs blocks indefinitely on process stdin during make check or cargo test in interactive environments, along with avoidable panics on I/O error paths and CLI formatting glitches.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-22</span>
+      <span><b>Applies to</b>staged diff (15 files)</span>
+      <span><b>Source</b>crates/clio-lib/src/compose_*, compose.yml, .env.example, README.md, hardware.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md core principles: honesty, proper completion, &lt;=450 lines per file, accurate module headers</li>
+        <li>coverage.md gate: &gt;=90% function and line coverage per file and aggregate</li>
+        <li>phase-100320-compose-lifecycle.md Acceptance Criteria AC-100320-01 through AC-100320-08 and test scenarios T100320-01 through T100320-12</li>
+        <li>rust-best-practices: avoid avoidable panics in production I/O boundaries</li>
+        <li>Security constraints: owner-only .env permissions and secret hygiene</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">7 of 8 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100320-01: am compose up materializes project-root compose + arch overlay and starts selection</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">compose_cli_tests.rs::up_materializes_and_runs_the_selected_profile verified; compose.yml, compose.arm64.yml, sql/*, models/README.md materialized with correct arguments</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100320-02: am compose down stops the environment</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">compose_cli_tests.rs::down_reverses_up_using_the_recorded_selection and down_is_idempotent_on_a_stopped_stack verified</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100320-03: OS/arch and Docker preconditions fail closed</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">detect_unsupported_fails_closed and failed_probe_leaves_no_files verify refusal before any file writes</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100320-04: Secrets never printed; files restricted</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">env_contents_hold_compose_variables_only verified; however write_env uses non-atomic write followed by chmod</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100320-05: User-edited files are protected</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">user_edited_compose_file_is_backed_up_before_overwrite and existing_user_env_is_never_overwritten verified</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100320-06: Existing Make/Compose workflow unchanged</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Makefile untouched; compose profile membership preserved; workspace tests pass</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100320-07: An empty directory becomes a working, schema-initialized stack</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Empty-dir materialization and bind mount verification tested; prototype run recorded in phase evidence</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100320-08: The pgvector image is pinned and its extension version recorded</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">compose.yml pinned to pgvector/pgvector:0.8.6-pg16 shipping pgvector 0.8.6</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Test prompt_tty_false_is_non_interactive_and_true_reads_stdin hangs indefinitely on unclosed stdin</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Running make check or cargo test in any interactive terminal or runner with inherited, unclosed stdin hangs indefinitely on read_line, freezing CI / local test runs.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Prevents automated or interactive test runs from completing without explicit &lt;/dev/null stdin redirection.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/compose_cli_fail_tests.rs:144 calls prompt_tty(true), invoking std::io::stdin().read_line(). Task-56 running make check hung for over 6 minutes until cancelled.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Do not call prompt_tty(true) on process stdin in unit tests. Parameterize the reader in prompt_tty(is_tty, reader) or test read_answer with in-memory buffers.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Avoidable panics in file backup and .env permission error paths</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Production CLI commands should return Result rather than crashing with unhandled thread panics on filesystem errors.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>If a user runs am compose up on a read-only directory, a full disk, or a filesystem that does not support Unix file modes (exFAT/FAT32/SMB), the command crashes with a panic.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/compose_assets.rs:144 uses .expect(&quot;back up user-edited compose file&quot;); crates/clio-lib/src/compose_env.rs:85 uses .expect(&quot;restrict generated .env permissions&quot;).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Propagate io::Error as Result&lt;(), String&gt; in backup_edited and restrict_owner_only, returning clear error messages if backup or permission changes fail.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">05</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>CLI help text formatting corrupted in main.rs</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Formatting defect in primary user-facing am help output reduces CLI polish and consistency.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>am help output has misaligned command entries (3 spaces on am compose and am retention schema) and Exit codes: stripped of indentation.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/main.rs:276-281: Exit codes: lost indent, am compose has 3 leading spaces, am retention schema has 3 leading spaces.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Restore 2-space command indent and 23-space description indent in print_help() in main.rs.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Non-atomic .env file creation introduces brief world-readable window before chmod</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Security guidelines require owner-only permissions on sensitive files. Writing then chmodding leaves a race window where other local users can open the file.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Other local processes or users on a multi-user machine could open .env before restrict_owner_only executes.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/compose_env.rs:72-73: std::fs::write(&amp;path, contents) followed by restrict_owner_only(&amp;path).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Use std::fs::OpenOptions with Unix mode(0o600) to create the file atomically with mode 0600 on Unix platforms.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Executing am compose with no subcommand produces awkward error message</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Poor user experience when invoking the command without subcommands.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Users running am compose see unknown compose command ``; try am compose up|down.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/compose_cli.rs:62-63: sub.as_str() matches empty string as other -&gt; eprintln!(&quot;unknown compose command `{other}`; try `am compose up|down`&quot;).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Check if sub.is_empty() and print help with exit code 0 or return missing compose subcommand; try am compose up|down.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Traceability table incorrectly cites NFR-6 for secret hygiene</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Documentation traceability must cite the accurate requirement IDs per AGENTS.md rules.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>phase-100320-compose-lifecycle.md:340 cites NFR-6 / secret hygiene, but NFR-6 in requirement.md specifies audit export completeness.</dd></div>
+              <div><dt>Evidence</dt><dd>requirement.md:612 defines NFR-6 as: &#39;All confidence, admission-score, and telemetry fields SHALL be included in any data export...&#39;; secret masking is in §4.9.5.B, FR-29, FR-32.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update Section 11 traceability to cite §4.9.5.B / FR-29 / FR-32 instead of NFR-6.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Overstated project isolation in documentation given hardcoded compose project name</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Users or downstream agents may assume multiple compose roots can run simultaneously without interference.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Because compose.yml hardcodes name: clio and .env has fixed host ports 34310-34313, running am compose down in one directory tears down containers started from another directory.</dd></div>
+              <div><dt>Evidence</dt><dd>phase-100320-compose-lifecycle.md:363 states running from different directories targets different roots, but compose.yml:20 hardcodes name: clio.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Clarify in hardware.md and phase doc that the stack uses project name clio and fixed ports, so concurrent stacks across directories require COMPOSE_PROJECT_NAME / port overrides.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Selection of single services (e.g. --services embed) activating paired profiles: dismissed because compose profiles are intentionally coarse-grained per compose.yml design.</li>
+        <li>Data volumes preserved across am compose down: dismissed because preserving volumes without an explicit -v flag is standard compose behavior and documented in §1.2.</li>
+        <li>Lack of Docker SDK: dismissed because shelling out to docker CLI is an explicit architectural decision in §2 and §5.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>All unit tests pass with clean cargo test — Running cargo test in interactive shells hangs on compose_cli_fail_tests.rs:144 prompt_tty(true) until stdin is redirected with &lt;/dev/null.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All reported Rust source files have &gt;=90% line and function coverage — cargo llvm-cov reports: compose_assets.rs 100% funcs/98.65% lines; compose_cli.rs 90.00%/96.17%; compose_docker.rs 92.31%/99.15%; compose_env.rs 100%/100%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All Rust source files are &lt;= 450 lines — All production and test files are well under 450 lines (compose_cli.rs is 305 lines; compose_cli_fail_tests.rs is 275 lines).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>pgvector/pgvector:0.8.6-pg16 is valid and ships pgvector 0.8.6 — Docker Hub official tag verified and confirmed to package pgvector 0.8.6 with halfvec support.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Behavior on non-standard Unix mount options (e.g., nodev/noexec on /tmp)</p>
+          <p class="d">Not tested on restricted tmpfs mounts · Integration test on restricted mount filesystem · Low: developer machines typically have standard /tmp permissions</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean modular decomposition across compose_assets, compose_cli, compose_docker, and compose_env.</li>
+        <li>Comprehensive coverage of happy and failure paths with stubbed Docker runners avoiding container leaks.</li>
+        <li>Precondition checks (platform detection, daemon probe) run strictly before any file writes, ensuring zero partial state.</li>
+        <li>Accurate AGENTS.md ownership headers and strict adherence to &lt;=450 lines constraint.</li>
+        <li>Zero external crate dependencies added.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Directly invoking prompt_tty(true) on process global stdin in a unit test, causing make check to freeze in interactive terminals.</li>
+          <li>Using .expect() in backup and chmod error paths rather than propagating Result errors.</li>
+          <li>Sloppy indentation formatting edits in main.rs help text.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Never attach unit tests directly to process-global stdin or stdout streams without mock abstractions.</li>
+          <li>Always run make check in an interactive terminal before staging to catch blocking tests.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix compose_cli_fail_tests.rs:144 to not call prompt_tty(true) on real stdin, unfreezing make check.</li>
+          <li>Fix indentation in crates/clio-lib/src/main.rs:276-281 for Exit codes: and am compose entries.</li>
+          <li>Replace .expect() in compose_assets.rs:144 and compose_env.rs:85 with Result error propagation.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Create .env atomically using OpenOptionsExt::mode(0o600) on Unix.</li>
+          <li>Handle empty subcommand in am compose to print help or a clean &#39;missing subcommand&#39; message.</li>
+          <li>Correct NFR-6 traceability citation in phase documentation.</li>
+          <li>Document compose project name and port constraints across multiple working directories.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-48nPNd/report.html</span>
+          <span><b>Findings:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-48nPNd/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

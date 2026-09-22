@@ -1,0 +1,279 @@
+{
+  "run": "r1",
+  "phase": "100140",
+  "subject": "Phase 100140: Persona Companion Object",
+  "verdict": "Adequate",
+  "verdict_justification": "Core functionality is well-tested with 0 workspace failures and all files exceeding the 90% coverage gate. However, an explicit roadmap-isolation violation ('Phase-100090 ownership') was left in production code comments despite being falsely claimed clean in logs, and pre-admission attribute schema registration permanently mutates the database even when admission rejects the candidate.",
+  "metadata": {
+    "generated": "2026-09-19",
+    "applies_to": "staged diff (r1)",
+    "source": "crates/clio-persona, crates/clio-store, crates/clio-types, crates/clio-retrieve, sql/001_core.sql"
+  },
+  "standard": [
+    "AGENTS.md / Roadmap isolation: never reference ./roadmap/, phase numbers, or roadmap files from code or comments",
+    "AGENTS.md: Source file size constraint (<= 450 lines per Rust file)",
+    "AGENTS.md / coverage.md: Workspace and per-file >= 90% function and line coverage",
+    "requirement.md §4.7 / PR-2: Bounded persona companion object with discrete/continuous path split",
+    "requirement.md §4.9.3: Admission gating stamps admission_score; rejected candidates must write nothing",
+    "roadmap/phase-100140: Acceptance criteria AC-100140-01 through AC-100140-09 and required scenarios T100140-01 through T100140-12"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100140-01: persona_get / persona_put_stable / persona_observe_preference exist (FR-25)",
+      "status": "Fully satisfied",
+      "evidence": "clio-persona exports all three tools, re-exported in clio-lib::persona; unit tests t01 and t04 pass.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100140-02: Discrete vs continuous split (PR-2)",
+      "status": "Fully satisfied",
+      "evidence": "Numeric payloads rejected on stable path; continuous-declared keys rejected on stable path; discrete-declared keys rejected on observe path.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100140-03: Adapter uses Phase 100090 engine only (no duplicated EMA math)",
+      "status": "Fully satisfied",
+      "evidence": "clio-persona/src/observe.rs delegates to clio_write::persona::observe_continuous; no local EMA formulas in crate.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100140-04: Token budget + score-ranked truncation (NFR-3 / §4.7)",
+      "status": "Fully satisfied",
+      "evidence": "budget_tests fixture confirms score desc, key asc drop order; estimate_tokens shared with compose via clio-types::tokens.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100140-05: Always-on vs intent gate (§2.7 / FR-7)",
+      "status": "Fully satisfied",
+      "evidence": "compose_wire_tests::compose_after_intent_skip_includes_persona_section passes; persona section is non-empty while memory is empty.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100140-06: Invalidation semantics for stable entries",
+      "status": "Fully satisfied",
+      "evidence": "t02_second_put_invalidates_prior sets valid_until on prior version; both versions retained in history.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100140-07: Vocabulary contract (source ≠ source_type)",
+      "status": "Fully satisfied",
+      "evidence": "Persona entries use source; pg_persona_tests verifies source column and absence of source_type.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100140-08: Bank isolation",
+      "status": "Fully satisfied",
+      "evidence": "run_persona_suite on SQLite and Postgres verifies cross-bank reads return empty; DEK encryption bank-scoped.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100140-09: Dual-backend parity sample",
+      "status": "Fully satisfied",
+      "evidence": "pg_persona_tests::persona_document_parity_sqlite_vs_postgres verifies identical documents across backends.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Hard rule: Roadmap isolation in code and comments",
+      "status": "Missed",
+      "evidence": "crates/clio-persona/src/observe.rs:7 explicitly references '(Phase-100090 ownership)' in module documentation.",
+      "severity": "High"
+    },
+    {
+      "requirement": "Hard rule: Admission reject must write nothing",
+      "status": "Partially satisfied",
+      "evidence": "crates/clio-persona/src/observe.rs:120 calls ensure_continuous_declaration before admission check, writing to attribute_schemas even when admission rejects.",
+      "severity": "High"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Roadmap isolation violation in crates/clio-persona/src/observe.rs",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md and phase instructions strictly forbid referencing roadmap files, phase numbers, or ./roadmap/ in code or comments. The codebase must remain coherent when roadmap/ is deleted.",
+      "impact": "Violates workspace policy and fails automated roadmap isolation audits; developer incorrectly claimed isolation check was clean.",
+      "evidence": "crates/clio-persona/src/observe.rs:7: `//! continuous adapter over the shared §4.6 EMA engine (Phase-100090 ownership).`",
+      "confidence": "High",
+      "proposed_fix": "Change line 7 of crates/clio-persona/src/observe.rs to `//! continuous adapter over the shared §4.6 EMA engine.`"
+    },
+    {
+      "id": 2,
+      "title": "Pre-admission database mutation in persona_observe_preference",
+      "severity": "Important",
+      "why_it_matters": "When a candidate preference fails create-time admission, nothing should be written to the database. Currently, ensure_continuous_declaration commits the attribute schema before admission evaluates the candidate.",
+      "impact": "Unadmitted candidate keys permanently pollute attribute_schemas and are locked into continuous update_rule, blocking subsequent persona_put_stable discrete writes for those keys.",
+      "evidence": "crates/clio-persona/src/observe.rs:120, 126-137: `ensure_continuous_declaration(args)?;` is executed before `run_create_admission(args)?;`. If admission returns rejected, the schema write is not rolled back.",
+      "confidence": "High",
+      "proposed_fix": "Before admission in persona_observe_preference, only inspect if an existing schema is discrete (rejecting if so). Defer registration of new continuous schema until after run_create_admission passes."
+    },
+    {
+      "id": 3,
+      "title": "Discarded telemetry trend in PersonaEvent",
+      "severity": "Minor",
+      "why_it_matters": "PersonaEvent defines `pub trend: Option<f64>` documented as 'EMA trend after a continuous observe', but observe.rs emits `trend: None` on every observe.",
+      "impact": "Downstream telemetry sinks cannot monitor preference trend drift from PersonaEvent.",
+      "evidence": "crates/clio-persona/src/observe.rs:198 hardcodes `trend: None`, despite line 147 computing `state.trend` via observe_continuous.",
+      "confidence": "High",
+      "proposed_fix": "Pass `Some(state.trend)` to emit() in observe.rs and populate `trend: Some(trend)` on PersonaEvent."
+    },
+    {
+      "id": 4,
+      "title": "Missing finite check on PersonaPreference.trend",
+      "severity": "Minor",
+      "why_it_matters": "PersonaPreference::validate() checks `self.value.is_finite()`, but omits checking `self.trend.is_finite()`. Non-finite floats (NaN/Inf) can bypass domain validation.",
+      "impact": "Invalid float values could enter storage or downstream serialization.",
+      "evidence": "crates/clio-types/src/persona.rs:173-178 validates `self.value.is_finite()` but has no check for `self.trend.is_finite()`.",
+      "confidence": "High",
+      "proposed_fix": "Add `if !self.trend.is_finite() { return Err(AmError::new(ErrorCode::OutOfRange, \"persona preference trend must be a finite number\")); }` in PersonaPreference::validate()."
+    },
+    {
+      "id": 5,
+      "title": "Redundant partial index on persona_stable_entries in core schema",
+      "severity": "Minor",
+      "why_it_matters": "Both a non-unique index and a unique index exist on identical columns with identical predicate.",
+      "impact": "Wastes database storage and write I/O updating two identical indexes on every insert/update.",
+      "evidence": "sql/001_core.sql:315-322 defines both `persona_stable_entries_bank_id_attr_key_open_inx` and `persona_stable_entries_bank_id_attr_key_open_uix` on `(bank_id, attr_key) WHERE valid_until IS NULL`.",
+      "confidence": "High",
+      "proposed_fix": "Drop the non-unique index `persona_stable_entries_bank_id_attr_key_open_inx` from sql/001_core.sql."
+    },
+    {
+      "id": 6,
+      "title": "Unnecessary KMS decryption overhead in find_preference",
+      "severity": "Minor",
+      "why_it_matters": "find_preference calls get_persona_document, which loads and decrypts all stable entries under KMS, even though preferences are stored unencrypted in a separate table.",
+      "impact": "Couples continuous observe performance and availability to KMS; a failure in KMS stable decryption causes continuous preference observe to fail.",
+      "evidence": "crates/clio-persona/src/observe.rs:292-298: `find_preference` calls `store.get_persona_document(args.ctx.bank.as_str())?`.",
+      "confidence": "High",
+      "proposed_fix": "Add a targeted query method to PersonaStore (e.g. `get_preference_state` or `has_preference`) that checks persona_preferences directly without decrypting stable entries."
+    },
+    {
+      "id": 7,
+      "title": "Dead/unimplemented read telemetry variants in PersonaEvent documentation",
+      "severity": "Minor",
+      "why_it_matters": "PersonaEvent documentation mentions `persona_get` operation and `read` outcome, but `PersonaGetArgs` has no telemetry sink and `persona_get` emits nothing.",
+      "impact": "Misleads API consumers into expecting telemetry on persona_get reads.",
+      "evidence": "crates/clio-persona/src/lib.rs:73-78 documents `persona_get` and `read` on PersonaEvent, but crates/clio-persona/src/document.rs has no telemetry sink.",
+      "confidence": "High",
+      "proposed_fix": "Update PersonaEvent documentation to indicate telemetry is mutator-only, or add PersonaVecSink to PersonaGetArgs if read auditing is required."
+    }
+  ],
+  "dismissed": [
+    "Greedy truncation vs knapsack: The requirement states 'drop lowest until within budget', and the score-descending iteration matches compose.rs pack_persona implementation exactly.",
+    "Dual-backend parity: Both SQLite and Postgres suites execute and pass against actual Postgres via Compose in CI/local environment.",
+    "File line counts: All newly added or modified Rust files are well below the 450-line limit (largest is 326 lines)."
+  ],
+  "verification": [
+    {
+      "claim": "All workspace tests pass",
+      "classification": "Established",
+      "source_note": "make check ran to completion; cargo test --workspace --locked reported 0 failures across all crates."
+    },
+    {
+      "claim": "Coverage exceeds 90% aggregate and per-file for lines and functions",
+      "classification": "Established",
+      "source_note": "make coverage reported 98.50% functions and 98.38% lines aggregate, with 0 files below 90%."
+    },
+    {
+      "claim": "All staged Rust files are <= 450 lines",
+      "classification": "Established",
+      "source_note": "wc -l over all staged .rs files confirmed largest file is crates/clio-store/src/sqlite_persona.rs at 326 lines."
+    },
+    {
+      "claim": "Roadmap isolation is maintained across code and comments",
+      "classification": "Contradicted",
+      "source_note": "crates/clio-persona/src/observe.rs:7 explicitly references 'Phase-100090 ownership'."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Real LLM tokenizer drift against character-based estimate_tokens heuristic",
+      "why_unknown": "No live LLM tokenizer is loaded on the budget hot path (by design under PR-1)",
+      "what_would_resolve_it": "Empirical sampling of tokenizer differences on diverse companion persona prompts",
+      "materiality": "Low; persona token budget of 400 has sufficient margin for typical character counts"
+    }
+  ],
+  "strengths": [
+    "Clean architectural separation between clio-persona, clio-store, clio-types, and clio-retrieve with zero circular dependencies",
+    "DEK crypto integration correctly encrypts stable persona values at rest while keeping preference values numeric",
+    "Shared estimator and identical ranking rules ensure persona_get and compose see the exact same truncated document view",
+    "Comprehensive test coverage across both SQLite and Postgres backends with high branch and line coverage"
+  ],
+  "regrets": [
+    "Developer claimed roadmap isolation check was clean without running an automated grep for phase references",
+    "Mutating database state in ensure_continuous_declaration prior to admission gate evaluation"
+  ],
+  "process_changes": [
+    "Automate roadmap isolation checks in CI/pre-commit hooks to prevent phase references from slipping through",
+    "Enforce that all mutator tools run admission checks prior to any database write or schema registration"
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Roadmap isolation violation: Phase-100090 referenced in code comments",
+      "evidence": "crates/clio-persona/src/observe.rs:7: `//! continuous adapter over the shared §4.6 EMA engine (Phase-100090 ownership).`",
+      "requirement_ref": "AGENTS.md / Roadmap isolation",
+      "recommendation": "Remove '(Phase-100090 ownership)' from crates/clio-persona/src/observe.rs:7."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Pre-admission database mutation: ensure_continuous_declaration writes schema before admission evaluation",
+      "evidence": "crates/clio-persona/src/observe.rs:120, 126-137: `ensure_continuous_declaration(args)?;` is executed before `run_create_admission(args)?;`. If admission rejects the candidate, `put_attribute_schema` was already committed to the database, contradicting the documented contract `/// The create path failed admission; nothing was written.` (crates/clio-persona/src/observe.rs:83) and permanently locking the unadmitted key to continuous update_rule, blocking subsequent `persona_put_stable` writes for that key.",
+      "requirement_ref": "requirement.md §4.9.3; crates/clio-persona/src/observe.rs:83; PR-5",
+      "recommendation": "In `persona_observe_preference`, only check whether the existing attribute schema is discrete prior to admission. Only register the continuous attribute declaration after `run_create_admission` passes."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Discarded telemetry trend: PersonaEvent.trend is hardcoded to None on continuous observations",
+      "evidence": "crates/clio-persona/src/observe.rs:198: `PersonaEvent { ... trend: None, ... }` discards `state.trend` computed by `observe_continuous` (observe.rs:147), despite `PersonaEvent.trend` being documented in crates/clio-persona/src/lib.rs:91 as `/// EMA trend after a continuous observe.`",
+      "requirement_ref": "crates/clio-persona/src/lib.rs:91; FR-15 / Task 5 telemetry spirit",
+      "recommendation": "Pass `Some(state.trend)` into `emit` in `persona_observe_preference` and set `trend: Some(trend)` on `PersonaEvent`."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "Missing finite check on PersonaPreference.trend allows NaN/Inf values",
+      "evidence": "crates/clio-types/src/persona.rs:173-178: `PersonaPreference::validate()` validates `self.value.is_finite()`, but does not validate `self.trend.is_finite()`. If trend is non-finite, `validate()` succeeds and allows invalid float values into storage.",
+      "requirement_ref": "crates/clio-types/src/persona.rs:159; requirement.md §4.7",
+      "recommendation": "Add `if !self.trend.is_finite() { return Err(AmError::new(ErrorCode::OutOfRange, \"persona preference trend must be a finite number\")); }` to `PersonaPreference::validate()`."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Redundant partial index on persona_stable_entries in core schema",
+      "evidence": "sql/001_core.sql:315-322: `persona_stable_entries_bank_id_attr_key_open_inx` and `persona_stable_entries_bank_id_attr_key_open_uix` both index `(bank_id, attr_key) WHERE valid_until IS NULL`. The non-unique index is completely redundant with the unique index.",
+      "requirement_ref": "sql/001_core.sql:315-322; sql-guidelines",
+      "recommendation": "Remove the redundant `persona_stable_entries_bank_id_attr_key_open_inx` index from sql/001_core.sql."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Unnecessary KMS decryption overhead in find_preference during preference observation",
+      "evidence": "crates/clio-persona/src/observe.rs:292-298: `find_preference` calls `store.get_persona_document(bank)`, which queries and decrypts all stable entries with KMS via `open_persona_value`, even though preferences are unencrypted numeric values in a separate table. A KMS failure or decryption error on stable entries causes continuous preference observation to fail.",
+      "requirement_ref": "crates/clio-persona/src/observe.rs:296; crates/clio-store/src/persona_store.rs:41-42",
+      "recommendation": "Add a lightweight method to `PersonaStore` (e.g. `get_preference_state` or `has_preference`) that checks `persona_preferences` directly without querying or decrypting stable entries."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "PersonaEvent defines persona_get and read operations that are never emitted",
+      "evidence": "crates/clio-persona/src/lib.rs:73-78: `PersonaEvent` documentation defines operation `persona_get` and outcome `read`. However, `PersonaGetArgs` in crates/clio-persona/src/document.rs has no telemetry sink parameter and `persona_get` never emits telemetry.",
+      "requirement_ref": "crates/clio-persona/src/lib.rs:69-78; crates/clio-persona/src/document.rs:28-37",
+      "recommendation": "Either add telemetry emission to `persona_get` if read audit is required by FR-15, or update `PersonaEvent` documentation to reflect that telemetry is mutator-only."
+    }
+  ],
+  "plan_1hr": [
+    "Fix roadmap isolation violation in crates/clio-persona/src/observe.rs:7 by removing '(Phase-100090 ownership)'",
+    "Fix pre-admission mutation in crates/clio-persona/src/observe.rs:120 by moving continuous declaration registration after run_create_admission passes",
+    "Fix discarded telemetry trend in crates/clio-persona/src/observe.rs:198 by passing Some(state.trend) to PersonaEvent.trend",
+    "Add is_finite() validation for trend in PersonaPreference::validate() in crates/clio-types/src/persona.rs",
+    "Remove redundant persona_stable_entries_bank_id_attr_key_open_inx index from sql/001_core.sql"
+  ],
+  "plan_unlimited": [
+    "Add lightweight get_preference method to PersonaStore trait to decouple preference observation from stable entry KMS decryption",
+    "Implement read telemetry on persona_get or update PersonaEvent documentation to align with mutator-only scope",
+    "Add property-based testing (proptest) for budget truncation edge cases across diverse token size distributions"
+  ]
+}

@@ -1,0 +1,21 @@
+2026-09-22T21:13:40Z START phase 100364 adversary r1; reviewing staged diff and running verifications
+2026-09-22T21:14:10Z git diff --cached -- . ':!.workflows/': 6 staged files inspected (main.rs, http_bind.rs, http_bind_tests.rs, main_tests.rs, mcp_http_bind_harness.rs, phase doc)
+2026-09-22T21:14:30Z cargo check --workspace: finished in 0.56s (clean)
+2026-09-22T21:15:08Z make lint: failed with exit 101; clippy::while_let_loop on crates/clio-lib/src/main.rs:103:5
+2026-09-22T21:15:09Z FINDING F-01 [high] crates/clio-lib/src/main.rs:103:5 clippy::while_let_loop fails make lint with -D warnings
+2026-09-22T21:16:20Z make test: passed (all 142 workspace tests and unit suites green)
+2026-09-22T21:16:24Z make coverage: first run failed with panic in http_bind::tests::explicit_address_is_honored (AddrInUse code 48)
+2026-09-22T21:16:25Z FINDING F-02 [medium] crates/clio-lib/src/http_bind_tests.rs:35:62 racy ephemeral port probe causes AddrInUse flake
+2026-09-22T21:17:04Z make coverage: second run passed (280 files checked, TOTAL lines 97.89% funcs 98.90%, http_bind.rs 100/100, main.rs 94.03/100)
+2026-09-22T21:17:14Z LIVE T01 bare --bind: bound 127.0.0.1:34300, stdout 0 bytes
+2026-09-22T21:17:19Z LIVE T02/T05 concurrent instances: instance 1 on 34300, instance 2 on 34301
+2026-09-22T21:17:23Z LIVE T03 explicit override: bound 127.0.0.1:34305
+2026-09-22T21:17:28Z LIVE T04 range exhaustion: all 10 held -> exit 1 'no free port in 34300-34309 on 127.0.0.1; stop the other listener or pass --bind HOST:PORT'
+2026-09-22T21:17:31Z LIVE T06 non-loopback without token: exit 1 'mcp http error: non-loopback bind requires an auth token'
+2026-09-22T21:17:34Z LIVE T06 non-loopback with token: bound 0.0.0.0:58941 with secret token
+2026-09-22T21:18:01Z FINDING F-03 [low] crates/clio-lib/src/main.rs:108 parse_flags misses --bind=ADDR syntax and silently auto-binds 34300
+2026-09-22T21:18:54Z node generate-report.cjs: rendered report.html and copied style.css
+2026-09-22T21:18:59Z cp artifacts to .workflows/phase-100364: findings.json, report.html, style.css present and verified
+2026-09-22T21:19:08Z phase doc attribution updated: Adversary r1 Antigravity CLI (Gemini 3.8 Flash) done
+2026-09-22T21:19:15Z FINISH adversary review complete; 3 findings recorded (1 high, 1 medium, 1 low)
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100364/findings.json c64bf677

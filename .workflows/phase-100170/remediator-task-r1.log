@@ -1,0 +1,13 @@
+2026-09-19T12:22:06Z START remediator r1 phase-100170: findings.backup exists, 3 issues + plan recs to address
+2026-09-19T12:26:25Z F-01 fixed: added mandatory header closing sentence crates/clio-store/src/postgres_inspect.rs:20-22, crates/clio-store/src/sqlite_inspect.rs:20-22, crates/clio-mcp/src/read_retrieve.rs:21-23
+2026-09-19T12:26:25Z F-02 fixed: schema_read_defs.rs added budget_tokens to persona_get (L130-131) and as_of/time_axis/expand_graph to compose_context (L112-120), matching handler extraction under additionalProperties:false
+2026-09-19T12:26:25Z F-03 fixed: roadmap/phase-100170-mcp-read-retrieve-compose-surface.md:6 Developer row corrected to Together . GLM-5.3 Flash High; Remediator row appended (done)
+2026-09-19T12:26:25Z plan_unlimited item 1 fixed: crates/clio-lib/src/main.rs:286-295 mcp_stdio_serves_then_eof now uses std::io::Cursor empty input + Vec output instead of locking inherited stdin; production code untouched
+2026-09-19T12:26:25Z plan_unlimited item 2 deferred: Embedder sidecar injection is documented Phase 100170 limitation owned by future deployment phase; process_changes deferred with reasons recorded in findings.json
+2026-09-19T12:26:25Z CMD make check -> exit 0, fmt + clippy -D warnings + all workspace tests clean (note: ran twice due to output-capture mistake, second pass incremental; no failures either time)
+2026-09-19T12:26:25Z CMD make coverage -> exit 0; TOTAL functions 98.63% (1939/1966), lines 98.11% (21305/21715); awk per-file scan: zero files below 90% functions or lines
+2026-09-19T12:26:25Z CMD wc -l modified files -> all <=450 (main.rs 341, schema_read_defs.rs 305, read_retrieve.rs 223, sqlite_inspect.rs 89, postgres_inspect.rs 80)
+2026-09-19T12:26:25Z findings.json updated: F-01/F-02/F-03 marked resolved with file:line evidence, plan_1hr done, plan_unlimited item 1 done item 2 deferred, verification block added
+2026-09-19T12:26:25Z git state: all changes left UNSTAGED per task rules; no git add/commit/stash run
+2026-09-19T12:26:25Z FINISH remediator r1 phase-100170 complete
+REMEDIATOR_DONE bc1527a7

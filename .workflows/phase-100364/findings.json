@@ -1,0 +1,209 @@
+{
+  "run": "r1",
+  "phase": "100364",
+  "subject": "Phase 100364: clio mcp http Auto-Bind and 34300-34309 Port Scan",
+  "verdict": "Adequate",
+  "verdict_justification": "Round-1 remediator resolved all three findings: the clippy while_let_loop error, the racy explicit-port tests, and the unsupported --bind=VALUE syntax. Post-fix gates: make lint exit 0, make check exit 0 (48 ok targets), make coverage 280 files TOTAL lines 97.87% functions 98.91% all per-file >=90%.",
+  "metadata": {
+    "generated": "2026-09-22",
+    "applies_to": "Phase 100364 staged diff",
+    "source": "crates/clio-lib/src/main.rs, crates/clio-lib/src/http_bind.rs, crates/clio-lib/src/http_bind_tests.rs, crates/clio-lib/src/main_tests.rs, crates/clio-lib/tests/mcp_http_bind_harness.rs"
+  },
+  "standard": [
+    "Phase 100364 specification (roadmap/phase-100364-mcp-http-auto-bind-port-scan.md)",
+    "requirement.md FR-20 and non-loopback auth rule",
+    "AGENTS.md honest reporting, coverage gate, and file size limits",
+    "Workspace make lint (cargo clippy --workspace --all-targets --all-features --locked -- -D warnings)"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100364-01: Bare --bind auto-binds loopback in 34300-34309",
+      "status": "Fully satisfied",
+      "evidence": "target/debug/clio mcp http --bind --db sqlite::memory: outputs 'mcp http listening on 127.0.0.1:34300' to stderr; stdout length is 0",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100364-02: Default scans 34300-34309 and supports concurrent instances",
+      "status": "Fully satisfied",
+      "evidence": "Two concurrent instances bind 127.0.0.1:34300 and 127.0.0.1:34301 respectively",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100364-03: Explicit address wins over auto-scan",
+      "status": "Fully satisfied",
+      "evidence": "clio mcp http --bind 127.0.0.1:34305 binds exactly 127.0.0.1:34305",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100364-04: Bound address on stderr; stdout pure MCP protocol",
+      "status": "Fully satisfied",
+      "evidence": "Verified 0 stdout bytes across all startup scenarios including error exits",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100364-05: Range exhaustion errors clearly naming 34300-34309 and remediation",
+      "status": "Fully satisfied",
+      "evidence": "Exhaustion exit code 1: 'mcp http error: no free port in 34300-34309 on 127.0.0.1; stop the other listener or pass --bind HOST:PORT'",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100364-06: Non-loopback bind without token fails closed",
+      "status": "Fully satisfied",
+      "evidence": "--bind 0.0.0.0:0 without token exits 1 with 'mcp http error: non-loopback bind requires an auth token'",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Workspace lint check: make lint / cargo clippy --all-targets clean",
+      "status": "Resolved in r1: parse_flags rewritten as `while let Some(flag) = pending.take().or_else(|| it.next())` (crates/clio-lib/src/main.rs:103); `make lint` exit 0 with cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+      "evidence": "make lint -> exit 0, 'Finished dev profile'",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Deterministic non-flaky test suite",
+      "status": "Resolved in r1: bounded retry loops added to explicit_address_is_honored (http_bind_tests.rs) and explicit_address_is_bound_exactly (tests/mcp_http_bind_harness.rs)",
+      "evidence": "make check exit 0 (48 'test result: ok' targets); make coverage coverage-guard: 280 file(s) checked, all per-file >=90%",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "No"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Clippy while_let_loop compilation error fails `make lint`",
+      "severity": "Critical",
+      "resolution": "Fixed by remediator r1: parse_flags loop in crates/clio-lib/src/main.rs:103 replaced with `while let Some(flag) = pending.take().or_else(|| it.next())`. Verified: `make lint` exit 0 (cargo clippy --workspace --all-targets --all-features --locked -- -D warnings, 'Finished dev profile').",
+      "why_it_matters": "`make lint` runs `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`. Clippy generates an error on the new parse_flags loop in main.rs, causing make lint to fail with exit code 101. The developer claimed clippy was clean in §9 and the run log.",
+      "impact": "CI gate failure; repository does not pass make lint or make check.",
+      "evidence": "crates/clio-lib/src/main.rs:103:5: error: this loop could be written as a `while let` loop",
+      "confidence": "High",
+      "proposed_fix": "In crates/clio-lib/src/main.rs:103, replace `loop { let Some(flag) = pending.take().or_else(|| it.next()) else { break; }; ... }` with `while let Some(flag) = pending.take().or_else(|| it.next()) { ... }`."
+    },
+    {
+      "id": 2,
+      "title": "Racy port allocation in `explicit_address_is_honored` causes intermittent test failure during coverage run",
+      "severity": "Important",
+      "resolution": "Fixed by remediator r1: explicit_address_is_honored (crates/clio-lib/src/http_bind_tests.rs) now retries probe+rebind up to 100 times on AddrInUse and only panics on non-AddrInUse errors; explicit_address_is_bound_exactly (crates/clio-lib/tests/mcp_http_bind_harness.rs) retries probe+spawn up to 10 times when the announced address does not match. Verified: `make check` exit 0 and `make coverage` coverage-guard clean (280 files).",
+      "note": "Pre-existing environment sensitivity, not caused by the fix: a bare (non-Makefile) `cargo test -p clio` fails ops_cli::tests::reindex_dense_confirmed_without_embedder_exits_3 because ~/.config/clio/deployment.json on this host configures an embed provider. The Makefile test/coverage targets export a hermetic CLIO_DEPLOYMENT_CONFIG (Makefile:90, coverage.md), so `make test`, `make check` and `make coverage` all pass; documented behavior, left as-is.",
+      "why_it_matters": "The unit test binds to port 0, reads the assigned port, drops the listener, and immediately re-binds. If the socket lingers in TIME_WAIT or a parallel test thread binds the port, resolve_listener fails with AddrInUse (code 48).",
+      "impact": "Flaky test runs in CI and coverage gates (`make coverage` failed on the first run with 'bind explicit: Os { code: 48, kind: AddrInUse }').",
+      "evidence": "crates/clio-lib/src/http_bind_tests.rs:35:62 and crates/clio-lib/tests/mcp_http_bind_harness.rs:101-105",
+      "confidence": "High",
+      "proposed_fix": "Add a bounded retry loop when selecting and verifying an explicit port in http_bind_tests.rs and mcp_http_bind_harness.rs, similar to occupied_with_free_next()."
+    },
+    {
+      "id": 3,
+      "title": "CLI flag parser does not support `--bind=HOST:PORT` syntax and silently falls back to auto-bind",
+      "severity": "Minor",
+      "resolution": "Fixed by remediator r1: parse_flags now splits `--flag=value` via split_once('=') before positional-value handling (crates/clio-lib/src/main.rs), additive for all shared consumers (ops, status, retention, compose, mcp). New tests parse_flags_equals_syntax and parse_flags_equals_value_beats_following_flag in main_tests.rs. Verified live: `clio mcp http --bind=127.0.0.1:34305 --db sqlite::memory:` prints 'mcp http listening on 127.0.0.1:34305'.",
+      "why_it_matters": "When a user passes `--bind=127.0.0.1:34305`, `parse_flags` does not split on `=` and stores key `bind=127.0.0.1:34305`. `flags.get(\"bind\")` returns None, causing clio to silently auto-bind to 34300 instead of 34305.",
+      "impact": "Users passing standard `--flag=value` syntax receive no warning/error and are bound to an unexpected port.",
+      "evidence": "crates/clio-lib/src/main.rs:108: `target/debug/clio mcp http --bind=127.0.0.1:34305 --db sqlite::memory:` outputs 'mcp http listening on 127.0.0.1:34300'",
+      "confidence": "High",
+      "proposed_fix": "In parse_flags, check if flag contains `=` (e.g. `flag.split_once('=')`) or reject unrecognized flag tokens."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Clippy while_let_loop compilation error fails `make lint`",
+      "evidence": "crates/clio-lib/src/main.rs:103:5: error: this loop could be written as a `while let` loop",
+      "requirement_ref": "Phase 100364 §9 Completion Evidence, AGENTS.md",
+      "recommendation": "In crates/clio-lib/src/main.rs:103, replace `loop { let Some(flag) = pending.take().or_else(|| it.next()) else { break; }; ... }` with `while let Some(flag) = pending.take().or_else(|| it.next()) { ... }`."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Racy port allocation in `explicit_address_is_honored` causes intermittent test failure during coverage run",
+      "evidence": "crates/clio-lib/src/http_bind_tests.rs:35:62: `make coverage` failed with 'bind explicit: Os { code: 48, kind: AddrInUse, message: \"Address already in use\" }'",
+      "requirement_ref": "Phase 100364 §8 Required Tests, AGENTS.md",
+      "recommendation": "Add a bounded retry loop for explicit port selection in http_bind_tests.rs and mcp_http_bind_harness.rs so tests do not flake when dropped probe sockets linger in TIME_WAIT."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "CLI flag parser does not support `--bind=HOST:PORT` syntax and silently falls back to auto-bind",
+      "evidence": "crates/clio-lib/src/main.rs:108: `clio mcp http --bind=127.0.0.1:34305 --db sqlite::memory:` binds to 127.0.0.1:34300 instead of 34305",
+      "requirement_ref": "Phase 100364 §5 Task 1, AC-100364-03",
+      "recommendation": "In parse_flags, parse `--flag=value` by splitting on `=` or reject unexpected `--` tokens."
+    }
+  ],
+  "dismissed": [
+    "Attribution row in phase doc references Go Deepseek V4.1 instead of GLM-5.3: developer model attribution mismatch in roadmap markdown is cosmetic and does not affect code or runtime.",
+    "File size checks: all created and modified Rust files are well below 450 lines (main.rs is 370 lines, main_tests.rs is 359 lines, harness is 147 lines, http_bind_tests.rs is 120 lines, http_bind.rs is 79 lines).",
+    "Roadmap isolation: verified 0 references to phase numbers or roadmap paths in staged crate diff."
+  ],
+  "verification": [
+    {
+      "claim": "make lint fails with clippy::while_let_loop",
+      "classification": "Established",
+      "source_note": "Reproduced directly by running `make lint` and `cargo clippy -p clio --all-targets`"
+    },
+    {
+      "claim": "make coverage aggregate and per-file >=90% passes",
+      "classification": "Established",
+      "source_note": "Coverage guard passed with TOTAL lines 97.89% and functions 98.90%; http_bind.rs lines 100%, main.rs lines 94.03%"
+    },
+    {
+      "claim": "All functional scenarios T01-T07 behave as specified",
+      "classification": "Established",
+      "source_note": "Verified live CLI runs for bare --bind, default no-flag scan, dual instances, explicit override, range exhaustion, non-loopback auth failure, and pure stdout"
+    },
+    {
+      "claim": "explicit_address_is_honored can fail with AddrInUse",
+      "classification": "Established",
+      "source_note": "Observed panic during first execution of `make coverage`"
+    }
+  ],
+  "unknowns": [],
+  "strengths": [
+    "Clean decomposition: http_bind module is concise (79 lines) with truthful AGENTS.md header and well-bounded ownership.",
+    "Strict adherence to security rules: non-loopback addresses fail closed without an auth token before listener announcement.",
+    "Zero stdout pollution: stderr receives diagnostic/announcement logs while stdout carries 0 bytes on startup.",
+    "Shared constants: range 34300-34309 cleanly reuses port_scan::FIRST_PORT and LAST_PORT."
+  ],
+  "regrets": [
+    "Developer claimed cargo clippy was clean without running with -D warnings or --all-targets.",
+    "Integration and unit test probe-and-rebind patterns should have used retry loops to prevent flaky failures."
+  ],
+  "remediation_r1": {
+    "gates": {
+      "make lint": "exit 0 (clippy --workspace --all-targets --all-features --locked -- -D warnings)",
+      "make check": "exit 0, 48 'test result: ok' targets, no failures",
+      "make coverage": "coverage-guard: 280 file(s) checked, TOTAL lines 97.87% functions 98.91%, all reported files meet the per-file floor (main.rs lines 92.73% functions 100%)"
+    },
+    "files_changed": [
+      "crates/clio-lib/src/main.rs",
+      "crates/clio-lib/src/main_tests.rs",
+      "crates/clio-lib/src/http_bind_tests.rs",
+      "crates/clio-lib/tests/mcp_http_bind_harness.rs"
+    ]
+  },
+  "process_changes": [
+    "Always run `make lint` prior to declaring developer work done.",
+    "Guard ephemeral socket tests against TIME_WAIT reuse collisions."
+  ],
+  "plan_1hr": [
+    "DONE r1: loop in crates/clio-lib/src/main.rs:103 changed to `while let Some(flag) = pending.take().or_else(|| it.next())`; make lint exit 0.",
+    "DONE r1: retry loops added to explicit_address_is_honored (http_bind_tests.rs) and explicit_address_is_bound_exactly (mcp_http_bind_harness.rs); make check exit 0."
+  ],
+  "plan_unlimited": [
+    "PARTIAL r1: parse_flags now handles `--key=val` (main.rs split_once), verified live. The second half — reporting usage errors on unrecognized flags — declined with reason: parse_flags is shared by ops/status/retention/compose/mcp (ops_cli.rs:57, status_cli.rs:113, retention_cli.rs:39, compose_cli.rs:49, main.rs:127/159/246); unknown flags are intentionally ignored so surfaces stay forward-compatible, and rejecting them would change every subcommand's behavior and break existing flag-forward tests, out of this phase's scope. Revisit if a dedicated CLI parser phase is opened.",
+    "DECLINED r1 with reason: unify socket test helpers into a shared module. The two retry helpers live in disjoint test surfaces — a #[cfg(test)] unit module (http_bind_tests.rs) and a tests/ integration harness (mcp_http_bind_harness.rs) — that cannot share a file without exporting test-only helpers from the production crate or adding a dev feature flag. Both retry blocks are ~10 lines and localized; duplication is cheaper than new production-crate surface."
+  ]
+}

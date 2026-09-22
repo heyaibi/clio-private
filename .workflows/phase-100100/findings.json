@@ -1,0 +1,415 @@
+{
+  "run": "r1",
+  "phase": "100100",
+  "subject": "Phase 100100 — Fact/Belief epistemic_kind and confidence trajectories (staged diff)",
+  "verdict": "Good",
+  "verdict_justification": "The core behavior is implemented and independently verified: belief objects, append-only history, create-vs-append gating, as-of reads, dual-backend parity, encryption at rest, and the frozen read contract all pass real tests, clippy, fmt, and per-file coverage (all 84 reported files >=90% functions and lines). The gaps are concurrency (create is check-then-insert outside a transaction), an unconfigurable belief admission key whose doc claims the opposite, and thinner-than-claimed durable telemetry; none is data-corrupting on the happy path.",
+  "metadata": {
+    "generated": "2026-09-18",
+    "applies_to": "staged diff against HEAD 812ed2fcef3c4680908b54f436a2f2fd398afa22",
+    "source": "git diff --cached (non-workflow paths); crates/clio-belief, crates/clio-store belief modules, crates/clio-types belief/read, crates/clio-admission/decision.rs, sql/001_core.sql"
+  },
+  "standard": [
+    "requirement.md §4.9.3 belief-writes row, §4.10 belief objects, §4.11 fact/belief, FR-13, FR-14, FR-15, NFR-4, PR-8",
+    "Phase 100100 acceptance criteria AC-100100-01..AC-100100-09 and required scenarios T100100-01..T100100-13",
+    "AGENTS.md: <=450 lines/file, exact file header structure, coverage gate, roadmap isolation",
+    "Verified independently: cargo fmt --check, clippy -D warnings, cargo test --locked --workspace, make coverage"
+  ],
+  "requirements": [
+    {
+      "requirement": "FR-13 append-only belief confidence history via belief_observe/belief_history",
+      "status": "Fully satisfied",
+      "evidence": "observe.rs:223-241 appends via store.append_confidence; history rows are INSERT-only (sqlite_belief.rs:330-364, postgres_belief.rs:320-354); tests t03/t04 and run_belief_suite assert first entry byte-identical after append",
+      "severity": "Low",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Create passes five-factor admission; append does not re-admit",
+      "status": "Fully satisfied",
+      "evidence": "signals.rs:84-93 -> decide_ungated (no category gate); observe.rs:223-241 append branch bypasses scoring; t03b and t09 pass",
+      "severity": "Low",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Create-vs-append identity is stable under concurrent first observes",
+      "status": "Partially satisfied",
+      "evidence": "observe.rs:223-268 is check-then-insert outside a transaction; unique index at sql/001_core.sql beliefs_bank_id_proposition_key_uix maps the loser to InvalidArgument (belief_store.rs:135-152)",
+      "severity": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "FR-14 epistemic_kind surfaced on reads; facts carry no trajectory",
+      "status": "Fully satisfied",
+      "evidence": "read.rs:61-95 RetrieveHit; item.rs:318-335 rejects source_type on facts; golden JSON read_tests.rs",
+      "severity": "Low",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "NFR-4 point-in-time belief confidence (as_of)",
+      "status": "Fully satisfied",
+      "evidence": "history.rs:63-72; SQL e.as_of <= ?3 ordered (sqlite_belief.rs:235-240, postgres_belief.rs:230-235); t05 passes",
+      "severity": "Low",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Security: proposition encrypted under DEK, cross-bank fail-closed",
+      "status": "Fully satisfied",
+      "evidence": "belief_store.rs:112-132 seal/open; run_belief_suite asserts ciphertext hides plaintext, wrong-bank reads empty, destroyed DEK returns Forbidden",
+      "severity": "Low",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-15-sufficient durable telemetry for belief writes",
+      "status": "Partially satisfied",
+      "evidence": "sqlite_belief.rs:94-107 / postgres_belief.rs:93-106 write detail_json only {\"created\":true}|{\"appended\":true}; confidence/source_type live only in the in-memory BeliefVecSink (observe.rs:79-100)",
+      "severity": "Medium",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "Coverage gate and 450-line cap",
+      "status": "Fully satisfied",
+      "evidence": "make coverage exit 0, TOTAL 96.04% lines / 99.30% funcs, all 84 reported files >=90% funcs+lines; every new/modified Rust file <=450 lines (max 393)",
+      "severity": "Low",
+      "correction_needed": "No"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Concurrent first observes race: create is check-then-insert outside a transaction",
+      "severity": "Important",
+      "why_it_matters": "belief_observe decides create-vs-append with a read (find_belief_by_proposition), then inserts in a separate transaction. Two observes of the same proposition that both read 'missing' both run the create path; the second violates the unique index and returns InvalidArgument instead of appending. The phase failure table expects concurrent observes to serialize as append.",
+      "impact": "A legitimate second observation is dropped as an error under concurrency on a new belief identity (no data corruption, but lost evidence and a spurious failure).",
+      "evidence": "crates/clio-belief/src/observe.rs:223-268; crates/clio-store/src/sqlite_belief.rs:74-92; crates/clio-store/src/belief_store.rs:135-152; sql/001_core.sql beliefs_bank_id_proposition_key_uix",
+      "confidence": "High",
+      "proposed_fix": "Make create-or-append atomic: either INSERT ... ON CONFLICT DO NOTHING then append when zero rows inserted, or catch the duplicate-key error and re-run the append branch, inside the store transaction."
+    },
+    {
+      "id": 2,
+      "title": "Belief admission threshold/prior cannot be configured, yet docs claim the key selects an override",
+      "severity": "Important",
+      "why_it_matters": "signals.rs documents BELIEF_KEY as selecting both the type prior and theta_admit override, but 'belief' is not in KNOWN_ADMISSION_KEYS and validate_override_map rejects unknown keys. The belief create gate silently uses the global theta and the fallback prior 0.5 with no way to tune it.",
+      "impact": "Operators cannot tune belief admission as the code comments promise; belief create behavior diverges from the documented policy surface.",
+      "evidence": "crates/clio-belief/src/signals.rs:24-28 (doc); crates/clio-config/src/admission_knobs.rs:43-54 (KNOWN_ADMISSION_KEYS), :134-141 (unknown key rejected), :198-203 (prior fallback 0.5)",
+      "confidence": "High",
+      "proposed_fix": "Add 'belief' to KNOWN_ADMISSION_KEYS with a documented default prior, or correct the signals.rs doc and explicitly state belief create uses the global theta/prior."
+    },
+    {
+      "id": 3,
+      "title": "Durable audit rows omit confidence/source_type; no production sink persists BeliefEvent",
+      "severity": "Important",
+      "why_it_matters": "AC-100100-08 cites durable audit_events rows as the telemetry evidence, but those rows carry only {created:true}/{appended:true} in detail_json. FR-15 expects events sufficient to reconstruct the operation (including confidence). The rich BeliefEvent (with confidence and admission_score) is only emitted to an in-memory sink, so a real deployment records no confidence in the durable trail.",
+      "impact": "The audit trail cannot reconstruct the confidence change of a belief observe; FR-15 reconstruction is weaker than the phase evidence claims.",
+      "evidence": "crates/clio-store/src/sqlite_belief.rs:94-107; crates/clio-store/src/postgres_belief.rs:93-106; crates/clio-belief/src/observe.rs:44-100",
+      "confidence": "High",
+      "proposed_fix": "Write confidence, source_type, and entry_count into audit_events.detail_json (the columns confidence/source_type already exist), and provide a durable BeliefSink adapter or document the in-memory-only limitation."
+    },
+    {
+      "id": 4,
+      "title": "beliefs.updated_at column is never updated on append and goes stale",
+      "severity": "Minor",
+      "why_it_matters": "create_belief sets beliefs.updated_at to the first entry's as_of; append_confidence only inserts the entry and an audit row, never touching the belief row. get_belief derives updated_at from the last history entry, so the API and the durable column disagree after any append. The phase 'Known limitations' says updated_at is 'derived rather than stored', which misdescribes a column that is stored and stale.",
+      "impact": "Any raw-SQL or future consumer reading beliefs.updated_at gets an out-of-date value; the documented limitation is inaccurate.",
+      "evidence": "crates/clio-store/src/sqlite_belief.rs:55-60 (create sets), :113-160 (append does not update), :190-194 (read derives); crates/clio-store/src/postgres_belief.rs:55-60, :112-158, :184-188",
+      "confidence": "High",
+      "proposed_fix": "UPDATE beliefs SET updated_at = entry.as_of in the append transaction, or drop the column and document derive-only reads."
+    },
+    {
+      "id": 5,
+      "title": "AC-100100-01/T100100-07 evidence overstates: no test rejects a fact carrying a confidence trajectory",
+      "severity": "Minor",
+      "why_it_matters": "The phase maps T100100-07 ('Fact with confidence_history attach -> Rejected') to AC-100100-01 and cites clio-types/src/belief_tests.rs::fact_items_never_carry_a_trajectory. That test builds a fact item with a scalar confidence and asserts validate() passes; it never attempts to attach a trajectory, and MemoryItem has no such field. The requirement is protected structurally, but the cited evidence does not exercise the stated rejection.",
+      "impact": "The acceptance-criterion evidence overstates test coverage for a negative case; a reviewer trusting the table would believe a rejection path is tested when it is only type-impossible.",
+      "evidence": "crates/clio-types/src/belief_tests.rs:133-157; crates/clio-types/src/item.rs:224-268 (no confidence_history field); roadmap/phase-100100...md AC-100100-01 row",
+      "confidence": "High",
+      "proposed_fix": "Reword AC-100100-01 to cite the type structure as the guarantee, or add a serialization-boundary test that a fact payload carrying confidence_history is rejected."
+    },
+    {
+      "id": 6,
+      "title": "§4.10 belief object omits epistemic_kind in the struct and table",
+      "severity": "Minor",
+      "why_it_matters": "The normative §4.10 example JSON carries 'epistemic_kind': 'belief'. BeliefObject (and the serialized belief_history response) expose no epistemic_kind field, and the beliefs table has no such column. Only RetrieveHit carries it. Under Option B a belief is implicitly a belief, so this may be intentional, but it is an undocumented divergence from the §4.10 shape and from FR-14's 'stored ... carries epistemic_kind'.",
+      "impact": "Consumers reading the concrete belief object (not the RetrieveHit) cannot see the epistemic kind field; the divergence from the normative shape is not stated.",
+      "evidence": "crates/clio-types/src/belief.rs:110-127; crates/clio-belief/src/history.rs:30-44; sql/001_core.sql beliefs table columns",
+      "confidence": "Medium",
+      "proposed_fix": "Document in the header/identity rule that belief objects are implicitly belief and not 'items', or add an epistemic_kind field to the object."
+    },
+    {
+      "id": 7,
+      "title": "Nine new production files omit the AGENTS.md-mandated closing header line",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md requires the exact header structure ending in 'Keep this module focused on <a single responsibility>'. Nine new production files stop at the Boundary paragraph; only clio-belief/src/lib.rs includes it. (Some pre-existing files such as clio-types/src/item.rs also omit it, so the convention is inconsistent.)",
+      "impact": "Header-structure compliance gap; no functional impact.",
+      "evidence": "Missing in crates/clio-belief/src/{history,observe,signals}.rs, crates/clio-types/src/{belief,read}.rs, crates/clio-store/src/{belief_reshape,belief_store,postgres_belief,sqlite_belief}.rs",
+      "confidence": "High",
+      "proposed_fix": "Append the 'Keep this module focused on ...' line to each new file's module doc, matching clio-belief/src/lib.rs."
+    },
+    {
+      "id": 8,
+      "title": "belief_history not-found uses InvalidArgument rather than a not-found code",
+      "severity": "Minor",
+      "why_it_matters": "An unknown belief/proposition returns ErrorCode::InvalidArgument with a 'not found' message. No dedicated NotFound code exists yet, so this is acknowledged in the phase's Known limitations, but callers cannot distinguish malformed input from a missing belief by code.",
+      "impact": "Weak error discrimination for the read API; acknowledged, low impact.",
+      "evidence": "crates/clio-belief/src/history.rs:78-93; crates/clio-types/src/error.rs ErrorCode variants",
+      "confidence": "High",
+      "proposed_fix": "Add a NotFound error code and use it here (or keep InvalidArgument and state the caller contract explicitly)."
+    },
+    {
+      "id": 9,
+      "title": "belief reshape can silently drop orphaned belief_confidence_entries",
+      "severity": "Minor",
+      "why_it_matters": "reshape_beliefs_sqlite/pg guard destructive drops only by counting rows in the stale beliefs table. If beliefs is empty but belief_confidence_entries holds rows (possible when foreign keys were not enforced), the drop of both tables discards those entries without the ConfigCorrupt guard firing.",
+      "impact": "Silent loss of orphaned history rows during an undeployed-schema reshape; narrow but real.",
+      "evidence": "crates/clio-store/src/belief_reshape.rs:104-123 and :129-148 (count beliefs only); :53-58 / :90-98 drop both tables",
+      "confidence": "Medium",
+      "proposed_fix": "Also count belief_confidence_entries rows (when the table exists) and refuse the drop when either is non-empty."
+    },
+    {
+      "id": 10,
+      "title": "belief_history as_of filtering relies on free-form string ordering",
+      "severity": "Minor",
+      "why_it_matters": "Entries and the as_of filter are stored/compared as text (e.as_of <= ?3). Mixed date-only ('2026-06-01') and timestamp ('2026-06-01T12:00:00Z') values compare lexicographically, so a same-day timestamp entry can be excluded or misordered relative to a date-only query. The format contract is undocumented.",
+      "impact": "Point-in-time results are ambiguous when callers mix date-only and timestamp formats; only affects NFR-4 reads at same-day boundaries.",
+      "evidence": "crates/clio-store/src/sqlite_belief.rs:235-240; crates/clio-store/src/postgres_belief.rs:230-235; crates/clio-types/src/belief.rs:169-176",
+      "confidence": "Medium",
+      "proposed_fix": "Document the accepted as_of format and normalize to a single canonical form on write, or compare parsed instants."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Concurrent first observes race: create is check-then-insert outside a transaction",
+      "evidence": "crates/clio-belief/src/observe.rs:223-268; crates/clio-store/src/sqlite_belief.rs:74-92; crates/clio-store/src/belief_store.rs:135-152",
+      "requirement_ref": "FR-13; phase-100100 §10 failure modes (Concurrent observes)",
+      "recommendation": "Make create-or-append atomic (INSERT ... ON CONFLICT DO NOTHING then append, or retry-on-duplicate into the append branch) within one store transaction.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved. observe.rs:68-96 added append_to_existing helper; the create branch now retries: on create_belief failure it re-resolves the proposition and appends when the identity exists (the create-race winner), else propagates the original error (observe.rs:316-324). Covered by observe_flow_tests.rs::create_race_loser_appends_instead_of_erroring (deterministic stale-read loser appends), ::create_race_loser_propagates_error_when_identity_is_gone (identity vanished -> original duplicate error), and ::concurrent_first_observes_serialize_as_append (two real threads, one create + one append, history=2, no error). Matches the phase-100100 failure table row 'Concurrent observes -> Serializable append'."
+      }
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Belief admission threshold/prior cannot be configured although docs claim the key selects an override",
+      "evidence": "crates/clio-belief/src/signals.rs:24-28 vs crates/clio-config/src/admission_knobs.rs:43-54,134-141,198-203",
+      "requirement_ref": "requirement.md §4.2; §4.9.3 belief-writes row",
+      "recommendation": "Add 'belief' to KNOWN_ADMISSION_KEYS with a documented default, or correct the doc to state the global theta/prior applies.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved by making the key configurable (the finding's first option). admission_knobs.rs:48 added 'belief' to KNOWN_ADMISSION_KEYS; default_type_prior('belief') = Some(0.50) (matches the historical fallback, so behavior is unchanged); override-map error message now says 'known category, episodic type, or belief key'. signals.rs BELIEF_KEY doc now states the default prior 0.5 and global-theta fallback. Test: admission_knobs_tests.rs::belief_create_key_is_tunable; knob_defaults_follow_appendix updated to 11 keys."
+      }
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Durable audit rows omit confidence/source_type and no production sink persists BeliefEvent",
+      "evidence": "crates/clio-store/src/sqlite_belief.rs:94-107; crates/clio-store/src/postgres_belief.rs:93-106; crates/clio-belief/src/observe.rs:44-100",
+      "requirement_ref": "FR-15; phase-100100 AC-100100-08",
+      "recommendation": "Persist confidence/source_type/entry_count in audit_events.detail_json (or the existing columns) and/or provide a durable BeliefSink.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved. belief_store.rs:134-152 adds belief_audit_detail(); both backends now write the audit_events.confidence column ($N::float8 on Postgres, matching the postgres_memory.rs item-audit pattern) and detail_json {created|appended, confidence, source_type, entry_count}. Evidence: belief_tests.rs::sqlite_belief_audit_rows_carry_reconstruction_fields and ::postgres_belief_audit_rows_carry_reconstruction_fields assert the confidence column and all detail fields for create (0.4/agent_inferred/1) and append (0.65/agent_inferred/2) on both backends. Durable BeliefSink adapter deliberately not added: audit_events IS the durable ordered trail (indexed by item_id+created_at); a second stream would duplicate it. admission_score is not persisted on the belief create row (documented in the phase Known limitations)."
+      }
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "beliefs.updated_at column is never updated on append and goes stale",
+      "evidence": "crates/clio-store/src/sqlite_belief.rs:55-60,113-160,190-194; crates/clio-store/src/postgres_belief.rs:55-60,112-158,184-188",
+      "requirement_ref": "FR-13; phase-100100 Task 2",
+      "recommendation": "Update beliefs.updated_at in the append transaction or drop the column and document derive-only reads.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved by maintaining the column. append_confidence now runs UPDATE beliefs SET updated_at = (SELECT MAX(as_of) FROM belief_confidence_entries WHERE belief_id=?) inside the append transaction (sqlite_belief.rs:159-166, postgres_belief.rs:158-167); create stores max-by-as_of instead of vector-last so the column always matches the derived read (SQL ORDER BY as_of). Asserted by the new audit-reconstruction tests (updated_at == '2026-07-14' read from the raw column on both backends)."
+      }
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "AC-100100-01/T100100-07 evidence overstates: no test rejects a fact carrying a confidence trajectory",
+      "evidence": "crates/clio-types/src/belief_tests.rs:133-157; crates/clio-types/src/item.rs:224-268",
+      "requirement_ref": "FR-14; phase-100100 AC-100100-01 / T100100-07",
+      "recommendation": "Cite the type structure as the guarantee or add a serialization-boundary negative test.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved by rewording the evidence (the finding's first option). The phase AC-100100-01 row now states T100100-07's rejection is structural: MemoryItem has no confidence_history field (a fact cannot carry a trajectory by type) and item.validate rejects source_type on facts; fact_items_never_carry_a_trajectory asserts a fact with scalar confidence validates and there is no runtime rejection path to call. No misleading test claim remains."
+      }
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "§4.10 belief object omits epistemic_kind in the struct and table",
+      "evidence": "crates/clio-types/src/belief.rs:110-127; crates/clio-belief/src/history.rs:30-44; sql/001_core.sql beliefs table",
+      "requirement_ref": "FR-14; requirement.md §4.10",
+      "recommendation": "Document the Option-B implicit-kind divergence, or add the field.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved by documenting the Option-B divergence (the finding's first option). clio-types/src/belief.rs BeliefObject doc now states: under Option B a belief object is implicitly epistemic_kind='belief'; beliefs are NOT items and carry no separate kind field/column/parameter; the kind is surfaced explicitly on reads via RetrieveHit. No schema change."
+      }
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Nine new production files omit the AGENTS.md-mandated closing header line",
+      "evidence": "crates/clio-belief/src/{history,observe,signals}.rs; crates/clio-types/src/{belief,read}.rs; crates/clio-store/src/{belief_reshape,belief_store,postgres_belief,sqlite_belief}.rs",
+      "requirement_ref": "AGENTS.md File Header",
+      "recommendation": "Append 'Keep this module focused on ...' to each new file's module doc.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved. The closing 'Keep this module focused on ...' header line was appended to all nine files: clio-belief/src/{history,observe,signals}.rs, clio-types/src/{belief,read}.rs, clio-store/src/{belief_reshape,belief_store,postgres_belief,sqlite_belief}.rs, matching clio-belief/src/lib.rs."
+      }
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "belief_history not-found uses InvalidArgument rather than a not-found code",
+      "evidence": "crates/clio-belief/src/history.rs:78-93",
+      "requirement_ref": "phase-100100 Task 4 (structured not-found)",
+      "recommendation": "Add a NotFound code or document the caller contract.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved by adding the code (the finding's first option). clio-types/src/error.rs adds ErrorCode::NotFound ('not_found', stable as_str asserted in error.rs tests); clio-belief/src/history.rs::not_found now returns it; history_tests.rs::unknown_belief_returns_structured_not_found asserts NotFound for both the unknown-target and cross-bank cases. Phase Known limitations updated."
+      }
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "belief reshape can silently drop orphaned belief_confidence_entries",
+      "evidence": "crates/clio-store/src/belief_reshape.rs:104-123,129-148,53-58,90-98",
+      "requirement_ref": "phase-100100 Task 1 (backfill safety)",
+      "recommendation": "Count belief_confidence_entries rows too and refuse the drop when either table is non-empty.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved. belief_reshape.rs now counts belief_confidence_entries rows too (sqlite_entry_rows/pg_entry_rows handle the table-not-exists case) and refuses the destructive drop with a combined ConfigCorrupt message when either table is non-empty. Tests: belief_reshape_tests.rs::orphaned_confidence_entries_are_preserved (sqlite) and the extended ::pg_beliefs_reshape_guard (orphaned entries alone refuse the drop)."
+      }
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "title": "belief_history as_of filtering relies on free-form string ordering",
+      "evidence": "crates/clio-store/src/sqlite_belief.rs:235-240; crates/clio-store/src/postgres_belief.rs:230-235; crates/clio-types/src/belief.rs:169-176",
+      "requirement_ref": "NFR-4",
+      "recommendation": "Document/normalize the as_of format or compare parsed instants.",
+      "resolution": {
+        "status": "resolved",
+        "fix": "Resolved by documenting the format contract (the finding's documentation option). clio-types/src/belief.rs ConfidenceEntry::as_of and BeliefObject::as_of_confidence, clio-store/src/belief_store.rs belief_history, and clio-belief/src/history.rs now state: as_of orders and filters as lexicographic ISO-8601 text; use ONE canonical form per trajectory (date-only or full timestamp), never mix. Phase Known limitations states the same. Normalizing stored history entries was rejected: it would rewrite append-only rows (FR-13)."
+      }
+    }
+  ],
+  "dismissed": [
+    "decide() losing its category gate: verification shows the whitelist lived in decide_raw via typed Candidate parsing, not in decide; the refactor to decide_ungated is behavior-preserving and all admission tests pass.",
+    "ConfidenceEntry/BeliefObject array-order current_confidence vs as_of ordering: stored histories are loaded ORDER BY as_of, so current_* is correct on every read path; only a hand-built out-of-order BeliefObject could differ, and no production caller does that.",
+    "Cross-subject evidence mixing on a shared proposition key: identity is (bank_id, proposition_key) by documented design, and subject_id only selects the DEK; bank remains the isolation boundary.",
+    "No DB trigger enforcing append-only history: the trait exposes only append/create with no UPDATE/DELETE path, so the API boundary is append-only.",
+    "Schema version bump 4->5 with fail-closed ConfigCorrupt on non-empty legacy beliefs: the phase explicitly permits fail-closed for pre-epistemic rows and the tables are undeployed.",
+    "roadmap-isolation: no references to roadmap/, phase numbers, or crates.md found in crates/ or sql/."
+  ],
+  "verification": [
+    {
+      "claim": "cargo test --locked --workspace is green",
+      "classification": "Established",
+      "source_note": "Ran it: TEST_EXIT=0; 18 'test result: ok' summaries, 0 failed (including postgres_belief_parity and pg_beliefs_reshape_guard with Compose Postgres on :34310)."
+    },
+    {
+      "claim": "clippy -D warnings and cargo fmt --check are clean",
+      "classification": "Established",
+      "source_note": "Ran both: fmt exit 0 with empty diff; clippy --workspace --all-targets --all-features --locked -- -D warnings exit 0."
+    },
+    {
+      "claim": "make coverage passes with every reported file >=90% functions and lines",
+      "classification": "Established",
+      "source_note": "Ran make coverage: exit 0; TOTAL 96.04% lines / 99.30% functions; parsed all 84 file rows, 0 below 90% on functions or lines. Only region coverage dips below 90 (not gated)."
+    },
+    {
+      "claim": "Facts cannot carry a confidence trajectory",
+      "classification": "Supported",
+      "source_note": "MemoryItem has no confidence_history field and item.validate rejects source_type on facts; the cited test only checks a scalar confidence, so the guarantee is structural, not test-exercised."
+    },
+    {
+      "claim": "Dual-backend parity for belief storage",
+      "classification": "Established",
+      "source_note": "run_belief_suite executes identically on SqliteStore and PostgresStore; both tests passed in the workspace run."
+    },
+    {
+      "claim": "All new/modified Rust files are <=450 lines",
+      "classification": "Established",
+      "source_note": "wc -l over each new/modified file: max 393 (schema_reshape.rs), all under 450."
+    },
+    {
+      "claim": "AC-100100-08 durable audit_events rows are sufficient for FR-15 reconstruction",
+      "classification": "Contradicted",
+      "source_note": "Rows write detail_json {\"created\":true}|{\"appended\":true}; confidence and source_type are absent, contrary to FR-15's reconstruction intent."
+    },
+    {
+      "claim": "make check passes after remediation (round 2)",
+      "classification": "Established",
+      "source_note": "Ran it: exit 0; fmt clean, clippy -D warnings clean, 18 'test result: ok' summaries, 365 tests ok, 0 failed. First run failed 2 PG tests (f64 into numeric audit_events.confidence); fixed with the repo's ::float8 cast pattern, then green."
+    },
+    {
+      "claim": "make coverage passes with every reported file >=90% functions and lines after remediation",
+      "classification": "Established",
+      "source_note": "Ran make coverage: exit 0; TOTAL functions 99.10%, lines 98.74% (regions 95.98% not gated). Parsed all per-file rows on the gated functions/lines columns: no file below 90%."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Real-world concurrency frequency and severity of the create race",
+      "why_unknown": "No multi-threaded observe test exists; only sequential store-level duplicate-create is tested",
+      "what_would_resolve_it": "Add a concurrent first-observe test (two threads, same proposition) and observe whether the loser errors or appends",
+      "materiality": "Determines whether F-01 stays high or should be downgraded to an edge case",
+      "status": "Resolved by remediation: observe_flow_tests.rs::concurrent_first_observes_serialize_as_append runs two real threads against one fresh proposition; the loser appends (never errors), history reaches 2 entries. Deterministic stale-read variants pin both retry branches."
+    },
+    {
+      "what": "Whether any production host wires a durable BeliefSink",
+      "why_unknown": "The crate ships only BeliefVecSink; the deployment binding is out of phase scope",
+      "what_would_resolve_it": "Inspect the eventual MCP/tool binding (slice 100160-17) for a persistent sink",
+      "materiality": "Affects whether F-03 is a real telemetry gap or a documented in-process limitation",
+      "status": "Partially resolved: the durable trail now lives in audit_events (see F-03), so a dedicated persistent sink is redundant today; revisit when the MCP/tool binding defines host telemetry needs."
+    }
+  ],
+  "strengths": [
+    "Append-only history holds at both the API and SQL layers; prior entries are asserted byte-identical after append on both backends.",
+    "Encryption-at-rest and crypto-shredding fail-closed behavior is genuinely tested (ciphertext hides plaintext, destroyed DEK returns Forbidden).",
+    "Create/append admission split is implemented as specified: no category gate on create, no re-scoring on append.",
+    "The frozen RetrieveHit contract and its golden JSON fixtures make the fact-vs-belief read shape unambiguous for slice 100120.",
+    "Claims in the phase file were independently reproducible: tests, clippy, fmt, and per-file coverage all match."
+  ],
+  "regrets": [
+    "The review is diff-centered; broader pre-existing assumptions (e.g., item-level epistemic enforcement owned by Phase 100030) were spot-checked rather than exhaustively traced.",
+    "No live concurrency probe was run for F-01; the finding rests on code reading plus the documented failure-mode table."
+  ],
+  "process_changes": [
+    "Add a concurrent create-or-append test to the belief suite so the race is observable rather than inferred.",
+    "Treat 'durable telemetry' claims as requiring inspection of the actual durable row contents, not just the in-memory event struct."
+  ],
+  "plan_1hr": [
+    "F-01: make create-or-append atomic in sqlite_belief/postgres_belief (or retry-on-duplicate in observe.rs) and add a concurrent test.",
+    "F-02: add 'belief' to KNOWN_ADMISSION_KEYS with a default prior (or fix the signals.rs doc).",
+    "F-03: include confidence/source_type/entry_count in the durable audit detail_json.",
+    "F-07: append the mandated 'Keep this module focused' header line to the nine new production files."
+  ],
+  "plan_unlimited": [
+    "Design a durable, ordered audit stream for belief observes that survives process restart and supports FR-15 reconstruction, then wire a real BeliefSink.",
+    "Introduce a NotFound error code and a unified temporal_history API so belief as_of and triple as_of share one canonical time parser.",
+    "Add a single atomic upsert path for identity-bearing writes and property-test it under concurrency."
+  ],
+  "plan_1hr_status": [
+    "F-01: done - retry-on-duplicate in observe.rs + deterministic and two-thread tests (see F-01 resolution).",
+    "F-02: done - 'belief' added to KNOWN_ADMISSION_KEYS with documented default prior 0.50 (see F-02).",
+    "F-03: done - confidence/source_type/entry_count persisted in audit detail_json + confidence column on both backends (see F-03).",
+    "F-07: done - closing header line appended to all nine new production files (see F-07)."
+  ],
+  "plan_unlimited_status": [
+    "Durable ordered audit stream + real BeliefSink: addressed at the data layer. The durable audit_events rows now reconstruct every belief observe (operation, item_id, epistemic_kind, confidence column, detail_json with confidence/source_type/entry_count, actor, created_at with the existing item_id+created_at index). A separate append-only stream plus a persistent BeliefSink adapter would duplicate audit_events row-for-row; deferred until a host binding (tool/MCP slices) needs subscription semantics. BeliefVecSink remains the in-process telemetry surface.",
+    "NotFound code: done (F-08). Unified temporal_history API spanning belief as_of and triple as_of: deferred - the phase file already lists 'temporal_history unified tool packaging' as a phase Known Limitation; wiring belief trajectories into the unified tool belongs to the tool-packaging slice, not this bug-fix round. The shared time-comparison contract is now documented on ConfidenceEntry::as_of and BeliefStore::belief_history.",
+    "Single atomic upsert path for identity-bearing writes + property tests: partially addressed. Belief identity writes are now create-or-append-safe under concurrency (retry-on-duplicate) with a two-thread test. Generalizing to all identity-bearing writes (items, triples) is a cross-cutting redesign outside a remediation round; the existing per-path guards (unique item index mapping, t11/t14 concurrency tests) remain in place."
+  ],
+  "remediation": {
+    "run": "r1",
+    "remediator": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+    "date": "2026-09-18",
+    "summary": "All 10 findings resolved (none disputed); plan_1hr fully implemented; plan_unlimited addressed with explicit dispositions (NotFound done; durable audit reconstruction done at the data layer; unified temporal_history and generic atomic upsert deferred with reasons). Tests were never weakened: only an exact key-count assertion (10->11 keys) and the not-found error-code assertions were updated to reflect the intended behavior change; new tests were added for every fix.",
+    "verify": "make check PASS (exit 0; fmt + clippy -D warnings + 365 tests, 0 failed); make coverage PASS (exit 0; TOTAL 99.10% functions / 98.74% lines; 0 files below the 90% per-file floor)."
+  }
+}

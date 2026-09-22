@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100310: Zero-Config Default Database Path with Full Precedence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100310: Zero-Config Default Database Path with Full Precedence</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">2 important · 2 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">Core database path resolution, CLI precedence chain, parent directory creation, help masking, and coverage thresholds were implemented and verified with green test suites. However, 48 binary LLVM profiling dumps (~18.5 MB) were staged in the git index, config system defaults hardcode SQLite backend even when DATABASE_URL infers Postgres, and one new Rust source file omitted the mandatory AGENTS.md responsibility header.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-21</span>
+      <span><b>Applies to</b>Phase 100310 r1 (git staged diff)</span>
+      <span><b>Source</b>git diff --cached -- . &#39;:!.workflows/&#39;</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md core principles, git hygiene, header structure, and 450-line file limit</li>
+        <li>coverage.md aggregate &gt;=90% and per-file &gt;=90% lines and functions gate</li>
+        <li>Phase 100310 Objective, Scope boundaries, and Acceptance Criteria (AC-100310-01 to AC-100310-08)</li>
+        <li>requirement.md §4.9.5.E (effective configuration consistency) and FR-32</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">8 of 11 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100310-01: No-flag am mcp stdio persists to XDG default database path</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t31_01_no_flags_persists_to_xdg_default passes; creates ~/.local/share/am/clio.db and data persists across process restart</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100310-02: AM_DATA_DIR and XDG_DATA_HOME overrides honored</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t31_02_am_data_dir_override_creates_parent and t31_03_xdg_data_home_override pass; unit tests in db_path_tests.rs pass</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100310-03: DATABASE_URL opens Postgres with inferred backend</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t31_04_database_url_infers_postgres_backend passes in default_db_path_test; infer_backend unit tests pass</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100310-04: --db and --backend flags win over environment; sqlite::memory: preserved</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t31_05_db_flag_wins_over_env_url, t31_06_explicit_backend_and_db_win, and t31_07_memory_db_stays_volatile pass</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100310-05: Parent directory auto-created on first open</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t31_01 and t31_02 verify parent creation with multi-level directories; create_parent_dir names offending path on error</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100310-06: Help displays resolved default; config and CLI agree</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">CLI help output displays default and precedence; config_get for store.sqlite_path and store.database_url matches resolver, but system_defaults hardcodes backend: sqlite even when DATABASE_URL infers postgres</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100310-07: No regression in existing test suites and coverage &gt;=90%</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage passes with 97.92% line coverage and 98.98% function coverage across 262 reported files; all 262 files &gt;=90%</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100310-08: Malformed data dir fails closed without credential leakage</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t31_09_data_dir_that_is_a_file_fails_closed asserts non-zero exit; database_help_block_masks_credentials asserts userinfo redacted</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Git hygiene - no build or profiling artifacts staged</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">48 binary .profraw files (~18.5 MB) generated in crates/clio-lib/ during test execution are staged in the git index</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Every Rust source file must have standard responsibility header</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-config/src/db_path_tests.rs lacks the required # Responsibility, ## Owns, ## Does not own, and ## Boundary sections</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Source file size constraint &lt;= 450 total lines</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All 13 new or modified Rust files are &lt;= 450 lines (largest is crates/clio-config/src/config/mod.rs at 389 lines)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>48 binary LLVM profiling dumps (.profraw) staged in Git index</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Committing binary build/profiling artifacts bloats repository history, pollutes git status/diffs, and breaks repository hygiene standards.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>18.5 MB of unneeded binary machine-specific profile data is staged in git and would be committed to the repository.</dd></div>
+              <div><dt>Evidence</dt><dd>git diff --cached --name-only | grep &#39;\.profraw$&#39; lists 48 files in crates/clio-lib/ (e.g., crates/clio-lib/default_12130406370214325728_0_89478.profraw).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Unstage and delete all crates/clio-lib/*.profraw files. Add `*.profraw` to `.gitignore`. In `crates/clio-lib/tests/default_db_path_test.rs`, ensure subprocesses run with LLVM_PROFILE_FILE directed to a temp dir or filtered from workspace tracking.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Config system defaults hardcode backend: sqlite ignoring scheme inference</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>When DATABASE_URL=postgres://... is configured, the CLI infers Postgres, but effective config defaults backend to sqlite, causing StoreOpenOptions::from_effective to open SQLite rather than Postgres.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Downstream phases relying on StoreOpenOptions::from_effective (such as Phase 100330 am setup, guaranteed in §12) or inspecting config_get(&quot;backend&quot;) observe a backend/database mismatch where store.database_url points to Postgres while backend remains sqlite.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/config/merge.rs:35-43 calls resolve_database(get, None, None) which infers backend=&quot;postgres&quot;, but line 39 hardcodes `&quot;backend&quot;: &quot;sqlite&quot;` in system_defaults.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update `system_defaults` in `crates/clio-config/src/config/merge.rs` to set `&quot;backend&quot;: resolved.backend` instead of `&quot;backend&quot;: &quot;sqlite&quot;`, and ensure `Runtime::apply_process_env` sets `backend` when inferred from `DATABASE_URL`.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">02</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Missing standard AGENTS.md responsibility header in db_path_tests.rs</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md strictly mandates that every Rust source file, including test files, use the standard header with Responsibility, Owns, Does not own, and Boundary sections.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Inconsistent module documentation and breach of repository AGENTS.md style contract.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/db_path_tests.rs:1-4 contains only copyright and a single summary line without the required sections.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the standard AGENTS.md header structure with truthful Responsibility, Owns, Does not own, and Boundary doc comments to `crates/clio-config/src/db_path_tests.rs`.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Developer attribution agent moniker discrepancy in phase document</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Automated workflow tooling parses phase attribution rows to track which agent model completed each round.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Potential inconsistency if pipeline audit checks expect the exact moniker specified in task prompts.</dd></div>
+              <div><dt>Evidence</dt><dd>roadmap/phase-100310-default-database-path.md:7 records `OpenCode CLI (Go . Deepseek V4.1 Flash High)` whereas task instructions specified `OpenCode CLI (Together . GLM-5.3 Flash High)`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update line 7 of `roadmap/phase-100310-default-database-path.md` if the pipeline mandates the exact prompt-specified moniker.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Precedence order implementation: confirmed exactly matching specification (--db &gt; DATABASE_URL/AM_DATABASE_URL &gt; AM_DATA_DIR &gt; XDG_DATA_HOME &gt; HOME &gt; ./clio.db).</li>
+        <li>Source file line length limits: confirmed all 13 new/modified files remain &lt;= 450 lines after decomposition.</li>
+        <li>Help output credential safety: confirmed database_help_block masks credentials via redact_credentials with dedicated test assertions.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make test passes full workspace suite cleanly — Independently executed make test; 110 passed, 0 failed.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make lint (clippy -D warnings) is clean — Independently executed cargo clippy --workspace --all-targets --all-features --locked -- -D warnings with exit code 0.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make check (fmt + clippy + workspace tests) is clean — Independently executed make check with exit code 0.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage meets &gt;=90% aggregate and per-file floors — Independently executed make coverage; 262 reported files all &gt;=90% functions and lines, aggregate 97.92% lines and 98.98% functions.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>am CLI help subcommands show default and masked credentials — Independently executed am help, am mcp stdio --help, am mcp http --help, and am ops --help.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether child processes spawned in default_db_path_test require LLVM profile dumping during test runs</p>
+          <p class="d">cargo llvm-cov instruments binaries, but tests use cmd.env_clear() which drops LLVM_PROFILE_FILE causing default fallback drops · Forwarding LLVM_PROFILE_FILE into child process or setting it to a temporary discard file in test helper · High for git staging cleanliness</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Pure, injectable resolver design allowing deterministic unit testing without host env pollution</li>
+        <li>Clean decomposition of main.rs and ops_cli.rs maintaining &lt;450 line limit while keeping &gt;93% coverage</li>
+        <li>End-to-end integration tests in default_db_path_test verifying actual file creation, persistence across restart, and fail-closed error reporting</li>
+        <li>Comprehensive coverage across all 262 source files in the workspace with zero files below 90%</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Developer ran git add without excluding *.profraw profiling dumps</li>
+          <li>Developer did not verify config backend default when DATABASE_URL is set to postgres</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Add *.profraw to root .gitignore immediately so llvm-cov test runs never leave untracked/staged profile files</li>
+          <li>Include config consumer tests for StoreOpenOptions::from_effective when modifying store connection defaults</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Unstage and remove all 48 .profraw files from crates/clio-lib/</li>
+          <li>Add *.profraw to .gitignore</li>
+          <li>Update system_defaults in crates/clio-config/src/config/merge.rs to use resolved.backend</li>
+          <li>Add AGENTS.md responsibility header to crates/clio-config/src/db_path_tests.rs</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Wire config file loading into the CLI resolver as planned for Phase 100330</li>
+          <li>Implement Windows %APPDATA% / %LOCALAPPDATA% resolution beyond HOME fallback</li>
+          <li>Harmonize StoreOpenOptions::from_effective and McpOpenOptions to share a single backend configuration parser</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100310/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100310/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100090: Shared Continuous EMA Update Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100090: Shared Continuous EMA Update Engine</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">1 important · 4 minor · 2 dismissed</span>
+    </div>
+    <p class="sum">The Phase 100090 implementation successfully delivers the shared continuous EMA and trend engine, durable definition-time update_rule declarations with epistemic_kind column separation, dual-backend persistence (SQLite and Postgres) with serializable concurrency, and the generic update rule splitter. All workspace test suites and the &gt;=90% per-file line/function coverage gate pass cleanly. Five non-blocking findings were identified: an addressability mismatch in the update facade, header boundary compliance, discarded discrete new_value, empty-window recovery bypass, and unparameterized SQL LIMIT in SQLite.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-18</span>
+      <span><b>Applies to</b>master (staged)</span>
+      <span><b>Source</b>crates/clio-types, crates/clio-store, crates/clio-write, sql/001_core.sql</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md: Core principles, communication, file header structure, 450-line limit per Rust file, coverage gate &gt;=90% lines and functions per file</li>
+        <li>requirement.md: PR-2, §2.2, §4.6 continuous EMA + trend formulas, §4.7 preferences, §4.9.4.A update, FR-11 update_rule declarations, FR-15 audit</li>
+        <li>roadmap/phase-100090-shared-continuous-ema-update-engine.md: Tasks 1-5, T100090-01 through T100090-14 test scenarios, AC-100090-01 through AC-100090-08</li>
+        <li>roadmap/phase-100090-appendix-ema-formulas.md: Normative formulas, cold start, bounds handling, defaults (alpha=0.3, N=10)</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">11 of 11 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100090-01: Attribute update_rule declaration at definition time (FR-11 / PR-2)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-types::AttributeSchema and attribute_schemas table persist update_rule in attr_class (distinct from items.epistemic_kind); verified by attribute_tests::t01_declaration_roundtrip_not_epistemic_column and attribute_tests::t13_epistemic_kind_is_not_update_rule</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100090-02: §4.6 EMA + trend formulas and appendix worked fixture</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-types::attribute::apply_observation verified against appendix fixture (alpha=0.5, N=3, obs 1.0/0.0/1.0 -&gt; states 1.0/0.5/0.75, trends 1.0/0.75/0.75) in attribute_tests::t02_t03_appendix_fixture and store-level attribute_tests::t02_t04_appendix_fixture_through_store</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100090-03: FR-11 update rule split both directions (discrete vs continuous)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-write::update::update routes continuous to EMA and discrete to invalidate; rejects mismatched rules with WrongUpdateRule; rejects fact/belief wire values; verified in update_tests::t05-t08, t13</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100090-04: Continuous series retained for trajectories (§4.8 / NFR-4)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Append-only continuous_observations table stores full point history; as_of filtering verified in attribute_tests::t10_series_retention_and_as_of</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100090-05: Dual-backend behavioral parity (SQLite + Postgres)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-store::pg_attribute_tests::t09_parity_with_sqlite passes against compose Postgres DB (127.0.0.1:34310), producing identical state and trend numbers to SQLite</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100090-06: Shared engine + persona adapter contract</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-write::persona::observe_continuous is a thin wrapper over store observe_continuous; verified in persona_tests::t12_adapter_calls_shared_engine</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100090-07: Telemetry on continuous mutators (FR-15 spirit)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">ContinuousEvent emitted to ContinuousSink on every successful observe; continuous_observe audit events recorded in audit_events; verified in persona_tests and update_tests</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100090-08: Concurrent observes on the same key are serializable</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">SQLite TransactionBehavior::Immediate and Postgres per-key advisory lock serialize same-key observes without lost updates; verified in attribute_tests::t14 (8 threads) and pg_attribute_tests::t14 (4 clients)</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md line count constraint (&lt;= 450 lines per Rust file)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All 18 modified or created Rust source files are &lt;= 422 lines (largest is sqlite_store.rs at 422 lines)</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md and coverage.md gate (&gt;= 90% function and line coverage per file)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage exits 0: aggregate 98.68% lines / 99.22% functions; all reported Rust files &gt;= 90% lines and &gt;= 90% functions (lowest new file: postgres_attribute.rs 95.83% functions / 98.40% lines)</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Roadmap isolation: no references to roadmap or phase numbers in code/comments</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">grep across crates/ and sql/ confirmed zero occurrences of roadmap/, phase-*, or crates.md</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">01</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Inconsistent addressability between continuous and discrete update paths in update facade</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The generic update(item_id, new_value, update_rule) entrypoint specified in §4.9.4.A takes target as item_id, but the implementation bifurcates target semantics: for continuous updates, target must be an attr_key; for discrete updates, target must be an item_id. Calling update with an attribute key for discrete updates returns ErrorCode::InvalidArgument (&#39;discrete updates are item-addressed&#39;), while calling update with an item_id for continuous updates fails with WrongUpdateRule.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Callers cannot use a uniform identifier scheme across update rules, and discrete updates on items cannot verify whether the item belongs to a continuous or discrete attribute schema.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/update.rs:97,138-171,173-198</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Standardize target addressability across both paths; either allow discrete updates to accept attribute keys and look up current open items, or enable items to reference their declared attr_key so caller update_rule can be validated against item attribute schema.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">04</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Missing boundary focus statement in newly added module headers</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md defines a strict module header template requiring &#39;//! Keep this module focused on &lt;responsibility&gt;.&#39; under the &#39;## Boundary&#39; section. All newly created production modules in clio-types, clio-store, and clio-write omit this closing sentence.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Minor style and governance compliance defect against the repository&#39;s AGENTS.md rules.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-types/src/attribute.rs:18-22, crates/clio-store/src/attribute_map.rs:16-19, crates/clio-store/src/sqlite_attribute.rs:16-19, crates/clio-store/src/postgres_attribute.rs:16-19, crates/clio-write/src/update.rs:18-21, crates/clio-write/src/persona.rs:16-19</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the mandatory &#39;//! Keep this module focused on &lt;responsibility&gt;.&#39; closing line under ## Boundary in all newly created Rust source files.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Discrete update routing silently discards new_value</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The update facade takes new_value as an argument. In the continuous path, new_value is parsed into float and smoothed via EMA. In the discrete path, new_value is completely ignored and None is passed as replacement_id to invalidate(). While closing the prior item satisfies invalidation without bypassing Phase 100040 admission gates, discarding new_value silently without error or replacement linkage is unexpected.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Callers passing a new value expecting it to replace the discrete fact will only invalidate the existing fact without creating or linking a replacement.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/update.rs:186-195</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Document why new_value cannot be admitted directly on the discrete branch without bypassing Phase 100040 admission gates, or accept an optional replacement ID for gated replacement.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>parse_window treats empty array &#39;[]&#39; as valid rather than falling back to series reconstruction</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>In parse_window, &#39;[]&#39; parses successfully as Some(vec![]). If continuous_state.window_json is corrupted with &#39;[]&#39; while continuous_observations has retained history points, observe_continuous_impl uses an empty prior window instead of triggering rebuild_window_from_points, resetting the EMA to cold start.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A corrupted empty window array causes unnecessary cold-start reset despite available historical observations.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/attribute_map.rs:89-105, crates/clio-store/src/sqlite_attribute.rs:204-229, crates/clio-store/src/postgres_attribute.rs:208-230</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update parse_window to return None when the parsed array has zero elements (if window.is_empty() { return None; }), ensuring an empty window row triggers history rebuild from continuous_observations.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Unparameterized LIMIT string formatting in sqlite_attribute.rs</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>continuous_series_impl in sqlite_attribute.rs formats capped as i64 directly into the SQL string via format!(... LIMIT {}, capped as i64) rather than binding it as a positional parameter LIMIT ?4.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Minor inconsistency with postgres_attribute.rs (which binds $4) and SQL formatting best practices.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_attribute.rs:313-321</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Parameterize the LIMIT clause as LIMIT ?4 with params![bank_id, attr_key, as_of, capped as i64], matching postgres_attribute.rs.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Non-encrypted numeric states in continuous_state/continuous_observations: Reviewed against §7.4 and Phase 100090 scope. DEK encryption applies to content-bearing payloads in items, whereas continuous scalar state is structured metadata; compliance erase of continuous series is explicitly scoped to slice 100190.</li>
+        <li>Postgres hashtext 32-bit advisory lock: Checked for collision impact. A 32-bit advisory lock hash collision only introduces brief lock serialization between different keys; data integrity is maintained by transactional WHERE bank_id AND attr_key clauses.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make check passes all formatting, clippy, and 16 workspace test suites — Re-verified locally: make check exited 0 with 28 clio-types, 94 clio-write, 91 clio-store tests passing</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage passes aggregate and per-file &gt;=90% lines and functions — Re-verified locally: make coverage exited 0 with 98.68% lines and 99.22% functions; all reported files &gt;= 90% on both gated metrics</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All modified and created Rust files are &lt;= 450 lines — Re-verified locally via wc -l: largest modified file is sqlite_store.rs at 422 lines</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Roadmap isolation preserved in code and comments — Re-verified via grep: no references to roadmap/, phase-*, or crates.md in crates/ or sql/</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Downstream temporal_history tool query integration</p>
+          <p class="d">Slice 100150 owns the temporal_history packaging; only the underlying continuous_series data seam was verified in this slice. · Execution of Phase 100150 with history tool tests. · Low for Phase 100090 exit.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Rigorous dual-backend testing including 8-thread SQLite and 4-client Postgres concurrency tests that verify mathematical serializability via observation reconstruction</li>
+        <li>Faithful reproduction of appendix worked examples with float epsilon comparisons</li>
+        <li>Self-healing corrupt window recovery mechanism using retained observation points in continuous_observations</li>
+        <li>Complete column separation between attribute_schemas.attr_class and items.epistemic_kind, preventing vocabulary confusion</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>The dual addressability model (target as attr_key vs item_id) could have been unified or abstracted earlier during existing-system discovery.</li>
+          <li>Header boundary focus sentences were omitted across all newly created files despite developer run log indicating headers were checked.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Automate header linting in make lint to ensure all sections and closing boundary sentences required by AGENTS.md are mechanically checked.</li>
+          <li>Add explicit schema-link tests between items and attribute schemas when designing mutator facades.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>F-02: Add missing &#39;//! Keep this module focused on &lt;responsibility&gt;.&#39; boundary lines to all 6 new module headers.</li>
+          <li>F-04: Update parse_window in attribute_map.rs to return None on empty array to trigger series reconstruction on empty window.</li>
+          <li>F-05: Parameterize LIMIT ?4 in sqlite_attribute.rs to align with postgres_attribute.rs.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>F-01: Redesign the update facade addressability: either allow discrete updates to accept an attribute key and look up the current active item, or store the declared attr_key on memory items so both discrete and continuous updates can be validated against declared schemas uniformly.</li>
+          <li>F-03: Extend discrete update routing to accept an optional replacement payload that interfaces with the Phase 100040 gated admission pipeline.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100090/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100090/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

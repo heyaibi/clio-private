@@ -1,0 +1,104 @@
+{
+  "run_id": "phase-100120",
+  "phase": "100120",
+  "state": "completed",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "signal": "DEVELOPER_DONE 3651a5c0"
+    },
+    {
+      "step": "adversary",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/findings.json 18090576"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "REMEDIATOR_DONE 390bc460"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "signal": "REMEDY_APPROVED 42604802"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "signal": "FINALIZE_DONE c6c8dfc5"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/developer-task-r1.md",
+      "prompt_sha256": "9345dc1619faf077fc8be5367bb90cf2e1abbb768861c1fbc43b9fc93fc78b28",
+      "duration_s": 2161.85,
+      "visits": 1,
+      "signal": "DEVELOPER_DONE 3651a5c0",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/developer-task-r1.tui.log",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/adversary-task-r1.md",
+      "prompt_sha256": "af182e7688283598b44cc676b041dd41de8caec7be561dd2e1fcd9e4c4d42f73",
+      "duration_s": 1151.545,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/findings.json 18090576",
+      "via": "mark-done",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/remediator-task-r1.md",
+      "prompt_sha256": "cdd2ca56cefbd55f4039c023dde55ed7ec50c640ec5e605cba8d40547135c9dc",
+      "duration_s": 1423.586,
+      "visits": 1,
+      "signal": "REMEDIATOR_DONE 390bc460",
+      "resume_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/remediator-resume-r1.md",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/remediator-task-r1.tui.log",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/approver-task-r1.md",
+      "prompt_sha256": "5c322fcae948c29d5a80aaa2d0345f62b980a28abb9d986ed18c5d9e2f8f9a61",
+      "duration_s": 602.057,
+      "visits": 1,
+      "signal": "REMEDY_APPROVED 42604802",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/approver-task-r1.tui.log",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/finalize-task-r1.md",
+      "prompt_sha256": "2263c238cfa7e1e26a1704e8a40303749bb28ddd9e4eec3d55eb7bedaa8f52ab",
+      "duration_s": 112.1,
+      "visits": 1,
+      "signal": "FINALIZE_DONE c6c8dfc5",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/finalize-task-r1.tui.log",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ]
+}

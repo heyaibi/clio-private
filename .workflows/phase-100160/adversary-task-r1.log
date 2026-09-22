@@ -1,0 +1,25 @@
+2026-09-19T10:04:04Z START adversary-task-r1 phase-100160
+2026-09-19T10:10:41Z reading phase doc + staged diff; 27 staged files, 4889 insertions
+2026-09-19T10:22:53Z git status: staged 27 non-workflow files (clio-mcp crate + clio-lib/Cargo/CI/phase doc); unstaged only .workflows/ (out of scope)
+2026-09-19T10:22:53Z cargo fmt --all -- --check: clean (exit 0)
+2026-09-19T10:22:53Z cargo clippy --workspace --all-targets --all-features --locked -D warnings: clean (exit 0)
+2026-09-19T10:22:53Z make test (cargo test --workspace --locked): 710 passed, 0 failed (exit 0)
+2026-09-19T10:22:53Z make coverage: exit 0; aggregate lines 95.14% / functions 98.68%; every reported file >=90% lines and functions (regions not gated)
+2026-09-19T10:22:53Z am mcp schema-export: 38 tools, rev 2025-11-25, hash fnv1a64:6ac072905b174921 (matches claim)
+2026-09-19T10:22:53Z cargo test -p clio-mcp --lib --list: 68 unit tests (schema 7, write_tools 16, mutator 12, protocol 12, runtime 10, http 11); NO stdio tests compiled; conformance 6. Claim of "74 unit ... stdio 3" is false
+2026-09-19T10:22:53Z F-01 crates/clio-mcp/src/stdio.rs has no #[cfg(test)] mod stdio_tests; stdio_tests.rs (82 lines) is never compiled/run
+2026-09-19T10:22:53Z F-02 only store schema has dry_run; 11 other mutating tools lack it (pack scan) vs phase Expected Outcome common dry_run
+2026-09-19T10:22:53Z F-03 graph_link bypasses resolve_ctx: assoc_surface.rs:42 bank required, write_tools.rs:384-387; schema marks bank optional (schema_defs.rs:427)
+2026-09-19T10:22:53Z F-04 CI does not run clio-mcp lib/schema tests: ci.yml:53 cargo test --locked (default-members=clio-lib), ci.yml:83 --test conformance only
+2026-09-19T10:22:53Z F-05 store/admit_preview nest decision; requirement expects top-level {id, admission_score} / {pass,...} (write_tools.rs:247-258)
+2026-09-19T10:22:53Z F-06 roadmap isolation: schema_read_defs.rs:25 "slice 100170"; schema_defs.rs:187 "later slice"
+2026-09-19T10:22:53Z F-07 am help + README document --path; code reads --out; --path silently ignored (verified: no file written, pack on stdout)
+2026-09-19T10:22:53Z F-08 http.rs write_simple Content-Length set from body but body skipped when message empty (400/413 paths)
+2026-09-19T10:22:53Z F-09 schema marks task_upsert definition/status and triple_end valid_until required; requirement marks them optional
+2026-09-19T10:22:53Z F-10 MCP store/triple/belief/persona/history pass NoSignals (empty) to admission; documented limitation (c), no owning phase named for dry_run limitation (d)
+2026-09-19T10:24:14Z findings.json written and JSON-validated: 11 findings (4 high, 2 medium, 5 low)
+2026-09-19T10:24:14Z phase doc Attribution Adversary row set to done (only phase-file edit)
+2026-09-19T10:24:14Z verified green: fmt, clippy -D warnings, 710 tests, coverage exit 0 (95.14% lines / 98.68% funcs, all files >=90%); schema pack 38 tools hash matches
+2026-09-19T10:24:14Z could NOT verify: no CI run output available; parity/harness behavior against a real external MCP client not exercised
+2026-09-19T10:24:14Z FINISH adversary-task-r1 phase-100160
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100160/findings.json a57e2ca1

@@ -1,0 +1,7 @@
+2026-09-22T21:03:36Z START phase 100364 developer r1; baseline coverage run begins
+2026-09-22T21:06:43Z BASELINE clean: guard TOTAL lines 97.91% functions 98.90%, all 279 files >=90% (/tmp/cov-baseline.json). No workers spawned: phase is a single coupled clio-lib slice (main.rs + new bind module + tests); serial work owned by developer.
+2026-09-22T21:10:40Z IMPLEMENTED: http_bind module + clio-lib wiring + main_tests + tests/mcp_http_bind_harness; parse_flags hardened so a valueless --bind before another flag is not swallowed. clippy clean; cargo test -p clio all green. Evidence captured for T01-T07. Running scoped coverage.
+2026-09-22T21:11:01Z FINAL GATE: make coverage (aggregate + per-file guard)
+2026-09-22T21:12:27Z EVIDENCE: bare --bind -> 127.0.0.1:34300; default -> 34300; 2nd instance -> 34301; explicit 34305 -> exact; all ten held -> exit1 'no free port in 34300-34309 ... --bind HOST:PORT'; 0.0.0.0:0 no token -> exit1; stdout_bytes 0 in every run.
+2026-09-22T21:12:27Z FINAL GATE PASS: make coverage -> 280 files checked, TOTAL lines 97.89% functions 98.90%, all per-file >=90%; http_bind.rs 100/100, main.rs 94.03/100. clippy -p clio clean. Staged 6 files with 'git add -- . :!.workflows/'.
+DEVELOPER_DONE 28143fad

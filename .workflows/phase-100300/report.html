@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100300: Rerank Provider Adapters (TEI and Cohere-Compatible)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100300: Rerank Provider Adapters (TEI and Cohere-Compatible)</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">3 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">Phase 100300 cleanly implements the Cohere-compatible reranker adapter (CohereReranker), factory selection (build_reranker and build_reranker_from), and comprehensive unit and contract tests while preserving TEI behavior, fail-open orchestration semantics, and strict file size and coverage constraints. Only three minor non-blocking items were identified regarding URL path suffix flexibility, pre-existing HttpReranker debug token masking, and keyless local proxy usage.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-21</span>
+      <span><b>Applies to</b>staged diff (r1)</span>
+      <span><b>Source</b>crates/clio-retrieve/src/rerank.rs, rerank_tests.rs, fixtures_tests.rs, lib.rs, README.md, .env.example, roadmap/phase-100300-rerank-providers.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>roadmap/phase-100300-rerank-providers.md: AC-100300-01 through AC-100300-05 and Definition of Done</li>
+        <li>AGENTS.md: Hard 450-line limit per Rust file and header ownership requirements</li>
+        <li>coverage.md: &gt;=90% aggregate and per-file function and line coverage floors</li>
+        <li>requirement.md §4.9.5.E/FR-32, §4.5/P4, FR-26: Fail-open rerank orchestration and credential masking</li>
+        <li>Roadmap isolation: No roadmap references in production crate code or comments</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">5 of 5 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100300-01: Cohere-compatible rerank yields a full permutation</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-retrieve::rerank_tests::cohere_permutation_equals_tei_results_parse and cohere_adapter_rejects_bad_indices_fail_closed pass; Cohere /v1/rerank maps best-first order to a full permutation with omitted documents appended in original order.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100300-02: TEI behavior unchanged</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">HttpReranker and parse_rerank_response unchanged; all pre-existing TEI test suites pass cleanly across clio-retrieve (139 passed, 0 failed).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100300-03: Provider selection fail-closed; factory config-driven</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">rerank_tests::factory_fails_closed_on_bad_provider_config, factory_selects_teiranker_by_provider, factory_empty_provider_keeps_tei_default, factory_selects_cohere_with_bearer pass; unknown provider, missing model, or missing key for cohere reject with ErrorCode::ConfigCorrupt.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100300-04: Empty/no-provider paths are no-ops</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">cohere_empty_documents_skip_the_request short-circuits without network call; factory_without_url_is_none and runtime_factory_without_rerank_config_is_none return Ok(None).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100300-05: No regression in retrieval/fusion</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Full workspace test suite passed (exit code 0); make coverage passes with 98.95% function coverage and 97.89% line coverage aggregate, and all individual files &gt;=90%.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">03</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Potential double &#39;/v1&#39; path if RERANK_URL contains &#39;/v1&#39; suffix</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Operators accustomed to OpenAI base URLs (like https://api.openai.com/v1) or following zero-deps.md examples might set RERANK_URL with a /v1 suffix, causing requests to target /v1/v1/rerank and fail.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Configuring RERANK_URL with trailing /v1 results in 404 Not Found from providers unless explicitly configured without /v1.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/rerank.rs:191</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Strip trailing &#39;/v1&#39; from the base URL before appending &#39;/v1/rerank&#39;, or document the strict root domain requirement in .env.example.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>HttpReranker derived Debug leaks bearer token if printed</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>While CohereReranker provides a custom fmt::Debug implementation that redacts bearer tokens, HttpReranker still derives Debug, meaning any debug formatting of the TEI reranker client could expose bearer tokens in logs.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Low risk for local sidecars which typically do not use bearer tokens, but violates defense-in-depth credential masking for authenticated TEI proxies.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/rerank.rs:61-66</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Replace #[derive(Debug)] on HttpReranker with a manual fmt::Debug implementation masking self.bearer as &#39;****&#39;.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>build_reranker_from strictly requires credentials for Cohere provider, blocking keyless local proxies</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Local self-hosted rerank engines (e.g. Infinity, TEI with Cohere API emulation, or local proxies) running Cohere wire format often require no authentication.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Operators cannot use local Cohere-compatible endpoints without supplying a dummy API key.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/rerank.rs:250-255</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Allow Optional bearer in build_reranker_from for provider = cohere when the endpoint is unauthenticated local http.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Omission of live retrieval integration: Verified as explicitly out of scope for Phase 100300; Phase 100350 owns live retriever wiring.</li>
+        <li>Retry policy on rerank requests: Verified that bounded latency budgets (2s) and fail-open precision ranking make fail-fast preferred over retries.</li>
+        <li>File line count constraints: All modified Rust source files (rerank.rs at 324L, rerank_tests.rs at 316L, fixtures_tests.rs at 338L, lib.rs at 119L) comply with the &lt;=450 lines limit.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>clio-retrieve test suite passes — cargo test -p clio-retrieve --locked executed with 139 passed, 0 failed.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace test suite passes — cargo test --locked --workspace executed with 0 failures across all crates.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Coverage floors satisfied — make coverage reported 98.95% function coverage and 97.89% line coverage aggregate; rerank.rs at 100% function and line coverage; 0 files below 90%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>No clippy or formatting defects — cargo clippy --workspace --all-targets --all-features --locked -- -D warnings and cargo fmt --check passed cleanly.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean reuse of parse_rerank_response ensuring full permutation and consistent out-of-range/duplicate rejection</li>
+        <li>Safe bearer masking in CohereReranker Debug implementation</li>
+        <li>Thorough test coverage with request-capturing fake HTTP server verifying paths, HTTP methods, headers, and payload structures</li>
+        <li>Flawless adherence to file size ceilings (all files &lt;= 338 lines) and AGENTS.md headers</li>
+      </ul>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>In CohereReranker::rerank, normalize base URL by trimming optional &#39;/v1&#39; before appending &#39;/v1/rerank&#39; to prevent double path segments.</li>
+          <li>Implement manual fmt::Debug for HttpReranker with bearer masking to match CohereReranker.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Support optional bearer keys for Cohere-compatible provider to enable seamless local sidecar engines (e.g. Infinity, vLLM).</li>
+          <li>Provide helper configuration diagnostics validating reranker endpoint connectivity and model compatibility during am ops doctor.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100300/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100300/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

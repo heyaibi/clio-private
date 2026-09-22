@@ -1,0 +1,136 @@
+# Clio Phase workflow: developer -> adversary -> remediator -> approver
+# (bounded loop) -> finalize. Each step points at one self-contained file in
+# ../stages/*.md holding both the role rules and the task text. Each stage
+# file declares the {{PLACEHOLDERS}} it consumes in its frontmatter; this
+# file binds every placeholder per step, so no step ids, placeholder names,
+# or template names are hardcoded in any runner.
+#
+# A step is: stage (file under ../stages/), record_as, bindings, plus
+# routing (when/end), and optionally require_file, skip_when_empty,
+# snapshot, max_rounds/on_exhausted. The {{harness}} body token needs no
+# declaration or binding: the runner resolves it per invocation from the
+# stage frontmatter list.
+#
+# Binding sources (a binding value is one of these):
+#   "{var}"            format string over inputs plus run builtins
+#                      (phase, run_id, run_dir, agent, round, rounds)
+#   {output: <step>}   last output text of another step ("" if none yet)
+#   {task: <step>}      rendered text of another stage file
+#   {join: [...]}       join of sources with "sep" (default blank line)
+#   {prev_output: true} output of the step that routed here (loop-backs)
+#
+# Harness selection: each stage file declares `harness:` as one
+# '<cli>:<provider>/<model>[@<effort>]' string or a list of them.
+# Provider and effort are optional: 'agy:gemini-3.8-flash-high' has neither,
+# 'opencode:go/deepseek-v4.1-flash@high' has both. The model part is the full
+# reference the CLI takes (opencode: the --model value, e.g.
+# 'togetherai/zai-org/GLM-5.3-Flash'; hermes: provider/model split on the
+# first '/' into --provider + -m). An optional '@effort' suffix (e.g.
+# '@high') sets reasoning effort per CLI (opencode variant, hermes
+# --reasoning, agy --effort; cursor has no effort flag). Provider aliases:
+# `go` under the opencode CLI always means the installed `opencode-go`
+# provider, and `together` always means `togetherai` (resolved by the
+# runner), so stages write opencode:go/... and opencode:together/... short.
+# Model aliases are keyed by resolved provider (each registry names the
+# same model its own way), so stages write the short form and the runner
+# expands it: glm-5.3-flash to zai-org/GLM-5.3-Flash on together,
+# deepseek-v4.1-flash to deepseek-ai/DeepSeek-V4.1-Flash on together and
+# to deepseek/deepseek-v4.1-flash on openrouter.
+# A list means
+# round-robin: each invocation of that step uses the next entry, wrapping
+# around, with a per-step counter, so remedy-loop rounds alternate
+# harnesses. Counters persist across runs in
+# .workflows/.harness-rotation-<pipeline>-<hash>.json (one file per pipeline
+# file), so consecutive runs keep alternating. --fresh does not reset
+# rotation: it archives run state, and alternation is independent of it. Always quote entries: YAML reads [opencode: model] as a
+# mapping, not a string.
+#
+# Runner contract (fixed, so this file stays small):
+# - No timeouts. A stage runs until it signals. Only you kill a process.
+#   (agy enforces its own --print-timeout, default 5m, inside the harness;
+#   reviews approaching that ceiling need an explicit harness-side call.)
+# - Per-invocation logs sit beside the task files in run_dir:
+#   <step>-task-r<N>.log, one fresh file per invocation.
+# - Signal matching is prefix match scanned bottom-up over the last 10
+#   non-empty run-log lines ({{LOG_PATH}}), which the agent ends with its
+#   nonce-bearing signal. Anything after the signal (findings=..., nonce)
+#   is carried as context. A signal printed only in chat never counts for
+#   the log match (the console mirror is the second channel).
+# - Any signal ending in BLOCKED ends the run as blocked, from any step.
+# - require_file is verified after the step's signal, before routing.
+# - snapshot copies rundir/from to rundir/to before the step, unless the
+#   target already exists.
+# - A matched edge into an already-visited target caps at the current step's
+#   max_rounds and then ends with on_exhausted.
+# - Strict validation: unknown keys; start, edge targets, stage files,
+#   or sub source steps that do not resolve; non-positive max_rounds;
+#   a step with neither/both of when/end; end states outside ends.
+version: 1
+run_dir: .workflows/phase-{phase:06d}
+# No attribution inputs: the harness for each step is declared exactly once,
+# in the stage file frontmatter `harness:` list. The runner derives the
+# display name (HARNESS_DISPLAY) per invocation and writes Attribution rows
+# itself. There is deliberately nothing to keep in sync here.
+inputs:
+  phase_number: {required: true}
+  phase_file: {required: true}
+  max_remedy_rounds: 3
+  run_label: phase
+start: developer
+ends: [completed, rejected, blocked]
+steps:
+  developer:
+    stage: ../stages/01-implement.md
+    record_as: Developer
+    bindings:
+      PHASE_NUMBER: "{phase_number}"
+      TASK_REQUIREMENTS: "{phase_file}"
+      LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
+    when:
+      DEVELOPER_DONE: adversary
+  adversary:
+    stage: ../stages/02-adversarial-analysis.md
+    record_as: Adversary
+    require_file: findings.json
+    skip_when_empty: finalize
+    bindings:
+      ORIGINAL_PROMPT: {join: [{task: developer}, {output: developer}]}
+      FINDINGS_PATH: "{run_dir}/findings.json"
+      ARTIFACT_DIR: "{run_dir}"
+      LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
+    when:
+      ADVERSARY_DONE: remediator
+  remediator:
+    stage: ../stages/03-remedy.md
+    record_as: Remediator
+    snapshot: {from: findings.json, to: findings.original.json}
+    bindings:
+      FINDINGS_PATH: "{run_dir}/findings.json"
+      BACKUP_PATH: "{run_dir}/findings.original.json"
+      ORIGINAL_PROMPT: {join: [{task: developer}, {output: developer}]}
+      PREVIOUS_VERDICT: {output: approver}
+      ROUND_INFO: "Round {round} of {rounds}"
+      LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
+    when:
+      REMEDIATOR_DONE: approver
+  approver:
+    stage: ../stages/04-check-remedy.md
+    record_as: Remedy Approver
+    max_rounds: 3
+    bindings:
+      FINDINGS_PATH: "{run_dir}/findings.json"
+      BACKUP_PATH: "{run_dir}/findings.original.json"
+      REMEDIATOR_AGENT_OUTPUT: {output: remediator}
+      ROUND_INFO: "Round {round} of {rounds}"
+      LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
+    when:
+      REMEDY_APPROVED: finalize
+      REMEDY_REJECTED: remediator
+    on_exhausted: rejected
+  finalize:
+    stage: ../stages/05-finalize.md
+    record_as: Developer
+    bindings:
+      REMEDY_APPROVER_AGENT_OUTPUT: {output: approver}
+      LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
+    end: completed

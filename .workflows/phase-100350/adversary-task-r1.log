@@ -1,0 +1,14 @@
+[2026-09-22T14:11:30+05:30] [start] adversary review started for phase 100350 run r1
+[2026-09-22T14:11:46+05:30] [git-status] 25 staged files outside .workflows/, 0 unstaged non-workflow files, clean workdir
+[2026-09-22T14:17:46+05:30] [make-check] cargo test flake in clio-ops reindex_space_tests (isolated pass); full cargo test workspace green (exit 0)
+[2026-09-22T14:17:46+05:30] [make-lint] clippy workspace clean (exit 0)
+[2026-09-22T14:17:46+05:30] [coverage] full gate passed: TOTAL lines 97.88%, funcs 98.94%; 276 files, 0 below 90%
+[2026-09-22T14:21:44+05:30] [omission-audit] verified In Scope tasks 1-5, AC-100350-01 through AC-100350-11, DoD, and downstream guarantees
+[2026-09-22T14:21:44+05:30] [finding F-01] crates/clio-mcp/src/index_drain_tests.rs:1-7 missing structured AGENTS.md responsibility header
+[2026-09-22T14:21:44+05:30] [finding F-02] crates/clio-mcp/src/ops_embedder.rs:104-115 partial embed config silently returns Ok(None) instead of failing closed
+[2026-09-22T14:21:44+05:30] [finding F-03] crates/clio-write/src/raw_ingest_tests.rs:75-93 raw ingest test verifies outbox enqueue but not end-to-end retrievability
+[2026-09-22T14:21:44+05:30] [finding F-04] crates/clio-mcp/src/runtime.rs:312-317 extract_available checks URL only, reporting true when hosted provider lacks API key
+[2026-09-22T14:21:44+05:30] [report] generated report.html and copied findings.json, report.html, style.css to .workflows/phase-100350/
+[2026-09-22T14:21:44+05:30] [attribution] updated phase file Attribution row for Adversary r1 to done
+[2026-09-22T14:21:44+05:30] [finish] adversary review completed successfully
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100350/findings.json 37594a3b

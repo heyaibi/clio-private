@@ -1,0 +1,11 @@
+2026-09-18T17:51:35Z developer r1 start: implementing phase-100120 intent gate / hybrid retrieve / compose
+2026-09-18T18:24:01Z baseline make coverage exit 0: TOTAL lines 98.50% / functions 98.77%; no reported file <90% on gated metrics
+2026-09-18T18:24:01Z created crates/clio-retrieve (intent gate, hybrid RRF retrieve, optional rerank, compose); added to workspace members/deps and clio-lib re-export; clio-index now re-exports post_json/HttpEndpoint
+2026-09-18T18:24:01Z cargo test -p clio-retrieve --locked: 78 passed, 0 failed (T100120-01..T100120-14 plus negative/failure-mode tests)
+2026-09-18T18:24:01Z cargo clippy --workspace --all-targets --all-features --locked -- -D warnings: clean; cargo fmt --all clean
+2026-09-18T18:24:01Z DATABASE_URL=... AM_PG_RETRIEVE_PARITY=1 cargo test -p clio-retrieve postgres_and_sqlite_hit_id_parity: 1 passed (dual-backend hit-id parity)
+2026-09-18T18:24:01Z make coverage exit 0: TOTAL lines 98.55% / functions 98.87%; every reported file >=90% (clio-retrieve rerank.rs 100/100, hybrid.rs 100/98.46, compose.rs 100/100)
+2026-09-18T18:24:01Z cargo test --workspace --locked: 486 passed, 0 failed; all new/modified Rust files <=450 lines (max hybrid_tests.rs 449, hybrid.rs 446)
+2026-09-18T18:24:01Z phase file roadmap/phase-100120 updated (AC evidence, DoD, completion evidence, attribution); crates.md clio-retrieve modules synced
+2026-09-18T18:24:01Z NOTE: did not run 'git add' (global AGENTS.md forbids all git staging/commit commands under any circumstances); changes are unstaged in the working tree and must be staged by the pipeline/user
+DEVELOPER_DONE 3651a5c0

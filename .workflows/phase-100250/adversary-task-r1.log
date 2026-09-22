@@ -1,0 +1,22 @@
+[2026-09-21 02:36:43] START adversary r1 phase-100250 per-bank retention profiles
+[2026-09-21 02:57:02] reviewed staged diff: 48 files staged, 0 unstaged/untracked outside .workflows; read phase-100250 doc, requirement.md diff, roadmap diff
+[2026-09-21 02:57:02] cmd: git status/diff --cached -- . ":!.workflows/" -> 48 staged files, no unstaged non-workflow changes
+[2026-09-21 02:57:02] cmd: ./target/debug/am mcp schema-export -> 67 tools, mcp_protocol_revision 2025-11-25; contains admit_preview_batch/retention_profile_get/retention_profile_set; NO x-verbosity/x-retention/x-duplicate/x-theta keys; DOES contain "honored from phase 100270"
+[2026-09-21 02:57:02] cmd: cargo fmt --all -- --check -> exit 0
+[2026-09-21 02:57:02] cmd: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> exit 0
+[2026-09-21 02:57:02] cmd: cargo test --workspace --locked (DATABASE_URL from coverage.md) -> exit 0; 44 test binaries ok; clio-config 88, clio-admission 33, clio-mcp --lib 183, clio bin 40, retention_profile_harness 10
+[2026-09-21 02:57:02] cmd: cargo llvm-cov --workspace --locked --json --fail-under-lines 90 --fail-under-functions 90 -> exit 0; aggregate lines 97.90% (34060/34789), functions 98.86% (2954/2988); 244 files, 0 below 90%
+[2026-09-21 02:57:02] cmd: wc -l staged .rs files -> max 444 (retention.rs); no file over 450
+[2026-09-21 02:57:02] F-01 high: phase number 027 in production code + published pack; retention.rs:209,314,404,425,430; pack output contains "honored from phase 100270"
+[2026-09-21 02:57:02] F-02 high: completion evidence false; phase file line 410 claims 41 tools + embedded x-* mapping keys; actual 67 tools, no x-* keys (schema_retention_defs.rs:71,97 embed only properties)
+[2026-09-21 02:57:02] F-03 medium: hub-distill gated write uses builtin policy; crates/clio-write/src/hub_distill.rs:199 AdmissionPolicy::new; engine wired at crates/clio-mcp/src/runtime.rs:249; reachable via consolidate
+[2026-09-21 02:57:02] F-04 medium: duplicate_tolerance_write balanced==lenient==0.0; retention.rs:176-183
+[2026-09-21 02:57:02] F-05 medium: save failure leaves in-memory profile applied; config/retention_ops.rs:95-96; runtime_retention.rs:52-58
+[2026-09-21 02:57:02] F-06 low: verify refusals stamp builtin version; clio-write/src/pipeline.rs:164, clio-write/src/store_path.rs:81
+[2026-09-21 02:57:02] F-07 low: permissive allowed as deployment default; retention.rs:257-286 validate ignores verbosity
+[2026-09-21 02:57:02] F-08 low: header singular "Developer"; clio-mcp/src/store_write.rs:1
+[2026-09-21 02:57:02] F-09 low: attribution row mismatch; phase file line 7
+[2026-09-21 02:57:02] F-10 low: test-count evidence wrong (clio-config 87 vs 88; clio 38 vs 40 bin)
+[2026-09-21 02:57:02] wrote findings.json (10 findings), report.html, style.css into .workflows/phase-100250; updated phase Attribution Adversary row
+[2026-09-21 02:57:02] FINISH adversary r1: verdict Adequate; 3 substantive defects (F-01/F-02/F-03); functional core verified green (tests, lint, fmt, coverage, 450-line, staging)
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100250/findings.json 47a40ca3

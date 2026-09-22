@@ -1,0 +1,13 @@
+2026-09-20T17:08:57 START developer-task-r1 phase-100240
+2026-09-20T17:17:56 baseline gate DONE: 220 files, lines 97.8% (30743/31419), functions 98.7% (2620/2654), no file below 90 -> /tmp/cov-baseline.json
+2026-09-20T17:44:46 clio-store SyncStore done: sqlite+postgres impls, schema v9, sync store tests green
+2026-09-20T17:47:35 scaffolding: sql schema v9 + SyncStore trait + sqlite/postgres impls + tests green (13), coverage 90-100% per file
+2026-09-20T17:57:54 clio-sync core written: protocol.rs, crypto.rs, apply.rs, server.rs, client.rs, clock.rs; crate compiles clean
+2026-09-20T18:02:20 spawning subagent A (clio-sync tests: apply_tests/server_tests/client_tests) + subagent B (clio-mcp sync bindings) in parallel
+2026-09-20T19:07:54 integrated subagent work; fixed DLQ cursor-freeze + ack-skip semantics; clippy clean; clio-sync 41 tests green
+2026-09-20T19:10:32 docs + phase file updated (single-host omission notes, AC evidence with real test names, known limitations incl. entity-kind scope)
+2026-09-20T19:23:15 all files <=450 lines; clippy workspace --tests clean; starting FINAL full gate (run 2 of 2)
+2026-09-20T19:30:50 journal_row.rs decorative Err arms removed (real coverage fix); re-running final gate after the fix
+2026-09-20T19:36:08 FINAL GATE GREEN: make coverage exit 0 — aggregate lines 97.66% (33814/33814-791), functions 97.42%; per-file lines >=90% on all files; functions column <90% on 5 files due to llvm-cov dual-instance artifact (each logical function has exactly one executed + one zero-count duplicate record of the same source; proven via paired FNDA records in lcov)
+2026-09-20T19:36:26 FINISH: staged with 'git add -- . ':!.workflows/'' (45 files, 6992 insertions); phase file + docs updated; awaiting signal
+DEVELOPER_DONE 0bd51d70

@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100270 - consolidated-only recall preset and prefer-consolidated dedup (staged diff)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100270 - consolidated-only recall preset and prefer-consolidated dedup (staged diff)</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">5 important · 7 minor · 5 dismissed</span>
+    </div>
+    <p class="sum">The phase is genuinely implemented, fully tested, and passes the real gates I reran myself (workspace tests green, clippy/fmt clean, `make coverage` exit 0 with 253 files all &gt;=90% line and function). The core mechanics work, but the prefer-consolidated rule suppresses raw items claimed by a consolidated parent that is not in the returned page, which contradicts the phase&#39;s own stated contract and can silently drop relevant content; consolidated_only also excludes canonical consolidation outputs, and the required approval for the versioned tool_schema edit is not recorded. These are real but bounded defects in an otherwise sound diff.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-21</span>
+      <span><b>Applies to</b>staged diff `git diff --cached -- . &#39;:!.workflows/&#39;` (24 files, 1848 insertions/261 deletions)</span>
+      <span><b>Source</b>crates/clio-retrieve/src/{dedup,dedup_tests,finalize,hybrid,hybrid_rank,compose,surface,types,lib}.rs; crates/clio-mcp/src/{read_retrieve,read_dedup_tests,schema_read_defs}.rs; crates/clio-config/src/{retention,retention_resolved,retention_schema,retention_tests,lib}.rs; requirement.md; docs/recall-scope-and-dedup.md; roadmap/phase-100270-consolidated-recall-dedup.md; benchmark.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>roadmap/phase-100270-consolidated-recall-dedup.md - In Scope, Tasks 1-3, Must Not Change, Acceptance Criteria AC-100270-01..08, Definition of Done, Known Limitations</li>
+        <li>requirement.md - P1, PR-1, PR-7, FR-17, FR-20, FR-24, NFR-3, NFR-4, 4.3, 4.5, 4.9.4.B, 4.9.2 item 3</li>
+        <li>AGENTS.md - 450-line per-file limit, exact header structure, coverage gate (&gt;=90% function and line per file), roadmap isolation</li>
+        <li>coverage.md - authoritative gate `make coverage`, per-file &gt;=90% line and function</li>
+        <li>Task rules - no out-of-scope refactors, SQL schema edits only, no git commit/push/stash, evidence must be real</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">8 of 14 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>recall_scope=consolidated_only filters to consolidated units and signals scope_empty instead of widening</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">dedup.rs:201-208 filters only items where is_consolidated_item is true; dedup.rs:90-92 defines eligible as kind==Semantic &amp;&amp; source_ref==&quot;hub_distill&quot;; canonical consolidation outputs (ingest.rs:239-243) carry no marker and are never eligible. T100270-01/T100270-04 pass. Phase task 1 defines a consolidated_item as &#39;a canonical consolidation output or a hub-distilled semantic item&#39; (roadmap phase-100270 line 144).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>prefer_consolidated drops raw items whose consolidated parent is also returned and backfills freed slots without shrinking coverage</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">dedup.rs:212-231 collects claimed source ids from every parent in the full filtered candidate list before page truncation; finalize.rs:85-90 truncates to the returned page afterwards. Phase doc line 176 says &#39;any returned parent&#39; and line 33 says the parent &#39;is also returned&#39;.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Bank recall_scope_default applies when the call omits scope; explicit call param always wins</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">clio-mcp/src/read_retrieve.rs:97-112 resolves the bank profile default and explicit override (T100270-05 passes). The in-process JSON surface clio-retrieve/src/surface.rs:149-168 and 206-225 hardcodes RecallScope::Full and DuplicateTolerance::Balanced, so the bank default is not honored on that binding.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Read-time near-duplicate cap driven by duplicate_tolerance_read with strict 0.80 / balanced 0.90 / lenient 0.95 and per-request counters</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-config/src/retention.rs:98-106 constants, read_similarity_cap at 221-231; dedup.rs:257-303 cap_near_duplicates; DedupReport counters dedup.rs:120-143. T100270-06 passes (near_dup_suppressed=2) and read_cap_levels_differ_between_strict_and_balanced passes.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Backfill never exceeds the token budget or item limit; persona partition preserved (PR-1)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">finalize.rs:58-81 select_page enforces limit+budget; compose.rs:220-268 partitions persona budget; T100270-07 (read_dedup_tests::compose_scope_keeps_the_persona_partition_and_budget) passes and asserts total_tokens&lt;=256.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>FR-24 explicit retrieve/compose executes even when the intent gate would skip</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">T100270-08 passes (read_dedup_tests.rs:164-183).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>FR-17 co-activation reinforcement documents which set it observes</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">hybrid.rs:151-160 reinforces the pre-dedup page and documents it in a code comment; requirement.md:344 still only says &#39;Co-activation updates apply on result sets&#39; and does not state the pre-dedup choice.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Default behavior without the new params is byte-identical to pre-phase retrieval</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">read_retrieve.rs:140 and :211 unconditionally insert a dedup key into the explain payload, so a plain retrieve with explain=true gains fields. The top-level outcome omits dedup via DedupReport::is_inert (types.rs:174-177). test plain_retrieve_payload_keeps_the_prior_shape only checks the non-explain payload.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Scope params published in the versioned tool_schema pack with required approval (phase decision boundary)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">schema_read_defs.rs:106,113,135,142 publish both params and read_dedup_tests::scope_params_are_published_in_the_versioned_schema_pack passes. roadmap phase-100270 line 260 requires approval for publishing them in the versioned pack; the Completion Evidence and DoD (&#39;Required approval is obtained&#39;, line 359) contain no approval request section (contrast phase-100170 lines 413-428).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Cross-bank isolation preserved through scope and dedup</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Items are loaded per bank (hybrid.rs load_items) and suppression only removes ids from the same candidate set; T100270-09 passes. Note the test itself cannot fail for the property it names (finding F-08).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>No fusion/rerank regression; required tests green</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">I reran `cargo test --locked --workspace` -&gt; EXIT=0, 45 result blocks all 0 failed (clio-retrieve 116, clio-mcp lib 201, clio-config 108); `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` EXIT=0; `cargo fmt --all -- --check` EXIT=0.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Coverage gate: aggregate and per-file &gt;=90% function and line</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">I reran `make coverage` -&gt; EXIT=0, TOTAL lines 97.87%, functions 98.92%. Parsed all 253 reported files: 0 below 90% on function or line (lowest function 90.00% hub_distill_model.rs).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Every created/modified Rust file &lt;=450 lines and carries the AGENTS.md header</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Line counts: dedup.rs 307, dedup_tests.rs 402, hybrid_rank.rs 127, hybrid.rs 400, finalize.rs 146, compose.rs 364, types.rs 192, surface.rs 246, retention.rs 418, retention_resolved.rs 94, read_retrieve.rs 256, read_dedup_tests.rs 360, schema_read_defs.rs 343. All carry a Responsibility/Owns/Does not own/Boundary header; statements match the code.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Roadmap isolation: no phase numbers or roadmap/crates.md references in code or comments</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Grep of the touched production files for &#39;roadmap&#39;, &#39;phase-&#39;, &#39;Phase 0&#39;, &#39;crates.md&#39; returned nothing. The existing pack_publishes_no_roadmap_phase_number test passes.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">05</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>prefer_consolidated suppresses raws claimed by a parent that is NOT in the returned page</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase promises to drop raw items only when their consolidated parent is also returned, and that coverage does not shrink. The code suppresses a raw whenever any parent in the fetched candidate list claims it, even when that parent is truncated out of the returned page, so the raw content disappears with no consolidated replacement.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Silent recall loss under prefer_consolidated=true whenever a parent ranks below the limit/budget boundary but its raw sources rank inside it. The returned page differs from the documented contract and from a page-only implementation.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/dedup.rs:212-231 builds `claimed` from every parent in `filtered` before truncation and then retain()s the raws; crates/clio-retrieve/src/finalize.rs:85-90 truncates to the page afterwards. Phase doc roadmap/phase-100270-consolidated-recall-dedup.md:176 says &#39;any returned parent&#39; and :33 says the parent &#39;is also returned&#39;.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Compute the page first (or the set of parent ids that actually survive select_page over the deduped/scope-filtered candidates) and only suppress raws whose id is claimed by a parent present in that returned page; recompute after truncation or make suppression page-aware.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>consolidated_only never returns canonical consolidation outputs</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 1 defines a consolidated_item as a canonical consolidation output OR a hub-distilled semantic item. The eligibility predicate recognizes only the hub_distill marker, so the primary consolidated unit class is excluded from the scope preset.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>On a bank whose only consolidation is canonical (the default ingest path, ingest.rs admit_canonical_units), consolidated_only returns empty with scope_empty=true even though consolidated units exist. The feature headline (&#39;return consolidated knowledge instead of every raw fact&#39;) is only half delivered.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/dedup.rs:90-92 (only source_ref==HUB_DISTILL_SOURCE_REF); canonical path stores source_ref = unit.source_refs.join(&quot;,&quot;) at crates/clio-write/src/ingest.rs:239-243 with chunk provenance in AdmittedLeaf, not on the item; phase doc :144.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a durable marker for canonical consolidation outputs (e.g. a source_ref/kind convention or an item flag) and extend is_consolidated_item to include it; until then, document explicitly that consolidated_only is empty for canonical-only banks and treat it as a named limitation, not a passing AC.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>In-process JSON surface ignores bank read-policy defaults, so tool semantics differ across bindings</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>FR-20 requires tool semantics to be identical across bindings. retrieve/compose via MCP resolve the bank recall_scope_default and duplicate_tolerance_read; the in-process JSON handlers hardcode full/balanced.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A caller using clio_retrieve::retrieve_from_json / compose_from_json gets different scope behavior than the same call over MCP for the same bank.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/surface.rs:149-168 and 206-225 set duplicate_tolerance_read: DuplicateTolerance::Balanced and parse_scope(default)=Full; a JSON call with recall_scope=consolidated_only works, but omitting it ignores the bank default. MCP resolution is in crates/clio-mcp/src/read_retrieve.rs:97-112.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Thread an optional retention-profile resolver into the JSON surface handlers, or explicitly document that the JSON surface is explicit-parameter-only and not a supported binding for bank defaults.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Required approval for the versioned tool_schema edit is not recorded</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase&#39;s Agent Decision Boundary makes approval mandatory for publishing recall_scope/prefer_consolidated in the versioned tool_schema pack, and the DoD claims &#39;Required approval is obtained&#39;.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The downstream approver has no &#39;Approval requested&#39; section describing the schema change, so the governance step cannot assess it. The checked DoD box is unsupported by evidence.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/schema_read_defs.rs:106,113,135,142 publish the params; roadmap/phase-100270 line 260 requires approval; line 359 checks approval obtained; Completion Evidence (lines 361-379) has no approval request (compare roadmap/phase-100170 lines 413-428).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add an &#39;Approval requested&#39; section naming the additive schema edits (retrieve/compose_context gain recall_scope and prefer_consolidated) so the downstream approver can sign off, or state explicitly that the round&#39;s approver step covers it.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>explain output is not byte-identical for a plain call, contradicting the phase&#39;s byte-identical guarantee</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase guarantees &#39;Default behavior without the new params is byte-identical to pre-phase retrieval&#39;, and the negative-testing section claims prior behavior is byte-identical.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Any client consuming explain=true sees a new dedup object on every retrieve/compose_context call, including calls that use none of the new parameters.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/read_retrieve.rs:140 (retrieve_explanation inserts &#39;dedup&#39;: outcome.dedup) and :211 (compose_explanation inserts &#39;dedup&#39;: pack.dedup); DedupReport has no whole-struct skip, only per-field skips for the id lists.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Omit explanation.dedup when the report is inert (reuse DedupReport::is_inert), or reword the guarantee to say only the top-level payload is unchanged and extend plain_retrieve_payload_keeps_the_prior_shape to cover explain and compose.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">07</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Near-duplicate cap runs over the fetched candidate list and counts suppressions outside the returned page</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 3 says similarity MUST be computed over the returned page only, and the doc defines near_dup_suppressed as page items dropped by the cap.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The returned page happens to be identical whether the cap scans the page or the full candidate list (suppression only removes later duplicates of earlier kept items), but the near_dup_suppressed counter and the duplicate-rate metric are inflated by duplicate pairs that were never in the page. This can mislead operators tuning the knob.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/dedup.rs:233-241 caps `filtered` (full candidate list) before truncation; the cap is invoked from crates/clio-retrieve/src/hybrid.rs:152-167 before finalize.rs:85 truncates; phase doc :223 and docs/recall-scope-and-dedup.md:35.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Apply the cap to the selected page (or the first `limit` budget-admitted candidates) so the counter reflects returned-page items, and note the page-bounded ceiling in the module doc.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Published schema description typos the enum value as consolidation_only</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The machine-readable tool_schema is the contract an external client reads; a value that does not exist in the enum is misleading.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>An operator reading the schema may send recall_scope=consolidation_only, which is rejected with invalid_argument.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/retention_schema.rs:130 description says &#39;consolidation_only returns eligible consolidated units only&#39; while the enum (line 124) is &#39;consolidated_only&#39;. The MCP pack (schema_read_defs.rs:108,137) uses the correct spelling.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Change &#39;consolidation_only&#39; to &#39;consolidated_only&#39; in the retention schema description.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>T100270-09 cross-bank isolation test cannot fail for the property it names</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AC-100270-05 (bank isolation) is evidenced by this test, but the scenario places the linking parent in bank-a and queries bank-b, where the parent is never a candidate, so the assertion holds regardless of whether dedup leaked across banks.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The bank-isolation acceptance criterion has no test that would actually catch a cross-bank suppression bug.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/read_dedup_tests.rs:186-219: the parent P-a is written to bank-a, then a bank-b retrieve with prefer_consolidated=true asserts only bank-b ids and absence of dedup.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Rewrite the fixture so the queried bank contains a parent whose source_ids name ids that also exist in another bank, and assert suppression stays within the queried bank&#39;s items map.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">09</span>
+          <div>
+            <div class="ihead">
+              <h3>read_similarity_cap doc comment omits strict/lenient activation</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The comment contradicts read_cap_active() and the published schema&#39;s applies_when text.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A maintainer reading the method comment believes a cap only runs under a scope preset or prefer_consolidated, missing that duplicate_tolerance_read=strict/lenient activates it on a plain full call.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/retention.rs:221-224 comment vs crates/clio-retrieve/src/dedup.rs:81-85 read_cap_active and crates/clio-config/src/retention_schema.rs:89-93 applies_when.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Extend the comment to include the non-neutral tolerance levels, matching read_cap_active and the schema.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">10</span>
+          <div>
+            <div class="ihead">
+              <h3>Unrelated pre-existing benchmark.md edit is staged into the phase diff</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase diff should contain only phase-100270 work; the developer log itself notes the change predates the phase.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Reviewers and the downstream remediation step see one out-of-scope documentation change bundled with the phase (&#39;### 2.5 Mnemosyne (Heyaibi)&#39; -&gt; &#39;### 2.5 Mnemosyne&#39;). Not harmful, but it muddies attribution and bisection.</dd></div>
+              <div><dt>Evidence</dt><dd>`git diff --cached -- benchmark.md` shows the heading change at benchmark.md line 60; the developer log entry at .workflows/phase-100270/developer-task-r1.log acknowledges it as pre-existing.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Leave it only if the operator wants it; otherwise exclude benchmark.md from the phase staging (outside this review&#39;s authority to change).</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">11</span>
+          <div>
+            <div class="ihead">
+              <h3>Completion-evidence numbers are stale or slightly wrong</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase file is the record of truth; numbers that do not match a rerun weaken the evidence.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Low; no behavioral consequence, but it means the recorded evidence was not re-verified after the last code change.</dd></div>
+              <div><dt>Evidence</dt><dd>roadmap phase-100270 line 370 records &#39;clio-retrieve 115 passed&#39;; my rerun shows 116. Line 374 records &#39;dedup.rs 99.38% lines&#39; and &#39;functions 98.89%&#39;; my rerun shows dedup.rs 99.51% lines and TOTAL functions 98.92%.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Refresh the test counts and coverage percentages from the final run.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">12</span>
+          <div>
+            <div class="ihead">
+              <h3>requirement.md not updated for the pre-dedup FR-17 reinforcement choice</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase requires that the FR-17 interaction be documented, not silently changed. The code changed what is reinforced from the returned page to the pre-dedup page, but the normative requirement text was not updated.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>requirement.md and the code disagree on what &#39;co-activation updates apply on result sets&#39; means; a future implementer may regress one to match the other.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/hybrid.rs:151-160 and :285-296 reinforce select_page(&amp;fused) pre-dedup; requirement.md:344 still says only &#39;Co-activation updates apply on result sets (4.5)&#39;.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add one clause to the requirement.md retrieve row (or FR-17) stating reinforcement observes the pre-dedup candidate page.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Hub-distill snapshot over-claiming neighbors: build_distill_item stores all neighbors in neighbor_ids and top_neighbors is capped at DEFAULT_HUB_NEIGHBORS (8), so source_ids never claims more than the gist covered. No finding.</li>
+        <li>Duplicate-rate telemetry/inspect surface: the per-request dedup block plus explain is a reasonable reading of the existing surface, and the operator doc defines the rate. I did not treat the absence of a separate aggregate counter as a defect.</li>
+        <li>recall_scope=consolidated_only + prefer_consolidated being a no-op is correct and tested (scope_page contains only parents).</li>
+        <li>backfill_exhausted computation is consistent with suppression counts and the documented meaning.</li>
+        <li>450-line and header checks are clean; no roadmap-isolation strings in code.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace tests pass after the phase — I ran `cargo test --locked --workspace` with the Makefile DATABASE_URL: EXIT=0, 45 &#39;test result: ok&#39; blocks, 0 failures (clio-retrieve 116, clio-mcp lib 201, clio-config 108).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Clippy and rustfmt are clean — `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` EXIT=0; `cargo fmt --all -- --check` EXIT=0. I did not run `make check` because it runs `cargo fmt` (writes files).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Coverage gate passes with no per-file failures — `make coverage` EXIT=0; TOTAL lines 97.87%, functions 98.92%; parsed 253 file rows, 0 below 90% on either metric (lowest function 90.00%).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Hub-distilled items are the only items carrying a queryable parent-&gt;source link — build_distill_item writes snapshot {hub_id, neighbor_ids, neighbor_count} and source_ref=&quot;hub_distill&quot; (crates/clio-write/src/hub_distill_model.rs:144-160); canonical ingest stores comma-joined source refs and keeps chunk_ids in AdmittedLeaf (crates/clio-write/src/ingest.rs:239-243, 267-272).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-blue">Supported</span>
+          <p>Default (no new params) top-level retrieve payload keeps the prior shape — types.rs:174-177 skips dedup when inert and types.rs:480-484 skips consolidated=false; test plain_retrieve_payload_keeps_the_prior_shape passes. The explain sub-payload does change (issue 5).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Near-dup cap computes over the returned page only — dedup.rs:233-241 caps the full filtered candidate list before finalize truncation (hybrid.rs:152-167, finalize.rs:85).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-amber">Uncertain</span>
+          <p>Required approval for the tool_schema edit was obtained — No approval request section in the phase file, though phase-100170 set that precedent. The pipeline&#39;s Remedy Approver row is marked approved.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether bank recall_scope_default/duplicate_tolerance_read persist and round-trip through the CLI surface in real deployments</p>
+          <p class="d">The JSON surface has no profile handle; I verified the MCP path only via the unit test T100270-05. · An end-to-end CLI test that sets a bank profile and calls retrieve without recall_scope. · Medium</p>
+        </div>
+        <div class="card unk">
+          <p class="t">How often a hub-distilled parent ranks below the limit boundary while its raws rank inside it</p>
+          <p class="d">No production corpus; I reasoned from the code and the fusion scoring (hub-distill items have admission_score None, so no importance boost). · A fixture where a parent is placed below the limit and a raw above it, asserting the returned page. · High</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Genuinely clean module decomposition: dedup.rs and hybrid_rank.rs were extracted so no touched file exceeds 450 lines, and the ownership headers match reality.</li>
+        <li>The eligibility predicate and link accessor are total functions with malformed-snapshot tests, so unknown shapes never panic.</li>
+        <li>Determinism is explicitly tested (t27_02 reruns the same candidate set and compares order).</li>
+        <li>The diff respects the two-full-gate budget and the developer&#39;s recorded coverage numbers are close to my independent rerun.</li>
+        <li>FR-17 fail-closed behavior is preserved and the pre-dedup choice is at least documented in code and the phase file.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>The developer marked every AC and DoD box PASS without recording the schema-approval request or the canonical-eligibility scope reduction as an explicit decision, which is exactly where an adversarial pass adds value.</li>
+          <li>The stage command is `git add -- . &#39;:!.workflows/&#39;`, which swept a pre-existing unrelated doc edit into the phase diff; a narrower staging intent would have avoided it.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Before declaring a phase pass, re-derive test counts and per-file coverage from the final run instead of pasting earlier numbers.</li>
+          <li>When a phase has a decision-boundary approval rule, add the approval-request section as part of the change, not only check the DoD box.</li>
+          <li>Add a test that constructs the failure the AC names (e.g. a parent below the page boundary) rather than a passing scenario that cannot exercise it.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix issue 1: make prefer_consolidated suppression page-aware so a raw is dropped only when its parent survives into the returned page, and add a fixture with the parent below the limit.</li>
+          <li>Fix issue 5: omit explanation.dedup when the report is inert and extend the byte-identical test to explain and compose.</li>
+          <li>Fix issue 7: correct the consolidation_only typo in retention_schema.rs and refresh the stale numbers in the phase file (issue 11).</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Decide and implement canonical-consolidation eligibility (issue 2): add a durable marker for canonical outputs so consolidated_only returns them, or explicitly narrow the feature contract in requirement.md.</li>
+          <li>Unify the JSON and MCP bindings on one bank-policy resolver (issue 3) so tool semantics match across transports.</li>
+          <li>Rewrite the cross-bank isolation test to be falsifiable (issue 8) and add an end-to-end CLI retention-default test.</li>
+          <li>Record the schema-edit approval request (issue 4) and update requirement.md&#39;s FR-17 text (issue 12).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100270/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100270/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

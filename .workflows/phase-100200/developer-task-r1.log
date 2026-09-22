@@ -1,0 +1,8 @@
+2026-09-19 22:15:20 START developer-task-r1 phase-100200
+2026-09-19 22:15:20 read task + phase file + crates.md + Makefile
+2026-09-19 22:17:48 baseline coverage clean: aggregate lines 94.72% funcs 98.68%; 0 files below 90%
+2026-09-19 22:38:47 clio-store tx-scoped extraction + BatchStore done; dry_run flags added to triple_add/task_upsert/failure_record/persona_put_stable
+2026-09-19 22:40:15 handler dry_run plumbing compiles; workspace tests pass
+2026-09-19 22:57:15 clio-compliance services (scratchpad/canonical/validate/stats) green; clio-store BatchStore + atomicity tests green (incl. PG parity)
+2026-09-19 23:17:59 clio-mcp additive+batch tools bound and tested; workspace tests green
+2026-09-19 23:31:46 fmt+clippy clean; integration conformance suite additive_tools_test.rs green

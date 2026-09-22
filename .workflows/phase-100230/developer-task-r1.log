@@ -1,0 +1,16 @@
+2026-09-20T09:32:40Z START developer r1 phase-100230 ops doctor/repair. Baseline coverage run launched (pid in shell) -> /tmp/cov-baseline.json.
+2026-09-20T09:32:40Z Discovery: no clio-ops crate yet; clio-index has rebuild_indexes (IndexCoordinator); clio-mcp dispatch via write_tools/dispatch + bound_tools; CLI clio-lib main minimal.
+2026-09-20T09:34:22Z Baseline coverage clean: 207 files, 0 below 90% fn/line (/tmp/cov-baseline.json). Proceeding to implementation.
+2026-09-20T09:40:58Z Frozen interfaces: clio-store OpsStore (+IntegritySignals, SCHEMA_VERSION), clio-index::rebuild(Option<&dyn Embedder>), clio-ops crate (diagnose/verify/doctor/repair/reindex + PlanRegistry), McpState.ops_plans/ops_embedder. Spawning 4 scoped subagents (clio-mcp ops slice, clio-lib CLI slice, clio-ops tests, clio-store+clio-index tests).
+2026-09-20T10:06:39Z Subagents: clio-mcp ops slice DONE (ops_tools.rs/schema_ops_defs.rs/ops_tools_tests.rs + lib/schema/write_tools wiring; 9 tests).
+2026-09-20T10:06:39Z Subagents: clio-lib CLI slice DONE (ops_cli.rs + main.rs; 14 tests; exit scheme 0/1/2/3). Fixed reindex default to dry-run=true + tests.
+2026-09-20T10:06:39Z Subagents: clio-ops tests DONE (6 *_tests.rs; per-file 92.78-100% lines). clio-store/clio-index tests DONE (ops_store/pg_ops/rebuild_embed; 95-100% lines).
+2026-09-20T10:06:39Z Integration: cargo clippy --workspace -D warnings clean; cargo test --workspace all green; cargo fmt clean. Final coverage gate launched.
+2026-09-20T10:06:39Z Added McpState.ops_store (OpsStore view) + runtime_sinks extraction to keep runtime.rs <=450; clio-store SCHEMA_VERSION const.
+2026-09-20T10:26:52Z Coverage: first final run aborted by pre-existing timing flake in mcp_read_conformance (temporal_history created_at crossed a 1s boundary because its triple_add seed omitted timestamp). Fixed root cause: added "timestamp": TS to the seed; 2x scoped rerun green.
+2026-09-20T10:26:52Z Coverage: also fixed per-file gaps found in the failed pass (runtime.rs fn 68.75%/ln 88.20%; ops_tools.rs ln 89.83%) via build_ops_embedder_from injectable env resolver + Debug test + non-generic McpState::build + postgres-open test + ops_tools error-path tests.
+2026-09-20T10:26:52Z Coverage FINAL gate exit 0: TOTAL 98.75% fn / 97.84% ln; 220 files, 0 below 90%. Clippy workspace clean; cargo test --workspace green (41 ok suites); fmt clean.
+2026-09-20T10:26:52Z Evidence: CLI transcripts captured (diagnose/verify/doctor exit0, repair no-confirm exit2, reindex bad-target exit3, reindex dry-run exit0); mcp schema-export lists diagnose/verify/doctor/repair/reindex on 2025-11-25.
+2026-09-20T10:26:52Z Phase file updated (Attribution, Discovery Output, tests checklist, AC evidence, DoD, Completion Evidence, Known Limitations, Final Status PASS WITH DOCUMENTED LIMITATIONS). Staged with: git add -- . ':!.workflows/' (42 files; no .workflows entries).
+2026-09-20T10:26:52Z Files verified <=450 lines; no roadmap/phase refs in code; SQL schema untouched; no migrations; no git commit/push.
+DEVELOPER_DONE 1c852ec7

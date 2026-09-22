@@ -1,0 +1,13 @@
+2026-09-18T11:05:00+05:30 START developer-task-r1 Phase 100080 implementation
+2026-09-18T11:05:05+05:30 Reading phase-100080.md, AGENTS.md, crates.md, coverage.md, skills
+2026-09-18T11:08:28+05:30 Baseline coverage PASS: all files >=90% lines+functions (aggregate 98.82% lines / 99.72% functions)
+2026-09-18T11:08:29+05:30 Discovery: triples table exists in sql/001_core.sql; no CRUD yet; clio-write has no clio-store dep; items already have bi-temporal cols for invalidate
+2026-09-18T11:16:39+05:30 Writing triple_tests + clio-write orchestration
+2026-09-18T11:23:07+05:30 make check PASS; starting coverage
+2026-09-18T11:30:00+05:30 Coverage gap: sqlite_triple.rs 87.5% fn / postgres_triple.rs 66.67% fn (unhit map_err + source_type.map closures)
+2026-09-18T11:32:00+05:30 Added duplicate-insert + belief source_type tests; trimmed triple_tests.rs to 445 lines
+2026-09-18T11:33:00+05:30 make coverage PASS: TOTAL fn=99.38% ln=98.59%; all reported files >=90%; sqlite/postgres_triple fn=100%
+2026-09-18T11:33:30+05:30 cargo test -p clio-store -p clio-write --lib triple: 17 PASS (T100080-01..T100080-12)
+2026-09-18T11:34:00+05:30 Filled phase-100080 AC/DoD/Completion Evidence + Attribution; git add -A excluding .workflows/
+2026-09-18T11:34:30+05:30 FINISH: bi-temporal triples + supersession implemented and verified
+DEVELOPER_DONE

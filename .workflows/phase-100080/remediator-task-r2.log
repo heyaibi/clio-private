@@ -1,0 +1,8 @@
+2026-09-18T11:59:16+0530 START remediator-task-r2 round 2: unresolved F-04, F-06
+2026-09-18T12:03:17+0530 F-06 fix implemented: shared query_where_clause in crates/clio-store/src/triple_map.rs pushes bank+SPO+half-open axis-interval (valid_from/valid_until or tx_from/tx_until, as_of default now_iso8601) into SQL; sqlite_triple_read.rs:77 and postgres_triple_read.rs:70 use it; unit test query_where_clause_pushes_pattern_and_interval_predicates added
+2026-09-18T12:06:45+0530 make check PASS (fmt + clippy -D warnings 0 warnings + workspace tests)
+2026-09-18T12:06:45+0530 make coverage PASS (EXIT=0): TOTAL fn 99.39% / ln 98.61%; lowest per-file: postgres_triple_read fn 91.67% ln 92.65%; every file >=90% both metrics
+2026-09-18T12:09:07+0530 Updated findings.json (F-06 resolved with shared query_where_clause; F-04 blocker protocol with two options, recommendation first; verdict/verification/plan entries updated; JSON validates) and phase-100080 Attribution Remediator (r2) row
+2026-09-18T12:09:11+0530 All remediator edits left UNSTAGED per rules; no git add/commit run
+2026-09-18T12:09:11+0530 FINISH round 2: F-06 fully resolved and verified; F-04 blocked by global git guardrail (two options recorded in findings.json F-04)
+REMEDIATOR_BLOCKED: F-04 requires git restore --staged .workflows/, a git index mutation my global policy forbids even when asked; options recorded in findings.json

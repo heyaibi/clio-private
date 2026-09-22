@@ -1,0 +1,175 @@
+{
+  "run": "r1",
+  "phase": "100190",
+  "subject": "Phase 100190: Compliance Erase Path",
+  "verdict": "Adequate",
+  "verdict_justification": "Core compliance crypto-shredding, KMS DEK destruction, and content-free tombstones are functional with high test coverage, but a hard AGENTS.md 450-line file size limit was violated, a cross-bank subject erasure desynchronization edge case exists, and Required Test Scenario T100190-03 (retrieve exclusion) was skipped.",
+  "metadata": {
+    "generated": "2026-09-19",
+    "applies_to": "Phase 100190 Developer r1",
+    "source": "git diff --cached -- . :!.workflows/"
+  },
+  "standard": [
+    "AGENTS.md hard constraint: every Rust file <= 450 total lines",
+    "requirement.md FR-19, \u00a77.4, PR-6, PR-8, PR-9: verified compliance crypto-shredding and derived structure purge",
+    "phase-100190-compliance-erase-path.md: Acceptance criteria AC-100190-01 through AC-100190-06 and required test scenarios T100190-01 through T100190-06",
+    "coverage.md: >= 90% line and function coverage overall and per-file"
+  ],
+  "requirements": [
+    {
+      "requirement": "KMS DEK Destruction & Crypto-Shred Verification (AC-100190-01)",
+      "status": "Fully satisfied",
+      "evidence": "clio_store::dek::DekProvider::destroy_dek and ensure_dek probe returning ErrorCode::ErasedSubject verified in clio-store/src/erase_tests.rs and compliance_erase_test.rs",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Dirty-Path Derived Structure Invalidation & Regeneration (AC-100190-02, AC-100190-03)",
+      "status": "Fully satisfied",
+      "evidence": "clio_write::MemTreeMaint::detach_erased clears ancestor summaries and marks dirty; vector embeddings, outbox, and FTS deleted",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Content-Free Tombstone Ledger (AC-100190-04)",
+      "status": "Fully satisfied",
+      "evidence": "compliance_tombstones table stores 64-character salted SHA-256 hashes, category, and timestamps; verified zero plaintext in serialized tombstones",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Read Operations Fail-Closed Safely (AC-100190-05)",
+      "status": "Partially satisfied",
+      "evidence": "get, get_snapshot, and get_gist return structured erased_subject error without panicking, but retrieve post-erasure was not tested in conformance suite",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "Operational Removal Boundary Isolation (AC-100190-06)",
+      "status": "Fully satisfied",
+      "evidence": "discard_does_not_destroy_dek test in clio-compliance verifies discard does not trigger key destruction",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Source File Size Constraint (AGENTS.md)",
+      "status": "Missed",
+      "evidence": "crates/clio-store/src/erase_tests.rs is 453 lines, exceeding the 450-line maximum",
+      "severity": "High"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "File size limit violation in newly created crates/clio-store/src/erase_tests.rs (453 lines > 450 lines)",
+      "evidence": "crates/clio-store/src/erase_tests.rs: 453 lines (wc -l crates/clio-store/src/erase_tests.rs)",
+      "requirement_ref": "AGENTS.md (Source File Size Constraint); roadmap/phase-100190-compliance-erase-path.md Definition of Done",
+      "recommendation": "Extract test fixtures (e.g. seed_hub, link_hub, or helper models) into a separate test support file or split SQLite and Postgres erase tests into separate modules, keeping each file strictly <= 450 lines."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Cross-bank subject erasure desynchronization: unpartitioned key_exists check allows global DEK shredding from empty bank without purging derived structures in target banks",
+      "evidence": "crates/clio-store/src/sqlite_erase.rs:71-86 and crates/clio-store/src/postgres_erase.rs:69-82. query_row checks subject_keys where subject_id = ?1 without bank scoping (sql/001_core.sql:592 has no bank_id column). An erase request on an empty bank for a known subject proceeds to destroy the DEK globally while purging zero derived structures in the banks where items actually reside.",
+      "requirement_ref": "requirement.md FR-19, \u00a77.4.3, PR-9; roadmap/phase-100190-compliance-erase-path.md Task 3",
+      "recommendation": "Either scope the pre-check strictly to bank items (returning NotFound if items.is_empty() in the requested bank) or fan out derived structure purges (embeddings, FTS, edges, MemTree) across all banks where the subject has items before destroying the global DEK."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Required Test Scenario T100190-03 (retrieve post-erasure exclusion) omitted from test suite",
+      "evidence": "crates/clio-mcp/tests/compliance_erase_test.rs:108-112 only verifies get, get_snapshot, and get_gist; grep for retrieve in compliance_erase_test.rs and crates/clio-store/src/erase_tests.rs returns zero results. Required test scenario T100190-03 in roadmap/phase-100190-compliance-erase-path.md \u00a78 was not executed.",
+      "requirement_ref": "roadmap/phase-100190-compliance-erase-path.md Task 5, \u00a78 (Scenario T100190-03)",
+      "recommendation": "Add a test case in crates/clio-mcp/tests/compliance_erase_test.rs executing a retrieve query post-erasure to assert that the erased item is not returned in candidate search results."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Incomplete Known Limitations documentation: missing debt-owning phase numbers",
+      "evidence": "roadmap/phase-100190-compliance-erase-path.md:501-504. Bullet 1 omits which phase owns asynchronous task scheduling debt, and Bullet 2 references \"A later phase\" without naming the specific phase number.",
+      "requirement_ref": ".workflows/phase-100190/adversary-task-r1.md (Known-limitations wording: must state missing, why, and which phase owns debt)",
+      "recommendation": "Update Known Limitations in roadmap/phase-100190-compliance-erase-path.md to explicitly name the roadmap phase numbers owning the deferred asynchronous recomputation and affirmative anonymization capabilities."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "File size limit violation in newly created crates/clio-store/src/erase_tests.rs (453 lines > 450 lines)",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md defines a mandatory 450-line limit per Rust file as a hard constraint to prevent unmaintainable code bloat. The phase Definition of Done checkbox was marked complete despite this violation.",
+      "impact": "Code style and project gate violation; increases maintenance complexity.",
+      "evidence": "crates/clio-store/src/erase_tests.rs: 453 lines (wc -l crates/clio-store/src/erase_tests.rs)",
+      "confidence": "High",
+      "proposed_fix": "Split crates/clio-store/src/erase_tests.rs into separate test modules or extract common test helper functions."
+    },
+    {
+      "id": 2,
+      "title": "Cross-bank subject erasure desynchronization: unpartitioned key_exists check allows global DEK shredding from empty bank without purging derived structures in target banks",
+      "severity": "Important",
+      "why_it_matters": "When subject_id exists in bank A and erase_request is executed in bank B, the key_exists check succeeds on the unpartitioned subject_keys table. The DEK is destroyed globally, but derived structures (embeddings, FTS, edges, MemTree) in bank A are never purged.",
+      "impact": "Derived index data and summaries continue describing personal data after legal crypto-shredding, violating FR-19 / GDPR Art. 17 guarantees.",
+      "evidence": "crates/clio-store/src/sqlite_erase.rs:71-86, crates/clio-store/src/postgres_erase.rs:69-82, and sql/001_core.sql:592.",
+      "confidence": "High",
+      "proposed_fix": "Ensure bank isolation by checking that items exist within the requested bank before proceeding, or fan out derived structure purges across all banks containing the subject."
+    },
+    {
+      "id": 3,
+      "title": "Required Test Scenario T100190-03 (retrieve post-erasure exclusion) omitted from test suite",
+      "severity": "Minor",
+      "why_it_matters": "Phase 100190 \u00a78 and Task 5 explicitly mandate verifying that retrieve queries never return shredded items in candidate lists.",
+      "impact": "Regression risk on retrieval candidate ranking following crypto-shredding.",
+      "evidence": "crates/clio-mcp/tests/compliance_erase_test.rs:108-112 checks only get, get_snapshot, and get_gist; zero references to retrieve.",
+      "confidence": "High",
+      "proposed_fix": "Add an assertion in compliance_erase_test.rs invoking retrieve on the erased item keywords and confirming zero matches."
+    },
+    {
+      "id": 4,
+      "title": "Incomplete Known Limitations documentation: missing debt-owning phase numbers",
+      "severity": "Minor",
+      "why_it_matters": "The workflow rules require every limitation to name what is missing, why, and which phase owns the debt.",
+      "impact": "Untracked architectural debt without clear phase ownership.",
+      "evidence": "roadmap/phase-100190-compliance-erase-path.md:501-504.",
+      "confidence": "High",
+      "proposed_fix": "Assign specific phase numbers to the deferred asynchronous scheduling and anonymization evidence capabilities."
+    }
+  ],
+  "plan_1hr": [
+    "Refactor crates/clio-store/src/erase_tests.rs to bring line count strictly <= 450 lines (currently 453 lines).",
+    "Add retrieve post-erasure assertion to crates/clio-mcp/tests/compliance_erase_test.rs satisfying Required Test Scenario T100190-03.",
+    "Fix erase_subject bank validation to reject cross-bank desynchronization when a bank contains 0 items for the subject.",
+    "Update roadmap/phase-100190-compliance-erase-path.md Known Limitations with explicit debt-owning phase numbers."
+  ],
+  "plan_unlimited": [
+    "Implement global cross-bank derived-structure discovery and purge orchestration so an authorized GDPR Art. 17 erasure request cleanly purges derived embeddings, FTS rows, edges, and MemTree leaves across all banks before destroying the subject DEK.",
+    "Implement asynchronous dirty-path ancestor recomputation for large MemTree forests with background worker tracking and status reporting.",
+    "Implement affirmative anonymization stamping at distillation time (\u00a77.4.5) to allow retaining non-identifying aggregate hub items while purging non-anonymized derivatives."
+  ],
+  "remediation": {
+    "round": "r1",
+    "updated": "2026-09-19",
+    "findings": {
+      "F-01": {
+        "status": "resolved",
+        "fix": "Split crates/clio-store/src/erase_tests.rs (453 lines) into erase_tests.rs (295 lines, scenarios) + erase_test_support.rs (283 lines, shared fixtures). While verifying, cargo fmt also pushed crates/clio-store/src/sqlite_erase.rs over the limit, so its purge-SQL helpers were extracted to sqlite_erase_purge.rs (228 lines); sqlite_erase.rs is now 255 lines. All created/modified Rust files <= 450 lines (verified with wc -l).",
+        "evidence": "wc -l over all modified files; cargo test --locked -p clio-store erase: 11 passed"
+      },
+      "F-02": {
+        "status": "resolved",
+        "fix": "Implemented the fan-out option (option 2), which also closes option 1's residual hole: erase_subject now queries SELECT DISTINCT bank_id FROM items WHERE subject_id = ? and, before destroying the global DEK, fans the derived-structure purge (embeddings, index_pending/outbox, FTS/tsv, assoc_edges, MemTree leaf+dirty ancestors, distilled hub referrers) out to every bank holding subject items. Cross-bank item rows are also hashed into the request bank's content-free tombstone ledger and reported in the outcome (item_ids/hashes/categories/audit detail). NotFound is still returned only when the subject has no items in any bank and no key record. Tests: sqlite/postgres erase fans out to other banks before DEK shred.",
+        "evidence": "crates/clio-store/src/sqlite_erase_purge.rs (purge_bank/select_subject_banks), crates/clio-store/src/sqlite_erase.rs, crates/clio-store/src/postgres_erase.rs; cargo test --locked -p clio-store erase: 11 passed"
+      },
+      "F-03": {
+        "status": "resolved",
+        "fix": "Added retrieve_excludes_erased_item_from_candidates to crates/clio-mcp/tests/compliance_erase_test.rs: full ingest through the store tool + lexical doc, asserts retrieve returns the item pre-erasure, erases via erase_request, then asserts the post-erasure retrieve outcome contains no item id and no personal text ('private'/'medical'). Satisfies Required Test Scenario T100190-03.",
+        "evidence": "cargo test --locked -p clio-mcp --test compliance_erase_test: 2 passed"
+      },
+      "F-04": {
+        "status": "resolved",
+        "fix": "roadmap/phase-100190-compliance-erase-path.md Known Limitations now state (a) what is missing, (b) why, and (c) the debt-owning phase: Phase 100070 (MemTree dirty-path maintenance) owns asynchronous ancestor-recomputation scheduling; Phase 100130 (coactivation/hub distillation) owns the affirmative anonymization_evidence stamp.",
+        "evidence": "roadmap/phase-100190-compliance-erase-path.md Known Limitations section"
+      }
+    },
+    "plan_1hr": "all four items implemented (F-01 split, F-02 bank validation via fan-out, F-03 retrieve test, F-04 limitations wording)",
+    "plan_unlimited": [
+      "Cross-bank derived-structure discovery and purge orchestration: implemented as part of F-02 (fan-out across all banks holding the subject's items before DEK destruction).",
+      "Asynchronous dirty-path ancestor recomputation with background worker tracking: NOT implemented; deferred as documented debt owned by Phase 100070 (see Known Limitations). Reason: the synchronous path already clears every un-refreshed ancestor summary (NULL), so no stale summary remains legible; the debt is latency-only, and the maintenance worker surface belongs to Phase 100070.",
+      "Affirmative anonymization stamping at distillation time (\u00a77.4.5): NOT implemented; deferred as documented debt owned by Phase 100130 (see Known Limitations). Reason: stamping must happen at distillation time, which Phase 100130 owns; erase-side conservative purge is the safe default until the stamp exists."
+    ]
+  }
+}

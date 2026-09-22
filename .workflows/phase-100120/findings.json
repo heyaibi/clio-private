@@ -1,0 +1,532 @@
+{
+  "run": "phase-100120-r1",
+  "phase": "100120",
+  "subject": "Phase 100120: intent gate, hybrid retrieve, and compose_context (clio-retrieve)",
+  "verdict": "Good",
+  "verdict_justification": "The new clio-retrieve crate is well-structured and almost every phase acceptance criterion is backed by a real, passing test; I independently reran the full suite (487 passed), clippy, fmt, per-file coverage (all >=90%), and the opt-in Postgres parity test and they hold. The weaknesses are honesty/process rather than runtime correctness: the Definition of Done marks independent approval and verification as complete while the sign-off rows are still pending, one phase Expected Result (hybrid beats dense-only/lexical-only on a labeled fixture, with a documented metric) has no evidence, and retrieve can exceed its optional budget for a single oversized hit.",
+  "metadata": {
+    "generated": "2026-09-19",
+    "applies_to": "unstaged working tree (nothing staged); crates/clio-retrieve + tracked edits",
+    "source": "crates/clio-retrieve/**/*.rs, Cargo.toml, Cargo.lock, crates.md, crates/clio-index/src/lib.rs, crates/clio-lib/{Cargo.toml,src/lib.rs}, roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md, roadmap/phase-100120-appendix-hybrid-fusion-and-budgets.md, requirement.md"
+  },
+  "standard": [
+    "AGENTS.md: Rust file header structure, <=450 lines/file, coverage gate (>=90% function and line per reported file), no comments unless required, requirement.md consistency",
+    "requirement.md: FR-6, FR-7, FR-24, FR-28, NFR-1, NFR-3, PR-1, PR-4, PR-7, section 2.7, section 4.5, section 4.9.4.B, section 8 retrieval-skip precision",
+    "phase-100120 intent gate / hybrid retrieve / compose acceptance criteria (AC-100120-01..AC-100120-10), required tests T100120-01..T100120-14, and Task Expected Results",
+    "Phase 100110 index-lag contract, Phase 100080 bitemporal semantics, Phase 100100 belief/fact read contract",
+    "Developer task: implementation scope, staging via git add, phase-file evidence honesty"
+  ],
+  "requirements": [
+    {
+      "requirement": "FR-6 intent gate + NFR-1 (AC-100120-01)",
+      "status": "Fully satisfied",
+      "evidence": "intent_tests::{t01_gate_on_greeting_skips, t01_gate_on_acknowledgement_skips, t02_gate_on_memory_needed_turn_retrieves_with_domains, t03_gate_latency_budget} pass; gate is pure normalize+substring (intent.rs:127-171), no embed/graph. Verified: cargo test --workspace --locked 487 passed.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-24 explicit retrieve runs after gate skip (AC-100120-02)",
+      "status": "Fully satisfied",
+      "evidence": "hybrid_tests::t04_explicit_retrieve_runs_after_gate_skip passes; retrieve() never consults the gate (hybrid.rs:130-186).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-7 / section 2.7 persona never gated; compose explicit vs auto (AC-100120-03)",
+      "status": "Fully satisfied",
+      "evidence": "compose_tests::{t05_auto_path_skips_memory_but_keeps_persona, t05b_explicit_compose_after_gate_skip_still_retrieves} and surface_tests::compose_tool_auto_path_honors_skip pass; persona section always emitted (compose.rs:225-234).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Hybrid dense+lexical(+graph) with RRF (AC-100120-04) and phase Task 2 Expected Result (hybrid beats dense-only/lexical-only with a documented metric)",
+      "status": "Partially satisfied",
+      "evidence": "T100120-06/T100120-07/T100120-12 and graph expansion tests pass and weighted RRF is correct (fusion_tests). But no test or metric compares hybrid against dense-only and lexical-only; the phase's Task 2 Expected Result has no evidence (grep for dense-only/lexical-only/metric across *_tests.rs finds only assertion strings).",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "resolution": "RESOLVED — new labeled fixture hybrid_quality_tests::hybrid_recall_beats_single_leg_baselines_on_labeled_fixture compares hybrid against dense-only and lexical-only with the documented metric recall@1 averaged over the two labeled queries: hybrid 1.0 vs dense-only 0.5 and lexical-only 0.5 (hybrid strictly beats both). Phase Task 2 Expected Result now cites this test in Completion Evidence."
+    },
+    {
+      "requirement": "Rerank optional, fail-open (AC-100120-05)",
+      "status": "Fully satisfied",
+      "evidence": "hybrid_tests::{t08_reverse_reranker_reverses_fused_order, t08_rerank_failure_keeps_fused_order, t08_rerank_sidecar_down_keeps_fused_order} and rerank_tests pass; dead-sidecar keeps fused order (hybrid.rs:374-380).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Bi-temporal as_of + time_axis (AC-100120-06)",
+      "status": "Fully satisfied",
+      "evidence": "hybrid_tests::t09_as_of_and_time_axis_filter_candidates and filter_tests::temporal_visibility_valid_and_transaction_axes pass; uses clio_types::interval_contains.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Belief/fact fields on hits, Phase 100100 contract (AC-100120-07)",
+      "status": "Fully satisfied",
+      "evidence": "surface_tests::belief_and_fact_fields_serialize_per_contract passes; RetrieveHit flattening (types.rs:104-121) exposes epistemic_kind/source_type/confidence.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "PR-1 bounded compose injection (AC-100120-08)",
+      "status": "Partially satisfied",
+      "evidence": "compose_tests::{t11_oversize_bank_respects_budget, total_tokens_never_exceeds_budget_across_sizes} pass, so compose injection is bounded. However retrieve's optional budget is not strictly honored: finalize.rs:50-55 admits the first hit unconditionally, so retrieve(budget_tokens=1) can return estimated_tokens>1. compose re-truncates in pack_memory, so the injection bound itself is safe.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "resolution": "RESOLVED — deliberate at-least-one-hit policy documented and tested: doc comment on finalize() in crates/clio-retrieve/src/finalize.rs and on RetrieveRequest::budget_tokens in types.rs states the first hit is always admitted even when alone over budget (compose re-truncates in pack_memory, so injection stays bounded); new test finalize_tests::budget_tokens_always_returns_first_hit_even_over_budget asserts the policy and its budget consequence (budget_tokens=8, oversized first hit returned with estimated_tokens>8). Cap behavior for normal hits remains tested by finalize_tests::budget_tokens_trims_returned_hits. AC-100120-08 compose injection itself was already fully satisfied."
+    },
+    {
+      "requirement": "ranking_env integration (AC-100120-09)",
+      "status": "Fully satisfied",
+      "evidence": "hybrid_tests::t14_weight_change_changes_order_deterministically and fusion_tests::weight_change_changes_scores_deterministically pass; dense/lexical normalized as list weights (hybrid.rs:385-392).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Bank isolation (AC-100120-10)",
+      "status": "Fully satisfied",
+      "evidence": "hybrid_tests::t13_bank_isolation_returns_no_cross_bank_hits passes; empty bank fails closed (hybrid.rs:188-207), store access is bank-scoped (hybrid.rs:283).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Dual-backend hit-id parity (AC-100120-11)",
+      "status": "Fully satisfied",
+      "evidence": "Verified by rerun: DATABASE_URL=postgres://agentmemoir:... AM_PG_RETRIEVE_PARITY=1 cargo test -p clio-retrieve postgres_and_sqlite_hit_id_parity -> 1 passed.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Coverage gate: >=90% functions and lines on every reported file",
+      "status": "Fully satisfied",
+      "evidence": "make coverage exit 0: TOTAL 98.55% lines / 98.87% functions; parsed every file row, zero files below 90% on either gated metric. clio-retrieve files: compose 100/100, filter 100/100, finalize 96.97/100, fusion 100/100, hybrid 98.46/100, intent 99.47/100, rerank 100/100, surface 98.68/100, token 100/100, types 100/100.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Rust file size <=450 total lines",
+      "status": "Fully satisfied",
+      "evidence": "wc -l: hybrid.rs 446, hybrid_tests.rs 449, all other new files smaller; tracked edits are single-line additions.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md header structure on every Rust source file",
+      "status": "Partially satisfied",
+      "evidence": "Production files and fixtures_tests.rs / pg_parity_tests.rs have the full Responsibility/Owns/Does not own/Boundary header. Seven new test files have only a copyright + one-line //! doc: intent_tests.rs:1-4, compose_tests.rs:1-4, hybrid_tests.rs:1-4, surface_tests.rs:1-4, fusion_tests.rs:1-4, filter_tests.rs:1-4, rerank_tests.rs:1-4.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "resolution": "RESOLVED — full AGENTS.md Responsibility/Owns/Does-not-own/Boundary headers added to all seven test files (intent_tests.rs, compose_tests.rs, hybrid_tests.rs, surface_tests.rs, fusion_tests.rs, filter_tests.rs, rerank_tests.rs). hybrid_tests.rs was at 449/450 lines, so the budget-trim test was moved to the new finalize_tests.rs to stay within the 450-line cap. Production files and the two existing full-header test files were already compliant."
+    },
+    {
+      "requirement": "Phase Definition of Done honesty (approval/verification)",
+      "status": "Missed",
+      "evidence": "roadmap/phase-100120...md:412-422 marks 'Verification is completed.' and 'Required approval is obtained.' as [x], while :7-10 show Adversary/Remediator/Remedy Approver/Finalize as pending and :515 says 'Verifier: [pending - Adversary r1]'.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "resolution": "RESOLVED r1 — Definition of DoD corrected: 'Verification is completed' and 'Required approval is obtained' are now UNCHECKED with pending-role notes in roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md (Definition of Done); Verification Sign-Off records Adversary r1 as delivered with Remedy Approver still pending. No finding content was altered."
+    },
+    {
+      "requirement": "section 8 retrieval-skip precision: false-negative rate tracked separately from false-positive rate (stricter bound)",
+      "status": "Partially satisfied",
+      "evidence": "requirement.md:681 is normative ('SHALL be tracked separately and held to a stricter bound'). GateMetrics (intent.rs:90-123) stores only evaluated/skipped counts; it cannot distinguish a false negative from a correct skip and there is no false-positive counter or bound. The phase appendix only required a 'false-negative monitoring note (even if only a test harness counter)', which is met.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "resolution": "RESOLVED — labeled evaluation hook implemented: intent.rs adds evaluate_gate(labeled_turns, thresholds) + GateEvaluation with separate false_negative_rate/false_positive_rate and documented stricter bound DEFAULT_FALSE_NEGATIVE_BOUND = 0.05 (FN produces wrong answers, FP only costs latency, so the FN bound is far tighter); intent_tests::gate_evaluation_tracks_fn_and_fp_separately asserts FN=0 with a nonzero FP. Deployment-scale offline evaluation corpus is explicitly scoped as future work in the phase Known Limitations and Completion Evidence. Offline corpus evaluation remains scoped to a later evaluation phase (documented)."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Definition of Done overclaims independent approval and verification",
+      "severity": "Important",
+      "why_it_matters": "The DoD is the phase's completion contract; checking 'Required approval is obtained' and 'Verification is completed' before the adversary and human approve turns an unverified state into a claimed one, which is the exact failure mode the review pipeline exists to prevent.",
+      "impact": "Pipeline and human reviewers may treat phase 100120 as approved when only the developer's self-check has happened.",
+      "evidence": "roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md:412-422 (all [x]) vs :7-10 (Adversary/Remediator/Approver/Finalize pending) and :515 ('Verifier: [pending - Adversary r1]').",
+      "confidence": "High",
+      "proposed_fix": "Uncheck 'Verification is completed' and 'Required approval is obtained' until the adversary/human rows complete; or relabel them as 'self-verification completed; independent verification pending'.",
+      "resolution": "RESOLVED r1 — Definition of DoD corrected: 'Verification is completed' and 'Required approval is obtained' are now UNCHECKED with pending-role notes in roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md (Definition of Done); Verification Sign-Off records Adversary r1 as delivered with Remedy Approver still pending. No finding content was altered."
+    },
+    {
+      "id": 2,
+      "title": "retrieve() can exceed its requested budget_tokens for a single oversized hit",
+      "severity": "Important",
+      "why_it_matters": "Task 4 requires retrieve to honor budgets when trimming the returned pack. The `&& !hits.is_empty()` guard means the first candidate is admitted even when it alone is larger than the budget, so the optional budget is a soft floor, not a cap.",
+      "impact": "A caller passing a small budget_tokens can receive a hit whose estimated_tokens exceeds it. The PR-1 injection bound is still safe because compose re-truncates in pack_memory (compose.rs:289-316), so this is a retrieve-contract issue, not an injection leak.",
+      "evidence": "crates/clio-retrieve/src/finalize.rs:50-55: `if let Some(budget) = args.req.budget_tokens && estimated_tokens + tokens > budget && !hits.is_empty() { break; }`. No test exercises a single hit larger than the budget (budget_tokens_trims_returned_hits uses two 8-token hits with budget 8).",
+      "confidence": "High",
+      "proposed_fix": "Either drop/skip a candidate that alone exceeds the remaining budget, or explicitly document and test that at least one hit is always returned as a deliberate behavior with its budget consequence stated.",
+      "resolution": "RESOLVED — deliberate at-least-one-hit policy documented and tested: doc comment on finalize() in crates/clio-retrieve/src/finalize.rs and on RetrieveRequest::budget_tokens in types.rs states the first hit is always admitted even when alone over budget (compose re-truncates in pack_memory, so injection stays bounded); new test finalize_tests::budget_tokens_always_returns_first_hit_even_over_budget asserts the policy and its budget consequence (budget_tokens=8, oversized first hit returned with estimated_tokens>8). Cap behavior for normal hits remains tested by finalize_tests::budget_tokens_trims_returned_hits."
+    },
+    {
+      "id": 3,
+      "title": "Phase Task 2 Expected Result ('hybrid beats dense-only and lexical-only on a labeled fixture, document metric') has no evidence",
+      "severity": "Important",
+      "why_it_matters": "The phase states this as the outcome that proves Task 2. AC-100120-04 only checks that a lexical-only exact hit is included; it does not measure any quality lift, so the substantive claim about hybrid retrieval is unverified.",
+      "impact": "Phase 100120 is accepted without demonstrating the core value proposition of hybrid retrieval; a regression that drops lexical recall below dense-only would still pass every test.",
+      "evidence": "hybrid_tests.rs:40-63 (t06 asserts only membership of the lexical-only hit plus candidate counts); no fixture computes a dense-only or lexical-only baseline. grep across *_tests.rs for 'dense-only|lexical-only|metric' finds no comparison.",
+      "confidence": "High",
+      "proposed_fix": "Add a small labeled fixture with a documented metric (e.g. recall@k or MRR) and assert hybrid >= dense-only and hybrid >= lexical-only, or downgrade the phase Expected Result to match what is actually tested.",
+      "resolution": "RESOLVED — new labeled fixture hybrid_quality_tests::hybrid_recall_beats_single_leg_baselines_on_labeled_fixture compares hybrid against dense-only and lexical-only with the documented metric recall@1 averaged over the two labeled queries: hybrid 1.0 vs dense-only 0.5 and lexical-only 0.5 (hybrid strictly beats both). Phase Task 2 Expected Result now cites this test in Completion Evidence."
+    },
+    {
+      "id": 4,
+      "title": "Seven new test source files omit the AGENTS.md-mandated header structure",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md states every Rust source file MUST use the Responsibility / Owns / Does not own / Boundary header. Test files are Rust source files.",
+      "impact": "Rule non-compliance across seven files; inconsistent documentation conventions for the new crate.",
+      "evidence": "intent_tests.rs:1-4, compose_tests.rs:1-4, hybrid_tests.rs:1-4, surface_tests.rs:1-4, fusion_tests.rs:1-4, filter_tests.rs:1-4, rerank_tests.rs:1-4 each have only copyright + SPDX + one-line //! doc. fixtures_tests.rs:1-18 and pg_parity_tests.rs:1-20 have the full structure.",
+      "confidence": "High",
+      "proposed_fix": "Add the full header block to the seven test files.",
+      "resolution": "RESOLVED — full AGENTS.md Responsibility/Owns/Does-not-own/Boundary headers added to all seven test files (intent_tests.rs, compose_tests.rs, hybrid_tests.rs, surface_tests.rs, fusion_tests.rs, filter_tests.rs, rerank_tests.rs). hybrid_tests.rs was at 449/450 lines, so the budget-trim test was moved to the new finalize_tests.rs to stay within the 450-line cap."
+    },
+    {
+      "id": 5,
+      "title": "section 8 normative false-negative tracking is reduced to a generic skip counter",
+      "severity": "Important",
+      "why_it_matters": "requirement.md:681 says the intent gate's false-negative rate SHALL be tracked separately from, and held to a stricter bound than, its false-positive rate. evaluated/skipped counters cannot express either rate because there is no ground truth attached to a decision.",
+      "impact": "The system cannot currently demonstrate the stricter false-negative bound the spec demands; a gate that skips many memory-needed turns looks identical to a well-calibrated one in metrics.",
+      "evidence": "intent.rs:90-123 (GateMetrics: evaluated, skipped only); intent_tests.rs:108-116 asserts only those two counters. No false_negative/false_positive symbol exists anywhere in crates/.",
+      "confidence": "High",
+      "proposed_fix": "Add a labeled evaluation hook that records expected_needed vs decision (FN/FP counters) and a documented stricter FN bound, or explicitly scope this metric to a later offline-evaluation phase and say so in the phase file.",
+      "resolution": "RESOLVED — labeled evaluation hook implemented: intent.rs adds evaluate_gate(labeled_turns, thresholds) + GateEvaluation with separate false_negative_rate/false_positive_rate and documented stricter bound DEFAULT_FALSE_NEGATIVE_BOUND = 0.05 (FN produces wrong answers, FP only costs latency, so the FN bound is far tighter); intent_tests::gate_evaluation_tracks_fn_and_fp_separately asserts FN=0 with a nonzero FP. Deployment-scale offline evaluation corpus is explicitly scoped as future work in the phase Known Limitations and Completion Evidence."
+    },
+    {
+      "id": 6,
+      "title": "Nothing is staged, contradicting the review premise that the developer staged the changes",
+      "severity": "Minor",
+      "why_it_matters": "The reviewer instructions say to review `git diff --cached`; that diff is empty, and the new crate is entirely untracked. The developer's own log states they deliberately skipped git add due to a global rule, so the intended pipeline step cannot run as specified.",
+      "impact": "Automated review of the staged diff sees no code; the changes could be missed or duplicated if the pipeline stages later.",
+      "evidence": "`git diff --cached -- . ':!.workflows/'` -> empty. `git diff --stat` shows 7 tracked files; `git ls-files --others` lists 21 untracked files under crates/clio-retrieve/. Developer log line: 'did not run git add ... changes are unstaged'.",
+      "confidence": "High",
+      "proposed_fix": "Pipeline (or user) stages with the documented pathspec, or the conflict between the global no-git rule and the developer-task staging instruction is resolved explicitly.",
+      "resolution": "RESOLVED BY EVIDENCE — the premise no longer holds: after this finding was written, the pipeline staged the developer's changes. `git diff --cached --stat` now shows 28 files changed, 3856 insertions (the full clio-retrieve crate is staged). Remediator left its own remediation changes UNSTAGED per round rules; the global no-git rule vs pipeline staging conflict remains recorded under process_changes."
+    },
+    {
+      "id": 7,
+      "title": "clio-retrieve's in-process tool schema requires `bank`, which is absent from the published section 4.9.4.B signature",
+      "severity": "Minor",
+      "why_it_matters": "requirement.md:342-344 and phase Task 4 list retrieve(query, domains?, limit?, as_of?, time_axis?, expand_graph?, budget_tokens?) and compose_context(query?, domains?, budget_tokens) with no bank argument. The schema adds a required bank.",
+      "impact": "Slices 100160-17 MCP binding must invent a bank-injection convention or change the schema; a generated tool catalog from the requirement would not match the implementation.",
+      "evidence": "surface.rs:50-53 (RetrieveArgs.bank required) and surface.rs:77-79 + 165-170 (ComposeArgs.bank optional then rejected if missing).",
+      "confidence": "Medium",
+      "proposed_fix": "Document that bank is supplied by the transport/session binding and make it explicit in the phase evidence, or align the argument contract with the requirement.",
+      "resolution": "RESOLVED BY EVIDENCE — the premise no longer holds: after this finding was written, the pipeline staged the developer's changes. `git diff --cached --stat` now shows 28 files changed, 3856 insertions (the full clio-retrieve crate is staged). Remediator left its own remediation changes UNSTAGED per round rules; the global no-git rule vs pipeline staging conflict remains recorded under process_changes."
+    },
+    {
+      "id": 8,
+      "title": "Retrieve and compose measure different text when applying the same token budget",
+      "severity": "Minor",
+      "why_it_matters": "finalize measures lexical/book text; compose measures the hit's gist (or snapshot ref / id). The same hit has two different token costs, so retrieve's budget trimming can be much more aggressive than the memory section needs, and estimated_tokens in RetrieveOutcome does not describe the composed pack.",
+      "impact": "Under-filled memory sections and a metric (estimated_tokens) whose meaning differs between retrieve and compose; both remain bounded, so no injection overrun.",
+      "evidence": "finalize.rs:49 uses doc_text(Some(item)) = clio_index::lexical_text (hybrid.rs:419-421). compose.rs:289-326 pack_memory uses hit_text = gist | snapshot_ref | item_id (compose.rs:318-326).",
+      "confidence": "High",
+      "proposed_fix": "Pick one canonical budgeted representation, or document the two and report both sizes.",
+      "resolution": "RESOLVED BY DOCUMENTATION — schema left aligned with reality: bank is documented as the session/transport-scoped isolation key injected by the binding layer (doc comments on surface.rs RetrieveArgs::bank / ComposeArgs::bank; phase Completion Evidence note). The published §4.9.4.B caller signatures intentionally omit it; slices 100160-17 must supply it from the session."
+    },
+    {
+      "id": 9,
+      "title": "T100120-03 latency test cannot fail on any realistic machine and is presented as NFR-1 evidence",
+      "severity": "Minor",
+      "why_it_matters": "The gate runs in-memory with no I/O; a p95 threshold of 50,000 microseconds over 2000 calls is trivially met, so the test is a smoke test rather than a bound. Labelling it as satisfying NFR-1 overstates the evidence.",
+      "impact": "A future change that adds real work to the gate (e.g. a classifier call) could still pass this test up to ~50 ms per call.",
+      "evidence": "intent_tests.rs:91-106: samples 2000 gate calls per microsecond clock, asserts p95 <= 50_000 us. The gate itself (intent.rs:127-171) does only string ops.",
+      "confidence": "High",
+      "proposed_fix": "State in the phase file that this is a smoke check and that the real NFR-1 guard is the absence of I/O in the gate; optionally add a tighter sanity bound (e.g. <1 ms) plus a structural test that the gate has no embedder/graph dependency.",
+      "resolution": "RESOLVED BY DOCUMENTATION — both budgeted representations are documented rather than unified: phase Completion Evidence note records that retrieve trims on lexical source text (clio_index::lexical_text = gist + snapshot tokens) while compose trims on the composed pack text (gist, else snapshot ref, else item id), and RetrieveOutcome.estimated_tokens in types.rs now documents that it describes the retrieve-side source size, not the composed pack. Unifying on one canonical representation was deliberately deferred: no spec mandates one representation and changing measurement semantics would alter tested budget behavior without a correctness gain (both remain bounded)."
+    },
+    {
+      "id": 10,
+      "title": "graph_expanded metric counts candidates that were already returned by dense/lexical legs",
+      "severity": "Minor",
+      "why_it_matters": "The metric is meant to report how many genuinely graph-expanded candidates entered the result set; counting ids that were already candidates overstates graph contribution and will mislead slice 100130 tuning.",
+      "impact": "Diagnostic only; no ranking or budget impact.",
+      "evidence": "hybrid.rs:164: `let graph_expanded = fused.iter().filter(|h| expanded.contains(&h.id)).count();` — `expanded` ids are appended to candidate_ids (hybrid.rs:151-155) but an id present in both lists is still counted.",
+      "confidence": "Medium",
+      "proposed_fix": "Count only expanded ids that were absent from the dense and lexical filtered lists.",
+      "resolution": "RESOLVED — relabeled as a smoke check: phase AC-100120-01 evidence now states t03 is a latency smoke check and names the structural NFR-1 guarantee (intent_gate is a pure &str function with no embedder/store/graph handles, so no I/O can enter the gate path); intent_tests.rs header records the same. The 50 ms assertion is kept as a smoke bound; a tighter bound was not added because it would be scheduling-flaky on CI without adding structural information."
+    },
+    {
+      "id": 11,
+      "title": "Completion evidence test count does not match a rerun (486 vs 487)",
+      "severity": "Minor",
+      "why_it_matters": "Evidence numbers should be reproducible; an off-by-one suggests the recorded output predates a final change or was transcribed inaccurately.",
+      "impact": "Low: the actual suite has one more passing test than claimed, so nothing is hidden, but the evidence is not an exact reproduction.",
+      "evidence": "phase-100120...md:432 claims 'cargo test --workspace --locked -> 486 passed'; rerun prints '487 passed (22 suites, 5.74s)'.",
+      "confidence": "High",
+      "proposed_fix": "Refresh the evidence line from a fresh run.",
+      "resolution": "RESOLVED — hybrid.rs now counts only genuinely expanded candidates: expansion ids absent from the dense/lexical candidate lists are collected as graph_new before fetch, and graph_expanded counts fused hits from graph_new only, so ids already produced by either leg are never reported as graph-expanded. hybrid_tests::graph_expansion_adds_seed_neighbors_when_enabled now feeds an expander that returns both a new neighbor and an id already present in the lexical leg and asserts graph_expanded == 1."
+    },
+    {
+      "id": 12,
+      "title": "AC-100120-11 was added to the acceptance table beyond the phase's original AC-100120-01..AC-100120-10 set",
+      "severity": "Minor",
+      "why_it_matters": "The AC table and the traceability section are the phase's contract. Adding a row is not itself wrong, but AC-100120-11 has no row in the section 11 traceability table, so the required Requirement -> Capability -> Implementation -> Test -> Evidence chain is incomplete for it.",
+      "impact": "Traceability gap for the dual-backend parity requirement.",
+      "evidence": "diff shows AC-100120-01..AC-100120-10 were the original rows and AC-100120-11 was added; section 11 (phase-100120...md:464-474) has no AC-100120-11 row.",
+      "confidence": "High",
+      "proposed_fix": "Add the AC-100120-11 traceability row, or fold dual-backend parity under an existing AC.",
+      "resolution": "RESOLVED — evidence line refreshed from a fresh workspace run after remediation: cargo test --workspace --locked → 490 passed, 0 failed across 22 suites (clio-retrieve: 81)."
+    }
+  ],
+  "dismissed": [
+    "Raw-score averaging across dense and lexical legs: not done; weighted RRF on ranks only (fusion.rs:58-86) is correct and matches the appendix.",
+    "Persona gated by intent gate: not done; persona section is always emitted and gate skip only omits the memory section (compose.rs:196-217).",
+    "Roadmap/phase-number references in clio-retrieve code or comments: none found (grep clean); the pre-existing 'Slices 100120, 13' line in crates.md is unchanged context.",
+    "Cross-bank leakage: none; store access and both search legs are bank-scoped, and the adversarial t13 test passes.",
+    "Unsafe code / panics in production paths: none; crate has forbid(unsafe_code) and no unwrap/expect/panic outside tests.",
+    "Secret logging: no secrets are logged; compose warnings carry only error messages, not content or credentials.",
+    "Appendix T100120-07 'A/B tie' prose vs formula: the developer documented and tested the formula-derived B>A>D>C order honestly; this is a strength, not a defect.",
+    "Postgres parity being opt-in: acceptable; coverage.md documents serialized Postgres suites and the opt-in test passes when enabled."
+  ],
+  "verification": [
+    {
+      "claim": "cargo test --workspace --locked passes",
+      "classification": "Established",
+      "source_note": "Rerun: '487 passed (22 suites, 5.74s)'."
+    },
+    {
+      "claim": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings is clean",
+      "classification": "Established",
+      "source_note": "Rerun exit 0, no warnings."
+    },
+    {
+      "claim": "cargo fmt --all is clean",
+      "classification": "Established",
+      "source_note": "cargo fmt --all -- --check exit 0."
+    },
+    {
+      "claim": "make coverage exit 0 with every reported file >=90% functions and lines",
+      "classification": "Established",
+      "source_note": "Rerun: TOTAL 98.55% lines / 98.87% functions; parsed all file rows, none below 90% on either gated metric."
+    },
+    {
+      "claim": "Opt-in dual-backend parity passes",
+      "classification": "Established",
+      "source_note": "DATABASE_URL=... AM_PG_RETRIEVE_PARITY=1 cargo test -p clio-retrieve postgres_and_sqlite_hit_id_parity -> 1 passed."
+    },
+    {
+      "claim": "All new/modified Rust files are <=450 lines",
+      "classification": "Established",
+      "source_note": "wc -l: hybrid.rs 446, hybrid_tests.rs 449, others smaller."
+    },
+    {
+      "claim": "Files are staged for review",
+      "classification": "Contradicted",
+      "source_note": "git diff --cached is empty; new crate is untracked."
+    },
+    {
+      "claim": "NFR-1 p95 <= 50 ms is meaningfully verified",
+      "classification": "Uncertain",
+      "source_note": "The test passes but can only fail under extreme scheduling pressure; it is a smoke test given the gate performs no I/O."
+    },
+    {
+      "claim": "Retrieval false-negative rate is tracked separately with a stricter bound (requirement section 8)",
+      "classification": "Contradicted",
+      "source_note": "Only evaluated/skipped counters exist; no ground-truth-based FN/FP measurement."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Whether the intent-gate heuristics generalize beyond the three fixture turns",
+      "why_unknown": "No labeled corpus, precision/recall not measured; only unit fixtures exist.",
+      "what_would_resolve_it": "An offline evaluation set of turns labeled memory-needed vs self-contained, with FN/FP reported.",
+      "materiality": "Medium: gate quality is the main behavioral risk (wrong answers on skipped memory)."
+    },
+    {
+      "what": "Whether the Postgres and SQLite rank orderings agree beyond hit ids",
+      "why_unknown": "Parity test compares sorted ids only; rank differences are explicitly allowed but not characterized.",
+      "what_would_resolve_it": "A fixture that logs rank divergence and asserts a bounded difference.",
+      "materiality": "Low: spec allows rank differences."
+    },
+    {
+      "what": "Whether retrieve's budget-first-hit behavior is intentional",
+      "why_unknown": "No comment or test marks it deliberate.",
+      "what_would_resolve_it": "A comment or a test asserting the at-least-one-hit policy and its budget consequence.",
+      "materiality": "Medium: affects the retrieve budget contract."
+    }
+  ],
+  "strengths": [
+    "Weighted RRF is implemented exactly as documented and reduced to classic Cormack RRF when weights are 1; the appendix tie discrepancy is documented and tested against the formula.",
+    "Fail-open behavior is real and tested three ways (failing reranker, dead HTTP sidecar, malformed response) and dense-leg outages degrade to lexical-only with structured warnings.",
+    "Bank isolation, bi-temporal filtering, and domain filtering are enforced on every path and covered by adversarial tests.",
+    "Compose dual-budget packing is genuinely bounded across budgets from 9 to 2048 tokens, and the persona channel is emitted even on the auto-skip path.",
+    "Independent verification replicates every headline claim: 487 tests, clean clippy/fmt, 98.55/98.87 coverage with no file below 90%, and a passing Postgres parity run.",
+    "Production code has no unwrap/expect/panic, forbids unsafe, and keeps every file under the 450-line cap."
+  ],
+  "regrets": [
+    "The review could not inspect a staged diff because nothing was staged; I derived staged-vs-unstaged from git diff variants instead of git status (global rule).",
+    "I could not construct a runtime counterexample for the retrieve budget overrun without editing the repository, so finding 2 rests on code inspection of finalize.rs."
+  ],
+  "process_changes": [
+    "When a phase adds a new crate, require the developer to run `git add -- . ':!.workflows/'` or record an explicit, approved exception so reviewers get a staged diff.",
+    "Require completion evidence to include the exact reproducible command output (test count) and to leave approval/verification rows pending until the independent roles complete.",
+    "Require every phase Task 'Expected Result' to map to a test or to be explicitly descoped in the AC table."
+  ],
+  "plan_1hr": [
+    "Correct the phase DoD and attribution so 'Verification is completed' and 'Required approval is obtained' are not claimed before independent sign-off.",
+    "Resolve the retrieve budget overrun in finalize.rs (enforce the cap or document/test the at-least-one-hit policy).",
+    "Add the missing hybrid-vs-dense-only/lexical-only labeled fixture (or descope the Task 2 Expected Result in the phase file).",
+    "Add the full AGENTS.md header to the seven test files.",
+    "Add a traceability row for AC-100120-11 and refresh the test-count evidence line."
+  ],
+  "plan_unlimited": [
+    "Build a labeled gate evaluation harness that reports false-negative and false-positive rates separately and enforces the stricter false-negative bound from requirement section 8.",
+    "Wire a genuine automatic path (turn text -> intent_gate -> compose) and back the GraphExpander seam with real assoc_edge reads so expand_graph is not a no-op.",
+    "Reconcile the in-process tool schema with requirement section 4.9.4.B (bank injection strategy) ahead of the MCP binding slices.",
+    "Unify retrieve/compose token accounting on one canonical budgeted representation and document the estimator's error bars against a real tokenizer sample.",
+    "Resolve the global no-git rule versus the pipeline staging requirement with a scoped, approved mechanism."
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Definition of Done claims independent verification and approval that have not happened",
+      "evidence": "roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md:412-422 all [x], vs :7-10 (Adversary/Remediator/Remedy Approver/Finalize pending) and :515 ('Verifier: [pending - Adversary r1]').",
+      "requirement_ref": "phase-100120 section 9 Definition of Done; project AGENTS.md honesty principle",
+      "recommendation": "Uncheck 'Verification is completed' and 'Required approval is obtained' until the independent roles finish; record self-verification as such.",
+      "resolution": "RESOLVED r1 — Definition of DoD corrected: 'Verification is completed' and 'Required approval is obtained' are now UNCHECKED with pending-role notes in roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md (Definition of Done); Verification Sign-Off records Adversary r1 as delivered with Remedy Approver still pending. No finding content was altered."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "retrieve() can return estimated_tokens over the requested budget_tokens for a single oversized hit",
+      "evidence": "crates/clio-retrieve/src/finalize.rs:50-55 admits the first hit unconditionally via `&& !hits.is_empty()`; no test covers a single hit larger than the budget.",
+      "requirement_ref": "phase-100120 Task 4 'Honors budgets when trimming returned pack'; PR-1",
+      "recommendation": "Enforce the cap for a single hit, or document and test the deliberate at-least-one-hit policy and its budget consequence. compose already re-truncates, so injection stays bounded.",
+      "resolution": "RESOLVED — deliberate at-least-one-hit policy documented and tested: doc comment on finalize() in crates/clio-retrieve/src/finalize.rs and on RetrieveRequest::budget_tokens in types.rs states the first hit is always admitted even when alone over budget (compose re-truncates in pack_memory, so injection stays bounded); new test finalize_tests::budget_tokens_always_returns_first_hit_even_over_budget asserts the policy and its budget consequence (budget_tokens=8, oversized first hit returned with estimated_tokens>8). Cap behavior for normal hits remains tested by finalize_tests::budget_tokens_trims_returned_hits."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Phase Task 2 Expected Result (hybrid beats dense-only and lexical-only, documented metric) has no test or metric",
+      "evidence": "crates/clio-retrieve/src/hybrid_tests.rs:40-63 asserts only that a lexical-only hit is included; grep across *_tests.rs finds no dense-only/lexical-only baseline or metric.",
+      "requirement_ref": "phase-100120 section 5 Task 2 Expected Result",
+      "recommendation": "Add a small labeled fixture with a metric (e.g. recall@k / MRR) and assert hybrid >= dense-only and >= lexical-only, or descope the claim.",
+      "resolution": "RESOLVED — new labeled fixture hybrid_quality_tests::hybrid_recall_beats_single_leg_baselines_on_labeled_fixture compares hybrid against dense-only and lexical-only with the documented metric recall@1 averaged over the two labeled queries: hybrid 1.0 vs dense-only 0.5 and lexical-only 0.5 (hybrid strictly beats both). Phase Task 2 Expected Result now cites this test in Completion Evidence."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Seven new test source files omit the required AGENTS.md header structure",
+      "evidence": "intent_tests.rs:1-4, compose_tests.rs:1-4, hybrid_tests.rs:1-4, surface_tests.rs:1-4, fusion_tests.rs:1-4, filter_tests.rs:1-4, rerank_tests.rs:1-4 have only copyright/SPDX + one-line //! doc; fixtures_tests.rs and pg_parity_tests.rs have the full structure.",
+      "requirement_ref": "AGENTS.md 'File Header'",
+      "recommendation": "Add the full Responsibility / Owns / Does not own / Boundary block to the seven test files.",
+      "resolution": "RESOLVED — full AGENTS.md Responsibility/Owns/Does-not-own/Boundary headers added to all seven test files (intent_tests.rs, compose_tests.rs, hybrid_tests.rs, surface_tests.rs, fusion_tests.rs, filter_tests.rs, rerank_tests.rs). hybrid_tests.rs was at 449/450 lines, so the budget-trim test was moved to the new finalize_tests.rs to stay within the 450-line cap."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Requirement section 8 false-negative tracking (separate, stricter bound) is not implemented",
+      "evidence": "crates/clio-retrieve/src/intent.rs:90-123 (GateMetrics only evaluated/skipped); requirement.md:681 requires FN rate tracked separately and held to a stricter bound. The phase appendix only asked for a note/counter.",
+      "requirement_ref": "requirement.md section 8 (line 681); FR-6",
+      "recommendation": "Add expected-vs-actual FN/FP counters in an evaluation hook, or explicitly scope the metric to a later offline-evaluation phase in the phase file.",
+      "resolution": "RESOLVED — labeled evaluation hook implemented: intent.rs adds evaluate_gate(labeled_turns, thresholds) + GateEvaluation with separate false_negative_rate/false_positive_rate and documented stricter bound DEFAULT_FALSE_NEGATIVE_BOUND = 0.05 (FN produces wrong answers, FP only costs latency, so the FN bound is far tighter); intent_tests::gate_evaluation_tracks_fn_and_fp_separately asserts FN=0 with a nonzero FP. Deployment-scale offline evaluation corpus is explicitly scoped as future work in the phase Known Limitations and Completion Evidence."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "hybrid.rs header claims ownership of final hit mapping, which lives in finalize.rs",
+      "evidence": "crates/clio-retrieve/src/hybrid.rs:12 ('Candidate fetch/filter flow and final hit mapping') vs crates/clio-retrieve/src/finalize.rs:5-17 (owns the final limit/budget/token-accounting step).",
+      "requirement_ref": "AGENTS.md header ownership accuracy",
+      "recommendation": "Move 'final hit mapping' to 'Does not own (finalize)' or move the statement to the owning module.",
+      "resolution": "RESOLVED — hybrid.rs header no longer claims final hit mapping: Owns now says 'Candidate fetch/filter flow feeding fusion and rerank'; 'Final hit mapping, limit, and budget/token accounting (finalize)' moved to Does not own."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Nothing is staged; the review premise of a staged diff does not hold",
+      "evidence": "`git diff --cached -- . ':!.workflows/'` returns empty; `git diff --stat` shows 7 tracked files; crates/clio-retrieve/ is entirely untracked (21 files). Developer log states they deliberately skipped git add.",
+      "requirement_ref": "developer task 'Git: stage your changes'; reviewer instructions",
+      "recommendation": "Resolve the global no-git rule vs pipeline staging conflict; stage with the documented pathspec or record an approved exception.",
+      "resolution": "RESOLVED BY EVIDENCE — the premise no longer holds: after this finding was written, the pipeline staged the developer's changes. `git diff --cached --stat` now shows 28 files changed, 3856 insertions (the full clio-retrieve crate is staged). Remediator left its own remediation changes UNSTAGED per round rules; the global no-git rule vs pipeline staging conflict remains recorded under process_changes."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "Tool argument schema requires `bank`, which the requirement's tool signature does not list",
+      "evidence": "crates/clio-retrieve/src/surface.rs:50-53 and :77-79, :165-170 require bank; requirement.md:342-344 lists retrieve/compose_context without bank.",
+      "requirement_ref": "requirement.md section 4.9.4.B",
+      "recommendation": "Document transport-level bank injection or align the schema with the published signature.",
+      "resolution": "RESOLVED BY DOCUMENTATION — schema left aligned with reality: bank is documented as the session/transport-scoped isolation key injected by the binding layer (doc comments on surface.rs RetrieveArgs::bank / ComposeArgs::bank; phase Completion Evidence note). The published §4.9.4.B caller signatures intentionally omit it; slices 100160-17 must supply it from the session."
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "Retrieve and compose apply token budgets to different text, making estimated_tokens inconsistent",
+      "evidence": "finalize.rs:49 uses doc_text = lexical_text (hybrid.rs:419-421); compose.rs:289-326 pack_memory uses gist/snapshot/id (compose.rs:318-326).",
+      "requirement_ref": "PR-1",
+      "recommendation": "Use one canonical budgeted representation or document/report both sizes.",
+      "resolution": "RESOLVED BY DOCUMENTATION — both budgeted representations are documented rather than unified: phase Completion Evidence note records that retrieve trims on lexical source text (clio_index::lexical_text = gist + snapshot tokens) while compose trims on the composed pack text (gist, else snapshot ref, else item id), and RetrieveOutcome.estimated_tokens in types.rs now documents that it describes the retrieve-side source size, not the composed pack. Unifying on one canonical representation was deliberately deferred: no spec mandates one representation and changing measurement semantics would alter tested budget behavior without a correctness gain (both remain bounded)."
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "title": "T100120-03 latency assertion is a smoke test, not a meaningful NFR-1 bound",
+      "evidence": "crates/clio-retrieve/src/intent_tests.rs:91-106 asserts p95 <= 50,000 us over 2000 in-memory calls on a pure string function.",
+      "requirement_ref": "NFR-1",
+      "recommendation": "Relabel the phase evidence as a smoke check and add a structural guard that the gate performs no I/O.",
+      "resolution": "RESOLVED — relabeled as a smoke check: phase AC-100120-01 evidence now states t03 is a latency smoke check and names the structural NFR-1 guarantee (intent_gate is a pure &str function with no embedder/store/graph handles, so no I/O can enter the gate path); intent_tests.rs header records the same. The 50 ms assertion is kept as a smoke bound; a tighter bound was not added because it would be scheduling-flaky on CI without adding structural information."
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "title": "graph_expanded metric can count candidates that were already in the dense/lexical legs",
+      "evidence": "crates/clio-retrieve/src/hybrid.rs:164 filters fused hits by membership in `expanded` only.",
+      "requirement_ref": "phase-100120 section 5 Task 2 (metrics)",
+      "recommendation": "Subtract ids already present in the dense/lexical filtered lists before reporting graph_expanded.",
+      "resolution": "RESOLVED — hybrid.rs now counts only genuinely expanded candidates: expansion ids absent from the dense/lexical candidate lists are collected as graph_new before fetch, and graph_expanded counts fused hits from graph_new only, so ids already produced by either leg are never reported as graph-expanded. hybrid_tests::graph_expansion_adds_seed_neighbors_when_enabled now feeds an expander that returns both a new neighbor and an id already present in the lexical leg and asserts graph_expanded == 1."
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "title": "Completion evidence test count (486) does not match a rerun (487)",
+      "evidence": "roadmap/phase-100120...md:432 claims 486 passed; rerun prints '487 passed (22 suites, 5.74s)'.",
+      "requirement_ref": "phase-100120 section 9 Completion Evidence",
+      "recommendation": "Refresh the evidence line from a fresh run.",
+      "resolution": "RESOLVED — evidence line refreshed from a fresh workspace run after remediation: cargo test --workspace --locked → 490 passed, 0 failed across 22 suites (clio-retrieve: 81)."
+    },
+    {
+      "id": "F-13",
+      "severity": "low",
+      "title": "AC-100120-11 added without a traceability row",
+      "evidence": "AC table gained AC-100120-11 (dual-backend parity) but phase-100120 section 11 (lines 464-474) has no AC-100120-11 row.",
+      "requirement_ref": "phase-100120 section 11 Traceability",
+      "recommendation": "Add the AC-100120-11 traceability row or fold the requirement under an existing AC.",
+      "resolution": "RESOLVED — AC-100120-11 traceability row added to section 11 ('§4.9.4.B dual-backend parity (Phase 100110 contract) | Task 4 | Opt-in parity test | AC-100120-11')."
+    }
+  ],
+  "remediation": {
+    "round": "r1",
+    "date": "2026-09-19",
+    "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+    "summary": "All 13 findings F-01..F-13 addressed: 11 fixed in code/phase-doc, F-07 resolved by evidence (pipeline staged the diff), F-08/F-09 resolved by documentation with reasons for deferring schema/token-unification code changes.",
+    "verification": [
+      "make check exit 0 (cargo fmt --all clean; clippy -D warnings clean; cargo test --workspace --locked: 490 passed, 0 failed, 22 suites)",
+      "make coverage exit 0: TOTAL 98.50% lines / 98.80% functions; 104 per-file rows scanned, zero files below 90% on either gated metric",
+      "all new/modified Rust files <= 450 lines (hybrid.rs 450, hybrid_tests.rs 449)",
+      "remediator changes left unstaged by design; staged snapshot is the pre-remediation baseline"
+    ],
+    "deferred_with_reason": [
+      "plan_unlimited 'wire a genuine automatic path + real assoc_edge reads': deferred — co-activation/association-edge reads are slice-13 scope; the phase documents the GraphExpander no-op as a known limitation, and inventing assoc-edge reads here would exceed remediation scope.",
+      "plan_unlimited 'unify retrieve/compose token accounting on one canonical representation': deferred with reason — see F-09 resolution (no spec mandate; both bounded; behavior risk).",
+      "plan_unlimited 'build a labeled gate evaluation harness at deployment scale': the FN/FP evaluation hook and stricter bound now exist (F-05); a deployment-scale labeled corpus remains future work and is recorded in Known Limitations."
+    ]
+  }
+}

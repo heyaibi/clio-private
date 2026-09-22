@@ -1,0 +1,150 @@
+{
+  "run": "r1",
+  "phase": "100300",
+  "subject": "Phase 100300: Rerank Provider Adapters (TEI and Cohere-Compatible)",
+  "verdict": "Good",
+  "verdict_justification": "Phase 100300 cleanly implements the Cohere-compatible reranker adapter (CohereReranker), factory selection (build_reranker and build_reranker_from), and comprehensive unit and contract tests while preserving TEI behavior, fail-open orchestration semantics, and strict file size and coverage constraints. Only three minor non-blocking items were identified regarding URL path suffix flexibility, pre-existing HttpReranker debug token masking, and keyless local proxy usage.",
+  "metadata": {
+    "generated": "2026-09-21",
+    "applies_to": "staged diff (r1)",
+    "source": "crates/clio-retrieve/src/rerank.rs, rerank_tests.rs, fixtures_tests.rs, lib.rs, README.md, .env.example, roadmap/phase-100300-rerank-providers.md"
+  },
+  "standard": [
+    "roadmap/phase-100300-rerank-providers.md: AC-100300-01 through AC-100300-05 and Definition of Done",
+    "AGENTS.md: Hard 450-line limit per Rust file and header ownership requirements",
+    "coverage.md: >=90% aggregate and per-file function and line coverage floors",
+    "requirement.md §4.9.5.E/FR-32, §4.5/P4, FR-26: Fail-open rerank orchestration and credential masking",
+    "Roadmap isolation: No roadmap references in production crate code or comments"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100300-01: Cohere-compatible rerank yields a full permutation",
+      "status": "Fully satisfied",
+      "evidence": "clio-retrieve::rerank_tests::cohere_permutation_equals_tei_results_parse and cohere_adapter_rejects_bad_indices_fail_closed pass; Cohere /v1/rerank maps best-first order to a full permutation with omitted documents appended in original order.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100300-02: TEI behavior unchanged",
+      "status": "Fully satisfied",
+      "evidence": "HttpReranker and parse_rerank_response unchanged; all pre-existing TEI test suites pass cleanly across clio-retrieve (139 passed, 0 failed).",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100300-03: Provider selection fail-closed; factory config-driven",
+      "status": "Fully satisfied",
+      "evidence": "rerank_tests::factory_fails_closed_on_bad_provider_config, factory_selects_teiranker_by_provider, factory_empty_provider_keeps_tei_default, factory_selects_cohere_with_bearer pass; unknown provider, missing model, or missing key for cohere reject with ErrorCode::ConfigCorrupt.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100300-04: Empty/no-provider paths are no-ops",
+      "status": "Fully satisfied",
+      "evidence": "cohere_empty_documents_skip_the_request short-circuits without network call; factory_without_url_is_none and runtime_factory_without_rerank_config_is_none return Ok(None).",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100300-05: No regression in retrieval/fusion",
+      "status": "Fully satisfied",
+      "evidence": "Full workspace test suite passed (exit code 0); make coverage passes with 98.95% function coverage and 97.89% line coverage aggregate, and all individual files >=90%.",
+      "severity": "Low"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "Potential double '/v1' path if RERANK_URL contains '/v1' suffix",
+      "evidence": "crates/clio-retrieve/src/rerank.rs:191 (format!(\"{}/v1/rerank\", self.url.trim_end_matches('/')))",
+      "requirement_ref": "roadmap/phase-100300-rerank-providers.md §5 Task 1",
+      "recommendation": "In CohereReranker::rerank, strip any trailing '/v1' before appending '/v1/rerank' (e.g. self.url.trim_end_matches('/').strip_suffix(\"/v1\").unwrap_or(...)) to gracefully tolerate operators passing RERANK_URL=https://api.cohere.com/v1."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "HttpReranker derived Debug leaks bearer token if printed",
+      "evidence": "crates/clio-retrieve/src/rerank.rs:61-66 (#[derive(Debug)] pub struct HttpReranker { url: String, bearer: Option<String>, ... })",
+      "requirement_ref": "roadmap/phase-100300-rerank-providers.md §7 Security Constraints",
+      "recommendation": "Implement a manual fmt::Debug for HttpReranker redacting the bearer token as '****', matching CohereReranker's implementation."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "build_reranker_from strictly requires credentials for Cohere provider, blocking keyless local proxies",
+      "evidence": "crates/clio-retrieve/src/rerank.rs:250-255 (let Some(key) = bearer else { return Err(AmError::new(ErrorCode::ConfigCorrupt, \"rerank.provider = cohere requires credentials...\")); };)",
+      "requirement_ref": "roadmap/phase-100300-rerank-providers.md §9 Known Limitations",
+      "recommendation": "Document or relax the bearer requirement in build_reranker_from if local unauthenticated Cohere-compatible sidecars (such as Infinity or Ollama) become a supported deployment option."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Potential double '/v1' path if RERANK_URL contains '/v1' suffix",
+      "severity": "Minor",
+      "why_it_matters": "Operators accustomed to OpenAI base URLs (like https://api.openai.com/v1) or following zero-deps.md examples might set RERANK_URL with a /v1 suffix, causing requests to target /v1/v1/rerank and fail.",
+      "impact": "Configuring RERANK_URL with trailing /v1 results in 404 Not Found from providers unless explicitly configured without /v1.",
+      "evidence": "crates/clio-retrieve/src/rerank.rs:191",
+      "confidence": "High",
+      "proposed_fix": "Strip trailing '/v1' from the base URL before appending '/v1/rerank', or document the strict root domain requirement in .env.example."
+    },
+    {
+      "id": 2,
+      "title": "HttpReranker derived Debug leaks bearer token if printed",
+      "severity": "Minor",
+      "why_it_matters": "While CohereReranker provides a custom fmt::Debug implementation that redacts bearer tokens, HttpReranker still derives Debug, meaning any debug formatting of the TEI reranker client could expose bearer tokens in logs.",
+      "impact": "Low risk for local sidecars which typically do not use bearer tokens, but violates defense-in-depth credential masking for authenticated TEI proxies.",
+      "evidence": "crates/clio-retrieve/src/rerank.rs:61-66",
+      "confidence": "High",
+      "proposed_fix": "Replace #[derive(Debug)] on HttpReranker with a manual fmt::Debug implementation masking self.bearer as '****'."
+    },
+    {
+      "id": 3,
+      "title": "build_reranker_from strictly requires credentials for Cohere provider, blocking keyless local proxies",
+      "severity": "Minor",
+      "why_it_matters": "Local self-hosted rerank engines (e.g. Infinity, TEI with Cohere API emulation, or local proxies) running Cohere wire format often require no authentication.",
+      "impact": "Operators cannot use local Cohere-compatible endpoints without supplying a dummy API key.",
+      "evidence": "crates/clio-retrieve/src/rerank.rs:250-255",
+      "confidence": "High",
+      "proposed_fix": "Allow Optional bearer in build_reranker_from for provider = cohere when the endpoint is unauthenticated local http."
+    }
+  ],
+  "dismissed": [
+    "Omission of live retrieval integration: Verified as explicitly out of scope for Phase 100300; Phase 100350 owns live retriever wiring.",
+    "Retry policy on rerank requests: Verified that bounded latency budgets (2s) and fail-open precision ranking make fail-fast preferred over retries.",
+    "File line count constraints: All modified Rust source files (rerank.rs at 324L, rerank_tests.rs at 316L, fixtures_tests.rs at 338L, lib.rs at 119L) comply with the <=450 lines limit."
+  ],
+  "verification": [
+    {
+      "claim": "clio-retrieve test suite passes",
+      "classification": "Established",
+      "source_note": "cargo test -p clio-retrieve --locked executed with 139 passed, 0 failed."
+    },
+    {
+      "claim": "Workspace test suite passes",
+      "classification": "Established",
+      "source_note": "cargo test --locked --workspace executed with 0 failures across all crates."
+    },
+    {
+      "claim": "Coverage floors satisfied",
+      "classification": "Established",
+      "source_note": "make coverage reported 98.95% function coverage and 97.89% line coverage aggregate; rerank.rs at 100% function and line coverage; 0 files below 90%."
+    },
+    {
+      "claim": "No clippy or formatting defects",
+      "classification": "Established",
+      "source_note": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings and cargo fmt --check passed cleanly."
+    }
+  ],
+  "strengths": [
+    "Clean reuse of parse_rerank_response ensuring full permutation and consistent out-of-range/duplicate rejection",
+    "Safe bearer masking in CohereReranker Debug implementation",
+    "Thorough test coverage with request-capturing fake HTTP server verifying paths, HTTP methods, headers, and payload structures",
+    "Flawless adherence to file size ceilings (all files <= 338 lines) and AGENTS.md headers"
+  ],
+  "plan_1hr": [
+    "In CohereReranker::rerank, normalize base URL by trimming optional '/v1' before appending '/v1/rerank' to prevent double path segments.",
+    "Implement manual fmt::Debug for HttpReranker with bearer masking to match CohereReranker."
+  ],
+  "plan_unlimited": [
+    "Support optional bearer keys for Cohere-compatible provider to enable seamless local sidecar engines (e.g. Infinity, vLLM).",
+    "Provide helper configuration diagnostics validating reranker endpoint connectivity and model compatibility during am ops doctor."
+  ]
+}

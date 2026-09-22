@@ -1,0 +1,13 @@
+2026-09-19T16:02:11Z start adversary r1 phase-100190 compliance erase path
+2026-09-19T16:02:25Z git status: 28 files staged, 0 unstaged non-workflow modifications
+2026-09-19T16:03:26Z make lint: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings: 0 warnings, exit 0
+2026-09-19T16:03:45Z cargo test --locked --workspace: all tests passed, exit 0
+2026-09-19T16:04:39Z make coverage: TOTAL lines 98.00%, functions 98.67%, all reported files >=90% func & line, exit 0
+2026-09-19T16:11:30Z finding F-01: crates/clio-store/src/erase_tests.rs:453 violates AGENTS.md 450-line file limit
+2026-09-19T16:11:30Z finding F-02: crates/clio-store/src/sqlite_erase.rs:71 and crates/clio-store/src/postgres_erase.rs:69 cross-bank erase desync via unpartitioned subject_keys check
+2026-09-19T16:11:30Z finding F-03: crates/clio-mcp/tests/compliance_erase_test.rs:108 required test scenario T100190-03 retrieve post-erasure exclusion omitted
+2026-09-19T16:11:30Z finding F-04: roadmap/phase-100190-compliance-erase-path.md:501 incomplete known limitations missing debt-owning phase numbers
+2026-09-19T16:11:30Z generate-report: report.html and style.css generated in .workflows/phase-100190
+2026-09-19T16:11:30Z phase attribution updated: roadmap/phase-100190-compliance-erase-path.md:7 set to Antigravity CLI (Gemini 3.8 Flash)
+2026-09-19T16:11:30Z finish adversary r1 phase-100190
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100190/findings.json 60b619b9

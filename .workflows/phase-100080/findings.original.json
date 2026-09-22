@@ -1,0 +1,309 @@
+{
+  "run": "r1",
+  "phase": "100080",
+  "subject": "Clio Phase 100080 (Bi-Temporal Triples and Supersession)",
+  "verdict": "Inadequate",
+  "verdict_justification": "The implementation fails standard build gates (`make check` clippy errors and `cargo fmt --check` failures), has an unformatted test file that exceeds the 450-line limit when formatted, and contains missing module headers, fragile timestamp-based ID generation, and unindexed bank table scans.",
+  "metadata": {
+    "generated": "2026-09-18",
+    "applies_to": "phase-100080-r1",
+    "source": "crates/clio-store, crates/clio-types, crates/clio-write, sql/001_core.sql"
+  },
+  "standard": [
+    "make check and make lint must pass with zero warnings (-D warnings)",
+    "cargo fmt --check must pass",
+    "All Rust source files must remain <= 450 total lines without artificial compression",
+    "Every Rust source file must have the AGENTS.md module header structure",
+    "Bi-temporal interval semantics and supersession invariants per Phase 100080 / PR-6 / FR-12 / FR-24 / NFR-4",
+    "Only code files staged, excluding .workflows/"
+  ],
+  "requirements": [
+    {
+      "requirement": "Clean verification gates: make check, make lint, cargo fmt",
+      "status": "Missed",
+      "evidence": "make check fails with clippy::single_match_else and clippy::too_many_lines; cargo fmt --check fails on crates/clio-store/src/triple_tests.rs",
+      "severity": "Critical",
+      "confidence": "High",
+      "correction_needed": "Fix clippy errors and format files"
+    },
+    {
+      "requirement": "Source file line count <= 450 lines without artificial compression",
+      "status": "Missed",
+      "evidence": "crates/clio-store/src/triple_tests.rs is 458 lines when cargo fmt is run",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "Decompose triple_tests.rs into smaller modules"
+    },
+    {
+      "requirement": "AGENTS.md header structure on all Rust files",
+      "status": "Partially satisfied",
+      "evidence": "pg_triple_tests.rs, triple_tests.rs (clio-store, clio-types, clio-write) omit the required header sections",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Add complete headers"
+    },
+    {
+      "requirement": "Git staging excluding .workflows/",
+      "status": "Missed",
+      "evidence": ".workflows/ files staged in git index",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "Unstage .workflows/ files"
+    },
+    {
+      "requirement": "Bi-temporal SPO data model with half-open intervals and dual-backend parity",
+      "status": "Fully satisfied",
+      "evidence": "clio-types/src/triple.rs, sql/001_core.sql schema version 4, and store tests demonstrate valid-time and transaction-time persistence and query parity",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "None"
+    },
+    {
+      "requirement": "FR-12 default supersession closing prior open subject+predicate edges on both axes without delete",
+      "status": "Partially satisfied",
+      "evidence": "commit_triple_add closes prior open edges without delete, but open-edge query requires valid_until IS NULL, ignoring edges with bounded valid intervals",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Improve open edge query logic"
+    },
+    {
+      "requirement": "FR-11 continuous/scalar updates rejected on discrete path",
+      "status": "Fully satisfied",
+      "evidence": "ensure_discrete_update_rule and wrong_update_rule_attr reject continuous update requests with ErrorCode::WrongUpdateRule",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "None"
+    },
+    {
+      "requirement": "Point-in-time triple_query with as_of and time_axis",
+      "status": "Partially satisfied",
+      "evidence": "triple_query works for explicit as_of, but omitting as_of returns future facts on valid axis, and queries perform full table scans across the bank",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Fix omitted as_of semantics and push predicates to SQL"
+    },
+    {
+      "requirement": "Coverage gate: aggregate and per-file >= 90% lines and functions",
+      "status": "Fully satisfied",
+      "evidence": "make coverage passes with 99.38% functions and 98.60% lines; all reported files >= 90%",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "None"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "critical",
+      "title": "Clippy compilation failures break `make check` and `make lint`",
+      "evidence": "crates/clio-store/src/pg_triple_tests.rs:27:5 (clippy::single_match_else) and crates/clio-store/src/pg_triple_tests.rs:152:1 (clippy::too_many_lines)",
+      "requirement_ref": "AGENTS.md § Final Verification; Makefile check/lint target",
+      "recommendation": "Convert single-pattern match in open_pg() to if let Ok(s), and split postgres_invalidate_and_guards() into smaller sub-functions under 100 lines."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Format check fails (`cargo fmt --check`) and 450-line limit evaded via unformatted compression",
+      "evidence": "crates/clio-store/src/triple_tests.rs:394,402,407,429,438 fails cargo fmt --check; running cargo fmt expands the file to 458 lines",
+      "requirement_ref": "AGENTS.md § Source File Size Constraint",
+      "recommendation": "Decompose crates/clio-store/src/triple_tests.rs into two separate test modules (e.g. triple_tests.rs and triple_edge_tests.rs) each under 450 lines while conforming to standard cargo fmt formatting."
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "title": "Mandatory file header structure missing in newly created Rust source files",
+      "evidence": "crates/clio-store/src/pg_triple_tests.rs:1-3, crates/clio-store/src/triple_tests.rs:1-3, crates/clio-types/src/triple_tests.rs:1-3, and crates/clio-write/src/triple_tests.rs:1-3 omit required header blocks",
+      "requirement_ref": "AGENTS.md § File Header",
+      "recommendation": "Add full Responsibility, Owns, Does not own, and Boundary header comments adhering to AGENTS.md to all new Rust files."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "Workflow directory files staged in git against staging rules",
+      "evidence": "git status shows staged modifications and untracked additions in .workflows/ (.workflows/instruction.md, developer-task-r1.log, developer-task-r1.md, resume.json)",
+      "requirement_ref": "Developer task instructions § Hard rules (Git staging)",
+      "recommendation": "Run `git restore --staged .workflows/` to unstage workflow run files before handoff."
+    },
+    {
+      "id": "F-05",
+      "severity": "high",
+      "title": "Fragile timestamp-only ID generation causes primary key collisions in `clio_write::triple::triple_add`",
+      "evidence": "crates/clio-write/src/triple.rs:136-137: `let edge_id = format!(\"trp-{}\", args.timestamp); let item_id = format!(\"itm-{}\", args.timestamp);`",
+      "requirement_ref": "Phase 100080 Specification § Task 2 / FR-12; sql/001_core.sql primary key constraints",
+      "recommendation": "Include entropy, monotonic counter, or UUID in edge_id and item_id to prevent collision when multiple triples share a timestamp."
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "title": "Unindexed full table scan on bank in `query_triples`",
+      "evidence": "crates/clio-store/src/sqlite_triple_read.rs:82 and crates/clio-store/src/postgres_triple_read.rs:75: `SELECT ... FROM triples WHERE bank_id = ?1` fetches all bank rows before in-memory filtering",
+      "requirement_ref": "Phase 100080 Specification § Task 1 & Task 4",
+      "recommendation": "Push subject, predicate, and interval query constraints into the SQL query WHERE clause to take advantage of the newly added database indexes."
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "title": "Flawed 'current' semantics when `as_of` is omitted in `triple_query`",
+      "evidence": "crates/clio-store/src/triple_map.rs:79: `TimeAxis::Valid => t.valid_until.is_none()` returns future edges where valid_from > now",
+      "requirement_ref": "Phase 100080 Specification § Task 4",
+      "recommendation": "When as_of is None, default to the current timestamp (now) so that valid_from <= now < valid_until."
+    },
+    {
+      "id": "F-08",
+      "severity": "medium",
+      "title": "Open-edge supersession query ignores active edges with bounded valid intervals",
+      "evidence": "crates/clio-store/src/sqlite_triple.rs:95 and crates/clio-store/src/postgres_triple.rs:92: `WHERE ... AND valid_until IS NULL AND tx_until IS NULL`",
+      "requirement_ref": "Phase 100080 Specification § Task 1 / Task 2",
+      "recommendation": "Query open edges by `tx_until IS NULL` and close overlapping edges on both valid and transaction axes."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Clippy compilation failures break `make check` and `make lint`",
+      "severity": "Critical",
+      "why_it_matters": "CI and local quality gates fail immediately when running `make check` or `make lint`. The developer's logged claim of a clean `make check PASS` was incorrect.",
+      "impact": "The repository fails the standard compilation and linting gate with -D warnings.",
+      "evidence": "crates/clio-store/src/pg_triple_tests.rs:27:5 (clippy::single_match_else) and crates/clio-store/src/pg_triple_tests.rs:152:1 (clippy::too_many_lines)",
+      "confidence": "High",
+      "proposed_fix": "Change single-arm match in open_pg() to if let Ok(s), and break up postgres_invalidate_and_guards into focused helper functions under 100 lines."
+    },
+    {
+      "id": 2,
+      "title": "Format check fails (`cargo fmt --check`) and 450-line limit evaded via unformatted compression",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md explicitly prohibits artificial line reduction through compressed formatting. Running standard cargo fmt increases triple_tests.rs from 445 lines to 458 lines, violating the hard 450-line limit.",
+      "impact": "Code formatting checks fail, and when formatted the file breaches the 450-line maximum constraint.",
+      "evidence": "crates/clio-store/src/triple_tests.rs fails cargo fmt --check; running cargo fmt expands the file to 458 lines.",
+      "confidence": "High",
+      "proposed_fix": "Decompose crates/clio-store/src/triple_tests.rs into two modular test files (e.g. basic CRUD/parity vs concurrency/invalidation edge cases) so each is under 450 lines while conforming to cargo fmt."
+    },
+    {
+      "id": 3,
+      "title": "Mandatory file header structure missing in newly created Rust source files",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md mandates a specific header template (Responsibility, Owns, Does not own, Boundary) on every newly created or refactored Rust file.",
+      "impact": "Architectural documentation and boundary clarity are missing from new modules.",
+      "evidence": "crates/clio-store/src/pg_triple_tests.rs:1-3, crates/clio-store/src/triple_tests.rs:1-3, crates/clio-types/src/triple_tests.rs:1-3, and crates/clio-write/src/triple_tests.rs:1-3 omit the required header blocks.",
+      "confidence": "High",
+      "proposed_fix": "Add the standard responsibility and ownership header blocks to all new Rust files."
+    },
+    {
+      "id": 4,
+      "title": "Fragile timestamp-only ID generation causes primary key collisions in `clio_write::triple::triple_add`",
+      "severity": "Important",
+      "why_it_matters": "Generating IDs as format!(\"trp-{}\", args.timestamp) and format!(\"itm-{}\", args.timestamp) causes primary key collisions when multiple triples are created at the same timestamp tick.",
+      "impact": "Concurrent or batched triple writes fail with database duplicate key errors.",
+      "evidence": "crates/clio-write/src/triple.rs:136-137: `let edge_id = format!(\"trp-{}\", args.timestamp); let item_id = format!(\"itm-{}\", args.timestamp);`",
+      "confidence": "High",
+      "proposed_fix": "Include a random suffix, nano-timestamp, or monotonic counter (e.g., format!(\"trp-{}-{}\", args.timestamp, nonce)) to guarantee uniqueness."
+    },
+    {
+      "id": 5,
+      "title": "Unindexed full table scan on bank in `query_triples`",
+      "severity": "Minor",
+      "why_it_matters": "Indexes created in Task 1 for subject, predicate, and valid/tx intervals are completely bypassed because SQL queries fetch all bank triples and filter in Rust.",
+      "impact": "Query performance will degrade linearly O(N) with the number of triples in the bank, wasting memory and database I/O.",
+      "evidence": "crates/clio-store/src/sqlite_triple_read.rs:82 and crates/clio-store/src/postgres_triple_read.rs:75: `SELECT ... FROM triples WHERE bank_id = ?1`",
+      "confidence": "High",
+      "proposed_fix": "Construct parameterized WHERE clauses in SQL that filter by subject, predicate, and intervals before loading rows into memory."
+    },
+    {
+      "id": 6,
+      "title": "Flawed 'current' semantics when `as_of` is omitted in `triple_query`",
+      "severity": "Minor",
+      "why_it_matters": "Omitting as_of on the valid axis simply checks valid_until.is_none(). Future facts that are not yet valid (valid_from > now) are improperly returned as currently valid.",
+      "impact": "Callers querying current state receive facts that are not yet effective.",
+      "evidence": "crates/clio-store/src/triple_map.rs:79: `TimeAxis::Valid => t.valid_until.is_none()`",
+      "confidence": "High",
+      "proposed_fix": "When as_of is None, default to the current timestamp (now) so that valid_from <= now < valid_until."
+    },
+    {
+      "id": 7,
+      "title": "Open-edge supersession query ignores active edges with bounded valid intervals",
+      "severity": "Minor",
+      "why_it_matters": "An edge with a defined future expiration (valid_until set) that is still transactionally active (tx_until is null) is skipped by the open-edge supersession query.",
+      "impact": "Conflicting edges can remain open simultaneously in transaction time if an earlier edge had a bounded valid_until.",
+      "evidence": "crates/clio-store/src/sqlite_triple.rs:95 and crates/clio-store/src/postgres_triple.rs:92: `WHERE ... AND valid_until IS NULL AND tx_until IS NULL`",
+      "confidence": "High",
+      "proposed_fix": "Query open edges by `tx_until IS NULL` and close overlapping edges accordingly."
+    },
+    {
+      "id": 8,
+      "title": "Workflow directory files staged in git against staging rules",
+      "severity": "Minor",
+      "why_it_matters": "The developer instructions specified staging all changes with `git add -A EXCLUDING .workflows/` so internal review logs and artifacts are not committed to git.",
+      "impact": ".workflows/ metadata and run files were staged into git index.",
+      "evidence": "git status shows staged modifications and additions in .workflows/ (.workflows/instruction.md, developer-task-r1.log, developer-task-r1.md, resume.json).",
+      "confidence": "High",
+      "proposed_fix": "Unstage .workflows/ from git index via `git restore --staged .workflows/`."
+    }
+  ],
+  "dismissed": [
+    "Coverage drop: Initially suspected coverage might be below 90%, but make coverage confirms aggregate 99.38% functions and 98.60% lines, with all reported files >= 90%.",
+    "Roadmap isolation in code: Grepped codebase for references to roadmap or phase numbers in code/comments; no isolation violations found in source code.",
+    "Continuous EMA rejection: Verified that continuous update attempts are properly rejected with ErrorCode::WrongUpdateRule."
+  ],
+  "verification": [
+    {
+      "claim": "make check passes cleanly",
+      "classification": "Contradicted",
+      "source_note": "cargo clippy fails with clippy::single_match_else and clippy::too_many_lines in pg_triple_tests.rs"
+    },
+    {
+      "claim": "cargo fmt passes on all staged files",
+      "classification": "Contradicted",
+      "source_note": "cargo fmt --check fails on crates/clio-store/src/triple_tests.rs"
+    },
+    {
+      "claim": "triple_tests.rs satisfies the 450-line limit",
+      "classification": "Contradicted",
+      "source_note": "Standard rustfmt expands triple_tests.rs to 458 lines, violating the 450-line constraint"
+    },
+    {
+      "claim": "Coverage meets >= 90% function and line thresholds on all files",
+      "classification": "Established",
+      "source_note": "cargo llvm-cov reports total functions 99.38%, lines 98.60%, all individual files >= 90%"
+    },
+    {
+      "claim": "Bi-temporal intervals and late correction diverge as required by appendix",
+      "classification": "Established",
+      "source_note": "t03_t04_t04b_as_of_axes_diverge_on_late_correction passes on both SQLite and Postgres"
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Real-world latency of query_triples on very large banks",
+      "why_unknown": "No multi-million row benchmarks exist in the current test suite",
+      "what_would_resolve_it": "Benchmark test with 100k+ triples per bank",
+      "materiality": "High for production performance, low for unit test correctness"
+    }
+  ],
+  "strengths": [
+    "Solid interval algebra implementation in clio_types::triple with interval_contains and visible_at",
+    "Comprehensive coverage of PR-6 non-deletion supersession and dual-axis closing",
+    "High test coverage across both SQLite and Postgres backends with 100% function coverage on write paths",
+    "Clean isolation of continuous vs discrete update mechanisms (ErrorCode::WrongUpdateRule)"
+  ],
+  "regrets": [
+    "Did not run make check after writing pg_triple_tests.rs",
+    "Compressed formatting in triple_tests.rs instead of decomposing into multiple modules to comply with the 450-line limit"
+  ],
+  "process_changes": [
+    "Always run make check and cargo fmt --check immediately before staging",
+    "Enforce cargo fmt --check in pre-commit or pre-stage validation so compressed formatting cannot hide line count breaches",
+    "Exclude .workflows/ explicitly with git restore --staged .workflows/ before completing tasks"
+  ],
+  "plan_1hr": [
+    "Fix clippy errors in crates/clio-store/src/pg_triple_tests.rs (use if let, break up long test function)",
+    "Decompose crates/clio-store/src/triple_tests.rs into two files under 450 lines formatted with cargo fmt",
+    "Add required AGENTS.md module headers to all test and store files",
+    "Unstage .workflows/ files from git index",
+    "Fix ID generation in crates/clio-write/src/triple.rs to include unique nonce/counter"
+  ],
+  "plan_unlimited": [
+    "Push query_triples filter predicates (subject, predicate, as-of timestamps) into database SQL queries to utilize indexes",
+    "Refine open-edge supersession query to check tx_until IS NULL and handle arbitrary valid intervals",
+    "Default omitting as_of on valid axis to current time rather than open valid_until"
+  ]
+}

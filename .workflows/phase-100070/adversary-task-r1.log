@@ -1,0 +1,24 @@
+2026-09-18T02:43:15+05:30 START adversary-task-r1 phase-100070
+2026-09-18T02:43:16+05:30 CMD git status -> 23 files staged in clio-store, clio-write, sql, roadmap
+2026-09-18T02:43:32+05:30 CMD make check -> PASS (fmt + clippy -D warnings + 155 workspace tests ok)
+2026-09-18T02:43:37+05:30 CMD make coverage -> PASS (aggregate lines 98.85%, functions 99.45%; all 37 files >= 90% lines and functions)
+2026-09-18T02:44:07+05:30 CMD find crates -name "*.rs" -exec wc -l -> PASS (max line count 441 sqlite.rs, 437 memtree_maint.rs <= 450 limit)
+2026-09-18T02:44:10+05:30 CMD git grep -i "roadmap" crates/ sql/ -> 0 occurrences (clean)
+2026-09-18T02:44:12+05:30 CMD git grep -i "phase" crates/ sql/ -> 2 violations in memtree.rs:71 and memtree_maint.rs:12
+2026-09-18T02:44:22+05:30 AUDIT Module doc headers -> 4 new test files omit responsibility headers (memtree_persist_tests.rs, postgres_ext_tests.rs, memtree_tests.rs, memtree_cov_tests.rs)
+2026-09-18T02:45:30+05:30 AUDIT Static review memtree_maint.rs -> CRITICAL race condition in dirty_set coalesce / refresh dropping re-dirtied nodes
+2026-09-18T02:46:00+05:30 AUDIT Static review memtree_attach.rs -> sibling interval_end truncation bug during split
+2026-09-18T02:47:11+05:30 AUDIT Review acceptance tests -> T100070-10 fudged (gist string checked, no MemoryItem snapshot tested); T100070-06 lacks slow worker
+2026-09-18T02:47:20+05:30 FINDING F-01 (critical): Dirty-set race condition drops re-dirtied nodes during concurrent maintenance refresh (crates/clio-write/src/memtree_maint.rs:117-136, 175-201, 230-236)
+2026-09-18T02:47:22+05:30 FINDING F-02 (high): Roadmap isolation rule violated by explicit 'Phase 100060' references (crates/clio-write/src/memtree.rs:71, crates/clio-write/src/memtree_maint.rs:12)
+2026-09-18T02:47:24+05:30 FINDING F-03 (high): Same-depth parallel refresh spawns unbounded OS threads and fully serializes on coarse-grained forest Mutex (crates/clio-write/src/memtree_maint.rs:168-179, 214)
+2026-09-18T02:47:26+05:30 FINDING F-04 (medium): Newly added Rust test modules omit mandatory AGENTS.md responsibility header blocks (crates/clio-store/src/memtree_persist_tests.rs:1-3, crates/clio-store/src/postgres_ext_tests.rs:1-3, crates/clio-write/src/memtree_tests.rs:1-3, crates/clio-write/src/memtree_cov_tests.rs:1-3)
+2026-09-18T02:47:28+05:30 FINDING F-05 (medium): Acceptance test T100070-10 / AC-100070-07 is fudged and does not test MemoryItem snapshot safety against summary refresh (crates/clio-write/src/memtree_tests.rs:268-300)
+2026-09-18T02:47:30+05:30 FINDING F-06 (medium): Internal node interval_end calculation truncates during k-ary split (crates/clio-write/src/memtree_attach.rs:209-216)
+2026-09-18T02:47:32+05:30 FINDING F-07 (medium): Migration updates schema_settings version to 3 before validating table reshape, risking corrupted metadata (crates/clio-store/src/sqlite.rs:49-52, crates/clio-store/src/postgres.rs:27-30)
+2026-09-18T02:47:34+05:30 FINDING F-08 (low): MemTree persistence in clio-store is disconnected from clio-write orchestration and lacks durable lifecycle integration (crates/clio-write/Cargo.toml:10-18, crates.md:49)
+2026-09-18T02:47:36+05:30 FINDING F-09 (low): Test t06 does not verify non-blocking write behavior during active maintenance refresh (crates/clio-write/src/memtree_tests.rs:173-207)
+2026-09-18T02:48:23+05:30 CMD write_to_file findings.json -> 9 findings recorded
+2026-09-18T02:48:27+05:30 CMD node generate-report.cjs .workflows/phase-100070 -> generated report.html (30288 bytes) and style.css
+2026-09-18T02:48:33+05:30 CMD python3 -m json.tool findings.json -> VALID JSON
+2026-09-18T02:48:45+05:30 ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100070/findings.json

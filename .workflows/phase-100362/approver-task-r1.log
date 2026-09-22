@@ -1,0 +1,11 @@
+2026-09-22T18:35:46Z START approver-task-r1 phase 100362; round 1 of 3
+2026-09-22T18:36:10Z F-01 VERIFIED RESOLVED: status_cli.rs:207-217 open_chosen checks path.exists() before SqliteStore::open, returning AmError(NotFound); tested clio status against nonexistent SQLite path -> exit 1, no database file created; unit test status_probe_tests.rs:77 open_chosen_missing_sqlite_file_degrades_without_creating passes.
+2026-09-22T18:36:33Z F-02 VERIFIED RESOLVED: cargo fmt --all applied; cargo fmt --all -- --check exits 0 with no diff blocks.
+2026-09-22T18:36:40Z F-03 VERIFIED RESOLVED: clio-config/src/config/mod.rs:221 added Runtime::deployment_keys(); status_cli.rs:317 build_setup masks all secret overlay keys discovered from overlay; unit test status_probe_tests.rs:124 build_setup_masks_secret_keys_outside_the_watched_allowlist passes.
+2026-09-22T18:36:42Z F-04 VERIFIED RESOLVED: port_scan_tests.rs:39 added listener_on_contract_port_is_reported binding port 34300; test passes.
+2026-09-22T18:37:31Z make check: exit 0 (fmt, clippy, unit and integration tests pass).
+2026-09-22T18:38:57Z make coverage: exit 0 (279 files, aggregate lines 97.90%, functions 98.87%, all per-file >=90%). Scoped: status_cli.rs 97.76%/93.33%, config/mod.rs 99.18%/100%, port_scan.rs 100%/100%.
+2026-09-22T18:39:15Z file constraints: all touched Rust source files <=450 lines (status_cli.rs 382, config/mod.rs 430, status_probe_tests.rs 286, port_scan_tests.rs 87, main.rs 322).
+2026-09-22T18:39:20Z phase attribution: updated roadmap/phase-100362-clio-status-unified-health.md with Remedy Approver r1 approved.
+2026-09-22T18:39:35Z FINISH round 1: 4/4 findings approved, 0 unresolved, make check exit 0, make coverage exit 0.
+REMEDY_APPROVED e581bdb4

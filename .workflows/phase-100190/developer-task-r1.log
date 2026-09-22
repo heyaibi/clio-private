@@ -1,0 +1,7 @@
+2026-09-19T15:24:13Z start developer r1 phase-100190 compliance erase path
+2026-09-19T15:52:21Z implemented store compliance erase (sqlite/postgres), erase_request workflow, MemTree detach_erased, MCP binding
+2026-09-19T15:52:21Z make coverage run 2 hit pre-existing flaky mcp_read_conformance (temporal_history second-boundary race), re-running
+2026-09-19T16:01:02Z implemented: ComplianceStore (sqlite+postgres erase tx, content-free tombstones, hub-derived purge), erase_request workflow (auth+confirm+DEK destroy+partial PROCESSING), MemTree detach_erased, ErasedSubject fail-closed, MCP+CLI catalog binding, schema table
+2026-09-19T16:01:02Z verified: cargo clippy -D warnings clean; cargo test --locked --workspace green (DATABASE_URL set and unset); make coverage exit 0 (lines 98.00%, functions 98.67%), no per-file <90%
+2026-09-19T16:01:02Z phase file updated (attribution/discovery/AC/tests/DoD/evidence/limitations/status); staged with git add -- . :!.workflows/ (28 files)
+DEVELOPER_DONE 4e79cbae

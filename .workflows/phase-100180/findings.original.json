@@ -1,0 +1,366 @@
+{
+  "run": "phase-100180/adversary-r1",
+  "phase": "100180",
+  "subject": "Phase 100180 \u2014 Audit Trail, Inspect, and Correction (staged diff, 48 non-workflow files)",
+  "verdict": "Adequate",
+  "verdict_justification": "The core surfaces are implemented and the workspace tests plus per-file coverage gate pass, with strong discrete-correction, lineage, and append-only tests. However, two required test scenarios (T100180-04 as_of, T100180-06 total count) are effectively unmet or untested, the coverage gate failed once on a flaky shared-Postgres assertion, and the new SQLite lineage columns have no upgrade path. These are material evidence/completeness gaps, not cosmetic.",
+  "metadata": {
+    "generated": "2026-09-19",
+    "applies_to": "staged working tree, branch master (no commit)",
+    "source": "git diff --cached (48 files); make check; make test; make coverage; requirement.md FR-15/FR-16 \u00a74.12; roadmap/phase-100180"
+  },
+  "standard": [
+    "requirement.md FR-15 (telemetry sufficient to reconstruct history; audit_trail exposes it)",
+    "requirement.md FR-16 (\u00a74.12 inspector: inspect/correct/erase_request)",
+    "requirement.md \u00a74.9.3/\u00a74.9.4.F tool gating and mutator rules",
+    "phase-100180 \u00a75 tasks 1-5, \u00a77 security acceptance, \u00a78 required tests/scenarios, \u00a79 AC/DoD",
+    "AGENTS.md: 450-line cap, headers, coverage.md per-file >=90% functions+lines",
+    "Developer completion evidence must be reproducible and accurate"
+  ],
+  "requirements": [
+    {
+      "requirement": "Telemetry on store/update/discard/invalidate/correct",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "evidence": "create_memory_item/update_memory_item pre-existing rows; discard/invalidate/correct insert rows in the same transaction (sqlite_discard.rs:118-137, sqlite_triple_read.rs:258-278, sqlite_correct.rs:196-226); tests pass."
+    },
+    {
+      "requirement": "audit_trail reconstructs lifecycle + lineage both ways + ITEM_NOT_FOUND",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "evidence": "sqlite_audit.rs:73-101,181-230; t18_02_audit_trail_traverses_lineage_from_any_revision (3-revision chain from every id); missing -> ItemNotFound."
+    },
+    {
+      "requirement": "inspect multi-filter, pagination default 50 / max 200, secret masking",
+      "status": "Partially satisfied",
+      "severity": "Medium",
+      "evidence": "read_tools.rs:182-215, inspect_query.rs:61-66, model.rs:129-146; T100180-06 total count missing (F-03/F-04)."
+    },
+    {
+      "requirement": "correct discrete supersession (both axes, lineage, no DELETE)",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "evidence": "sqlite_correct.rs/postgres_correct.rs; tests assert prior tx_until+valid_until, superseded_by_id/corrects_item_id, admission_score untouched, no DELETE in path."
+    },
+    {
+      "requirement": "correct continuous respects EMA + records attribution/reason",
+      "status": "Partially satisfied",
+      "severity": "Medium",
+      "evidence": "correct.rs:117-148 routes to observe_continuous_with_reason; reason/actor persisted on continuous_observe row, but no 'correct' operation and no audit_trail visibility (F-05)."
+    },
+    {
+      "requirement": "Blank/missing reason rejected (400-class)",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "evidence": "correct.rs:99-105; store guards; MCP confirm path; tests."
+    },
+    {
+      "requirement": "Telemetry append-only (UPDATE/DELETE rejected)",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "evidence": "sql/002_vectors_{sqlite,postgres}.sql triggers; t18_06_audit_events_reject_update_and_delete; pg parity test."
+    },
+    {
+      "requirement": "Files <= 450 lines; headers; coverage per-file >=90%",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "evidence": "max touched file postgres_store.rs 429; all new files have required headers; my coverage run: 0 files below 90% functions/lines."
+    },
+    {
+      "requirement": "MCP + in-process exposure of audit_trail/inspect/correct",
+      "status": "Partially satisfied",
+      "severity": "Low",
+      "evidence": "bound_write_tools/bound_read_tools updated; clio-compliance public API; CLI is only `am mcp stdio|http`; no stdio test (F-10)."
+    },
+    {
+      "requirement": "Required test scenarios T100180-01..T100180-06",
+      "status": "Partially satisfied",
+      "severity": "High",
+      "evidence": "T100180-01/02/03/05/06(immutability) covered; T100180-04 as_of untested (F-02); T100180-06 total count missing (F-03)."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Pre-existing SQLite databases never receive the new lineage columns",
+      "severity": "Important",
+      "why_it_matters": "A schema change shipped without an upgrade path for the default in-process backend silently breaks correct/audit_trail on any existing SQLite file.",
+      "impact": "correct_item/audit_trail SQL references items.corrects_item_id/superseded_by_id; a v6 SQLite DB lacks them and fails at runtime with 'no such column'. Only Postgres converges.",
+      "evidence": "sql/001_core.sql:146-147; sql/002_vectors_postgres.sql:35-36; sql/002_vectors_sqlite.sql (no ALTER); schema_reshape.rs:26 (SCHEMA_VERSION '6'), :29-58 (staleness only class/epistemic_kind).",
+      "confidence": "High",
+      "proposed_fix": "Bump schema_version and add a SQLite convergence path (guarded ALTER TABLE ADD COLUMN, or extend sqlite_items_stale to detect missing columns)."
+    },
+    {
+      "id": 2,
+      "title": "make coverage is not reliably green (flaky shared-Postgres index test)",
+      "severity": "Important",
+      "why_it_matters": "The phase's completion evidence claims the coverage gate is green; a failing gate contradicts that and can block the pipeline.",
+      "impact": "One of three `make coverage` runs failed on index_store_tests::tests::postgres_index_contract; the phase's new pg tests add index_pending contention to a pre-existing whole-store assertion.",
+      "evidence": "crates/clio-store/src/index_store_tests.rs:239; crates/clio-store/src/postgres_index.rs:243-249 (global LIMIT 10). Failure observed once, passes isolated and 5/5 plain runs.",
+      "confidence": "High",
+      "proposed_fix": "Scope pending_index_jobs assertion to the test's own bank, or make the assertion independent of global ordering."
+    },
+    {
+      "id": 3,
+      "title": "Required scenario T100180-04 (as_of historical query) is never tested",
+      "severity": "Important",
+      "why_it_matters": "NFR-4 past-system-belief queryability is the core claim of non-destructive correction; row-level inspection does not prove the read path returns the old value at as_of.",
+      "impact": "No test exercises as_of/time_axis for items after correction; AC-100180-04 is marked PASS on weaker evidence.",
+      "evidence": "phase \u00a78 T100180-04; grep as_of/time_axis in audit/correct tests = 0; capability exists at clio-retrieve/src/filter.rs:40.",
+      "confidence": "High",
+      "proposed_fix": "Add a retrieve/compose as_of test (transaction axis) before/after correction asserting old then new value."
+    },
+    {
+      "id": 4,
+      "title": "inspect does not return a total count (T100180-06 unmet)",
+      "severity": "Important",
+      "why_it_matters": "T100180-06's expected result explicitly requires an accurate total count; pagination without a total is not the specified contract.",
+      "impact": "Clients cannot know the full result size; AC-100180-03 overstates coverage.",
+      "evidence": "crates/clio-mcp/src/read_tools.rs:206-211; Store::inspect_items returns Vec only (store.rs:313); no test asserts total.",
+      "confidence": "High",
+      "proposed_fix": "Add a count query with the same predicates and return `total`; assert it in the pagination test."
+    },
+    {
+      "id": 5,
+      "title": "Continuous corrections emit no `correct` telemetry and are invisible to audit_trail",
+      "severity": "Important",
+      "why_it_matters": "Task 4 requires a telemetry record with operation 'correct'; the continuous branch records 'continuous_observe' with item_id NULL, so the correction is not reconstructable through the audit_trail surface.",
+      "impact": "AC-100180-01's 'correct on correction' holds only for discrete items; the Known Limitations wording ('auditable') overstates what any tool exposes.",
+      "evidence": "sqlite_attribute.rs:283-295; postgres_attribute.rs; sqlite_audit.rs:55-72; phase file line 489.",
+      "confidence": "High",
+      "proposed_fix": "Label the continuous-correction audit row operation='correct' and expose an attribute-key audit view, or reword the limitation to say it is not surfaced."
+    },
+    {
+      "id": 6,
+      "title": "Completion-evidence counts and a coverage number are inaccurate",
+      "severity": "Minor",
+      "why_it_matters": "Reviewer-facing evidence must be accurate; inflated counts/coverage mislead the approver.",
+      "impact": "'20 audit/correct tests' is actually 17; audit_correct_tests is 8 not 9; postgres_audit.rs functions are 91.67% not 100%.",
+      "evidence": "grep '#[test]' counts; target/coverage report (postgres_audit.rs 12 functions, 1 missed).",
+      "confidence": "High",
+      "proposed_fix": "Correct the phase file numbers."
+    },
+    {
+      "id": 7,
+      "title": "MCP correct dry-run does not validate a non-empty reason",
+      "severity": "Minor",
+      "why_it_matters": "Security acceptance says correct without a reason returns a 400-class error; the dry-run path returns success for a blank reason.",
+      "impact": "Inconsistent validation between preview and confirmed paths; no state change, so impact is limited to contract clarity.",
+      "evidence": "crates/clio-mcp/src/mutator_tools.rs:145-172; audit_tools_tests.rs:123-136 only tests confirm=true.",
+      "confidence": "High",
+      "proposed_fix": "Validate reason/target before returning the preview."
+    },
+    {
+      "id": 8,
+      "title": "inspect time_range upper bound is inclusive, not half-open",
+      "severity": "Minor",
+      "why_it_matters": "Task 3 specifies [start, end); an inclusive end returns an extra boundary row.",
+      "impact": "Off-by-one at the upper boundary; pre-existing, unchanged.",
+      "evidence": "inspect_query.rs:95-103.",
+      "confidence": "High",
+      "proposed_fix": "Use `<` for the end bound or document inclusive semantics with a boundary test."
+    },
+    {
+      "id": 9,
+      "title": "audit_trail returns parallel arrays, not a single consolidated timeline",
+      "severity": "Minor",
+      "why_it_matters": "AC-100180-02 wording ('merges ... ordered ascending') and Task 2's Expected Result imply one merged sequence.",
+      "impact": "Consumers must merge three arrays by timestamp themselves; evidence overstates.",
+      "evidence": "crates/clio-compliance/src/audit.rs:37-48.",
+      "confidence": "Medium",
+      "proposed_fix": "Interleave revisions+events into one array, or reword the evidence."
+    },
+    {
+      "id": 10,
+      "title": "No automated stdio test for correct/audit_trail",
+      "severity": "Minor",
+      "why_it_matters": "DoD claims end-to-end stdio verification; the staged diff adds no stdio test.",
+      "impact": "The transport-level claim rests on manual verification only.",
+      "evidence": "crates/clio-mcp/tests/ listing; audit_tools_tests.rs uses in-process dispatch.",
+      "confidence": "Medium",
+      "proposed_fix": "Add a stdio round-trip for correct + audit_trail, or reword the DoD."
+    }
+  ],
+  "dismissed": [
+    "No DELETE in the correction path (verified: none).",
+    "PR-8 attribution present on discard/invalidate/correct (actor required at store and service).",
+    "Correcting an already-discarded/superseded prior fails closed.",
+    "Correction preserves create-time admission score and prior snapshot.",
+    "Roadmap isolation: no ./roadmap/ or phase-number references in code; T-number test ids match the repo's established convention.",
+    "The T-numbered test names (T18-xx) are consistent with prior-phase convention and are not a roadmap-isolation violation.",
+    "New crate clio-compliance is already listed in crates.md.",
+    "Aggregate coverage and per-file >=90% both pass in my runs."
+  ],
+  "verification": [
+    {
+      "claim": "Workspace tests pass",
+      "classification": "Established",
+      "source_note": "make check and make test: 0 failures across all suites (clio-store lib 155 passed)."
+    },
+    {
+      "claim": "Per-file >=90% functions/lines",
+      "classification": "Established",
+      "source_note": "make coverage per-file scan: 0 files below 90% (TOTAL lines 97.99%, functions 98.62%)."
+    },
+    {
+      "claim": "make coverage green",
+      "classification": "Contradicted",
+      "source_note": "1 of 3 runs failed on index_store_tests::tests::postgres_index_contract; flaky."
+    },
+    {
+      "claim": "T100180-04 as_of historical query verified",
+      "classification": "Contradicted",
+      "source_note": "No as_of/time_axis usage in any audit/correct test."
+    },
+    {
+      "claim": "T100180-06 accurate total count",
+      "classification": "Contradicted",
+      "source_note": "inspect payload has no total; no count method."
+    },
+    {
+      "claim": "postgres_audit.rs 100% functions",
+      "classification": "Contradicted",
+      "source_note": "Coverage report: 11/12 functions = 91.67%."
+    },
+    {
+      "claim": "20 audit/correct tests in clio-store",
+      "classification": "Contradicted",
+      "source_note": "Actual 17 (8+5+4)."
+    },
+    {
+      "claim": "No DELETE in correction path (PR-6)",
+      "classification": "Established",
+      "source_note": "grep of correct impls and clio-compliance: no DELETE."
+    },
+    {
+      "claim": "Telemetry rows immutable on both backends",
+      "classification": "Established",
+      "source_note": "SQLite RAISE triggers and Postgres BEFORE triggers; direct-SQL tests pass."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Whether the manual stdio round-trip actually succeeded",
+      "why_unknown": "No automated artifact or transcript is in the repo",
+      "what_would_resolve_it": "A committed stdio test or captured transcript",
+      "materiality": "Low"
+    },
+    {
+      "what": "Whether any production SQLite DB exists at schema v6",
+      "why_unknown": "No deployment data available",
+      "what_would_resolve_it": "Confirm pre-release status",
+      "materiality": "Medium (determines F-04 impact)"
+    }
+  ],
+  "strengths": [
+    "Discrete correction is atomic and genuinely non-destructive, with both axes closed and lineage linked.",
+    "Append-only enforcement is at the database layer on both backends, with direct-SQL negative tests.",
+    "audit_trail lineage traversal is tested from every revision in a 3-revision chain.",
+    "Reason/actor validation is enforced at service and store layers, not just the binding.",
+    "All new files respect the 450-line cap and the required header structure; per-file coverage passes."
+  ],
+  "regrets": [
+    "Should have reproduced the coverage gate more than once before claiming it green.",
+    "Should have read the phase's Required Test Scenarios table line by line before accepting AC-100180-04/AC-100180-03 as PASS.",
+    "Should have tested the SQLite upgrade path, not just the Postgres convergence ALTER."
+  ],
+  "process_changes": [
+    "Treat 'make coverage green' as a claim requiring repeated runs when tests share a DB.",
+    "Check every Required Test Scenario ID against a named test, not just the checklist bullets.",
+    "For any schema change, verify both fresh-DB and pre-existing-DB paths on every backend."
+  ],
+  "plan_1hr": [
+    "Add the missing T100180-04 as_of test via retrieve/compose with time_axis=transaction.",
+    "Add `total` to the inspect payload and assert it in the pagination test.",
+    "Fix the phase-file counts/coverage claims and reword the continuous-correction limitation.",
+    "Validate reason on the MCP correct dry-run path."
+  ],
+  "plan_unlimited": [
+    "Bump schema_version and implement a SQLite schema-convergence path for the new columns.",
+    "Make continuous corrections first-class audit_trail events (operation 'correct' + attribute-key view).",
+    "De-flake the shared-Postgres whole-store index assertions and give each test bank-scoped queries.",
+    "Add a stdio end-to-end test for correct/audit_trail and inspect."
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "make coverage is not reliably green (flaky shared-Postgres index test)",
+      "evidence": "First `make coverage` run (2026-09-19) failed: `index_store_tests::tests::postgres_index_contract` panicked at crates/clio-store/src/index_store_tests.rs:239 'backoff is lifted when the cutoff is None'; exit 101. It passes in isolation (cargo test -p clio-store --lib index_store: 4 passed) and 5/5 plain full-lib runs, and 2 of 3 subsequent `make coverage` runs. The assertion reads the whole store via `pending_index_jobs(10, None)` (crates/clio-store/src/postgres_index.rs:243-249, ORDER BY queued_at LIMIT 10); the phase's new pg tests add index_pending rows in the shared DB, saturating the first-10 window under coverage instrumentation.",
+      "requirement_ref": "Phase 100180 Completion Evidence ('make coverage green')",
+      "recommendation": "Scope the assertion to the test's own bank (e.g. a bank-filtered pending query) or raise/removal of the global limit; do not claim a reliably green coverage gate until it passes repeatedly."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Required scenario T100180-04 (as_of historical query) is never tested",
+      "evidence": "Phase 100180 \u00a78 T100180-04 requires: 'Query historical fact via as_of after correction | Returns original value at past timestamp'. No test in the staged diff uses as_of/time_axis for items (grep for as_of/time_axis in audit_correct_tests.rs, pg_audit_tests.rs, correct_reject_tests.rs, clio-compliance tests: 0 hits). Tests only re-read the prior row directly and assert tx_until/valid_until + snapshot (crates/clio-store/src/audit_correct_tests.rs:167-200, crates/clio-compliance/src/correct_tests.rs:199-225). The capability to test it exists: clio-retrieve/src/filter.rs:40 item_visible_at() honours TimeAxis for items.",
+      "requirement_ref": "phase-100180 \u00a78 T100180-04 / AC-100180-04",
+      "recommendation": "Add a test that calls retrieve/compose with as_of before and after the correction on time_axis=transaction and asserts the old then new value; or correct the AC wording if row-level inspection is intended."
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "title": "inspect does not return a total count, so T100180-06 is unmet",
+      "evidence": "Phase 100180 \u00a78 T100180-06 requires 'Exactly limit items returned with accurate total count'. The inspect payload is {items, limit, offset, include_discarded} only (crates/clio-mcp/src/read_tools.rs:206-211); Store::inspect_items returns Vec<ItemInspectRow> with no count (crates/clio-store/src/store.rs:313). No test asserts a total. AC-100180-03 marks inspect filtering PASS without mentioning total.",
+      "requirement_ref": "phase-100180 \u00a78 T100180-06 / AC-100180-03",
+      "recommendation": "Add a count query (same predicates, no limit/offset) and return `total`; assert it in the pagination test. If total is intentionally out of scope, say so and downgrade T100180-06."
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "title": "Pre-existing SQLite databases never receive the new lineage columns",
+      "evidence": "sql/001_core.sql:146-147 adds items.corrects_item_id/superseded_by_id for fresh DBs; sql/002_vectors_postgres.sql:35-36 converges pre-existing Postgres DBs via ALTER TABLE ADD COLUMN IF NOT EXISTS. sql/002_vectors_sqlite.sql has no equivalent ALTER (grep 'ALTER TABLE' sql/: only 002_vectors_postgres.sql). schema_version stays '6' (crates/clio-store/src/schema_reshape.rs:26) and sqlite_items_stale() only checks class/epistemic_kind (schema_reshape.rs:29-58), so a v6 SQLite DB is not reshaped. correct_item/audit_trail SQL references the missing columns and fails at runtime with 'no such column'.",
+      "requirement_ref": "Phase 100180 Task 1/Task 4; Must-Not-Change in-process schemas; FR-16",
+      "recommendation": "Bump schema_version and add a SQLite convergence path (ALTER TABLE ... ADD COLUMN guarded by table_info, or extend sqlite_items_stale to detect the missing columns) so existing SQLite DBs upgrade."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "Continuous corrections emit no `correct` telemetry and are invisible to audit_trail",
+      "evidence": "The continuous branch writes operation='continuous_observe' with item_id=NULL (crates/clio-store/src/sqlite_attribute.rs:283-295; postgres_attribute.rs same). AC-100180-01 claims a 'correct' row on correction, but no 'correct' event exists for the continuous path, and audit_trail(item_id) cannot return it (no attribute-key anchor: sqlite_audit.rs:55-72 returns ItemNotFound). The Known Limitations entry (phase file line 489) says such corrections are 'auditable through the same-transaction continuous_observe telemetry row', but no exposed tool lists audit_events rows.",
+      "requirement_ref": "FR-15, \u00a74.12, phase-100180 Task 4 ('Emit a telemetry record with operation: correct')",
+      "recommendation": "Either label the continuous-correction audit row operation='correct' (with attr_key in detail) and expose an attribute-key audit view, or state plainly in the limitation that continuous corrections are not surfaced by audit_trail (not 'auditable')."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Completion-evidence counts and a coverage number are inaccurate",
+      "evidence": "Phase file DoD says '20 audit/correct tests in clio-store (both backends)' and Completion Evidence says audit_correct_tests.rs has 9 tests; actual counts: audit_correct_tests 8 + correct_reject_tests 5 + pg_audit_tests 4 = 17 (grep '#[test]'). Coverage claim 'sqlite_audit.rs and postgres_audit.rs 100% functions'; my `make coverage` run shows postgres_audit.rs 11/12 functions = 91.67% (target/coverage run, cov3.txt). All are >=90% so the gate passes.",
+      "requirement_ref": "phase-100180 DoD / Completion Evidence",
+      "recommendation": "Correct the counts and the postgres_audit.rs function figure."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "MCP correct dry-run (confirm=false) does not validate a non-empty reason",
+      "evidence": "crates/clio-mcp/src/mutator_tools.rs:145-172 returns the would_correct preview after only req_str('item_id'/'reason') presence checks; a blank-string reason with confirm omitted succeeds. The blank-reason rejection only fires on the confirmed path (audit_tools_tests.rs:123-136 uses confirm=true). Security acceptance says 'Calling correct without a reason returns a 400-class error'.",
+      "requirement_ref": "phase-100180 \u00a77 Security Acceptance Conditions",
+      "recommendation": "Validate reason (and target existence) before returning the preview so the dry-run and confirmed paths agree."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "inspect time_range upper bound is inclusive, not half-open [start,end)",
+      "evidence": "Phase 100180 Task 3 specifies time_range [start, end). inspect_query.rs:95-103 compiles created_at >= start and created_at <= end (inclusive). Pre-existing, unchanged by this phase; AC-100180-03 claims time-range filtering is covered.",
+      "requirement_ref": "phase-100180 \u00a75 Task 3",
+      "recommendation": "Change the upper bound to `<` (or document the inclusive choice) and add a boundary test."
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "audit_trail returns three parallel arrays, not the consolidated timeline AC evidence describes",
+      "evidence": "AC-100180-02 evidence says audit_trail 'merges revision rows + telemetry events + belief confidence trajectory, ordered ascending'. AuditTrailView exposes separate revisions/events/belief_confidence arrays (crates/clio-compliance/src/audit.rs:37-48), each sorted independently; Task 2's Expected Result ('an ordered array of every change') is not a single merged sequence.",
+      "requirement_ref": "phase-100180 Task 2 / AC-100180-02",
+      "recommendation": "Either interleave revisions+events into one timeline array or reword the evidence to say the arrays are individually ordered."
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "title": "No automated stdio test exercises correct/audit_trail despite the DoD claim",
+      "evidence": "DoD says 'verified end-to-end over stdio'. The staged diff adds no stdio integration test; crates/clio-mcp/tests/mcp_read_conformance.rs covers T17 read tools only, and audit_tools_tests.rs drives crate::write_tools::dispatch in-process. No test in crates/clio-mcp/tests references audit_trail/correct (only a comment in mcp_read_mock.rs).",
+      "requirement_ref": "phase-100180 DoD ('verified end-to-end over stdio')",
+      "recommendation": "Add a stdio (or existing harness) round-trip for correct + audit_trail, or reword the DoD to in-process binding tests."
+    }
+  ]
+}

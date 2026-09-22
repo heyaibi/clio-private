@@ -1,0 +1,21 @@
+12:02:41 START developer r1 phase-100340: read task+phase file, reading repo context
+12:04:04 pg_isready 34310 done
+12:04:29 baseline gate restarted with rustup cargo (homebrew cargo lacks llvm-tools-preview); running in background pid 51879
+12:08:27 BASELINE OK: 270 files, none below 90 (lines 97.92/functions 98.96); /tmp/cov-baseline.json
+12:12:29 note: config::persist::save_is_owner_only flaked once under parallel run, passes in isolation (persist.rs untouched by phase 100340)
+12:15:32 note: clio-ops reindex_across_two_providers_and_widths flaked once in the llvm-cov workspace run, passes standalone (clio-ops untouched by phase 100340); rerunning workspace JSON
+12:22:26 scoped passes green: clio-write extract_chat 100% fns/93.0 lines, extract 100/100, factory 100/100; clio-config env 100/100, merge 100/100, validate 98.3/100
+12:20 Implemented myself (no workers: slices were small/intertwined at the interface):
+  clio-config: merge.rs (extract.provider default template), validate.rs (extract.provider + credentials.extract_api_key allowlist/typed checks), env.rs (EXTRACT_URL/MODEL/PROVIDER/API_KEY), new extract_knob_tests.rs.
+  clio-write: Cargo.toml (+clio-index, plan-allowed, no new third-party dep), extract.rs (Transport::post_json_bearer default + HttpTransport over clio_index::post_json), new extract_chat.rs (ChatExtractor, SYSTEM_PROMPT, build_user_message with scrub_inline_secrets, chat_request_body, parse_chat_response fail-closed), new extract_factory.rs (build_extractor_from fail-closed), lib.rs re-exports.
+  Tests: extract_chat_tests.rs (T100340-01..T100340-11), extract_factory_tests.rs, extract_knob_tests.rs.
+12:22 cargo fmt + clippy -D warnings: clean after fixing user-message writeln + format! inline lints.
+12:24 scoped llvm-cov runs: clio-write extract_chat 100% fns/93.0 lines after covering generic instantiations (extract<HttpTransport>, extract<RefusingTransport>) + replacing infallible unwrap_or_else closures with expect.
+12:26 docs: README extraction provider section (egress + quality trade-off), hardware.md egress note + hosted env sketch, .env.example hosted knobs separated from local Compose vars.
+12:30 FINAL GATE make coverage: exit 0, --fail-under-lines 90 --fail-under-functions 90; TOTAL 97.90% lines / 98.93% functions; per-file scan: NONE below 90/90.
+12:31 Flakes noted (untouched files, green on rerun + in final gate): clio-config persist save_is_owner_only_and_round_trips; clio-ops reindex_across_two_providers_and_widths.
+12:31 Phase file updated: Attribution row (Developer r1 done), AC evidence table, DoD, Completion Evidence, Final Status PASS WITH DOCUMENTED LIMITATIONS, sign-off date 2026-09-22.
+12:32 File size check: all new/modified Rust files <= 450 lines (max mod.rs 423).
+12:32 Unverified: live chat endpoint against a real OpenAI-compatible server (no network egress in CI by design; Phase 100350 owns live runtime wiring).
+12:27:20 staging with git add -- . ':!.workflows/'
+DEVELOPER_DONE 3d91e644

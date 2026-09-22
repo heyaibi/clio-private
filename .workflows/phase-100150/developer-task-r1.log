@@ -1,0 +1,16 @@
+2026-09-19T06:31:39Z START phase-100150 developer r1 nonce=9cce45c0
+2026-09-19T06:31:39Z BASELINE running make coverage (postgres up on 34310)
+2026-09-19T06:32:14Z BASELINE make coverage exit=0 TOTAL lines=98.38 pct funcs=98.51 pct; every file funcs+lines >=90 (regions below 90 on several is not gated)
+2026-09-19T06:33:10Z DISCOVERY no clio-history crate yet; workspace members end at clio-retrieve. FailureRecord absent from clio-types.
+2026-09-19T06:33:10Z DISCOVERY SearchDomain::Task/Failure/Temporal already defined (clio-types/read.rs); episodic_type task/failure allowed in items CHECK (sql/001_core.sql).
+2026-09-19T06:33:10Z DISCOVERY pattern: store traits in clio-store (BeliefStore/PersonaStore), SQL per backend, gated writes via clio-admission gated_create, atomic carrier item + structured row like commit_triple_add.
+2026-09-19T06:33:10Z DISCOVERY temporal sources: Store::query_triples (no all-versions), ContinuousStore::continuous_series, BeliefStore::belief_history.
+2026-09-19T06:33:10Z DISCOVERY plan: new clio-history crate; clio-types history types; clio-store HistoryStore trait + sqlite/postgres impls + DDL; history tools + similarity + retry + temporal facade.
+2026-09-19T07:00:11Z IMPL clio-types history types + clio-store HistoryStore (sqlite/postgres split files) + clio-history crate + DDL + workspace/clio-lib wiring done
+2026-09-19T07:00:11Z TEST cargo test --locked --workspace exit=0 all suites pass; clippy -D warnings clean; cargo fmt applied
+2026-09-19T07:00:11Z COVERAGE running make coverage
+2026-09-19T07:12:22Z COVERAGE make coverage exit=0 TOTAL lines=98.37% functions=98.65%; all 135 reported files >=90% functions+lines; new history files >=95% lines, 100% functions
+2026-09-19T07:12:22Z CHECK make check exit=0 (fmt+clippy -D warnings+workspace tests)
+2026-09-19T07:12:22Z PHASE file updated: attribution done, AC results, DoD, completion evidence, Final Status PASS WITH DOCUMENTED LIMITATIONS
+2026-09-19T07:12:22Z DOCS crates.md per-crate dependency row updated to include clio-admission
+DEVELOPER_DONE 9cce45c0

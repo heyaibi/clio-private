@@ -1,0 +1,6 @@
+2026-09-18T12:35:41+0530 START finalize-task-r1: close-out for phase-100080 (remedy approved round 2)
+2026-09-18T12:35:41+0530 attribution check: roadmap/phase-100080-bitemporal-triples-supersession.md Attribution table present and well-formed; Developer row Cursor Agent CLI (auto) already present, no edit needed
+2026-09-18T12:36:17+0530 make check: PASS EXIT=0 (cargo fmt --all, clippy -D warnings 0 warnings, cargo test workspace 0 failures)
+2026-09-18T12:36:17+0530 working tree: code changes confined to crates/clio-types, crates/clio-store, crates/clio-write, crates/clio-lib, sql/001_core.sql, Cargo.lock, roadmap/phase-100080-bitemporal-triples-supersession.md; .workflows/ paths are pipeline-internal and ignored per close-out rules; changes left uncommitted, no commit created
+2026-09-18T12:36:19+0530 FINISH finalize-task-r1: attribution confirmed, make check passed, working tree clean of unintended changes
+FINALIZE_DONE

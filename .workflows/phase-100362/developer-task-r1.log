@@ -1,0 +1,4 @@
+2026-09-22T17:48:28Z START developer-task-r1 phase 100362 clio status command
+2026-09-22T17:52:21Z read task/phase/coverage/crates/gaps + requirement FR-30/FR-32/NFR-6; discovered: no status dispatch; diagnose = health source; compose has probe only, no ps; install type NOT persisted in deployment overlay (only embed/rerank/credentials fields); deployment path getter = clio_config::resolve_deployment_path(None); masking = redact_credentials + mask_secret
+2026-09-22T17:53:55Z baseline attempt 1 failed (llvm-tools-preview missing); installed component, relaunched cargo llvm-cov workspace baseline (pid 76034)
+2026-09-22T17:56:14Z toolchain fix: PATH resolved cargo to Homebrew rust (no llvm-tools); fixed by prepending ~/.cargo/bin (rustup shim) so rustc+llvm-tools match (stable 1.98.1); baseline relaunched, tests running

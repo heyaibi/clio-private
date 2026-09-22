@@ -1,0 +1,15 @@
+2026-09-22T08:53:26Z [start] remediator r1: 4 findings (F-01..F-04), all minor, clio-mcp/clio-write. Backup findings.original.json already exists. Triage: fixing all myself (coupled in clio-mcp).
+2026-09-22T09:08:22Z [triage] F-01..F-04 fixed directly by remediator (all small + coupled inside clio-mcp; worker fan-out would have shared files, so serial self-fix).
+2026-09-22T09:08:22Z [F-01] index_drain_tests.rs: full Responsibility/Owns/Does-not-own/Boundary header added (file 427 lines).
+2026-09-22T09:08:22Z [F-02] ops_embedder.rs build_ops_embedder_from: non-empty provider + empty embed.model -> Err(ConfigCorrupt); embed.dims==0 with url -> Err(ConfigCorrupt). runtime_tests.rs assertions updated to expect ConfigCorrupt with embed.model/embed.dims messages.
+2026-09-22T09:08:22Z [F-03] index_drain_tests.rs: new t35_06_raw_ingest_drains_and_retrieves_end_to_end (fake extract server -> ingest_raw -> drain_index lexical_only=1 -> retrieve hit contains admitted id).
+2026-09-22T09:08:22Z [F-04] runtime.rs: new extract_available_from() mirrors clio_write::build_extractor_from fail-closed rules (openai needs model+credential; unknown provider never ready). runtime_tests.rs: extract_available_matches_ingest_fail_closed (6 cases).
+2026-09-22T09:08:22Z [verify-scoped] cargo test -p clio-mcp --locked: 249 passed, 0 failed (index_drain 10/10 incl. new tests).
+2026-09-22T09:08:22Z [line-limit] runtime.rs 432, ops_embedder.rs 133, index_drain_tests.rs 427, runtime_tests.rs 420 — all <=450 (cargo fmt applied; fmt re-wrap initially pushed test file to 466/453; fixed by moving readiness test to runtime_tests.rs).
+2026-09-22T09:08:22Z [plan_unlimited-1] rejected with evidence: sweeper already condvar-nudge-driven on every write (runtime_index.rs:56-98), 500ms timeout only a fallback; NFR-2 verified by t35_13; bounded batches pinned by t35_14. Looping over full backlog adds no NFR-2 gain and removes the batch bound.
+2026-09-22T09:08:22Z [plan_unlimited-2] rejected with evidence: cargo test -p clio-store --locked postgres against live compose PG :34310 -> 44 passed, 0 failed; drain wiring backend-agnostic, covered on SQLite (t35_01/03/06/09/13/14); residual full-drain-on-PG scenario stays a documented limitation.
+2026-09-22T09:08:22Z [report] findings.json updated: all 4 findings carry resolution blocks; remediation section added with plan dispositions. JSON validated (python3 -m json.tool).
+2026-09-22T09:08:22Z [check] make check (fmt + clippy -D warnings + full workspace test): clean, no failures.
+2026-09-22T09:08:22Z [gate] cargo llvm-cov --workspace --locked --json --fail-under-lines 90 --fail-under-functions 90 (DATABASE_URL=compose PG :34310, rustup llvm-tools): exit=0, /tmp/cov-remediator-r1.json: TOTAL lines 97.91% funcs 98.94%, 276 files, 0 below 90; ops_embedder.rs 100/100, runtime.rs 98.26/100.
+2026-09-22T09:08:22Z [attribution] phase file Remediator r1 row -> done (unstaged, like the Adversary row; changes left UNSTAGED per task rules).
+REMEDIATOR_DONE fb703a9c

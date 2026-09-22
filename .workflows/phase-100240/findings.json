@@ -1,0 +1,377 @@
+{
+  "run": "r1",
+  "phase": "phase-100240",
+  "subject": "Phase 100240: Multi-Host Sync Protocol Implementation Review",
+  "verdict": "Inadequate",
+  "verdict_justification": "The Phase 100240 implementation fails critical quality gates: make check / make lint fail due to an unused import (ErrorCode in journal_row.rs:29), and the required 90% per-file function coverage gate failed on 5 source files (postgres_sync.rs, client.rs, http.rs, protocol.rs, server.rs). Furthermore, sub-millisecond item updates crash SQLite due to duplicate audit_events.id, and triples are omitted from the client push change feed.",
+  "metadata": {
+    "generated": "2026-09-20",
+    "applies_to": "r1 (staged diff: 45 files, 6992 insertions)",
+    "source": "git staged diff against main branch"
+  },
+  "standard": [
+    "AGENTS.md: Clean compilation under cargo clippy --workspace --all-targets --all-features --locked -- -D warnings (make check / make lint)",
+    "AGENTS.md & coverage.md: ≥90% line and function coverage on EVERY reported Rust source file (per-file gate)",
+    "Hard Rules: Roadmap isolation (never reference ./roadmap/, phase numbers, or crates.md in code or comments)",
+    "Hard Rules: Source file line limit ≤ 450 lines per Rust file",
+    "Phase 100240 Specification & Appendix: Full FR-31 surfaces, idempotent apply, DLQ cursor blocking, LWW conflict resolution, client encryption, assoc_edge and triple sync"
+  ],
+  "requirements": [
+    {
+      "requirement": "Clean workspace build and linting (make check / make lint)",
+      "status": "Missed",
+      "severity": "Critical",
+      "confidence": "High",
+      "evidence": "make lint and make check fail with exit code 101: unused import ErrorCode in crates/clio-sync/src/journal_row.rs:29:25"
+    },
+    {
+      "requirement": "Per-file ≥90% function and line coverage (AGENTS.md)",
+      "status": "Missed",
+      "severity": "Critical",
+      "confidence": "High",
+      "evidence": "5 sync files have function coverage <90% in both full gate and scoped package runs (protocol.rs 60.00%, server.rs 64.71%, http.rs 69.57%, client.rs 79.17%, postgres_sync.rs 80.00%, sqlite_sync.rs 87.04%)"
+    },
+    {
+      "requirement": "Crash-safe and race-free idempotent apply (T100240-02 / T100240-03 / P-lww)",
+      "status": "Partially satisfied",
+      "severity": "High",
+      "confidence": "High",
+      "evidence": "Sub-millisecond item updates fail with UNIQUE constraint failed: audit_events.id due to millisecond timestamp collisions in item_update.rs:38"
+    },
+    {
+      "requirement": "Sync change feed includes all required entity kinds (triples, assoc_edge, items)",
+      "status": "Partially satisfied",
+      "severity": "High",
+      "confidence": "High",
+      "evidence": "push_bank in client.rs only queries feed_items and feed_assoc, completely omitting feed_triples"
+    },
+    {
+      "requirement": "DLQ cursor freeze and ack-skip recovery on corrupted/unopenable ciphertext (Appendix §7)",
+      "status": "Partially satisfied",
+      "severity": "Medium",
+      "confidence": "High",
+      "evidence": "decrypt_for_apply propagates key.open() errors with ?, aborting pull_bank without writing to sync_dead_letter, making ack_skip impossible"
+    },
+    {
+      "requirement": "Roadmap isolation in code and comments (Hard Rules)",
+      "status": "Partially satisfied",
+      "severity": "Low",
+      "confidence": "High",
+      "evidence": "crates/clio-sync/src/crypto.rs:16 contains explicit reference to Phase 100020 separation"
+    },
+    {
+      "requirement": "Rust source file line limit ≤ 450 lines (AGENTS.md)",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "confidence": "High",
+      "evidence": "All modified/created Rust files stay at or below 450 total lines (max is client.rs at 450 lines)"
+    },
+    {
+      "requirement": "AGENTS.md file header and ownership block on all new Rust files",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "confidence": "High",
+      "evidence": "All 27 newly created Rust files contain truthful responsibility, owns, does not own, and boundary blocks"
+    },
+    {
+      "requirement": "Single-host omission documentation and tooling flags",
+      "status": "Fully satisfied",
+      "severity": "Low",
+      "confidence": "High",
+      "evidence": "crates.md, clio-sync/src/lib.rs, and clio-config profile omission flags properly document and gate sync tools for single-host deployments"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Compilation and Linter Failure on make check / make lint (Unused Import ErrorCode)",
+      "severity": "Critical",
+      "why_it_matters": "Clippy fails under -D warnings across the workspace; make check and make lint cannot pass.",
+      "impact": "Blocks CI and fails workspace gate; breaks production compilation under strict warning flags.",
+      "evidence": "crates/clio-sync/src/journal_row.rs:29:25: use clio_types::{AmError, ErrorCode};. Command make lint exits 101 with error: unused import: ErrorCode.",
+      "confidence": "High",
+      "proposed_fix": "Remove unused import ErrorCode from crates/clio-sync/src/journal_row.rs:29.",
+      "status": "resolved",
+      "resolution": "Removed the unused `ErrorCode` import from `crates/clio-sync/src/journal_row.rs`.",
+      "resolution_evidence": "make lint (cargo clippy --workspace --all-targets --all-features --locked -- -D warnings) exits 0; make check exits 0."
+    },
+    {
+      "id": 2,
+      "title": "Falsified Coverage Defense and Under-90% Function Coverage Across Five Source Files",
+      "severity": "Critical",
+      "why_it_matters": "The project enforces a strict ≥90% per-file function coverage gate. The developer claimed that low numbers were an LLVM dual-codegen artifact and that scoped runs were 90-100%, but scoped runs also fail (protocol.rs 60.00%, server.rs 64.71%, http.rs 69.57%, client.rs 79.17%, postgres_sync.rs 80.00%, sqlite_sync.rs 87.04%).",
+      "impact": "Multiple production functions across clio-sync and clio-store are unexercised in tests, violating core AGENTS.md rules and masking potential defects.",
+      "evidence": "Output of make coverage and cargo llvm-cov --package clio-sync: protocol.rs (60.00% func, 8 missed), server.rs (64.71% func, 12 missed), http.rs (69.57% func, 7 missed), client.rs (79.17% func, 5 missed), postgres_sync.rs (80.00% func, 9 missed), sqlite_sync.rs (87.04% func, 7 missed). Functions like subject_is_shredded and dead_letter_status have zero test invocations.",
+      "confidence": "High",
+      "proposed_fix": "Add comprehensive unit/integration tests targeting unhit functions across clio-sync and clio-store, and prune unneeded functions to bring all reported files above 90% function coverage.",
+      "status": "resolved",
+      "resolution": "Real deficit, not only an artifact. cargo-llvm-cov's per-cfg instantiation is genuine, but it masked unreached error-mapper closures. Removed the unreachable closures (content_for, crypto::seal, server::write_json, journal_row_to_mutation error arms), replaced them with shared unit-tested mapper functions, extracted push-side packaging into client_feed.rs, and added the missing tests (protocol cursor/watermark error shapes, content_value, http framing/io mappers, server error seams). Stale target/llvm-cov-target artifacts are cleared with `cargo llvm-cov clean --workspace` before the gate.",
+      "resolution_evidence": "make coverage exit 0; aggregate functions 98.86% (2899, 33 missed), lines 97.87%. No reported file below 90% on functions or lines. clio-sync: protocol.rs 100/100, client.rs 100/92.97, client_feed.rs 100/96.39, http.rs 100/99.15, server.rs 100/95.51, crypto.rs 100/94.74, apply.rs 100/97.29; clio-store: postgres_sync.rs 100/100, sqlite_sync.rs 100/100 (functions/lines %)."
+    },
+    {
+      "id": 3,
+      "title": "Race Condition and Flaky Test Failure on Rapid Item Updates (audit_events.id Collision)",
+      "severity": "Important",
+      "why_it_matters": "Sub-millisecond updates to the same memory item crash with an internal SQLite UNIQUE constraint violation, causing intermittent test failures and runtime crashes.",
+      "impact": "Causes random test flakiness during sync apply and crashes in high-throughput or batch sync scenarios.",
+      "evidence": "crates/clio-store/src/item_update.rs:37-38 uses now_iso() milliseconds for audit_id = format!(\"audit-upd-{}-{}\", item.id, ts). Running cargo llvm-cov panicked: apply::apply_tests::t24_03_equal_stamp_tie_broken_by_score_then_device panicked at crates/clio-sync/src/apply_tests.rs:162:33: apply succeeds: AmError { code: Internal, message: \"audit update: UNIQUE constraint failed: audit_events.id\" }.",
+      "confidence": "High",
+      "proposed_fix": "Append an atomic sequence number, microsecond/nanosecond component, or UUID suffix to audit_id in item_update.rs to guarantee uniqueness within the same millisecond.",
+      "status": "resolved",
+      "resolution": "`update_audit_id` in crates/clio-store/src/item_update.rs appends a process-wide atomic sequence to the millisecond stamp, so two updates of the same item in one millisecond cannot collide on audit_events.id.",
+      "resolution_evidence": "New regression coverage `suite_rapid_updates_unique_audit` runs 25 back-to-back updates on SQLite and Postgres (`sqlite_memory_item_suite`, `postgres_memory_item_suite`); make check 1185 passed / 0 failed."
+    },
+    {
+      "id": 4,
+      "title": "Client Push Change Feed Silently Omits Triples",
+      "severity": "Important",
+      "why_it_matters": "Triples created or closed locally are never discovered by push_bank and never pushed to remote peers.",
+      "impact": "Multi-host deployments fail to sync facts/triples, causing divergence across nodes despite claimed sync support.",
+      "evidence": "crates/clio-sync/src/client.rs:205-237 only queries cfg.sync.feed_items() and cfg.sync.feed_assoc(). Although SyncStore::feed_triples is implemented in clio-store, push_bank never calls it. crates/clio-sync/src/client.rs:153-160 also omits feed_triples in pending_push calculation.",
+      "confidence": "High",
+      "proposed_fix": "Call cfg.sync.feed_triples() in push_bank, convert closed triples into SyncMutation envelopes, and include them in the outbound payload; include triple feed count in sync_status pending_push.",
+      "status": "resolved",
+      "resolution": "`client_feed::push_bank` now iterates `SyncStore::feed_triples`, packages each closed triple as a `triple`/`invalidate` mutation with SPO content, and `sync_status.pending_push` counts the triple feed. `client.rs` was split (<450 lines) to make room.",
+      "resolution_evidence": "End-to-end test `client_feed::client_feed_tests::triple_close_packages_as_invalidate_and_replicates`: A closes a triple, pushes, the relay journals the invalidate, and B's matching triple closes. `triple_packaging_skips_open_and_missing_triples` covers open/missing skip paths."
+    },
+    {
+      "id": 5,
+      "title": "Pull Loop Permanently Stuck on Unopenable or Corrupted Ciphertext (Bypassing DLQ Quarantine)",
+      "severity": "Important",
+      "why_it_matters": "If a client cannot decrypt an encrypted payload (wrong key, bad ciphertext, or tampering), pull fails with an unhandled error instead of quarantining the mutation to dead-letter.",
+      "impact": "The pull pipeline is permanently wedged. Because the mutation is never written to sync_dead_letter, the operator cannot call ack_skip to unfreeze the pull cursor.",
+      "evidence": "crates/clio-sync/src/client.rs:368 calls let bytes = key.open(cipher)?; in decrypt_for_apply. Any decryption error bubbles up through ?, terminating pull_bank without recording a dead-letter row.",
+      "confidence": "High",
+      "proposed_fix": "Catch key.open() errors in decrypt_for_apply, quarantine the mutation into sync_dead_letter using quarantine(), and return Ok(None) so the pull cursor safely freezes and can be ack-skipped.",
+      "status": "resolved",
+      "resolution": "`decrypt_for_apply` now quarantines an unopenable (wrong key / tampered) or non-JSON payload as `malformed` and returns `Ok(None)`, so the pull loop returns with a frozen cursor and a dead-letter row that `ack_skip` can clear, instead of propagating `?` and wedging the pull with no DLQ row.",
+      "resolution_evidence": "Test `client::client_status_tests::wrong_cipher_key_quarantines_then_ack_skip_unfreezes`: wrong key -> dead_letter_open 1, pull_cursor frozen, item absent; after ack_skip -> open 0, cursor advances, item still absent."
+    },
+    {
+      "id": 6,
+      "title": "Server Pull Fails with HTTP 500 on Mutations with Null or Empty content_sealed",
+      "severity": "Important",
+      "why_it_matters": "If any journal row has NULL content_sealed, the server fails during pull serialization and returns HTTP 500.",
+      "impact": "Any sync client attempting to pull a page containing such a row receives an HTTP 500 error, halting replication.",
+      "evidence": "crates/clio-sync/src/server.rs:338-344: let sealed = row.content_sealed.clone().unwrap_or_default(); followed by serde_json::from_str::<clio_store::CiphertextEnvelope>(&sealed). If content_sealed is None, deserializing an empty string fails with EOF.",
+      "confidence": "High",
+      "proposed_fix": "In journal_row_to_mutation, handle None / empty content_sealed gracefully by supplying an empty default JSON value rather than attempting to deserialize an empty string as a CiphertextEnvelope.",
+      "status": "resolved",
+      "resolution": "`server::journal_row_to_mutation` serves empty plain content (`{}`) for a row with no sealed content (KMS-less writer) instead of deserializing an empty string into `CiphertextEnvelope`.",
+      "resolution_evidence": "Test `server::server_tests::pull_survives_unsealed_journal_row_without_http_500`: a NULL content_sealed row pulls with HTTP 200 and `{mode:plain,data:{}}`. Additional error-seam tests cover corrupt cipher rows and corrupt sealed envelopes."
+    },
+    {
+      "id": 7,
+      "title": "Roadmap Isolation Hard-Rule Violation in Code Doc-Comments",
+      "severity": "Minor",
+      "why_it_matters": "Roadmap phase references in production code violate the hard rule that the codebase must remain decoupled and valid if roadmap/ is deleted.",
+      "impact": "Violates AGENTS.md and Developer task hard isolation constraints.",
+      "evidence": "crates/clio-sync/src/crypto.rs:16: //! - Subject DEKs or KMS (see clio-store dek — Phase 100020 separation).",
+      "confidence": "High",
+      "proposed_fix": "Remove — Phase 100020 separation from the doc comment in crates/clio-sync/src/crypto.rs:16.",
+      "status": "resolved",
+      "resolution": "Removed the `Phase 100020 separation` reference from the `crypto.rs` module doc comment.",
+      "resolution_evidence": "grep for `Phase` under crates/ returns no source hit; make check clean."
+    },
+    {
+      "id": 8,
+      "title": "Asymmetric LWW Tie-Breaking Due to Missing Local Device ID on Stored Items",
+      "severity": "Minor",
+      "why_it_matters": "The LWW tie-breaker compares device IDs lexicographically when timestamps and scores tie, but the local device ID is hardcoded to \"\".",
+      "impact": "Remote mutations always win ties against local items regardless of lexicographical device ID ordering.",
+      "evidence": "crates/clio-sync/src/apply.rs:395 passes \"\" as existing device ID in lww_compare. Any non-empty incoming device_id will win ties.",
+      "confidence": "High",
+      "proposed_fix": "Persist originating device ID in items or pass the local node device ID to allow true symmetric tie-breaking.",
+      "status": "resolved",
+      "resolution": "`apply::lww_loser` now passes this node's device id (`engine.device_id`) as the existing side of `lww_compare` instead of the empty string, removing the 'any non-empty remote device wins a full tie' asymmetry. Full origin-device persistence is not added; it is recorded as a Known Limitation with a named debt owner.",
+      "resolution_evidence": "`t24_03_equal_stamp_tie_broken_by_score_then_device` now asserts a higher device id (`peer-z` > local `node-1`) wins a full tie; make check clean."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "critical",
+      "title": "Compilation and Linter Failure on make check / make lint (Unused Import ErrorCode)",
+      "evidence": "crates/clio-sync/src/journal_row.rs:29:25: use clio_types::{AmError, ErrorCode};. Command make lint exits 101 with error: unused import: ErrorCode.",
+      "requirement_ref": "AGENTS.md (make check = fmt + clippy -D warnings + test, Verify your work)",
+      "recommendation": "Remove unused import ErrorCode from crates/clio-sync/src/journal_row.rs:29.",
+      "status": "resolved",
+      "resolution": "Removed the unused `ErrorCode` import from `crates/clio-sync/src/journal_row.rs`.",
+      "resolution_evidence": "make lint (cargo clippy --workspace --all-targets --all-features --locked -- -D warnings) exits 0; make check exits 0."
+    },
+    {
+      "id": "F-02",
+      "severity": "critical",
+      "title": "Falsified Coverage Defense and Under-90% Function Coverage Across Five Source Files",
+      "evidence": "Output of make coverage and cargo llvm-cov --package clio-sync: protocol.rs (60.00% func, 8 missed), server.rs (64.71% func, 12 missed), http.rs (69.57% func, 7 missed), client.rs (79.17% func, 5 missed), postgres_sync.rs (80.00% func, 9 missed), sqlite_sync.rs (87.04% func, 7 missed). Functions like subject_is_shredded and dead_letter_status have zero test invocations.",
+      "requirement_ref": "AGENTS.md (Coverage Gate: ≥90% function and line coverage per file), coverage.md",
+      "recommendation": "Add comprehensive unit/integration tests targeting unhit functions across clio-sync and clio-store, and prune unneeded functions to bring all reported files above 90% function coverage.",
+      "status": "resolved",
+      "resolution": "Real deficit, not only an artifact. cargo-llvm-cov's per-cfg instantiation is genuine, but it masked unreached error-mapper closures. Removed the unreachable closures (content_for, crypto::seal, server::write_json, journal_row_to_mutation error arms), replaced them with shared unit-tested mapper functions, extracted push-side packaging into client_feed.rs, and added the missing tests (protocol cursor/watermark error shapes, content_value, http framing/io mappers, server error seams). Stale target/llvm-cov-target artifacts are cleared with `cargo llvm-cov clean --workspace` before the gate.",
+      "resolution_evidence": "make coverage exit 0; aggregate functions 98.86% (2899, 33 missed), lines 97.87%. No reported file below 90% on functions or lines. clio-sync: protocol.rs 100/100, client.rs 100/92.97, client_feed.rs 100/96.39, http.rs 100/99.15, server.rs 100/95.51, crypto.rs 100/94.74, apply.rs 100/97.29; clio-store: postgres_sync.rs 100/100, sqlite_sync.rs 100/100 (functions/lines %)."
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "title": "Race Condition and Flaky Test Failure on Rapid Item Updates (audit_events.id Collision)",
+      "evidence": "crates/clio-store/src/item_update.rs:37-38 uses now_iso() milliseconds for audit_id = format!(\"audit-upd-{}-{}\", item.id, ts). Running cargo llvm-cov panicked: apply::apply_tests::t24_03_equal_stamp_tie_broken_by_score_then_device panicked at crates/clio-sync/src/apply_tests.rs:162:33: apply succeeds: AmError { code: Internal, message: \"audit update: UNIQUE constraint failed: audit_events.id\" }.",
+      "requirement_ref": "FR-31 (Idempotent Apply / LWW Conflict resolution), AC-100240-03, T100240-03",
+      "recommendation": "Append an atomic sequence number, microsecond/nanosecond component, or UUID suffix to audit_id in item_update.rs to guarantee uniqueness within the same millisecond.",
+      "status": "resolved",
+      "resolution": "`update_audit_id` in crates/clio-store/src/item_update.rs appends a process-wide atomic sequence to the millisecond stamp, so two updates of the same item in one millisecond cannot collide on audit_events.id.",
+      "resolution_evidence": "New regression coverage `suite_rapid_updates_unique_audit` runs 25 back-to-back updates on SQLite and Postgres (`sqlite_memory_item_suite`, `postgres_memory_item_suite`); make check 1185 passed / 0 failed."
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "title": "Client Push Change Feed Silently Omits Triples",
+      "evidence": "crates/clio-sync/src/client.rs:205-237 only queries cfg.sync.feed_items() and cfg.sync.feed_assoc(). Although SyncStore::feed_triples is implemented in clio-store, push_bank never calls it. crates/clio-sync/src/client.rs:153-160 also omits feed_triples in pending_push calculation.",
+      "requirement_ref": "FR-31, Phase 100240 Appendix §2, Phase 100240 Doc §1 & §12",
+      "recommendation": "Call cfg.sync.feed_triples() in push_bank, convert closed triples into SyncMutation envelopes, and include them in the outbound payload; include triple feed count in sync_status pending_push.",
+      "status": "resolved",
+      "resolution": "`client_feed::push_bank` now iterates `SyncStore::feed_triples`, packages each closed triple as a `triple`/`invalidate` mutation with SPO content, and `sync_status.pending_push` counts the triple feed. `client.rs` was split (<450 lines) to make room.",
+      "resolution_evidence": "End-to-end test `client_feed::client_feed_tests::triple_close_packages_as_invalidate_and_replicates`: A closes a triple, pushes, the relay journals the invalidate, and B's matching triple closes. `triple_packaging_skips_open_and_missing_triples` covers open/missing skip paths."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "Pull Loop Permanently Stuck on Unopenable or Corrupted Ciphertext (Bypassing DLQ Quarantine)",
+      "evidence": "crates/clio-sync/src/client.rs:368 calls let bytes = key.open(cipher)?; in decrypt_for_apply. Any decryption error bubbles up through ?, terminating pull_bank without recording a dead-letter row.",
+      "requirement_ref": "Phase 100240 Appendix §1, §4, §7 (DLQ Policy)",
+      "recommendation": "Catch key.open() errors in decrypt_for_apply, quarantine the mutation into sync_dead_letter using quarantine(), and return Ok(None) so the pull cursor safely freezes and can be ack-skipped.",
+      "status": "resolved",
+      "resolution": "`decrypt_for_apply` now quarantines an unopenable (wrong key / tampered) or non-JSON payload as `malformed` and returns `Ok(None)`, so the pull loop returns with a frozen cursor and a dead-letter row that `ack_skip` can clear, instead of propagating `?` and wedging the pull with no DLQ row.",
+      "resolution_evidence": "Test `client::client_status_tests::wrong_cipher_key_quarantines_then_ack_skip_unfreezes`: wrong key -> dead_letter_open 1, pull_cursor frozen, item absent; after ack_skip -> open 0, cursor advances, item still absent."
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "title": "Server Pull Fails with HTTP 500 on Mutations with Null or Empty content_sealed",
+      "evidence": "crates/clio-sync/src/server.rs:338-344: let sealed = row.content_sealed.clone().unwrap_or_default(); followed by serde_json::from_str::<clio_store::CiphertextEnvelope>(&sealed). If content_sealed is None, deserializing an empty string fails with EOF.",
+      "requirement_ref": "§4.9.5.D, AC-100240-01",
+      "recommendation": "In journal_row_to_mutation, handle None / empty content_sealed gracefully by supplying an empty default JSON value rather than attempting to deserialize an empty string as a CiphertextEnvelope.",
+      "status": "resolved",
+      "resolution": "`server::journal_row_to_mutation` serves empty plain content (`{}`) for a row with no sealed content (KMS-less writer) instead of deserializing an empty string into `CiphertextEnvelope`.",
+      "resolution_evidence": "Test `server::server_tests::pull_survives_unsealed_journal_row_without_http_500`: a NULL content_sealed row pulls with HTTP 200 and `{mode:plain,data:{}}`. Additional error-seam tests cover corrupt cipher rows and corrupt sealed envelopes."
+    },
+    {
+      "id": "F-07",
+      "severity": "medium",
+      "title": "Roadmap Isolation Hard-Rule Violation in Code Doc-Comments",
+      "evidence": "crates/clio-sync/src/crypto.rs:16: //! - Subject DEKs or KMS (see clio-store dek — Phase 100020 separation).",
+      "requirement_ref": "Hard Rules (Roadmap isolation: never reference ./roadmap/, phase numbers, or roadmap files from code or comments)",
+      "recommendation": "Remove — Phase 100020 separation from the doc comment in crates/clio-sync/src/crypto.rs:16.",
+      "status": "resolved",
+      "resolution": "Removed the `Phase 100020 separation` reference from the `crypto.rs` module doc comment.",
+      "resolution_evidence": "grep for `Phase` under crates/ returns no source hit; make check clean."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "Asymmetric LWW Tie-Breaking Due to Missing Local Device ID on Stored Items",
+      "evidence": "crates/clio-sync/src/apply.rs:395 passes \"\" as existing device ID in lww_compare. Any non-empty incoming device_id will win ties.",
+      "requirement_ref": "Phase 100240 Appendix §5 (sync_lww_rule)",
+      "recommendation": "Persist originating device ID in items or pass the local node device ID to allow true symmetric tie-breaking.",
+      "status": "resolved",
+      "resolution": "`apply::lww_loser` now passes this node's device id (`engine.device_id`) as the existing side of `lww_compare` instead of the empty string, removing the 'any non-empty remote device wins a full tie' asymmetry. Full origin-device persistence is not added; it is recorded as a Known Limitation with a named debt owner.",
+      "resolution_evidence": "`t24_03_equal_stamp_tie_broken_by_score_then_device` now asserts a higher device id (`peer-z` > local `node-1`) wins a full tie; make check clean."
+    }
+  ],
+  "dismissed": [
+    "Checked file size constraints across all 45 staged files; all files remain at or below the 450-line limit (crates/clio-sync/src/client.rs is at exactly 450 lines).",
+    "Checked AGENTS.md headers across all 27 new Rust files; all conform to responsibility, ownership, and boundary structure.",
+    "Checked SQLite and Postgres sync schema migrations; tables were added cleanly to sql/001_core.sql without separate migration files."
+  ],
+  "verification": [
+    {
+      "claim": "make check passes cleanly",
+      "classification": "Confirmed",
+      "source_note": "make check exit 0: fmt + clippy -D warnings + workspace tests (1185 passed, 0 failed)."
+    },
+    {
+      "claim": "Every reported Rust source file achieves ≥90% line and function coverage",
+      "classification": "Confirmed",
+      "source_note": "make coverage exit 0 (aggregate functions 98.86%, lines 97.87%); per-file scan shows no reported file below 90 on functions or lines."
+    },
+    {
+      "claim": "All unit and integration tests pass reliably",
+      "classification": "Confirmed",
+      "source_note": "make check 1185 passed / 0 failed; the same-millisecond audit_events.id collision is fixed by the atomic sequence suffix."
+    },
+    {
+      "claim": "Triples are included in the sync protocol payload",
+      "classification": "Confirmed",
+      "source_note": "push_bank calls feed_triples and packages closed triples as invalidate; triple_close_packages_as_invalidate_and_replicates proves relay+peer apply."
+    },
+    {
+      "claim": "No roadmap phase numbers referenced in source code or comments",
+      "classification": "Confirmed",
+      "source_note": "Phase 100020 reference removed from crypto.rs."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Long-term performance of the watermark-based client push feed under high deletion/invalidation rates",
+      "why_unknown": "Client change feed queries items/assoc tables with timestamp ranges rather than a dedicated transaction log",
+      "what_would_resolve_it": "Benchmarking push latency with 100k+ items and high churn",
+      "materiality": "Medium"
+    }
+  ],
+  "strengths": [
+    "Comprehensive state machine and property test suite structure (P-no-readmit-divergence, P-dlq-blocks, P-cursor-crash).",
+    "Clean separation of crypto and storage: server-blind ciphertext storage prevents DEK leakage to the sync server.",
+    "Strict conformance to the 450-line file limit across all 45 staged files.",
+    "Well-architected MCP tool bindings (sync_serve, sync_push, sync_pull, sync_status, sync_ack_skip) with robust token masking."
+  ],
+  "regrets": [
+    "The developer skipped running the full make check before staging, missing an obvious unused import compiler error.",
+    "The developer rationalized away the function coverage deficit instead of implementing tests for unhit functions or pruning dead code."
+  ],
+  "process_changes": [
+    "Enforce running make check (which includes clippy -D warnings) as an automated mandatory pre-stage hook.",
+    "Disallow speculative dual codegen rationalizations when per-file function coverage is below 90%."
+  ],
+  "plan_1hr": [
+    "DONE: removed unused ErrorCode import (journal_row.rs).",
+    "DONE: unique update audit id via atomic sequence suffix (item_update.rs).",
+    "DONE: removed Phase 100020 reference (crypto.rs).",
+    "DONE: decrypt_for_apply quarantines unopenable/non-JSON ciphertext and returns Ok(None).",
+    "DONE: journal_row_to_mutation serves empty plain content for unsealed rows (no HTTP 500).",
+    "DONE: push_bank calls feed_triples and sync_status.pending_push counts triples."
+  ],
+  "plan_unlimited": [
+    "DONE: added the missing tests across protocol/http/server/client and clio-store sync; every reported file is now >=90% on functions and lines.",
+    "ADJUSTED: full symmetric origin-device tracking is not implemented. `apply::lww_loser` uses the local node device id as the existing side (the option F-08 offered), which removes the empty-string asymmetry but is not globally symmetric for peer-origin rows. Persisting an origin device per item needs a schema change plus both backends; deferred to post-roadmap sync hardening and recorded as a Known Limitation with that owner.",
+    "ADJUSTED: no push-watermark benchmark was added this round. The wall-clock watermark change feed is unchanged and remains a documented Known Limitation (upgrade path: a write-path journal hook); benchmarking is deferred to post-roadmap sync hardening."
+  ],
+  "status": "remediated",
+  "remediation": {
+    "round": "r1",
+    "gates": {
+      "make_check": "exit 0; 1185 tests passed, 0 failed",
+      "make_coverage": "exit 0; aggregate functions 98.86%, lines 97.87%; no file below 90% on functions or lines"
+    },
+    "files_changed": [
+      "crates/clio-sync/src/journal_row.rs",
+      "crates/clio-sync/src/crypto.rs",
+      "crates/clio-sync/src/client.rs",
+      "crates/clio-sync/src/client_feed.rs (new)",
+      "crates/clio-sync/src/client_feed_tests.rs (new)",
+      "crates/clio-sync/src/http.rs",
+      "crates/clio-sync/src/http_tests.rs (new)",
+      "crates/clio-sync/src/server.rs",
+      "crates/clio-sync/src/server_tests.rs",
+      "crates/clio-sync/src/server_error_tests.rs (new)",
+      "crates/clio-sync/src/protocol_tests.rs",
+      "crates/clio-sync/src/client_status_tests.rs",
+      "crates/clio-sync/src/apply.rs",
+      "crates/clio-sync/src/apply_tests.rs",
+      "crates/clio-sync/src/lib.rs",
+      "crates/clio-store/src/item_update.rs",
+      "crates/clio-store/src/memory_item_tests.rs",
+      "crates/clio-store/src/sync_store_tests.rs",
+      "crates/clio-store/src/pg_sync_tests.rs"
+    ],
+    "coverage_note": "cargo-llvm-cov counts per-cfg instantiations and closures as separate functions; a dirty target/llvm-cov-target merges stale pre-refactor instantiations and inflates misses, so the workspace gate is run after `cargo llvm-cov clean --workspace`."
+  }
+}

@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100110: Dense and Lexical Index Pipelines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100110: Dense and Lexical Index Pipelines</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">2 important · 4 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">The developer delivered all core Phase 100110 capabilities: the clio-index crate with sidecar HTTP client, transactional outbox worker, rebuild hooks, and dual-backend vector/lexical search with extensive test coverage meeting all gates (98.85% functions, 98.50% lines aggregate, 0 files below 90%). The adversarial review identified two important functional/operational edge-case issues (zero-limit search returns 1 hit on IndexStore, and single-IP DNS resolution in HTTP connect failing on dual-stack localhost) and four minor issues (module headers on 7 test files, dead widening loop, eager rebuild page buffering, and missing Content-Length parsing).</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-18</span>
+      <span><b>Applies to</b>master (staged phase-100110 diff)</span>
+      <span><b>Source</b>crates/clio-index, crates/clio-store, crates/clio-config, crates/clio-types, crates/clio-lib, sql/001_core.sql</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>PR-9 / FR-3: Decoupled write and structural maintenance; leaf write durability never blocks on embedding.</li>
+        <li>Dual backend parity: SQLite (sqlite-vec + FTS5) and Postgres (pgvector + FTS) support identical search semantics.</li>
+        <li>Profile C packaging: remote HTTP sidecar only; zero host-process ML model loading.</li>
+        <li>Coverage gate: &gt;=90% function and line coverage workspace aggregate and per-file.</li>
+        <li>Hard constraints: &lt;=450 lines per Rust file; AGENTS.md file headers; roadmap isolation preserved.</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">8 of 11 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100110-01: Embedding pipeline via sidecar/stub</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">TeiEmbedder and std::net::TcpStream HTTP client implemented in clio-index; verified by T100110-01, T100110-02, T100110-08, T100110-11 test scenarios.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100110-02: Dense search both backends</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Dense cosine search implemented on SQLite vec0 and Postgres pgvector with domain filters; IndexStore returns 1 hit when limit is 0 (F-01).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100110-03: Lexical search both backends</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">SQLite FTS5 bm25 and Postgres tsvector/GIN implemented; IndexStore returns 1 hit when limit is 0 (F-01).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100110-04: Index separable from leaf write success</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Leaf write durably enqueues in transactional outbox index_pending; ACK under 500ms verified with 700ms-delayed sidecar in T100110-11.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100110-05: Rebuild hooks</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">IndexCoordinator::rebuild_indexes supports dry-run, confirmed apply, dense/lexical/all targets, and orphan cleanup.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100110-06: Bank isolation</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Search primitives fail closed on empty bank and reject cross-bank retrieval (verified in T100110-10 and contract tests).</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100110-07: Phase 100020 appendix ceilings respected</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">SQLite dense retrieval remains exact KNN over vec0 with widening fetch; no ANN dependency added.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Rule: Line count &lt;= 450 lines per Rust source file</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All 34 staged Rust files verified &lt;=450 lines (largest is sqlite_store.rs at 438 lines).</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Rule: AGENTS.md file header structure</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Seven newly created test and support files omit the Responsibility/Owns/Boundary docblocks (F-03).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Rule: Coverage &gt;= 90% lines and functions per file and aggregate</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage exit 0: 98.85% functions, 98.50% lines aggregate; 0 files below 90%.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Rule: Roadmap isolation</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Zero references to roadmap/ or phase numbers found in staged code or comments outside roadmap/ dir.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>IndexStore search primitives return 1 hit when limit is 0</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Callers requesting zero results (e.g. for existence checks or pagination probes) receive an unexpected match.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Violates expected query limit semantics for callers directly invoking IndexStore trait methods.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_index.rs:148, crates/clio-store/src/sqlite_index.rs:187, crates/clio-store/src/postgres_index.rs:146, crates/clio-store/src/postgres_index.rs:195</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add an early check `if limit == 0 { return Ok(Vec::new()); }` at the start of dense_search and lexical_search on both SqliteStore and PostgresStore.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>HTTP client connects only to first resolved IP address, failing on dual-stack localhost</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Connecting to http://localhost:&lt;port&gt; fails if localhost resolves to IPv6 ::1 first while the sidecar is bound only to IPv4 127.0.0.1.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Standard development and container setups where TEI listens on 127.0.0.1 fail to connect if host is specified as &#39;localhost&#39;.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-index/src/http.rs:91-96</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Iterate through the SocketAddr iterator from to_socket_addrs() and attempt connect_timeout on each until one succeeds.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">04</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Missing AGENTS.md mandatory module header structure in 7 newly created Rust files</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md mandates the Responsibility/Owns/Boundary docblock header on every Rust file.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Non-compliance with repository file header standards.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/config/embed_knob_tests.rs:1-3, crates/clio-index/src/embed_test_support.rs:1-3, crates/clio-index/src/embed_tests.rs:1-3, crates/clio-index/src/http_tests.rs:1-3, crates/clio-index/src/rebuild_tests.rs:1-3, crates/clio-index/src/worker_tests.rs:1-3, crates/clio-store/src/index_store_tests.rs:1-3</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the required module header format including //! # Responsibility, //! ## Owns, //! ## Does not own, and //! ## Boundary to all 7 files.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Dead widening loop and potential duplicate accumulation in SqliteStore::lexical_search</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The loop in sqlite_index.rs::lexical_search is dead code because SQL filtering handles limits directly. If ever reached, it would duplicate results.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Misleading code structure that mimics dense vector widening where it does not apply.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_index.rs:148-175</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Remove the loop and query directly with limit as parameter.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Eager full-bank ID buffering in visible_pages during rebuild sweeps</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Rebuilding indexes for a bank with tens of thousands of items buffers all item IDs in memory at once.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Unnecessary memory consumption during reindex operations on large banks.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-index/src/worker.rs:364-377</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Stream or paginate item IDs lazily during rebuild sweeps.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>HTTP client reads until EOF without checking Content-Length header</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>If a sidecar server sends a full Content-Length response but delays socket shutdown, read_response blocks until the timeout.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Potential latency spikes if connected to HTTP/1.1 servers that don&#39;t immediately close sockets on Connection: close.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-index/src/http.rs:162-187</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Parse Content-Length from response headers and terminate reading once expected bytes have been consumed.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>ANN support on SQLite: Confirmed Phase 100020 appendix allows exact KNN for SQLite vec0 at current scale ceiling.</li>
+        <li>Postgres ts_rank_cd difference from BM25: Documented as expected; rank fusion will be used in slice 100120.</li>
+        <li>Missing external HTTP library: Zero new external dependencies is a stated constraint; custom std::net::TcpStream transport is compliant.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All workspace tests pass (409 passed, 0 failed) — Re-executed make test: 409 passed across all crates.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace aggregate line and function coverage &gt;=90% — Re-executed make coverage: 98.85% functions, 98.50% lines aggregate.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Every reported file achieves &gt;=90% line and function coverage — Inspected all files in make coverage output: 0 files below 90% on either metric.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All Rust files remain &lt;=450 lines — Scanned all 34 staged Rust files: all &lt;=450 lines.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Roadmap isolation preserved in code and comments — Scanned staged non-roadmap files: 0 references to roadmap or phase numbers.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Behavior of TEI sidecar when encountering non-English documents</p>
+          <p class="d">No multilingual test fixture was included in unit tests. · Integration test with multi-language token sets against live TEI sidecar. · Low for Phase 100110 English baseline model.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Strict compliance with zero-new-dependencies rule by implementing a clean std::net::TcpStream HTTP client.</li>
+        <li>Strong decoupling of leaf write path from sidecar embedding via transactional outbox (index_pending).</li>
+        <li>Comprehensive unit and integration test coverage for failure modes, backoff, and dimension mismatches.</li>
+        <li>Dual-backend parity test suite executing identical contract assertions on both SQLite and Postgres.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Did not add module header documentation to the test files before completing developer turn.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Automate pre-commit verification of file headers across all files including test modules.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix F-01 by adding `if limit == 0 { return Ok(Vec::new()); }` to `dense_search` and `lexical_search` in `sqlite_index.rs` and `postgres_index.rs`.</li>
+          <li>Fix F-02 in `crates/clio-index/src/http.rs` by looping over `to_socket_addrs()` candidates in `connect()`.</li>
+          <li>Fix F-03 by adding the mandatory AGENTS.md module header docblocks to all 7 newly created Rust files.</li>
+          <li>Fix F-04 by cleaning up the dead widening loop in `SqliteStore::lexical_search`.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Implement streaming rebuild sweeps in `IndexCoordinator` that process pages lazily without full-bank buffering in memory.</li>
+          <li>Enhance the raw TCP HTTP client to parse Content-Length headers and reuse connections with keep-alive, or adopt an approved minimal HTTP library like `ureq`.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100110/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100110/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

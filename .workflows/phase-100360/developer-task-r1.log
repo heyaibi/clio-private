@@ -1,0 +1,14 @@
+2026-09-22T19:40:42 START developer-task-r1 (phase 100360): read task, phase file, coverage.md, Makefile, ci.yml
+2026-09-22T19:40:58 research done: --json --summary-only keeps per-file summaries; --fail-under-* gates TOTAL only, works with --json; llvm-cov export JSON = data[].files[].{filename,summary.{lines,functions,regions}.percent}
+2026-09-22T19:40:58 running baseline gate: cargo llvm-cov --workspace --locked --json --output-path /tmp/cov-baseline.json (DATABASE_URL from coverage.md)
+2026-09-22T19:46:07 baseline blocker: host ~/.config/am/deployment.json sets embed.url to running sidecar (127.0.0.1:34311) so reindex_dense_confirmed_without_embedder_exits_3 failed; fix: export AM_DEPLOYMENT_CONFIG= (empty disables deployment loading per persist.rs:63) — hermetic run, no code change
+2026-09-22T19:46:07 rerunning baseline gate with AM_DEPLOYMENT_CONFIG empty
+2026-09-22T19:50:06 baseline OK: /tmp/cov-baseline.json, 276 files, 0 offenders, totals lines=97.91% functions=98.94% (hermetic env: DATABASE_URL + AM_DEPLOYMENT_CONFIG=/tmp/am-empty-deployment.json + rustup llvm tools env)
+2026-09-22T19:50:06 decomposition decision: script+Makefile+CI+docs are one intertwined slice -> no workers, implement solo (implement-worker.md consulted, not used)
+2026-09-22T19:53:27 contract test OK: scoped clio-types run with --fail-under-lines 99.5 exited 1 AND wrote JSON; guard read it (10 files, exit 0)
+2026-09-22T19:53:27 guard self-test OK: T100360-01..T100360-05 + malformed/no-summary/zero-file fixtures all pass (exit codes as expected)
+2026-09-22T19:53:27 FINAL GATE OK: make coverage exit 0 — single instrumented run -> aggregate gate + guard; 276 files, 0 offenders, TOTAL lines 97.90% functions 98.94%
+2026-09-22T19:55:17 docs + phase file updated: coverage.md §2 column-mapping subsection + §6 checklist item; roadmap/phase-100360-coverage-guard.md §9/§10 evidence, DoD, attribution (Developer r1 done), §12 implementer sign-off
+2026-09-22T19:55:17 staging with exact task-ordered command
+2026-09-22T19:55:17 staged: scripts/coverage_guard.py (new), Makefile, .github/workflows/ci.yml, coverage.md, roadmap/phase-100360-coverage-guard.md
+DEVELOPER_DONE da5a9e66

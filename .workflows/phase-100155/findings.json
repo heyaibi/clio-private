@@ -1,0 +1,201 @@
+{
+  "run": "r1",
+  "phase": "100155",
+  "subject": "Phase 100155 Operations discard tool (Gap Remediation)",
+  "verdict": "Good",
+  "verdict_justification": "The core in-process discard tool, dual-backend store operations, and visibility exclusion are cleanly implemented with full test coverage (95.38% lines, 98.85% functions, zero files below 90%) and all checks passing. Minor issues identified include a roadmap isolation violation in discard.rs comments, a dry-run false positive on already-discarded items, and a test gap for episodic items.",
+  "metadata": {
+    "generated": "2026-09-19",
+    "applies_to": "r1",
+    "source": "13 staged files (clio-store, clio-write, clio-retrieve, phase-100155)"
+  },
+  "standard": [
+    "AGENTS.md: Hard rules on file size (<= 450 lines), coverage gate (>= 90% per-file func and line), file headers, and roadmap isolation.",
+    "requirement.md: \u00a74.9.4.A discard tool, \u00a74.9.2 destructive confirmation, PR-6 supersession separation, FR-15 telemetry.",
+    "roadmap/phase-100155-ops-discard-tool.md: AC-100155-01 through AC-100155-06, dual-backend parity, bank isolation, visibility exclusion."
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100155-01: In-process discard tool with \u00a74.9.2 confirmation semantics",
+      "status": "Fully satisfied",
+      "evidence": "clio-write/src/discard_tests.rs: dry_run_writes_nothing and confirmed_emits_one_pii_safe_event pass.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100155-02: Dual-backend store mutation with parity",
+      "status": "Fully satisfied",
+      "evidence": "clio-store/src/discard_tests.rs: sqlite_discard_contract and postgres_discard_contract pass identical parity suites.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100155-03: FR-15 telemetry on mutating path",
+      "status": "Fully satisfied",
+      "evidence": "DiscardEvent records operation, bank, actor, timestamp, item_id, category, epistemic_kind, reason_len; verified in confirmed_emits_one_pii_safe_event.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100155-04: Visibility exclusion proven end-to-end",
+      "status": "Fully satisfied",
+      "evidence": "suite_visibility in discard_tests.rs tests lexical, dense, indexable_items, count_indexable_items, and index_coverage.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100155-05: PR-6/\u00a77.4 boundaries held (no supersession, no key interaction)",
+      "status": "Fully satisfied",
+      "evidence": "suite_discard and invalidate_and_discard_are_independent verify content ciphertext and time axes are untouched.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100155-06: Coverage gate (aggregate and per-file >= 90% lines and functions)",
+      "status": "Fully satisfied",
+      "evidence": "make coverage exit 0; TOTAL lines 95.38%, funcs 98.85%; 0 files below 90%.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Roadmap isolation: no phase or slice numbers in code comments",
+      "status": "Fully satisfied after r1 remediation",
+      "evidence": "crates/clio-write/src/discard.rs:16 slice reference removed; grep over crates/clio-write/src and crates/clio-store/src discard modules finds no slice/phase/roadmap references.",
+      "severity": "Medium"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Roadmap isolation violation in discard.rs doc comment",
+      "evidence": "crates/clio-write/src/discard.rs:16",
+      "requirement_ref": "AGENTS.md Roadmap Isolation / Phase 100155 Hard Rules",
+      "recommendation": "Remove (slice-16 MCP binding) and rephrase as transport-level MCP binding.",
+      "status": "Resolved (r1)",
+      "resolution": "crates/clio-write/src/discard.rs:16 now reads `(MCP binding)`; no slice/phase/roadmap references remain in the discard modules of either crate (grep verified)."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Dry-run reports success on already-discarded items",
+      "evidence": "crates/clio-write/src/discard.rs:160-166; crates/clio-store/src/sqlite_discard.rs:36; crates/clio-store/src/postgres_discard.rs:36",
+      "requirement_ref": "requirement.md \u00a74.9.2 / Phase 100155 Task 2",
+      "recommendation": "Filter by discarded_at IS NULL in get_item_identity or check discarded_at status before returning DryRun outcome so dry-run accurately reports that the item cannot be discarded.",
+      "status": "Resolved (r1)",
+      "resolution": "get_item_identity SQL now includes `AND discarded_at IS NULL` in both backends (crates/clio-store/src/sqlite_discard.rs, crates/clio-store/src/postgres_discard.rs). A dry-run on an already-discarded item now fails NotFound instead of reporting would-discard; the confirmed path still fails InvalidArgument. Covered by clio-write dry_run_rejects_already_discarded and the active-only identity assertion in clio-store suite_episodic_discard. The discard() doc comment was updated to state this behavior."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Concurrent discard race surfaces ErrorCode::Internal instead of already-discarded error",
+      "evidence": "crates/clio-store/src/sqlite_discard.rs:101-104; crates/clio-store/src/postgres_discard.rs:99-102",
+      "requirement_ref": "Phase 100155 Task 1",
+      "recommendation": "When discard UPDATE matches zero rows, check whether the row was concurrently discarded and return ErrorCode::InvalidArgument (already discarded) instead of ErrorCode::Internal.",
+      "status": "Resolved (r1)",
+      "resolution": "On `n == 0` both backends now return ErrorCode::InvalidArgument (`item is already discarded`). Implemented without a recheck query because items are never hard-deleted: a miss on the `discarded_at IS NULL` guard after the live pre-check can only mean a concurrent discard won the race. An initial version with a SELECT recheck was reverted: its recheck-only lines were unreachable from the public API and dragged both discard files to ~78% line coverage, breaking the per-file 90% gate."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Test suite lacks coverage for discarding episodic memory items",
+      "evidence": "crates/clio-store/src/discard_tests.rs:45-67; crates/clio-write/src/discard_tests.rs:37-59",
+      "requirement_ref": "Phase 100155 AC-100155-02, AC-100155-03",
+      "recommendation": "Add test cases exercising discard on an episodic memory item where category is None.",
+      "status": "Resolved (r1)",
+      "resolution": "clio-store: new sample_episodic fixture + suite_episodic_discard (create -> identity with NULL category -> discard -> raw columns set -> identity no longer resolves) running on both SqliteStore and PostgresStore via the existing contract tests. clio-write: episodic_item fixture + episodic_discard_reports_null_category verifying NULL category in both the dry-run identity and the FR-15 telemetry event."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Roadmap isolation violation in discard.rs doc comment",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md and the task rules enforce strict roadmap isolation: code and comments must never reference roadmap phases, slices, or files so the codebase remains self-contained after roadmap/ is deleted.",
+      "impact": "Breaks roadmap isolation and leaks roadmap slice numbering into production code comments.",
+      "evidence": "crates/clio-write/src/discard.rs:16: `//! - Transport-level confirmation plumbing (slice-16 MCP binding) and compliance`",
+      "confidence": "High",
+      "proposed_fix": "Remove `(slice-16 MCP binding)` and replace with `(transport-level MCP binding)`."
+    },
+    {
+      "id": 2,
+      "title": "Dry-run reports success on already-discarded items",
+      "severity": "Important",
+      "why_it_matters": "Destructive confirmation dry-run (\u00a74.9.2) should validate whether a discard will succeed. Because get_item_identity does not filter discarded_at IS NULL, an unconfirmed call on an already-discarded item returns DryRun(identity) indicating it would be discarded, but the subsequent confirmed call fails with InvalidArgument.",
+      "impact": "Inconsistency between dry-run and execution paths; false confidence given to callers during dry run.",
+      "evidence": "crates/clio-write/src/discard.rs:160-166: `let identity = args.store.get_item_identity(bank, args.item_id)?.ok_or_else(...); DiscardOutcome::DryRun(identity)` combined with `SELECT category, epistemic_kind FROM items WHERE id = ?1 AND bank_id = ?2` in crates/clio-store/src/sqlite_discard.rs:36.",
+      "confidence": "High",
+      "proposed_fix": "Update get_item_identity SQL to include `AND discarded_at IS NULL`, or have ItemIdentity include a discarded flag so the dry-run path rejects already-discarded items with the same error as confirmed discard."
+    },
+    {
+      "id": 3,
+      "title": "Concurrent discard race returns ErrorCode::Internal",
+      "severity": "Minor",
+      "why_it_matters": "In a race condition where two callers attempt to discard the same item concurrently, both may pass the initial lookup, but only one will update the row. The loser encounters n == 0 and receives an Internal server error instead of the expected InvalidArgument (already discarded) error.",
+      "impact": "Surfaces misleading 500/Internal errors to operators or callers under concurrent access.",
+      "evidence": "crates/clio-store/src/sqlite_discard.rs:100-105: `if n == 0 { return Err(AmError::new(ErrorCode::Internal, \"discard update matched zero rows\")); }`",
+      "confidence": "High",
+      "proposed_fix": "On n == 0, query the item again to confirm if it was discarded by a concurrent transaction, and return ErrorCode::InvalidArgument if so."
+    },
+    {
+      "id": 4,
+      "title": "Test suite lacks coverage for discarding episodic items",
+      "severity": "Minor",
+      "why_it_matters": "Episodic memory items have NULL category in the database schema. All existing tests in discard_tests.rs exclusively test semantic items with a populated category (ToolConfig). Although the code uses Option<String>, this path is not exercised by tests.",
+      "impact": "Testing gap for episodic memory item discard lifecycle.",
+      "evidence": "crates/clio-store/src/discard_tests.rs:45-67 only constructs semantic items via sample_semantic; crates/clio-write/src/discard_tests.rs:37-59 only constructs semantic items.",
+      "confidence": "High",
+      "proposed_fix": "Add an episodic item creation and discard test case to discard_tests.rs in both clio-store and clio-write."
+    }
+  ],
+  "dismissed": [
+    "Gated region coverage: clio-store/src/sqlite_triple_read.rs had 83.57% region coverage, but AGENTS.md explicitly states region coverage is not gated and line (96.80%) and function (93.33%) coverage are well above 90%."
+  ],
+  "verification": [
+    {
+      "claim": "make check passes (fmt, clippy, 26 test binaries)",
+      "classification": "Established",
+      "source_note": "Remediator r1: make check re-run after remediation, exit 0, no failed tests."
+    },
+    {
+      "claim": "make coverage meets >= 90% aggregate and per-file threshold",
+      "classification": "Established",
+      "source_note": "Remediator r1: make coverage exit 0. Per-file scan over the full llvm-cov summary shows no reported file below 90% functions or lines. Touched files: clio-write/src/discard.rs 100%/100%, clio-store/src/sqlite_discard.rs 100%/95.00%, clio-store/src/postgres_discard.rs 100%/95.06% (functions/lines)."
+    },
+    {
+      "claim": "All modified and new Rust files are <= 450 lines",
+      "classification": "Established",
+      "source_note": "Remediator r1: discard.rs 177, sqlite_discard.rs 119, postgres_discard.rs 117, clio-store discard_tests.rs 360, clio-write discard_tests.rs 314."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Long-term index maintenance strategy for discarded items",
+      "why_unknown": "Physical index cleanup was deferred per the phase scope allowance.",
+      "what_would_resolve_it": "A future maintenance phase hooking background worker compaction for discarded rows.",
+      "materiality": "Low - read paths filter discarded_at IS NULL, preventing leakage."
+    }
+  ],
+  "strengths": [
+    "Clean dual-backend implementation with identical contract tests running on SQLite and Postgres.",
+    "Zero schema migrations needed; leverages pre-existing discarded_at/discard_reason columns.",
+    "Strict adherence to PR-6 and \u00a77.4 boundaries: zero DEK or content interaction.",
+    "PII-safe telemetry implementation recording reason length while omitting reason content."
+  ],
+  "regrets": [
+    "Dry-run behavior on already-discarded items was not tested during development, leaving a minor semantic gap."
+  ],
+  "process_changes": [
+    "Include automated grep for slice and phase keywords in git pre-commit hooks to avoid roadmap isolation leaks."
+  ],
+  "plan_1hr": [
+    "DONE (r1): roadmap isolation comment removed in crates/clio-write/src/discard.rs:16.",
+    "DONE (r1): get_item_identity filters `AND discarded_at IS NULL` in SQLite and Postgres; dry-run on an already-discarded item now rejects instead of reporting would-discard; covered by new tests in both crates.",
+    "DONE (r1): episodic-item discard tests added to clio-store (suite_episodic_discard, both backends) and clio-write (episodic_discard_reports_null_category), plus dry_run_rejects_already_discarded."
+  ],
+  "plan_unlimited": [
+    "NOT APPLIED (r1, reason): the atomic UPDATE ... RETURNING refactor for Postgres discard_item was declined. The pre-lookup SELECT must stay either way to distinguish NotFound from already-discarded with the documented error codes, so RETURNING removes no query and only adds backend-specific SQL divergence. The misleading-error part of this recommendation (the race) is fully fixed by F-03: a guarded-update miss now surfaces InvalidArgument, never Internal.",
+    "DEFERRED (r1, reason): integrating discard events into the uniform audit_trail logging depends on future audit-trail work that does not exist yet; out of scope for this phase per the phase scope allowance.",
+    "DEFERRED (r1, reason): background index cleanup hooks for discarded rows remain deferred per the phase scope allowance; read paths already filter discarded_at IS NULL so there is no correctness impact."
+  ],
+  "remediation_notes": {
+    "round": "r1",
+    "backup": "findings.original.json (pre-remediation snapshot)",
+    "note": "F-03 was first implemented as a SELECT-recheck on the n == 0 branch. That code was unreachable from the public API (items are never hard-deleted), drove both discard files to ~78% line coverage, and was replaced by the direct InvalidArgument return described in F-03's resolution. Coverage was re-measured after the change; no gaming of the gate was involved.",
+    "leftover": "Pre-existing roadmap-adjacent wording (e.g. `slice-15 feed` in crates/clio-store/src/persona_store.rs:77, `this slice` in crates/clio-write/src/maintenance.rs:29 and memtree_tools.rs:57, `slice 100080` in crates/clio-write/src/consolidate.rs:64) exists in files outside this phase's diff. Not part of any finding here and left untouched to avoid drive-by changes; flag for a future cleanup phase."
+  }
+}

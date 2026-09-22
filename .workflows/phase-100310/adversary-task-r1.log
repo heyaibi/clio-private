@@ -1,0 +1,20 @@
+[2026-09-21 23:26 IST] START adversary-task-r1, phase-100310 hostile adversarial review.
+[2026-09-21 23:26 IST] DISCOVERY git status: 64 staged entries, no unstaged code changes, untracked .workflows/ directory.
+[2026-09-21 23:26 IST] DISCOVERY git diff --cached --stat: 1469 insertions, 385 deletions across 64 files including 48 binary .profraw files.
+[2026-09-21 23:27 IST] AUDIT 450-line rule: all 13 staged .rs files verified <= 450 lines (max is crates/clio-config/src/config/mod.rs at 389 lines).
+[2026-09-21 23:27 IST] AUDIT header check: crates/clio-config/src/db_path_tests.rs:1-4 missing AGENTS.md responsibility doc header.
+[2026-09-21 23:27 IST] AUDIT roadmap isolation: grep for phase/roadmap/crates.md across staged code diff returned clean (exit 1).
+[2026-09-21 23:29 IST] TEST make test: exit 0, 110 passed, 0 failed.
+[2026-09-21 23:29 IST] LINT make lint (clippy -D warnings): clean, exit 0.
+[2026-09-21 23:30 IST] CHECK make check (fmt + clippy + test): clean, exit 0.
+[2026-09-21 23:31 IST] GATE make coverage: exit 0; aggregate lines 97.92% (36821/37587), functions 98.98% (3132/3164); 262 reported files all >=90% lines and functions.
+[2026-09-21 23:32 IST] VERIFY CLI binary: am help, am mcp stdio --help, am mcp http --help, am ops --help all print default path and mask credentials.
+[2026-09-21 23:33 IST] FINDING F-01 (high): crates/clio-lib/*.profraw 48 binary files (~18.5 MB) staged in git index due to unignored test artifacts.
+[2026-09-21 23:33 IST] FINDING F-02 (medium): crates/clio-config/src/config/merge.rs:39 system_defaults hardcodes backend: sqlite ignoring scheme inference from DATABASE_URL.
+[2026-09-21 23:33 IST] FINDING F-03 (low): crates/clio-config/src/db_path_tests.rs:1-4 missing AGENTS.md responsibility doc header.
+[2026-09-21 23:33 IST] FINDING F-04 (low): roadmap/phase-100310-default-database-path.md:7 Developer agent moniker discrepancy in attribution table.
+[2026-09-21 23:34 IST] DELIVERABLE findings.json: written to /Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100310/findings.json.
+[2026-09-21 23:34 IST] DELIVERABLE report.html: generated with generate-report.cjs (21610 bytes) and style.css copied beside it.
+[2026-09-21 23:34 IST] DELIVERABLE roadmap/phase-100310-default-database-path.md: updated Adversary r1 attribution row to done.
+[2026-09-21 23:35 IST] FINISH adversary-task-r1 complete.
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100310/findings.json dc9cc43a

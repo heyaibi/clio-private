@@ -1,0 +1,14 @@
+2026-09-21T11:40:00 START adversary-task-r1 phase-100260: reading task, git status, staged diff
+2026-09-21T11:40:06 make check: 45 test suites pass, formatting and clippy clean (exit 0)
+2026-09-21T11:40:41 make lint: clippy --workspace --all-targets --all-features clean in 0.16s (exit 0)
+2026-09-21T11:40:53 file line counts: all 48 staged files <= 450 lines (max 443 in retention_mission.rs)
+2026-09-21T11:41:27 roadmap isolation: 0 references to roadmap or phase numbers in crate comments/code
+2026-09-21T11:42:35 make coverage: aggregate lines 97.87% / functions 98.91%, 0 of reported files below 90%
+2026-09-21T11:44:42 FINDING F-01: crates/clio-config/src/retention_schema.rs:105,112 broken $ref pointer to /properties/mission/x-mission-entry fails JSON Schema validation (PointerToNowhere)
+2026-09-21T11:46:00 FINDING F-02: crates/clio-config/src/retention_mission.rs:143-215 mission examples with secret patterns are not rejected at set time and persist unmasked to disk
+2026-09-21T11:43:41 FINDING F-03: crates/clio-config/src/retention_store.rs:106-109 pre-existing repo: banks without stored overrides resolve coding_default_profile on upgrade without mention in Known Limitations
+2026-09-21T11:46:21 FINDING F-04: crates/clio-admission/src/decision_mission_tests.rs:1-6, crates/clio-config/src/mission_match_tests.rs:1-6, crates/clio-config/src/retention_mission_tests.rs:1-6, crates/clio-lib/tests/retention_mission_harness.rs:1-5 missing //! # Responsibility and AGENTS.md headers
+2026-09-21T11:47:18 adversarial report generated: findings.json, report.html, style.css written to .workflows/phase-100260/
+2026-09-21T11:47:33 attribution updated in roadmap/phase-100260-retention-mission-coding-defaults.md
+2026-09-21T11:47:45 FINISH adversary-task-r1 phase-100260: 4 findings documented (2 high, 1 medium, 1 low)
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100260/findings.json c74e5972

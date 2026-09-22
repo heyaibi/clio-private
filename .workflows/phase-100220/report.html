@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100220 JSON Export and Import Implementation (Round 1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100220 JSON Export and Import Implementation (Round 1)</h1>
+    <div class="vline">
+      <span class="badge b-red"><i data-lucide="octagon-x" class="ic"></i>Inadequate</span>
+      <span class="mono">1 critical · 4 important · 1 minor · 2 dismissed</span>
+    </div>
+    <p class="sum">While the implementation delivers all required MCP schemas and achieves &gt;=90% test coverage, workspace make lint fails with a clippy doc-markdown error, live import executes un-batched store mutations during planning that break transaction rollback guarantees, ciphertext backup import double-encrypts ciphertext and drops item metadata, and tombstone records are omitted from array canonicalization.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-20</span>
+      <span><b>Applies to</b>staged diff (r1)</span>
+      <span><b>Source</b>git diff --cached -- . &#39;:!.workflows/&#39;</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#critical">Critical</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>FR-29: JSON export with completeness manifest, dsar_plaintext and ciphertext_backup modes, idempotent import enforcing §4.1-§4.2</li>
+        <li>NFR-6: All confidence, admission-score, and telemetry fields included in data export</li>
+        <li>Phase 100220 Specification &amp; Appendix: Canonical JSON checksum verification before writes, atomic transactional batches on import</li>
+        <li>AGENTS.md and Makefile Quality Gates: make lint, make test, make coverage with &gt;=90% line and function coverage per file</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">4 of 8 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100220-01 Manifest-backed export</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Single-file bundle with completeness manifest implemented in crates/clio-compliance/src/export.rs; however, tasks and failures are silently truncated at 10,000 without setting complete=false.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100220-02 Idempotent gated import</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Idempotent skip logic works on clean re-import; however, live import mutations are performed during Planner::run before batch commit, breaking atomicity and transactional rollback.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100220-03 Dry-run zero writes</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">import(dry_run=true) reports counts without mutating store; verified by dry_run_reports_and_leaves_store_unchanged test.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100220-04 No plaintext secrets</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Export masks snapshots via masked_clone and gists via scrub_inline_secrets; verified by t22_06_secrets_never_reach_the_file.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100220-05 Provider stub only (FR-29 carve-out)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">import_provider returns PROVIDER_IMPORT_UNSUPPORTED, writes 0, and masks credentials; verified by t22_07 test.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100220-06 assoc_edge included</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Export lists assoc edges and includes in bundle; import plans PutAssocEdge batch effects.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100220-07 DSAR plaintext vs ciphertext modes</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Export produces opaque items without DEKs, but import calls put_item which double-encrypts ciphertext and drops all NFR-6 metadata.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Definition of Done: Tests pass, clippy clean, files &lt;= 450 lines</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">All files are &lt;= 450 lines and cargo test passes, but make lint (cargo clippy --all-targets --all-features -D warnings) fails on bundle.rs:238.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="critical">
+      <h2 class="sh"><i data-lucide="octagon-alert" class="ic c-red"></i>Critical <span class="cnt">01</span></h2>
+      <p class="lede">Address these before considering the work done.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Live import executes un-batched store mutations during `Planner::run`, violating transactional rollback guarantees</h3>
+              <span class="badge b-red"><span class="dot"></span>Critical</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>If import fails partway through execution, partial writes remain committed to the database with no rollback mechanism, causing inconsistent state and corrupted banks.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Violates §5 Task 2 and §10 rollback requirements; corrupts state on mid-batch failure.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-compliance/src/import.rs:138 calls planner.run()?, which executes direct mutations in import_apply.rs:151,271,272,286,370,390 and import_rows.rs:250,283 before batch commit.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Defer all mutations until planning validates the entire bundle, and execute all writes within an atomic batch or transaction.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">04</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>`make lint` fails with clippy doc-markdown error on `crates/clio-compliance/src/bundle.rs:238`</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Breaks workspace CI and quality gates; cargo clippy --workspace --all-targets --all-features -D warnings exits 101.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Codebase fails automated lint verification despite developer sign-off.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-compliance/src/bundle.rs:238:5 doc comment contains key/as_of without backticks.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Wrap `key/as_of` in backticks on line 238 of crates/clio-compliance/src/bundle.rs.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Ciphertext backup import invokes `Store::put_item`, double-encrypting ciphertext and discarding all item metadata</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Restoring a ciphertext backup produces unusable rows: ciphertext is re-encrypted with local KMS DEK, item columns are wiped, and get_memory_item fails.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>ciphertext_backup round-trip claims are broken; restored data is unreadable.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-compliance/src/import_apply.rs:260-287 passes opaque ciphertext to Store::put_item, which encrypts it again and inserts dummy episodic rows in envelope_persist.rs:49-55.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Persist OpaqueItem rows directly to items table preserving metadata and writing pre-encrypted content_ciphertext without re-encryption.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>`sort_entity_arrays` omits `ComplianceTombstoneView`, breaking canonical ordering and cross-backend checksum equivalence</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Tombstone arrays are not canonically ordered, causing checksum mismatches on cross-backend import and non-deterministic bundle hashes.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Breaks Appendix §4 canonical JSON checksum verification when tombstones are present.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-compliance/src/bundle.rs:276-288 only inspects id, key, and as_of; ComplianceTombstoneView has none of these, leaving tombstones in raw database order (which differs between SQLite and Postgres).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add tombstone comparator fields (subject_hash, item_id_hash, request_id) to sort_entity_arrays and align SQLite/Postgres tombstone SQL order.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>`export` silently truncates tasks and failures at `HISTORY_LIMIT = 10_000` while manifest reports `complete = true`</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Completeness manifests must truthfully report complete=false when data is truncated. Silent truncation produces incomplete exports falsely certified as complete.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Violates FR-29 manifest integrity contract on large task/failure stores.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-compliance/src/export.rs:47 caps history queries at 10,000, but completeness() in export.rs:404-422 never checks if truncation occurred.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Detect if task/failure count equals HISTORY_LIMIT and mark complete=false with an explanatory omission note.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">01</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>`validate_envelope` permits invalid `format_version == 0`</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Version gate should reject unsupported version numbers strictly.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>format_version 0 is improperly accepted instead of rejected.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-compliance/src/bundle.rs:313 checks `envelope.format_version &gt; BUNDLE_FORMAT_VERSION` which evaluates false for version 0.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Change version validation condition to `envelope.format_version == 0 || envelope.format_version &gt; BUNDLE_FORMAT_VERSION`.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Suspected 450-line violation on export_tests.rs: File is exactly 450 lines by POSIX newline count (wc -l), complying with the hard ceiling.</li>
+        <li>Suspected missing MCP tool export: Removed placeholder in schema_read_defs.rs was intentionally relocated to schema_portability_defs.rs and bound in bound_write_tools.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace tests pass across all crates — Executed `make test`: 39 test suites, all passed.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Workspace clippy lint passes cleanly — Executed `make lint`: Failed with exit code 101 on bundle.rs:238.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Aggregate and per-file coverage &gt;= 90% — Executed `make coverage`: 98.60% functions, 97.74% lines; 0 files below 90%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Every Rust file &lt;= 450 lines — Scanned all staged .rs files with wc -l: max line count is 450 (export_tests.rs).</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Behavior of downstream node-restore with double-encrypted ciphertext</p>
+          <p class="d">Node-restore phase is not yet implemented · Inspection of Phase 100230/100240 restore specifications · High impact for ciphertext_backup recovery</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>All staged Rust source files strictly respect the 450-line limit, with comprehensive decomposition into dedicated submodules.</li>
+        <li>Full coverage gate passes with 98.60% functions and 97.74% lines across the workspace, with every single file &gt;= 90%.</li>
+        <li>Defensive secret-stripping (masked_clone and scrub_inline_secrets) is thoroughly implemented and tested across all export and stub diagnostic paths.</li>
+        <li>MCP schema definitions on stdio and HTTP match exactly, with import_provider properly registered as a non-writing stub.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Developer did not run `make lint` (`--all-features`) before declaring DONE.</li>
+          <li>Developer allowed un-batched direct store writes inside `Planner::run()` instead of routing through atomic batch commits.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Always run `make lint` exactly as defined in the workspace Makefile rather than manual cargo clippy invocations.</li>
+          <li>Enforce transactional boundaries by forbidding direct store writes in planning modules.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix clippy doc-markdown backticks error on `crates/clio-compliance/src/bundle.rs:238` so `make lint` passes cleanly.</li>
+          <li>Fix `validate_envelope` in `crates/clio-compliance/src/bundle.rs:313` to reject `format_version == 0`.</li>
+          <li>Add tombstone sorting fields to `sort_entity_arrays` in `crates/clio-compliance/src/bundle.rs:277` and align SQLite/Postgres tombstone SQL order.</li>
+          <li>Fix manifest completeness calculation in `crates/clio-compliance/src/export.rs` to detect when tasks or failures hit `HISTORY_LIMIT = 10_000` and mark `complete = false` with an omission note.</li>
+          <li>Wrap live import execution in a rollback-capable transaction or defer direct store writes until after batch commit to prevent partial corrupt states on mid-import failure.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Extend `BatchWrite` enum and `BatchStore::apply_batch` with variants for `PutPreferenceState`, `AppendBeliefConfidence`, and `PutOpaqueItem`, unifying all import operations under a single atomic transaction.</li>
+          <li>Implement dedicated `put_opaque_item` storage primitive that stores pre-encrypted ciphertext directly into `items` without double-encryption and retains all `OpaqueItem` NFR-6 metadata.</li>
+          <li>Stream large export payloads instead of in-memory buffering, eliminating arbitrary caps like `HISTORY_LIMIT = 10_000`.</li>
+          <li>Add property-based testing and cross-backend round-trip fuzzing for canonical JSON checksum verification across SQLite and Postgres.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

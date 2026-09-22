@@ -1,0 +1,261 @@
+{
+  "run": "r1",
+  "phase": "phase-100170",
+  "subject": "Phase 100170: MCP Read, Retrieve, and Compose Surface",
+  "verdict": "Good",
+  "verdict_justification": "All 19 Core read tools bound with verified stdio and Streamable HTTP parity, bi-temporal query support, durable co-activation reinforcement, and strict token budget enforcement; coverage >98% aggregate with zero files below 90%. The three r1 defects (module header closing sentence in three files, omitted persona_get/compose_context schema parameters, Developer attribution model mismatch) were remediated in r1; `make check` and `make coverage` pass after remediation.",
+  "metadata": {
+    "generated": "2026-09-19",
+    "applies_to": "r1",
+    "source": "crates/clio-mcp, crates/clio-store, crates/clio-retrieve, crates/clio-types, roadmap/phase-100170-mcp-read-retrieve-compose-surface.md",
+    "remediated": "2026-09-19",
+    "remediated_by": "OpenCode CLI (Together . GLM-5.3 Flash High)"
+  },
+  "standard": [
+    "requirement.md \u00a74.9.2, \u00a74.9.4 Core tool catalog (FR-5, FR-6, FR-7, FR-8, FR-9, FR-14, FR-16, FR-17, FR-20, FR-24, FR-26, FR-27, FR-28)",
+    "AGENTS.md core rules (>=90% per-file coverage, <=450 lines per Rust file, exact file header structure, roadmap isolation)",
+    "roadmap/phase-100170-mcp-read-retrieve-compose-surface.md acceptance criteria AC-100170-01 through AC-100170-07 and definition of done",
+    "Pinned MCP transport revision 2025-11-25 (Streamable HTTP + stdio)"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100170-01 / FR-20: All 19 Core read tools published and callable over MCP",
+      "status": "Fully satisfied",
+      "evidence": "clio_mcp::bound_read_tools() exports 19 read tools; tools/list returns 33 tools total; verified in mcp_read_conformance::ac_17_01_all_read_tools_listed",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100170-02 / AC-100170-03: Stdio and Streamable HTTP transport support with full parity",
+      "status": "Fully satisfied",
+      "evidence": "Table-driven 18-fixture parity matrix passes identically across stdio (stdio_read_matrix_with_parity) and Streamable HTTP (http_read_matrix_with_parity)",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100170-04 / PR-1: compose_context respects token budgets partitioned between persona and memory",
+      "status": "Fully satisfied",
+      "evidence": "compose_context tests (t17_03_compose_budget_is_enforced and compose_context_respects_budget_and_prioritizes_persona) verify total_tokens <= 300 with non-empty persona section",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100170-05 / FR-24 / NFR-4: Bi-temporal queries honor as_of and time_axis",
+      "status": "Fully satisfied",
+      "evidence": "t17_05_triple_query_honors_as_of tests historical as_of query against superseded triples; temporal_history_and_triple_query_bi_temporal passes",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100170-06 / FR-17: retrieve durably persists co-activation edges and fails closed on handoff error",
+      "status": "Fully satisfied",
+      "evidence": "t17_06_retrieve_persists_assoc_edges confirms edge growth in store; assoc_durable_tests confirms fail-closed behavior with CoactivationHandoffFailed; protocol maps to JSON-RPC -32001",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100170-07: Zero stdout logging on stdio transport during read queries",
+      "status": "Fully satisfied",
+      "evidence": "t17_07_stdout_purity_on_reads asserts that all stdout lines emitted during stdio execution parse as valid JSON-RPC frames",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-16: Memory inspection API (inspect) without ciphertext or DEK leaks",
+      "status": "Fully satisfied",
+      "evidence": "Store::inspect_items implemented for SQLite (sqlite_inspect.rs) and Postgres (postgres_inspect.rs); parity verified in pg_inspect_tests; secret masking applied before response",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md: Coverage Gate (>=90% aggregate and per-file functions and lines)",
+      "status": "Fully satisfied",
+      "evidence": "make coverage reports total functions 98.63% (1939/1966) and lines 98.14% (21301/21705); lowest function coverage is 90% (hub_distill_model.rs) and lowest line coverage is 91.26% (http.rs)",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md: Source file size constraint (<= 450 lines per Rust file)",
+      "status": "Fully satisfied",
+      "evidence": "wc -l across all modified and created Rust files confirms maximum file size is 450 lines (hybrid.rs: 450 lines, mcp_read_conformance.rs: 446 lines, schema_defs.rs: 441 lines)",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md: Module header specification",
+      "status": "Fully satisfied",
+      "evidence": "Remediated r1: mandatory closing sentence added to postgres_inspect.rs:20-22, sqlite_inspect.rs:20-22, read_retrieve.rs:21-23; headers now follow the exact AGENTS.md template",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-20: Published tool_schema pack consistency with handler parameters",
+      "status": "Fully satisfied",
+      "evidence": "Remediated r1: schema_read_defs.rs now declares budget_tokens for persona_get (schema_read_defs.rs:130-131) and as_of/time_axis/expand_graph for compose_context (schema_read_defs.rs:112-120), matching handler extraction in read_tools.rs:162 and read_retrieve.rs:136-138 under additionalProperties: false",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "AGENTS.md module header specification violation in three newly introduced Rust files",
+      "evidence": "crates/clio-store/src/postgres_inspect.rs:18-19, crates/clio-store/src/sqlite_inspect.rs:18-19, crates/clio-mcp/src/read_retrieve.rs:19-21",
+      "requirement_ref": "AGENTS.md (File Header section)",
+      "recommendation": "Add the mandatory concluding line `//! Keep this module focused on <a single responsibility>.` to each file's module documentation header."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Schema parameter omission for persona_get and compose_context in published tool_schema pack",
+      "evidence": "crates/clio-mcp/src/schema_read_defs.rs:127-131 (persona_get has empty props while read_tools.rs:161-163 parses budget_tokens); crates/clio-mcp/src/schema_read_defs.rs:108-116 (compose_context props omit as_of, time_axis, expand_graph while read_retrieve.rs:134-136 parses them)",
+      "requirement_ref": "FR-20, \u00a74.9.4.B, \u00a74.9.4.C",
+      "recommendation": "Declare budget_tokens in persona_get schema, and declare as_of, time_axis, expand_graph in compose_context schema (or remove parsing of undeclared properties from handlers), because schemas specify additionalProperties: false."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Attribution mismatch between developer task instructions and phase file",
+      "evidence": "adversary-task-r1.md:86 requested '| Developer | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |', but roadmap/phase-100170-mcp-read-retrieve-compose-surface.md:6 records 'OpenCode CLI (Go . Deepseek V4.1 Flash High)'",
+      "requirement_ref": "Phase 100170 Attribution instructions",
+      "recommendation": "Correct the Developer Attribution row to match the specified runtime model ('Together . GLM-5.3 Flash High'), or document the runner override in the phase notes."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "AGENTS.md module header specification violation in three newly introduced Rust files",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md requires every Rust source file to have an exact module header structure ending with '//! Keep this module focused on <a single responsibility>.'. Missing this line violates the normative repository code standard.",
+      "impact": "Code style and consistency violation in production Rust crates (clio-store and clio-mcp).",
+      "evidence": "crates/clio-store/src/postgres_inspect.rs:18-19, crates/clio-store/src/sqlite_inspect.rs:18-19, crates/clio-mcp/src/read_retrieve.rs:19-21 omit the required closing line.",
+      "confidence": "High",
+      "proposed_fix": "Append `//! Keep this module focused on <a single responsibility>.` (with appropriate responsibility wording) to the header doc comments of postgres_inspect.rs, sqlite_inspect.rs, and read_retrieve.rs."
+    },
+    {
+      "id": 2,
+      "title": "Schema parameter omission for persona_get and compose_context in published tool_schema pack",
+      "severity": "Minor",
+      "why_it_matters": "All published MCP tool definitions enforce additionalProperties: false. If a handler parses parameters that are not defined in the schema, strict MCP client validators will reject client calls attempting to supply those parameters.",
+      "impact": "Clients passing budget_tokens to persona_get or as_of/time_axis/expand_graph to compose_context will fail JSON Schema validation.",
+      "evidence": "crates/clio-mcp/src/schema_read_defs.rs:127-131 has empty props for persona_get, but read_tools.rs:161-163 reads budget_tokens. Similarly, schema_read_defs.rs:108-116 omits as_of/time_axis/expand_graph for compose_context, while read_retrieve.rs:134-136 extracts them.",
+      "confidence": "High",
+      "proposed_fix": "Add the optional property definitions to schema_read_defs.rs (budget_tokens for persona_get; as_of, time_axis, expand_graph for compose_context), or remove their extraction from the handler if intentionally unsupported over MCP."
+    },
+    {
+      "id": 3,
+      "title": "Attribution mismatch between developer task instructions and phase file",
+      "severity": "Minor",
+      "why_it_matters": "The task prompt explicitly mandated logging OpenCode CLI (Together . GLM-5.3 Flash High) in the phase attribution table, but the developer recorded OpenCode CLI (Go . Deepseek V4.1 Flash High).",
+      "impact": "Audit trail discrepancy in roadmap documentation.",
+      "evidence": "adversary-task-r1.md line 86 vs roadmap/phase-100170-mcp-read-retrieve-compose-surface.md line 6.",
+      "confidence": "High",
+      "proposed_fix": "Update line 6 of roadmap/phase-100170-mcp-read-retrieve-compose-surface.md to match the task instructions or record the reason for the variation."
+    }
+  ],
+  "dismissed": [
+    "Cargo test hang on un-piped stdin: crates/clio-lib/src/main.rs::mcp_stdio_serves_then_eof blocks on stdin.lock() when stdin is not redirected from /dev/null; dismissed as an issue against Phase 100170 because main.rs was unmodified in this phase and was authored in Phase 100160.",
+    "Mock MCP client in-process architecture: Task 5 unlimited plan mentions MockMcpClient; implemented cleanly in tests/mcp_read_mock.rs covering drops, mid-stream aborts, and session token drops.",
+    "Undeclared 'timestamp' argument in read tools: runtime.rs::resolve_timestamp accepts an optional timestamp arg used across test fixtures; this is an internal test override helper, not part of the public client contract."
+  ],
+  "verification": [
+    {
+      "claim": "cargo test --workspace --locked passes across all crates",
+      "classification": "Established",
+      "source_note": "Re-executed independently with stdin redirected from /dev/null; all 108 tests in clio-store, 83 in clio-mcp lib, 10 in mcp_read_conformance, 5 in mcp_read_mock, and all other workspace tests passed (0 failures)."
+    },
+    {
+      "claim": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings is clean",
+      "classification": "Established",
+      "source_note": "Executed independently; finished with 0 warnings or errors."
+    },
+    {
+      "claim": "cargo fmt --all -- --check is clean",
+      "classification": "Established",
+      "source_note": "Executed independently; 0 formatting discrepancies found."
+    },
+    {
+      "claim": "make coverage achieves >=90% aggregate and per-file function and line coverage",
+      "classification": "Established",
+      "source_note": "Executed independently: aggregate functions 98.63% (1939/1966), aggregate lines 98.14% (21301/21705). Awk verification over all reported .rs files confirmed min function coverage 90.00% and min line coverage 91.26%."
+    },
+    {
+      "claim": "All modified Rust source files remain at or below 450 total lines",
+      "classification": "Established",
+      "source_note": "wc -l on all staged Rust files confirmed: maximum size is 450 lines (crates/clio-retrieve/src/hybrid.rs), 446 lines (crates/clio-mcp/tests/mcp_read_conformance.rs), 441 lines (crates/clio-mcp/src/schema_defs.rs)."
+    },
+    {
+      "claim": "No references to roadmap/ or phase numbers in codebase",
+      "classification": "Established",
+      "source_note": "git diff --cached grep confirmed zero roadmap isolation violations in code or comments."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Long-term deployment plan for attaching embedding sidecar to McpState",
+      "why_unknown": "Documented in Known Limitations as owned by a future deployment/configuration phase; not owned by Phase 100170.",
+      "what_would_resolve_it": "Execution of the deployment wiring phase attaching clio_index::Embedder.",
+      "materiality": "Low - documented limitation compliant with roadmap requirements."
+    }
+  ],
+  "strengths": [
+    "Full 19-tool read catalog bound on the shared MCP dispatcher with rigorous parity testing between stdio and Streamable HTTP transports.",
+    "Durable co-activation reinforcement failure contract (FR-17) is fully wired and tested with fail-closed behavior mapped to standard JSON-RPC -32001.",
+    "Comprehensive MockMcpClient harness in tests/mcp_read_mock.rs simulating network disconnects, mid-stream aborts, and dropped session tokens.",
+    "High-fidelity inspect implementation for both SQLite and Postgres with shared predicate compilation and zero plaintext/ciphertext/DEK leakage.",
+    "Outstanding test coverage (98.63% functions, 98.14% lines) strictly honoring the workspace coverage gate."
+  ],
+  "regrets": [
+    "Did not catch the missing closing sentence in module doc headers before staging.",
+    "Did not audit published tool schemas against handler parameter extraction for persona_get and compose_context."
+  ],
+  "process_changes": [
+    "Add an automated linter or pre-commit check verifying the exact AGENTS.md file header template including the closing 'Keep this module focused on...' sentence.",
+    "Add a schema conformance test verifying that every parameter extracted by a tool handler is explicitly defined in its inputSchema properties when additionalProperties is false."
+  ],
+  "plan_1hr": [
+    "Add the missing concluding line `//! Keep this module focused on <a single responsibility>.` to `postgres_inspect.rs`, `sqlite_inspect.rs`, and `read_retrieve.rs`.",
+    "Update `schema_read_defs.rs` to include `budget_tokens` for `persona_get` and `as_of`, `time_axis`, `expand_graph` for `compose_context` so strict schema validators do not reject valid client parameters.",
+    "Align the Developer Attribution row in `roadmap/phase-100170-mcp-read-retrieve-compose-surface.md` with the model name from `adversary-task-r1.md`."
+  ],
+  "plan_unlimited": [
+    "Refactor `crates/clio-lib/src/main.rs` unit test `mcp_stdio_serves_then_eof` to avoid blocking on `std::io::stdin().lock()` in environments with inherited open stdin.",
+    "Implement runtime injection of `clio_index::Embedder` into `McpState` to enable full dense retrieval alongside lexical retrieval over MCP once embedding sidecar lifecycle and profile wiring are available."
+  ],
+  "remediation": {
+    "run": "r1",
+    "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+    "status": "resolved",
+    "findings": {
+      "F-01": "Resolved: added the mandatory `//! Keep this module focused on ...` closing sentence to crates/clio-store/src/postgres_inspect.rs, crates/clio-store/src/sqlite_inspect.rs, and crates/clio-mcp/src/read_retrieve.rs (responsibility wording tailored to each module).",
+      "F-02": "Resolved: added `budget_tokens` to the persona_get schema and `as_of`, `time_axis`, `expand_graph` to the compose_context schema in crates/clio-mcp/src/schema_read_defs.rs so strict validators (additionalProperties: false) no longer reject parameters the handlers extract.",
+      "F-03": "Resolved: Developer attribution row in roadmap/phase-100170-mcp-read-retrieve-compose-surface.md corrected to `OpenCode CLI (Together . GLM-5.3 Flash High)` as mandated by the task instructions."
+    },
+    "plan_1hr": "All three items implemented (F-01, F-02, F-03 above).",
+    "plan_unlimited": {
+      "item_1": "Implemented: crates/clio-lib/src/main.rs test `mcp_stdio_serves_then_eof` now serves from an in-memory empty cursor (std::io::Cursor) writing to a Vec instead of locking the inherited process stdin, so `cargo test` can no longer block when stdin is not redirected. Production code and the `run`/`mcp_stdio` path are unchanged.",
+      "item_2": "Deferred with reason: runtime injection of clio_index::Embedder into McpState is the documented Known Limitation of Phase 100170; the embedding sidecar lifecycle/profile wiring does not exist yet and is owned by a future deployment/configuration phase, not this remediation round."
+    },
+    "process_changes": {
+      "header_template_linter": "Deferred with reason: repo-wide tooling addition is a separate process decision; the AGENTS.md File Header rule plus adversarial review caught this class of defect in r1.",
+      "schema_param_conformance_test": "Deferred with reason: a full extraction-vs-schema conformance harness spans all 33 bound tools and is out of remediation scope; the r1 defect is fixed at the source and the finding documents the gap."
+    },
+    "verification": {
+      "make_check": "PASS (fmt + clippy -D warnings + full workspace tests), exit 0, no warnings or failures.",
+      "make_coverage": "PASS, exit 0: aggregate functions 98.63% (1939/1966), lines 98.11% (21305/21715); awk scan over all reported .rs files found no file below 90% functions or lines. Modified files: postgres_inspect.rs 100%/100%, sqlite_inspect.rs 100%/100% (region col informational), read_retrieve.rs 100%/97.32%, schema_read_defs.rs 100%/100%, main.rs 96.55%/91.63%.",
+      "file_sizes": "All modified Rust files <= 450 lines: main.rs 341, schema_read_defs.rs 305, read_retrieve.rs 223, sqlite_inspect.rs 89, postgres_inspect.rs 80."
+    }
+  }
+}

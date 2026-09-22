@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100364: clio mcp http Auto-Bind and 34300-34309 Port Scan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100364: clio mcp http Auto-Bind and 34300-34309 Port Scan</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">1 critical · 1 important · 1 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">The auto-bind port scan, CLI flags, address announcement, and security guards function as specified. However, the modified parse_flags loop introduces a Clippy while_let_loop lint error that breaks `make lint`, and explicit-address unit/harness tests suffer from intermittent port-reuse race conditions under parallel execution.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-22</span>
+      <span><b>Applies to</b>Phase 100364 staged diff</span>
+      <span><b>Source</b>crates/clio-lib/src/main.rs, crates/clio-lib/src/http_bind.rs, crates/clio-lib/src/http_bind_tests.rs, crates/clio-lib/src/main_tests.rs, crates/clio-lib/tests/mcp_http_bind_harness.rs</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#critical">Critical</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>Phase 100364 specification (roadmap/phase-100364-mcp-http-auto-bind-port-scan.md)</li>
+        <li>requirement.md FR-20 and non-loopback auth rule</li>
+        <li>AGENTS.md honest reporting, coverage gate, and file size limits</li>
+        <li>Workspace make lint (cargo clippy --workspace --all-targets --all-features --locked -- -D warnings)</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">6 of 8 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100364-01: Bare --bind auto-binds loopback in 34300-34309</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">target/debug/clio mcp http --bind --db sqlite::memory: outputs &#39;mcp http listening on 127.0.0.1:34300&#39; to stderr; stdout length is 0</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100364-02: Default scans 34300-34309 and supports concurrent instances</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Two concurrent instances bind 127.0.0.1:34300 and 127.0.0.1:34301 respectively</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100364-03: Explicit address wins over auto-scan</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio mcp http --bind 127.0.0.1:34305 binds exactly 127.0.0.1:34305</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100364-04: Bound address on stderr; stdout pure MCP protocol</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Verified 0 stdout bytes across all startup scenarios including error exits</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100364-05: Range exhaustion errors clearly naming 34300-34309 and remediation</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Exhaustion exit code 1: &#39;mcp http error: no free port in 34300-34309 on 127.0.0.1; stop the other listener or pass --bind HOST:PORT&#39;</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100364-06: Non-loopback bind without token fails closed</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">--bind 0.0.0.0:0 without token exits 1 with &#39;mcp http error: non-loopback bind requires an auth token&#39;</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Workspace lint check: make lint / cargo clippy --all-targets clean</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">make lint fails with exit 101: clippy::while_let_loop on crates/clio-lib/src/main.rs:103:5</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Deterministic non-flaky test suite</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">make coverage failed initially at http_bind::tests::explicit_address_is_honored due to ephemeral port probe race</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="critical">
+      <h2 class="sh"><i data-lucide="octagon-alert" class="ic c-red"></i>Critical <span class="cnt">01</span></h2>
+      <p class="lede">Address these before considering the work done.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Clippy while_let_loop compilation error fails `make lint`</h3>
+              <span class="badge b-red"><span class="dot"></span>Critical</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>`make lint` runs `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`. Clippy generates an error on the new parse_flags loop in main.rs, causing make lint to fail with exit code 101. The developer claimed clippy was clean in §9 and the run log.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>CI gate failure; repository does not pass make lint or make check.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/main.rs:103:5: error: this loop could be written as a `while let` loop</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>In crates/clio-lib/src/main.rs:103, replace `loop { let Some(flag) = pending.take().or_else(|| it.next()) else { break; }; ... }` with `while let Some(flag) = pending.take().or_else(|| it.next()) { ... }`.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">01</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Racy port allocation in `explicit_address_is_honored` causes intermittent test failure during coverage run</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The unit test binds to port 0, reads the assigned port, drops the listener, and immediately re-binds. If the socket lingers in TIME_WAIT or a parallel test thread binds the port, resolve_listener fails with AddrInUse (code 48).</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Flaky test runs in CI and coverage gates (`make coverage` failed on the first run with &#39;bind explicit: Os { code: 48, kind: AddrInUse }&#39;).</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/http_bind_tests.rs:35:62 and crates/clio-lib/tests/mcp_http_bind_harness.rs:101-105</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a bounded retry loop when selecting and verifying an explicit port in http_bind_tests.rs and mcp_http_bind_harness.rs, similar to occupied_with_free_next().</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">01</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>CLI flag parser does not support `--bind=HOST:PORT` syntax and silently falls back to auto-bind</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>When a user passes `--bind=127.0.0.1:34305`, `parse_flags` does not split on `=` and stores key `bind=127.0.0.1:34305`. `flags.get(&quot;bind&quot;)` returns None, causing clio to silently auto-bind to 34300 instead of 34305.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Users passing standard `--flag=value` syntax receive no warning/error and are bound to an unexpected port.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/main.rs:108: `target/debug/clio mcp http --bind=127.0.0.1:34305 --db sqlite::memory:` outputs &#39;mcp http listening on 127.0.0.1:34300&#39;</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>In parse_flags, check if flag contains `=` (e.g. `flag.split_once(&#39;=&#39;)`) or reject unrecognized flag tokens.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Attribution row in phase doc references Go Deepseek V4.1 instead of GLM-5.3: developer model attribution mismatch in roadmap markdown is cosmetic and does not affect code or runtime.</li>
+        <li>File size checks: all created and modified Rust files are well below 450 lines (main.rs is 370 lines, main_tests.rs is 359 lines, harness is 147 lines, http_bind_tests.rs is 120 lines, http_bind.rs is 79 lines).</li>
+        <li>Roadmap isolation: verified 0 references to phase numbers or roadmap paths in staged crate diff.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make lint fails with clippy::while_let_loop — Reproduced directly by running `make lint` and `cargo clippy -p clio --all-targets`</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage aggregate and per-file &gt;=90% passes — Coverage guard passed with TOTAL lines 97.89% and functions 98.90%; http_bind.rs lines 100%, main.rs lines 94.03%</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All functional scenarios T01-T07 behave as specified — Verified live CLI runs for bare --bind, default no-flag scan, dual instances, explicit override, range exhaustion, non-loopback auth failure, and pure stdout</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>explicit_address_is_honored can fail with AddrInUse — Observed panic during first execution of `make coverage`</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean decomposition: http_bind module is concise (79 lines) with truthful AGENTS.md header and well-bounded ownership.</li>
+        <li>Strict adherence to security rules: non-loopback addresses fail closed without an auth token before listener announcement.</li>
+        <li>Zero stdout pollution: stderr receives diagnostic/announcement logs while stdout carries 0 bytes on startup.</li>
+        <li>Shared constants: range 34300-34309 cleanly reuses port_scan::FIRST_PORT and LAST_PORT.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Developer claimed cargo clippy was clean without running with -D warnings or --all-targets.</li>
+          <li>Integration and unit test probe-and-rebind patterns should have used retry loops to prevent flaky failures.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Always run `make lint` prior to declaring developer work done.</li>
+          <li>Guard ephemeral socket tests against TIME_WAIT reuse collisions.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Change the loop in crates/clio-lib/src/main.rs:103 to `while let Some(flag) = pending.take().or_else(|| it.next())` to fix `make lint`.</li>
+          <li>Add retry loop to `explicit_address_is_honored` in `http_bind_tests.rs` and `explicit_address_is_bound_exactly` in `mcp_http_bind_harness.rs`.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Enhance `parse_flags` to robustly handle `--key=val` pairs and report usage errors on unrecognized flags.</li>
+          <li>Unify socket test helpers into a shared test utility module.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/tmp/adversarial-review-O7tTCs/report.html</span>
+          <span><b>Findings:</b>/tmp/adversarial-review-O7tTCs/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

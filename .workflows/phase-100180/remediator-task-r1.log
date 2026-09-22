@@ -1,0 +1,17 @@
+2026-09-19_20:21:41 start: remediator r1 reading findings + phase file
+2026-09-19_20:38:31 read findings.json: F-01..F-10 (all important/medium/low)
+2026-09-19_20:38:31 F-04 fix: new crates/clio-store/src/schema_converge.rs (guarded ALTER); call at sqlite.rs:50 before portable DDL; lineage indexes moved 001->002_*.sql; schema_version 6->7 (schema_reshape.rs:26, sql/001_core.sql:30); tests schema_converge_tests.rs (3)
+2026-09-19_20:38:31 F-03 fix: Store::count_items added (store.rs:315), sqlite/postgres count_items_impl, read_tools.rs:206 returns total; asserted read_tools_tests/audit_tools_tests/pg_inspect_tests/stdio
+2026-09-19_20:38:32 F-02 fix: crates/clio-retrieve/src/audit_asof_tests.rs t18_04 uses item_visible_at(TimeAxis::Transaction) over corrected rows; AC-100180-04 reworded (retrieval indexes live rows only)
+2026-09-19_20:38:32 F-05 fix: reasoned continuous observation writes operation=correct (sqlite_attribute.rs:286, postgres_attribute.rs:286); test continuous_correction_emits_correct_operation; limitation reworded
+2026-09-19_20:38:32 F-07 fix: mutator_tools.rs rejects blank reason on dry-run before preview; test added
+2026-09-19_20:38:32 F-08 fix: inspect_query.rs:102 upper bound now exclusive (<); model doc + compiler test + pg boundary assertions updated
+2026-09-19_20:38:32 F-09 fix: AuditTrailView gains merged ascending timeline (clio-compliance/src/audit.rs); tests in audit_tests.rs + stdio
+2026-09-19_20:38:32 F-10 fix: new crates/clio-mcp/tests/mcp_audit_conformance.rs drives correct/audit_trail/inspect over stdio::serve
+2026-09-19_20:38:32 F-01 fix: index_store_tests.rs pending_index_jobs assertions read ALL_PENDING=1_000_000 window so own bank rows cannot be displaced
+2026-09-19_20:38:32 F-06 fix: phase-100180 counts corrected (store 9+5+4=18 +3 convergence, compliance 13, mcp 3+1, retrieve 1); postgres_audit claim corrected to 91.67% functions/93.47% lines
+2026-09-19_20:38:32 findings.json updated: 10/10 marked resolved + resolutions/evidence; verdict Adequate (remediated); findings.original.json untouched
+2026-09-19_20:38:32 files verified <=450 lines (max postgres_store.rs 433)
+2026-09-19_20:38:32 make check exit 0 (34 test-result-ok suites, 0 FAILED)
+2026-09-19_20:38:32 make coverage exit 0: aggregate lines 97.99% functions 98.63%; 163 reported files, none below 90% functions/lines
+REMEDIATOR_DONE 18f534ca

@@ -1,0 +1,364 @@
+{
+  "run": "adversary-task-r1",
+  "phase": "100130",
+  "subject": "Phase 100130: Co-Activation Associations and Hub Distillation (developer r2 staged diff)",
+  "verdict": "Adequate",
+  "verdict_justification": "The core behavior is implemented and genuinely tested: all 531 workspace tests pass, clippy is clean, fmt is clean, and coverage passes aggregate (fn 98.54% / lines 98.42%) with all 113 reported files at or above 90% on both functions and lines. However, several claims are stronger than the code supports: the ranking-env association knobs are stored but consumed by no production path, the §7.4.5 derivative-decision log failure is silently swallowed, and expand_graph does not honor min_weight for explicit edges. These are real spec gaps rather than cosmetic ones.",
+  "metadata": {
+    "generated": "2026-09-19",
+    "applies_to": "git staged diff (index) for phase-100130; run adversary-task-r1",
+    "source": "git diff --cached -- . ':!.workflows/' plus surrounding unchanged callers (hybrid.rs, store.rs, gated.rs, sql/001_core.sql, requirement.md)"
+  },
+  "standard": [
+    "requirement.md §4.5 (association_weight_policy: saturating growth, lazy decay, prune, hub distill; explicit sticky edges), FR-17 (durable reinforce handoff, fail closed), FR-18, FR-15, PR-6, PR-8, PR-9, §7.4.5 (affirmative derivative-decision log), §4.9.4.B/E tool semantics",
+    "roadmap/phase-100130 acceptance criteria AC-100130-01..AC-100130-12, T100130-01..T100130-16, Definition of Done, Completion Evidence",
+    "AGENTS.md: per-file >=90% function and line coverage; every Rust source file <=450 lines; exact file header structure; no roadmap/phase references in code",
+    "Developer task: no drive-by refactors, no unapproved public contract changes, no silent soft-drop of FR-17 reinforce, do not claim completion without evidence"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100130-01 saturating growth + lazy decay + prune per §4.5 (T100130-01..T100130-03)",
+      "status": "Fully satisfied",
+      "evidence": "clio-store/src/assoc.rs:103-139 implements grow/effective_weight/should_prune; assoc_policy_tests.rs:35-94 assert the 0.15/0.2775/0.385875 step table, the 30d half-life, future-clock and unparseable-stamp cases; assoc_tests.rs:103-122 assert prune-on-observe deletes the row.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100130-02 co-retrieve durably reinforces pairs (FR-17), T100130-04/T100130-05",
+      "status": "Partially satisfied",
+      "evidence": "hybrid.rs:215-218 reinforces outcome.hits and propagates errors; assoc_tests.rs:49-70 asserts 3 hits -> 3 edges at 0.15. T100130-05 (assoc_tests.rs:163-185) only fails via invalid eta validation, not a durable-handoff/DB failure.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "AC-100130-03/AC-100130-04 associations/graph_link/graph_query semantics (T100130-06/T100130-07)",
+      "status": "Fully satisfied",
+      "evidence": "assoc_graph.rs:33-234 implements all three; assoc_graph_tests.rs:20-143 and assoc_surface_tests.rs:37-158 cover multi-relationship, hop caps, edge_type mapping, missing-endpoint rejection.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100130-05 expand_graph uses assoc weights (T100130-08)",
+      "status": "Partially satisfied",
+      "evidence": "hybrid.rs:169-192 merges expanded ids pre-fusion; assoc_tests.rs:72-100 proves a linked neighbor surfaces only with expand on. But assoc_graph.rs:267-289 does not apply min_weight to explicit edges (observe returns raw for explicit at assoc.rs:138-139), contradicting phase Task 5 'w_eff >= min_weight' and the inline comment at assoc_graph.rs:271.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "AC-100130-06 hub distill gated + non-blocking (T100130-09/T100130-10)",
+      "status": "Fully satisfied",
+      "evidence": "hub_distill.rs:203-214 routes through clio_admission::gated_create; gated.rs:246-251 writes only when decision.pass. hub_distill_tests.rs:102-169 prove admitted item + prune on pass, edge retention + no item on reject.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100130-07 assoc path != update_rule / != triples (T100130-13/T100130-16)",
+      "status": "Fully satisfied",
+      "evidence": "assoc_tests.rs:233-253 source guard on assoc.rs and clio-store/src/assoc.rs; assoc_policy_tests.rs:50-62 proves grow != EMA; sql/001_core.sql:410-424 is a dedicated assoc_edges table with AssocKind coactivation|explicit only (model.rs:22-56).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100130-08 ranking_env knobs (T100130-12)",
+      "status": "Partially satisfied",
+      "evidence": "admission_knobs.rs:80-146 adds hub_degree_limit/max_hops + validation; admission_knobs_tests.rs:124-165 prove serde round-trip. But no production path reads RankingEnv.coactivation: hybrid.rs:83-86 hardcodes AssocPolicy::default(); from_coactivation is only called by Default (assoc.rs:47-51); set_assoc_policy/from_coactivation have no non-test callers (grep). t12 sets the policy directly, not via ranking_env.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "AC-100130-09 bank isolation (T100130-11)",
+      "status": "Fully satisfied",
+      "evidence": "assoc_graph.rs:123-130 rejects endpoints absent from the bank; assoc_graph_tests.rs:146-173 and assoc_edge_tests.rs:224-274 assert cross-bank/empty-bank isolation; all list/delete SQL is bank-scoped.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100130-10 dual-backend parity (T100130-14)",
+      "status": "Fully satisfied",
+      "evidence": "pg_assoc_edge_tests.rs:292-391 ran and passed locally against a live Postgres; asserts 0.385875 on both backends and identical explicit multi-relationship rows.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100130-11 explicit sticky default (T100130-15)",
+      "status": "Fully satisfied",
+      "evidence": "assoc.rs:138-139 returns raw weight for explicit and never prunes; assoc_tests.rs:204-231 keeps a 10,000-day-old explicit edge at its raw 0.2.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100130-12 graph-metadata model matches requirement v1.8",
+      "status": "Fully satisfied",
+      "evidence": "sql/001_core.sql:410-430 dedicated assoc_edges table; no subject/predicate/interval columns; AssocKind is coactivation|explicit only.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Per-file coverage >=90% functions and lines; aggregate gate",
+      "status": "Fully satisfied",
+      "evidence": "make coverage exit 0; TOTAL fn 98.54% / lines 98.42%; parsed all 113 reported files, none below 90% on either metric.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Every Rust source file <=450 lines; no roadmap/phase references in code",
+      "status": "Fully satisfied",
+      "evidence": "Largest touched file is hybrid.rs at 417 lines; all new files 97-391 lines. grep for 'roadmap/'/Phase 100130/phase-100130 in crates/ returns nothing.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Exact AGENTS.md header structure on new/modified Rust files",
+      "status": "Partially satisfied",
+      "evidence": "Production new files carry the full header; assoc_policy_tests.rs:1-3 and assoc_edge_tests.rs:1-2 / pg_assoc_edge_tests.rs:1-2 lack the Responsibility/Owns/Does not own/Boundary block (the latter two are pre-existing but were modified).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Ranking-env co-activation knobs are stored but consumed by no production path",
+      "evidence": "crates/clio-retrieve/src/hybrid.rs:83-86 constructs AssociationEngine with AssocPolicy::default(); crates/clio-store/src/assoc.rs:47-51 makes Default call from_coactivation(&CoactivationConstants::default()); grep shows from_coactivation and set_assoc_policy have no non-test callers. crates/clio-retrieve/src/assoc_tests.rs:188-202 (t12) sets the policy directly, not via ranking_env.",
+      "requirement_ref": "phase-100130 Task 7 / AC-100130-08; requirement.md §4.5 config surface",
+      "recommendation": "Build the retriever's AssocPolicy from the live RankingEnv.coactivation (e.g. in the production constructor or retrieve handler), or document explicitly that config-to-engine wiring is deferred and downgrade the 'operators can tune without code changes' claim."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "§7.4.5 anonymized-derivative decision log failure is silently swallowed",
+      "evidence": "crates/clio-write/src/hub_distill.rs:361-368 calls `let _ = self.store.record_assoc_audit(...)` for the hub_distill derivative decision. A storage failure returns Ok and the admitted distilled item remains stored with no logged decision.",
+      "requirement_ref": "requirement.md §7.4.5 ('this determination MUST be affirmatively logged per item at the time of distillation')",
+      "recommendation": "Propagate the audit error (fail the distillation or surface a degraded status) so the MUST-log cannot be silently skipped; if best-effort is intentional, the requirement needs an explicit carve-out."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "expand_graph does not apply min_weight to explicit edges and the inline comment is wrong",
+      "evidence": "crates/clio-retrieve/src/assoc_graph.rs:270-274 expands any neighbor whose observe() returns Some, commenting that observe prunes below w_min; but crates/clio-retrieve/src/assoc.rs:138-139 returns Some(edge.weight) for explicit edges at any weight, so a 0.001-weight explicit edge is expanded. associations (assoc_graph.rs:60) and graph_query (assoc_graph.rs:209) do apply the min filter.",
+      "requirement_ref": "phase-100130 Task 5 ('add neighbors with w_eff >= min_weight'); requirement.md §4.5 explicit-edge participation",
+      "recommendation": "Apply the policy min-weight check inside expand_ids for both kinds, or explicitly document that sticky explicit edges bypass min_weight and fix the misleading comment."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "hub_distill is not enqueued as a job and reinforce/hub telemetry is incomplete",
+      "evidence": "crates/clio-write/src/hub_distill.rs:242-261 consolidate_hubs recomputes eligible_hubs and distills inline; there is no queue table/state and maintenance_status does not report pending hub jobs (developer documents this as an optional gap). reinforce_assoc_edge emits no audit event; only prune/graph_link/hub_distill do.",
+      "requirement_ref": "phase-100130 Task 6 ('Enqueue hub_distill job; consolidate drains eligible jobs'); In Scope 'Telemetry: reinforce, prune, hub enqueue/complete'",
+      "recommendation": "Either implement a durable hub_distill job/queue with maintenance_status visibility and a reinforce telemetry event, or record the deviation in the phase's Known Limitations as an explicit non-conformance."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "T100130-05 durable-handoff failure test only exercises store-side validation",
+      "evidence": "crates/clio-retrieve/src/assoc_tests.rs:163-185 injects eta=2.0 so require_pair rejects before any write; no store double simulates a mid-reinforce DB failure, so the test does not prove no partial reinforcement or that a torn durable handoff fails closed.",
+      "requirement_ref": "phase-100130 T100130-05 ('Durable handoff fails -> Retrieve fails closed / degraded')",
+      "recommendation": "Add a failing store double that errors on the second reinforce call and assert retrieve returns Err and no partial-success outcome is returned."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "New/modified test files lack the required AGENTS.md header block",
+      "evidence": "crates/clio-store/src/assoc_policy_tests.rs:1-3 has only copyright + SPDX + a one-line //!; crates/clio-store/src/assoc_edge_tests.rs:1-2 and crates/clio-store/src/pg_assoc_edge_tests.rs:1-2 omit the SPDX line and the Responsibility/Owns/Does not own/Boundary block. AGENTS.md requires the full structure for every Rust source file.",
+      "requirement_ref": "AGENTS.md File Header",
+      "recommendation": "Add the full header block to the new test files (and the modified pre-existing test files the developer touched)."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Phase-file attribution string does not match the instructed value",
+      "evidence": "roadmap/phase-100130-coactivation-associations-hub-distillation.md:6 records 'OpenCode CLI (Go . Deepseek V4.1 Flash High)'; the developer prompt instructed 'OpenCode CLI (Together . GLM-5.3 Flash High)'.",
+      "requirement_ref": "developer task 'Update the phase file -> Attribution'",
+      "recommendation": "Correct the attribution row to the instructed agent string (or confirm the actual runtime agent and record it consistently)."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "Coactivation pair uniqueness is application-enforced only, not by a DB constraint",
+      "evidence": "sql/001_core.sql:423 UNIQUE (bank_id, source_id, target_id, assoc_kind, relationship); relationship is NULL for coactivation and NULLs compare distinct, so the constraint does not prevent duplicate coactivation rows. Uniqueness holds only because reinforce_assoc_edge always writes the deterministic coactivation_id (sqlite_assoc.rs:222).",
+      "requirement_ref": "phase-100130 Task 1 uniqueness; AC-100130-12",
+      "recommendation": "Add a partial unique index on (bank_id, source_id, target_id) WHERE assoc_kind='coactivation', or document that the deterministic id is the sole uniqueness mechanism."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Ranking-env co-activation knobs are stored but consumed by no production path",
+      "severity": "Important",
+      "why_it_matters": "The phase Goal and AC-100130-08 present association knobs as operator-tunable without code changes. In fact nothing reads RankingEnv.coactivation when building the retriever, so ranking_env_set(eta=...) has no effect on reinforcement or decay.",
+      "impact": "Operators can change eta/half_life/w_min in config and observe no behavioral change, silently. The tests pass only because they set the policy object directly.",
+      "evidence": "crates/clio-retrieve/src/hybrid.rs:83-86; crates/clio-store/src/assoc.rs:47-51; grep: from_coactivation/set_assoc_policy have no non-test callers; crates/clio-retrieve/src/assoc_tests.rs:188-202.",
+      "confidence": "High",
+      "proposed_fix": "Construct AssocPolicy from the live RankingEnv.coactivation at retriever construction (or in the retrieve handler), and add a test that patches eta via ranking_env and observes the changed growth step on retrieve."
+    },
+    {
+      "id": 2,
+      "title": "§7.4.5 derivative-decision log failure is silently swallowed",
+      "severity": "Important",
+      "why_it_matters": "requirement.md §7.4.5 states the anonymized-derivative determination MUST be affirmatively logged per item at distillation time. The code discards the log result.",
+      "impact": "A distilled item can be admitted and retained with no durable record of the derivative decision, so the compliance MUST is not guaranteed.",
+      "evidence": "crates/clio-write/src/hub_distill.rs:361-368.",
+      "confidence": "High",
+      "proposed_fix": "Propagate record_assoc_audit's error from distill_hub so the distillation fails (or reports degraded) when the decision cannot be logged."
+    },
+    {
+      "id": 3,
+      "title": "expand_graph ignores min_weight for explicit edges and the comment is inaccurate",
+      "severity": "Important",
+      "why_it_matters": "Phase Task 5 requires expansion to add neighbors with w_eff >= min_weight. Explicit edges are added at any weight, unlike associations/graph_query, so weak explicit links can pull unrelated items into results.",
+      "impact": "Inconsistent filtering between tools; a 0.0-1.0 weight explicit edge below w_min is still expanded, defeating the min_weight bound.",
+      "evidence": "crates/clio-retrieve/src/assoc_graph.rs:267-289 and :271 comment; crates/clio-retrieve/src/assoc.rs:138-139.",
+      "confidence": "High",
+      "proposed_fix": "Apply `eff < min` in expand_ids for both kinds, or explicitly document and test that sticky explicit edges intentionally bypass min_weight; fix the misleading comment."
+    },
+    {
+      "id": 4,
+      "title": "hub_distill is not enqueued and reinforce/hub telemetry is incomplete",
+      "severity": "Minor",
+      "why_it_matters": "Task 6 says enqueue a hub_distill job drained by consolidate, and In-Scope lists reinforce/prune/hub-enqueue telemetry. Eligibility is recomputed on every consolidate with no durable queue or pending state, and reinforce emits no telemetry.",
+      "impact": "No queue depth/pending visibility; a crash mid-consolidate leaves no record of intended work. FR-15-spirit telemetry for reinforce is absent.",
+      "evidence": "crates/clio-write/src/hub_distill.rs:242-261; crates/clio-write/src/memtree_tools.rs:167-171; no audit call in reinforce_assoc_edge_impl.",
+      "confidence": "Medium",
+      "proposed_fix": "Implement a durable/queued hub_distill job with maintenance_status reporting and a PII-safe reinforce telemetry event, or document the deviation as a known non-conformance in the phase."
+    },
+    {
+      "id": 5,
+      "title": "T100130-05 durable-handoff failure test only exercises store-side validation",
+      "severity": "Minor",
+      "why_it_matters": "FR-17's hard requirement is fail-closed on durable handoff failure, not merely on a validation error. The test does not exercise a real handoff/DB failure.",
+      "impact": "A partial-reinforcement or torn-write bug would not be caught by the current suite.",
+      "evidence": "crates/clio-retrieve/src/assoc_tests.rs:163-185.",
+      "confidence": "High",
+      "proposed_fix": "Add a store double that fails on the second reinforce and assert retrieve returns Err with no partial-success outcome."
+    },
+    {
+      "id": 6,
+      "title": "New/modified test files lack the required AGENTS.md header block",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md requires every Rust source file to carry the exact header structure, and the developer task repeats it for modified files.",
+      "impact": "Header/ownership discipline erodes on test modules; automated header checks would fail.",
+      "evidence": "crates/clio-store/src/assoc_policy_tests.rs:1-3; crates/clio-store/src/assoc_edge_tests.rs:1-2; crates/clio-store/src/pg_assoc_edge_tests.rs:1-2.",
+      "confidence": "High",
+      "proposed_fix": "Add the full Responsibility/Owns/Does not own/Boundary header to the new test files and the modified pre-existing test files."
+    },
+    {
+      "id": 7,
+      "title": "Phase-file attribution string does not match the instructed value",
+      "severity": "Minor",
+      "why_it_matters": "Attribution is pipeline provenance; a mismatched agent string makes the record unreliable.",
+      "impact": "Traceability/audit of which agent ran the developer step is wrong.",
+      "evidence": "roadmap/phase-100130-coactivation-associations-hub-distillation.md:6 vs the developer prompt's instructed string.",
+      "confidence": "High",
+      "proposed_fix": "Correct the attribution row to the instructed agent string or the actual runtime agent."
+    },
+    {
+      "id": 8,
+      "title": "Coactivation pair uniqueness is application-enforced only",
+      "severity": "Minor",
+      "why_it_matters": "Task 1 specifies one undirected coactivation weight per pair. The DB UNIQUE includes relationship, which is NULL for coactivation, so it does not enforce this.",
+      "impact": "Any future code path that writes a coactivation row with a non-deterministic id could create duplicates; the guarantee rests on a single helper.",
+      "evidence": "sql/001_core.sql:423; crates/clio-store/src/sqlite_assoc.rs:221-222.",
+      "confidence": "Medium",
+      "proposed_fix": "Add a partial unique index on (bank_id, source_id, target_id) WHERE assoc_kind='coactivation', or document reliance on the deterministic id."
+    }
+  ],
+  "dismissed": [
+    "450-line violations: none found; largest touched file is hybrid.rs at 417 lines.",
+    "Roadmap isolation: grep for roadmap/, phase-100130, Phase 100130 in crates/ returns nothing.",
+    "Coverage below 90%: parsed all 113 reported files; none below 90% on functions or lines.",
+    "update_rule/EMA contamination: source guard and separate tables hold; assoc path never references the continuous engine.",
+    "Unsafe code or secret logging: no unsafe introduced; audit details are ids/weights only.",
+    "Dual-backend parity is real: the Postgres test ran and passed locally, not skipped."
+  ],
+  "verification": [
+    {
+      "claim": "cargo test --workspace --locked: 531 passed, 0 failed",
+      "classification": "Established",
+      "source_note": "Re-ran make test / cargo test; summed suites = 531 passed, 0 failed."
+    },
+    {
+      "claim": "cargo clippy --workspace --all-targets --all-features --locked -D warnings: clean",
+      "classification": "Established",
+      "source_note": "Re-ran make lint; finished with no warnings."
+    },
+    {
+      "claim": "make coverage exit 0; aggregate fn 98.54% / lines 98.42%; no file below 90%",
+      "classification": "Established",
+      "source_note": "Re-ran make coverage; parsed all 113 file rows; none below 90% on functions or lines."
+    },
+    {
+      "claim": "pg_assoc_edge_tests::t14_dual_backend_reinforce_parity passes against real Postgres",
+      "classification": "Established",
+      "source_note": "Test line appeared as 'ok' in the test log; a live Postgres was reachable via DATABASE_URL."
+    },
+    {
+      "claim": "cargo fmt --all applied",
+      "classification": "Established",
+      "source_note": "cargo fmt --all -- --check exits 0."
+    },
+    {
+      "claim": "ranking_env knob changes affect reinforcement behavior",
+      "classification": "Contradicted",
+      "source_note": "No production path reads RankingEnv.coactivation; t12 sets the policy directly."
+    },
+    {
+      "claim": "Anonymized-derivative decision is affirmatively logged per §7.4.5",
+      "classification": "Uncertain",
+      "source_note": "The audit write is attempted but its error is discarded, so the guarantee is not enforced."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Whether any higher-level (later-phase) assembly is expected to wire RankingEnv into HybridRetriever/HubDistillEngine",
+      "why_unknown": "No production constructor for either engine exists in this phase; only tests build them.",
+      "what_would_resolve_it": "A phase doc or downstream design stating where the retriever is constructed from Runtime config.",
+      "materiality": "Determines whether F-01 is a defect now or deferred wiring."
+    },
+    {
+      "what": "Whether sticky explicit edges are intentionally exempt from min_weight in expansion",
+      "why_unknown": "The requirement says explicit edges participate in expand_graph but also that expansion uses w_eff >= min_weight.",
+      "what_would_resolve_it": "A normative clarification in requirement.md §4.5.",
+      "materiality": "Determines whether F-03 is a bug or a documentation gap."
+    }
+  ],
+  "strengths": [
+    "Clean separation of the pure weight-policy math (clio-store::assoc) from storage and from traversal, with the EMA engine explicitly excluded.",
+    "Atomic single-statement saturating upsert on both backends, plus a real 4-thread concurrency test proving no lost increments and no duplicate rows.",
+    "Hub distillation genuinely routes through clio_admission::gated_create and writes only on pass; reject path retains edges and creates no item.",
+    "Dual-backend parity is tested against a live Postgres, not mocked.",
+    "Honest Known Limitations section in the phase file, including the weak T100130-05 failure mode and the missing maintenance_status hub reporting."
+  ],
+  "regrets": [
+    "AC-100130-08's operator-tunability claim was accepted at face value from the config round-trip test; a grep for the knob's consumer would have exposed the gap immediately.",
+    "I initially treated expand_ids' 'observe prunes below w_min' comment as true before reading observe's explicit-edge branch."
+  ],
+  "process_changes": [
+    "For every config knob added, grep for a production consumer, not just a serialization test.",
+    "For every 'MUST log/emit' requirement, check that the error path is propagated rather than discarded."
+  ],
+  "plan_1hr": [
+    "Wire RankingEnv.coactivation into the retriever's AssocPolicy construction and add a ranking_env->retrieve growth test (F-01).",
+    "Propagate the §7.4.5 derivative-log error in distill_hub (F-02).",
+    "Apply min_weight in expand_ids and fix the comment (F-03)."
+  ],
+  "plan_unlimited": [
+    "Implement a durable hub_distill job/queue with maintenance_status visibility and reinforce telemetry, or formally narrow the phase spec (F-04).",
+    "Add a failing-store-double durability test for FR-17 and a partial-failure test for cross-ref writes (F-05).",
+    "Add a partial unique index for coactivation pairs and a header/ownership CI check (F-06, F-08)."
+  ]
+}

@@ -1,0 +1,21 @@
+2026-09-21T07:18:18Z START phase-100270 developer r1 (OpenCode CLI, deepseek-v4.1-flash)
+2026-09-21T07:18:18Z read task file, phase file, AGENTS.md, coverage.md, crates.md, requirement.md refs
+2026-09-21T07:18:18Z baseline gate: cargo llvm-cov --workspace --locked --json --output-path /tmp/cov-baseline.json (with LLVM_COV/LLVM_PROFDATA from Makefile logic) -> report saved; 250 files, no file below 90%% line/function; totals lines 97.86 fn 98.88
+2026-09-21T07:18:18Z NOTE: first baseline attempt aborted on clio-compliance::import_restore_tests::force_overwrites_opaque_envelope (would_overwrite 0 vs 1); re-ran clio-compliance lib 3x green and second full baseline green -> pre-existing parallel flake, not caused by this phase
+2026-09-21T07:26:00Z discovery: 006 canonical consolidation stores merged chunks as ONE item with chunk/source-refs only (no item-id parent->source link); 013 hub distill stores snapshot {hub_id,neighbor_ids} + source_ref=hub_distill -> only eligible consolidated parents have item-id links
+2026-09-21T07:26:00Z clio-config retention: added RecallScope::parse, read similarity caps (strict .80/balanced .90/lenient .95), schema x-duplicate-tolerance-read-mapping, activated accepted_but_inert note
+2026-09-21T07:26:00Z clio-retrieve: new dedup.rs + hybrid_rank.rs (extracted fuse/apply_rerank from the 450-line hybrid.rs), RetrieveRequest scope/prefer/tolerance, RetrieveOutcome.dedup, finalize.select_page
+2026-09-21T07:26:00Z cargo test -p clio-retrieve -> 115 passed, 0 failed
+2026-09-21T07:45:27Z clio-mcp: read_retrieve resolves bank recall_scope_default + duplicate_tolerance_read, threading new params; explain extension adds dedup block; schema_read_defs publishes recall_scope/prefer_consolidated
+2026-09-21T07:45:27Z added backfill_exhausted signal; extracted ResolvedRetention to retention_resolved.rs because retention.rs hit 484 lines (>450 limit)
+2026-09-21T07:45:27Z docs/recall-scope-and-dedup.md operator doc; requirement.md retrieve/compose signatures + retention-profile rows updated
+2026-09-21T07:45:27Z cargo test --locked --workspace -> all suites pass (clio-retrieve 115, clio-mcp lib 201)
+2026-09-21T07:45:27Z cargo clippy --workspace --all-targets --all-features -D warnings -> clean
+2026-09-21T07:45:27Z final gate: make coverage -> EXIT=0, totals lines 97.88% functions 98.92%; parsed per-file table: 0 files below 90%% line or function
+2026-09-21T07:54:48Z final gate re-run after hit-metadata additions: make coverage EXIT=0, totals lines 97.87%% functions 98.89%%, 0 files below 90%%
+2026-09-21T07:54:48Z phase file updated: AC table with real evidence, DoD checked, Completion Evidence, Attribution, Final Status = PASS WITH DOCUMENTED LIMITATIONS (canonical-consolidation no-item-link fallback)
+2026-09-21T07:55:09Z NOTE pre-existing working-tree edit benchmark.md (removed '(Heyaibi)') was present before this phase and is not part of phase-100270 work; staging uses the exact task pathspec so it lands in the index
+2026-09-21T07:55:31Z staged with exact task pathspec 'git add -- . '"'"':!.workflows/'"'"''; staged set: 24 files (23 phase files + pre-existing benchmark.md); no .workflows entries in index
+2026-09-21T07:55:31Z line-count check: every created/modified Rust file <=450 (max retention.rs 418)
+2026-09-21T07:55:31Z DONE: implemented recall_scope/prefer_consolidated + read-time near-dup cap; tests green; coverage gate green; docs+requirement+phase file updated
+DEVELOPER_DONE 516b2dcd

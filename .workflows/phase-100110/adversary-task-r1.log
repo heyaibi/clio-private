@@ -1,0 +1,20 @@
+2026-09-18T22:56:00+0530 START phase-100110 adversary r1: initializing review
+2026-09-18T22:56:01+0530 git status: 41 files staged, 0 non-workflow unstaged
+2026-09-18T22:56:12+0530 make check && make lint: ok (clippy -D warnings clean)
+2026-09-18T22:56:22+0530 make test: ok (409 passed across workspace)
+2026-09-18T22:56:47+0530 make coverage: ok (exit 0; 98.85% functions, 98.50% lines aggregate)
+2026-09-18T22:56:51+0530 verified per-file coverage floors: 0 files below 90% threshold
+2026-09-18T22:56:55+0530 verified line counts on 34 staged Rust files: all <=450 lines
+2026-09-18T22:56:58+0530 verified roadmap isolation: 0 references to roadmap or phase numbers in staged non-roadmap files
+2026-09-18T22:57:02+0530 FINDING F-03 low: 7 newly created Rust files missing AGENTS.md module header structure (crates/clio-config/src/config/embed_knob_tests.rs:1-3, crates/clio-index/src/embed_test_support.rs:1-3, crates/clio-index/src/embed_tests.rs:1-3, crates/clio-index/src/http_tests.rs:1-3, crates/clio-index/src/rebuild_tests.rs:1-3, crates/clio-index/src/worker_tests.rs:1-3, crates/clio-store/src/index_store_tests.rs:1-3)
+2026-09-18T22:57:50+0530 FINDING F-01 medium: IndexStore search primitives return 1 hit when limit is 0 (crates/clio-store/src/sqlite_index.rs:148, crates/clio-store/src/sqlite_index.rs:187, crates/clio-store/src/postgres_index.rs:146, crates/clio-store/src/postgres_index.rs:195)
+2026-09-18T22:57:51+0530 FINDING F-04 low: dead widening loop and potential duplicate accumulation in SqliteStore::lexical_search (crates/clio-store/src/sqlite_index.rs:148-175)
+2026-09-18T22:58:10+0530 FINDING F-02 medium: HTTP client connects only to first resolved IP address, failing on dual-stack localhost (crates/clio-index/src/http.rs:91-96)
+2026-09-18T22:58:15+0530 FINDING F-06 low: HTTP client reads until EOF without checking Content-Length header (crates/clio-index/src/http.rs:162-187)
+2026-09-18T22:58:35+0530 FINDING F-05 low: eager full-bank ID buffering in visible_pages during rebuild sweeps (crates/clio-index/src/worker.rs:364-377)
+2026-09-18T23:00:14+0530 updated phase-100110 attribution for Adversary r1
+2026-09-18T23:00:36+0530 generated findings.json (validated 6 findings)
+2026-09-18T23:00:43+0530 generated report.html via generate-report.cjs
+2026-09-18T23:00:48+0530 copied report artifacts to artifact directory
+2026-09-18T23:01:00+0530 FINISH: adversary review complete
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100110/findings.json 9ea9834f

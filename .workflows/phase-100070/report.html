@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Clio Phase 100070 (MemTree and Dirty-Path Maintenance)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Clio Phase 100070 (MemTree and Dirty-Path Maintenance)</h1>
+    <div class="vline">
+      <span class="badge b-red"><i data-lucide="octagon-x" class="ic"></i>Inadequate</span>
+      <span class="mono">1 critical · 2 important · 6 minor · 1 dismissed</span>
+    </div>
+    <p class="sum">While basic in-memory MemTree insertion and dual-backend CRUD tests pass, critical data race conditions in dirty-set maintenance drop re-dirtied nodes under concurrent writes, violating §4.3 Step 4. Furthermore, code comments violate the roadmap isolation hard rule, four new test files omit required responsibility headers, parallel refresh serializes on a coarse-grained lock with unbounded OS threads, and acceptance criterion T100070-10 was fudged without testing snapshot safety.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-18</span>
+      <span><b>Applies to</b>staged diff (master)</span>
+      <span><b>Source</b>crates/clio-write, crates/clio-store, sql/001_core.sql, roadmap/phase-100070-memtree-dirty-path-maintenance.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#critical">Critical</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>FR-3 / PR-9: Leaf readability preserved; construction and structural maintenance are separate, non-blocking processes.</li>
+        <li>§4.3 Steps 3–5: MemTree hierarchical temporal index, dirty-path ancestor marking, and level-parallel refresh.</li>
+        <li>PR-4: Structured snapshot fidelity preserved; ancestor summaries are non-authoritative and must never mutate snapshots.</li>
+        <li>AGENTS.md: Hard rules on roadmap isolation, 450-line maximum per file, and strict file header structure.</li>
+        <li>Coverage gate: ≥90% line and function coverage workspace aggregate and on every reported Rust source file.</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">5 of 12 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100070-01: Time-ordered MemTree with leaf attachment and fan-out k=8</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">MemForest and BankMemTree implement k-ary split and default fan-out 8; however, interval_end truncates on split (F-06).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100070-02 / §4.3 Step 4: Dirty-path only refresh without global rewrite</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">snapshot_dirty does not drain dirty_set, enqueue_dirty drops re-enqueued nodes as duplicates, and drain_dirty drops nodes dirtied during refresh (F-01).</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100070-03 / §4.3 Step 5: Coalescing and level-parallel ancestor refresh</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Grouping by depth works, but worker threads spawn unbounded and completely serialize on Arc&lt;Mutex&lt;MemForest&gt;&gt; (F-03).</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100070-04 / FR-3: Leaf queryable while ancestors dirty</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Verified via t01 and t05; LeafIndex lookup returns true independently of ancestor dirty state.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100070-05: maintenance_status and consolidate tools non-blocking</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Tools implemented and non-blocking in API, but t06 fails to test write path during active maintenance (F-09).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100070-06: memtree_query and memtree_get tools</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Verified in t08 and t09; filter options for interval, depth, task_id function correctly.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100070-07 / PR-4: Summaries do not mutate leaf snapshots</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">t10 only tests in-memory summary_gist; no MemoryItem snapshot is constructed or verified (F-05).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100070-08: Cross-bank isolation</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Verified in t11 for memtree read/attach and in store parity tests for SQLite and Postgres.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Roadmap isolation</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">Explicit &#39;Phase 100060&#39; references in crates/clio-write/src/memtree.rs:71 and crates/clio-write/src/memtree_maint.rs:12 (F-02).</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Source file line limit (&lt;=450 lines)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All modified and new Rust files are &lt;= 441 lines (sqlite.rs 441, memtree_maint.rs 437).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Module doc headers</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">4 new test modules omit the required 4-part module header (F-04).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md &amp; coverage.md: ≥90% line and function coverage</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage PASS (aggregate lines 98.85%, functions 99.45%; all files ≥90% line and function).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="critical">
+      <h2 class="sh"><i data-lucide="octagon-alert" class="ic c-red"></i>Critical <span class="cnt">01</span></h2>
+      <p class="lede">Address these before considering the work done.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Dirty-set race condition drops re-dirtied nodes during concurrent maintenance refresh</h3>
+              <span class="badge b-red"><span class="dot"></span>Critical</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>When leaves are attached concurrently with background maintenance refresh, any ancestor marked dirty during an in-flight refresh wave is either cleared despite unsummarized changes or removed from dirty_set while still dirty in memory. In both cases, the node will never be refreshed by subsequent maintenance waves.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Data loss in ancestor summaries; stale or permanently dirty MemTree state under the primary non-blocking write scenario.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/memtree_maint.rs:117-136, 175-201, 230-236: snapshot_dirty clones without draining; enqueue_dirty rejects re-insertions as duplicates; refresh_one unconditionally sets dirty = false; and drain_dirty removes nodes from dirty_set even if generation bumped.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Drain dirty IDs on wave snapshot, compare node.generation before setting dirty = false in refresh_one, and do not remove nodes from dirty_set whose generation counter increased after the wave began.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Roadmap isolation rule violated by explicit &#39;Phase 100060&#39; references in clio-write</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The codebase must remain fully functional and decoupled if the roadmap/ directory is deleted. Hard rules in AGENTS.md strictly forbid mentioning phase numbers in code or comments.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Breaks architectural isolation and violates repository hard rules.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/memtree.rs:71 (&#39;/// Inputs for attaching a Phase 100060 leaf into the tree.&#39;) and crates/clio-write/src/memtree_maint.rs:12 (&#39;//! - `MaintenanceHook` that attaches Phase 100060 leaves into the forest&#39;).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Remove all mentions of &#39;Phase 100060&#39; from docstrings and module headers, replacing them with generic domain terminology (e.g. &#39;canonical leaf&#39; or &#39;ingest leaf&#39;).</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Same-depth parallel refresh spawns unbounded OS threads and fully serializes on coarse-grained forest Mutex</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Spawning an OS thread per dirty node at the current level without bounding violates the min(P, num_dirty_at_level) mandate and risks thread starvation or memory exhaustion on wide trees. Furthermore, holding forest.lock() inside refresh_one across the entire child read and summary generation serializes all worker threads, negating parallel speedup.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Unbounded resource usage and zero actual concurrency during level refresh.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/memtree_maint.rs:168-179 spawns unbounded thread::scope workers; line 214 locks forest across the entire execution of refresh_one.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Bound worker concurrency to pool budget P, read child summaries under a brief read lock, and perform string aggregation outside the forest write lock.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">06</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Newly added Rust test modules omit mandatory AGENTS.md responsibility header blocks</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md mandates that every Rust source file use the standard 4-section responsibility header template. Omitting this in test modules degrades architectural clarity and violates workspace standards.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Non-compliance with AGENTS.md file header constraints.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/memtree_persist_tests.rs:1-3, crates/clio-store/src/postgres_ext_tests.rs:1-3, crates/clio-write/src/memtree_tests.rs:1-3, and crates/clio-write/src/memtree_cov_tests.rs:1-3 contain only copyright headers.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Prepend the standard 4-section module responsibility header template to all 4 test files.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Acceptance test T100070-10 / AC-100070-07 is fudged and does not test MemoryItem snapshot safety against summary refresh</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AC-100070-07 and PR-4 require verification that derived ancestor summaries never mutate or corrupt authoritative MemoryItem structured snapshots. Verifying an in-memory summary_gist string on an un-attached leaf is a vacuous check.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Fudged acceptance criterion leaves PR-4 snapshot fidelity unverified.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/memtree_tests.rs:268-300 (t10_summary_does_not_mutate_leaf_gist) asserts equality only on leaf_node.summary_gist; no MemoryItem snapshot is constructed or verified.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update T100070-10 to attach an actual MemoryItem with structured snapshot bytes through LeafIndex, execute ancestor refresh, and assert that LeafIndex::get / get_snapshot returns byte-identical snapshot content.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Internal node interval_end calculation truncates during k-ary split</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>During node split, sibling.interval_end is set to last.interval_end. If a non-last child in the partition has a later interval_end, the sibling internal node&#39;s interval is truncated, causing time-range queries to omit relevant ancestor nodes.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Incorrect time-range query filtering in memtree_query.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/memtree_attach.rs:209-216 assigns last.interval_end without checking whether earlier children in right_ids have greater interval_end.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Call self.refresh_interval_from_children(&amp;sibling_id) after creating the sibling node in split_upwards.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Migration updates schema_settings version to 3 before validating table reshape, risking corrupted metadata</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>If an existing store with pre-existing memtree_nodes rows fails migration in ensure_memtree_shape_sqlite / ensure_memtree_shape_pg, the database is stamped with schema_version = &#39;3&#39; even though the table lacks required interval columns.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Corrupted schema_settings metadata on migration error.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite.rs:49-52 and crates/clio-store/src/postgres.rs:27-30 run SQL_CORE before table validation.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Validate table shape before running SQL_CORE or decouple version bumping so schema_settings is only updated when all validations pass.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>MemTree persistence in clio-store is disconnected from clio-write orchestration and lacks durable lifecycle integration</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>clio-write has no dependency on clio-store and runs MemForest purely in-memory. Persistent tables in SQLite/Postgres remain unpopulated by the write path and tree state is lost on process restart.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>MemTree data is not durable across host restarts.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/Cargo.toml lacks clio-store dependency; store CRUD methods are only called in clio-store unit tests.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Clarify durable vs in-process MemTree lifecycle boundaries in downstream phases or wire store persistence behind an optional/async sink in MemTreeMaint.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">09</span>
+          <div>
+            <div class="ihead">
+              <h3>Test t06 does not verify non-blocking write behavior during active maintenance refresh</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>t06 completes consolidate immediately on 3 nodes and joins a thread calling attach_leaf directly rather than testing writes during active refresh.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Acceptance criterion AC-100070-05 is weakly verified.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/memtree_tests.rs:173-207 uses instant refresh and bypasses MaintenanceHook on concurrent write.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a test with a slow/blocking refresh worker proving leaf writes succeed without delay during an in-flight refresh wave.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>SqliteStore::query_memtree_nodes decodes JSON in-memory rather than SQL pushdown: While Postgres pushes down time/depth filters in SQL and SQLite filters in Rust application code, both return identical results and satisfy the dual-backend parity contract for test workloads.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make check passes clippy -D warnings and format checks across the workspace — Independently verified: cargo check, fmt, and clippy exited 0 with 0 warnings.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Coverage is &gt;=90% aggregate and per-file for lines and functions — Independently verified via cargo llvm-cov: aggregate lines 98.85%, functions 99.45%; all 37 reported source files &gt;= 91.30%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All Rust source files are &lt;= 450 lines — Independently verified via wc -l: max line count is 441 in sqlite.rs and 437 in memtree_maint.rs.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Dual-backend MemTree CRUD operations succeed on Postgres and SQLite — Independently verified via cargo test -p clio-store memtree (8 tests pass including Postgres).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Concurrent writes do not block or corrupt dirty maintenance paths — Static review of memtree_maint.rs revealed dirty_set race condition where writes occurring during refresh are dropped from pending maintenance.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Long-term durable MemTree lifecycle across process restarts</p>
+          <p class="d">clio-write does not depend on clio-store and runs MemForest in memory; the roadmap defers multi-scope forest and durable host wiring to downstream phases. · Downstream architecture ADR or phase connecting MemTreeMaint with clio-store. · Medium for production persistence; low for phase exit.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Comprehensive unit and integration coverage achieving &gt;98% aggregate line and function coverage.</li>
+        <li>Clean separation of structural k-ary insert (memtree_attach) from maintenance orchestration (memtree_maint).</li>
+        <li>Postgres and SQLite dual-backend store implementations share rigorous parity tests.</li>
+        <li>Strict compliance with the 450-line source file limit across all 23 modified/created files.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Did not detect the concurrent dirty-set race condition prior to adversary review.</li>
+          <li>Did not maintain header compliance on test files, repeating an issue identified in Phase 100060.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Run a pre-review automated header linter and grep check for roadmap/phase references before staging.</li>
+          <li>Include concurrent write-during-maintenance race condition tests for any async state machine.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix roadmap isolation violations: remove &#39;Phase 100060&#39; from crates/clio-write/src/memtree.rs:71 and crates/clio-write/src/memtree_maint.rs:12 (F-02).</li>
+          <li>Add required AGENTS.md responsibility header doc blocks to crates/clio-store/src/memtree_persist_tests.rs, crates/clio-store/src/postgres_ext_tests.rs, crates/clio-write/src/memtree_tests.rs, and crates/clio-write/src/memtree_cov_tests.rs (F-04).</li>
+          <li>Fix dirty-set race condition in crates/clio-write/src/memtree_maint.rs: drain dirty IDs on snapshot, compare generation before clearing dirty = false in refresh_one, and do not drain re-dirtied nodes (F-01).</li>
+          <li>Fix interval calculation in crates/clio-write/src/memtree_attach.rs:209-216 by calling refresh_interval_from_children(&amp;sibling_id) upon split (F-06).</li>
+          <li>Update T100070-10 in crates/clio-write/src/memtree_tests.rs to verify genuine MemoryItem structured snapshot immutability against ancestor summary refresh (F-05).</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>All items in plan_1hr.</li>
+          <li>Bound concurrency of same-depth parallel refresh to worker budget P using a semaphore or scoped worker pool, and narrow Mutex&lt;MemForest&gt; lock scope so summaries format concurrently outside the critical section (F-03).</li>
+          <li>Reorder schema migration so schema_version = &#39;3&#39; is only committed after memtree_nodes column validation succeeds, preventing stale version stamping on error (F-07).</li>
+          <li>Add an end-to-end slow-maintenance test verifying non-blocking parallel_ingest execution during an active refresh wave (F-09).</li>
+          <li>Align clio-write with crates.md:49 by providing an asynchronous durable persistence bridge to clio-store for MemTree nodes (F-08).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100070/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100070/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

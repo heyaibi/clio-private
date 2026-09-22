@@ -1,0 +1,373 @@
+{
+  "run": "r1",
+  "phase": "100230",
+  "subject": "Phase 100230 — Ops Doctor and Repair (diagnose/verify/doctor/repair/reindex)",
+  "verdict": "Good",
+  "verdict_justification": "All five operator surfaces ship, the staged diff builds, fmt/clippy/tests are green, and an independent full coverage gate passed with 220 files and 0 below the 90% per-file bar. The remaining problems are a fudged acceptance-evidence claim (failed-verify CLI exit 1 is never tested), an inconsistent secret-redaction boundary between the CLI and MCP error paths, and scope/authorization edge cases on the newly public reindex surface.",
+  "metadata": {
+    "generated": "2026-09-20",
+    "applies_to": "staged diff (42 non-workflow files), phase-100230",
+    "source": "git diff --cached -- . ':!.workflows/'; independent cargo llvm-cov gate; cargo fmt/clippy/test; live ./target/debug/am transcripts"
+  },
+  "standard": [
+    "requirement.md §4.9.5.C (diagnose/verify/doctor/repair/reindex), FR-30, NFR-8",
+    "requirement.md §4.9.7 (MUST NOT log or return unmasked credentials/DEKs from diagnose/doctor/repair surfaces)",
+    "roadmap/phase-100230-ops-doctor-repair.md scope, AC-100230-01..06, T100230-01..08, Definition of Done",
+    "AGENTS.md per-file ≤450 lines, header structure, coverage ≥90% per file (fn + line)",
+    "coverage.md §4.4 (serialize shared Postgres access with PG_TEST_LOCK)"
+  ],
+  "requirements": [
+    {
+      "requirement": "FR-30 / §4.9.5.C: expose diagnose, verify, doctor, repair, reindex",
+      "status": "Fully satisfied",
+      "evidence": "New clio-ops crate (crates/clio-ops/src/{diagnose,verify,doctor,repair,reindex}.rs), MCP bindings (ops_tools.rs, schema_ops_defs.rs), CLI (clio-lib/src/ops_cli.rs). Live `./target/debug/am ops diagnose|verify|doctor|reindex` outputs reproduced.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-30: doctor MUST NOT mutate under any dry_run value",
+      "status": "Fully satisfied",
+      "evidence": "doctor.rs:168-190 reads then inserts only into the in-memory PlanRegistry when dry_run=false. ops_tools_tests.rs:124-147 asserts item-row count unchanged after dry_run=false.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-30: mutating repair/reindex gated by confirmation; unknown repair actions refused",
+      "status": "Fully satisfied",
+      "evidence": "repair.rs:120-133 (CONFIRM_REQUIRED before any mutation), repair.rs:168-192 (UNKNOWN_REPAIR_ACTION); rebuild.rs:61-66 (confirm gate). Live `am ops repair ... --actions ...` without --confirm returned exit 2 with CONFIRM_REQUIRED.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "NFR-8: non-interactive verify/repair/reindex failures exit non-zero",
+      "status": "Partially satisfied",
+      "evidence": "Mapping exists (ops_cli.rs:144-161 verify→1, :217-226 repair→2, :253-260 reindex→3) and repair/reindex exits reproduced live. But the verify-failure→exit-1 branch (ops_cli.rs:156) is never executed by any test; independent coverage JSON shows line 156 uncovered, and no captured transcript shows a failing verify.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "§4.9.7 / §7: PII-safe output and no unmasked credentials in diagnose/doctor/repair",
+      "status": "Partially satisfied",
+      "evidence": "Content PII: verified by ops_tools_tests.rs:322-356 and the code emits only counts/codes. Credentials: CLI emit_error redacts URLs (ops_cli.rs:283-290) but the MCP error_envelope (ops_tools.rs:145-158) and repair action details (repair.rs:280,325) copy raw AmError text unredacted.",
+      "severity": "Medium",
+      "confidence": "Medium",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "Phase scope: bank or whole-store scope honored by reindex",
+      "status": "Partially satisfied",
+      "evidence": "rebuild.rs:75-78 scopes coverage/sweeps to the bank, but rebuild.rs:100 calls index.cleanup_orphans(), which is whole-store on both backends (index_store.rs:141-145; sqlite_index.rs:333-349). A bank-scoped reindex deletes orphan derived rows in every other bank.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "Phase security: unauthorized actors cannot repair/mutate foreign banks",
+      "status": "Partially satisfied",
+      "evidence": "repair/reindex call resolve_ctx (ops_tools.rs:93,111) which only rejects the shared bank when disabled, using the args/default bank. reindex then passes bank=None when omitted (ops_tools.rs:117) and rebuild.rs:77 expands to indexable_banks() — all banks, including shared.",
+      "severity": "Medium",
+      "confidence": "Medium",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "Phase scope: MCP structured failure objects on stdio and Streamable HTTP",
+      "status": "Fully satisfied",
+      "evidence": "ops_tools.rs:50-55 + :144-158 produce {ok:false,code,message,findings}; protocol.rs:158-172 sets isError from ok and exposes structuredContent. Both transports call the same write_tools::dispatch. ops_tools_tests covers forbidden/CONFIRM_REQUIRED/config_corrupt.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Phase scope: post-repair targeted re-verify of addressed findings",
+      "status": "Fully satisfied",
+      "evidence": "repair.rs:202-252 rebuilds the addressed code set and filters a fresh verify to residual_findings; repair_tests.rs:220-285 assert cleared vs residual.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md: every Rust file ≤450 lines; coverage ≥90% fn+line per file",
+      "status": "Fully satisfied",
+      "evidence": "Longest staged file is write_tools.rs at 444 lines; independent `cargo llvm-cov --workspace --locked --json --fail-under-lines 90 --fail-under-functions 90` exited 0, 220 files, 0 below 90%, totals 98.75% fn / 97.84% ln.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Roadmap isolation: no roadmap/phase references in code; no SQL migrations",
+      "status": "Fully satisfied",
+      "evidence": "grep for roadmap/phase-0xx/crates.md across all new modules returned no matches; no sql/ or migration files in the staged diff.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Phase Task 5: reindex targets dense/lexical/both and optional MemTree ancestor materializations",
+      "status": "Partially satisfied",
+      "evidence": "RebuildTargets is Dense|Lexical|All only (report.rs:26-32); no ancestor target. The requirement marks ancestor materialization optional, but the phase's Known Limitations (phase file §12) never discloses the omission.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "AC-100230-05 / T100230-08 claimed as passing, but the 'failed verify exits 1' path is never tested",
+      "severity": "Important",
+      "why_it_matters": "The phase marks T100230-08 done and its Required Tests checklist says CLI non-zero exits are covered by ops_cli tests, yet no test or transcript exercises a verify that reports errors. The only verify CLI test asserts exit 0 on an empty store. This is a required acceptance criterion with no real evidence.",
+      "impact": "A regression that breaks NFR-8's CI gate for verify (e.g. verify returning ok=true despite error findings) would not be caught. The completion evidence overstates what was verified.",
+      "evidence": "crates/clio-lib/src/ops_cli.rs:313-421 tests contain no failing-verify case; line 156 (ExitCode::from(1) in run_verify) is uncovered in an independent coverage JSON; phase file line 308,324,341.",
+      "confidence": "High",
+      "proposed_fix": "Add an ops_cli test that plants an integrity fault in a temp sqlite file (or injects an OpsStore double) so run_verify returns exit 1, and record the captured transcript in Completion Evidence."
+    },
+    {
+      "id": 2,
+      "title": "MCP ops error and repair-detail messages are not credential-redacted, unlike the CLI",
+      "severity": "Important",
+      "why_it_matters": "§4.9.7 forbids returning unmasked credentials from diagnose/doctor/repair surfaces. The CLI author added redact() precisely because driver errors can embed connection URLs, but the MCP path and the repair action details do not apply it, so the same error leaks over MCP what the CLI hides.",
+      "impact": "A Postgres connection error could surface a URL with an embedded password in an MCP tool result (content/structuredContent) or in a repair action detail printed by CLI --confirm.",
+      "evidence": "crates/clio-mcp/src/ops_tools.rs:145-158 copies err.message verbatim into message and findings; crates/clio-ops/src/repair.rs:280 and :325 interpolate raw {e} into ActionOutcome.detail; crates/clio-lib/src/ops_cli.rs:283-290 is the only redaction helper and is CLI-only.",
+      "confidence": "Medium",
+      "proposed_fix": "Promote a single shared redactor (URL userinfo stripping) and apply it in error_envelope and to every ActionOutcome.detail built from an error."
+    },
+    {
+      "id": 3,
+      "title": "Bank-scoped reindex runs whole-store orphan cleanup",
+      "severity": "Important",
+      "why_it_matters": "The public reindex contract says a bank or the whole store can be targeted. The orphan-cleanup step inside the sweep ignores the scope and deletes derived rows in every bank, so a scoped operation mutates data outside its scope (and reruns redundantly once per bank on whole-store runs).",
+      "impact": "An operator reindexing one bank can drop orphan vectors/lexical docs/queue rows belonging to other banks, including banks the caller was not authorized for.",
+      "evidence": "crates/clio-index/src/rebuild.rs:84-101 calls index.cleanup_orphans() inside the per-scope loop; the trait method takes no bank (crates/clio-store/src/index_store.rs:141-145) and the SQLite implementation deletes globally (crates/clio-store/src/sqlite_index.rs:333-349).",
+      "confidence": "High",
+      "proposed_fix": "Run cleanup once per call and, when a bank scope is given, either skip cleanup or add a bank-filtered cleanup so scoped reindex never touches other banks."
+    },
+    {
+      "id": 4,
+      "title": "Shared-bank permission is bypassed by calling reindex without a bank",
+      "severity": "Important",
+      "why_it_matters": "The deployment gate for the cross-agent `shared` namespace is meant to block all access unless enabled. reindex calls resolve_ctx (which checks the default/args bank) but then passes the raw bank arg to reindex; when omitted, the rebuild expands to every indexable bank, including `shared`.",
+      "impact": "A caller on a deployment with the shared bank disabled can still mutate the shared bank's derived index state by omitting `bank`.",
+      "evidence": "crates/clio-mcp/src/ops_tools.rs:109-122 (resolve_ctx result discarded; bank: opt_str(args,\"bank\")), crates/clio-mcp/src/runtime.rs:278-302 (only gate is bank == shared), crates/clio-index/src/rebuild.rs:75-78 (None -> indexable_banks()).",
+      "confidence": "Medium",
+      "proposed_fix": "Use the resolved context bank when args omit one, or reject a bank-less reindex/repair when the deployment has the shared bank disabled, or exclude the shared bank from the default scope."
+    },
+    {
+      "id": 5,
+      "title": "IndexCoordinator rebuild sweep no longer records embed latency/error in worker state",
+      "severity": "Minor",
+      "why_it_matters": "The refactor moved the sweep out of worker.rs but the new free rebuild() calls embedder.embed_batch directly, whereas the old sweep_dense used self.embed_and_observe, which records last_latency_ms/last_error surfaced by status().",
+      "impact": "Rolling diagnostics silently stop reflecting rebuild embed activity; a failing embed during rebuild no longer populates last_error (the Err still propagates to the caller).",
+      "evidence": "crates/clio-index/src/worker.rs:191-201 delegates rebuild_indexes to crate::rebuild::rebuild; crates/clio-index/src/rebuild.rs:174-191 uses raw embed_batch; the removed self.embed_and_observe path remains only for process_one (worker.rs:257-282).",
+      "confidence": "Medium",
+      "proposed_fix": "Have rebuild accept an optional observe callback, or route the coordinator through a thin wrapper that records latency/error, preserving the documented Phase 100110 observability."
+    },
+    {
+      "id": 6,
+      "title": "New Postgres-open MCP test bypasses PG_TEST_LOCK serialization",
+      "severity": "Minor",
+      "why_it_matters": "coverage.md §4.4 requires all shared-Postgres test access to be serialized with PG_TEST_LOCK. opens_postgres_when_database_url_configured runs whenever DATABASE_URL points at postgres (including every make coverage run) and opens/migrates the shared database with no lock, while clio-store pg tests delete and restore schema_settings under the lock.",
+      "impact": "A race between this open (migration/version check) and pg_ops_tests' schema_version deletion is a plausible intermittent coverage-gate failure.",
+      "evidence": "crates/clio-mcp/src/runtime_tests.rs:302-315; crates/clio-store/src/pg_ops_tests.rs:97-113 deletes the schema_version row; PG_TEST_LOCK is private to clio-store (crates/clio-store/src/pg_lock.rs).",
+      "confidence": "Medium",
+      "proposed_fix": "Gate the open test behind a serialized lock, or drop it in favor of an am-store-covered postgres path, or skip it unless an explicit AM_PG_OPEN_TEST env is set."
+    },
+    {
+      "id": 7,
+      "title": "Optional MemTree ancestor reindex silently omitted from Known Limitations",
+      "severity": "Minor",
+      "why_it_matters": "Phase Task 5 lists 'optional MemTree ancestor materializations'. Optional means it need not be built, but the developer rules require any silently skipped in-scope item to be disclosed with what/why/owner. The phase's Known Limitations never mention it.",
+      "impact": "A reader could infer reindex materializes ancestors when it cannot.",
+      "evidence": "crates/clio-index/src/report.rs:26-32 (Dense|Lexical|All only); roadmap/phase-100230-ops-doctor-repair.md §12 Known Limitations (lines 428-431) omits ancestor materialization.",
+      "confidence": "High",
+      "proposed_fix": "Add a Known Limitations bullet: MemTree ancestor materialization not implemented (optional; no target), why, and owning phase."
+    },
+    {
+      "id": 8,
+      "title": "Attribution row does not match the instructed agent label",
+      "severity": "Minor",
+      "why_it_matters": "The developer task instructed an exact attribution string; the phase file records a different agent identity, which weakens run provenance.",
+      "impact": "Audit trail attributes the work to the wrong agent string.",
+      "evidence": "roadmap/phase-100230-ops-doctor-repair.md:6 ('OpenCode CLI (Go . Deepseek V4.1 Flash High)') versus the developer task instruction ('OpenCode CLI (Together . GLM-5.3 Flash High)').",
+      "confidence": "High",
+      "proposed_fix": "Correct the Developer attribution row to the instructed label (or confirm the label actually used)."
+    },
+    {
+      "id": 9,
+      "title": "MCP schema descriptions for diagnose/repair bank scope do not match behavior",
+      "severity": "Minor",
+      "why_it_matters": "schema_ops_defs says diagnose's bank is 'used only for failure findings' (diagnose ignores it entirely) and repair's bank means 'whole store when omitted' (repair with omitted bank fails every action with no bank scope).",
+      "impact": "Agents relying on the advertised contract get surprising fallbacks/failures.",
+      "evidence": "crates/clio-mcp/src/schema_ops_defs.rs:39 and :79; crates/clio-mcp/src/ops_tools.rs:62-69 (no bank passed to diagnose); crates/clio-ops/src/repair.rs:272-275 (action requires a bank scope).",
+      "confidence": "High",
+      "proposed_fix": "Either wire the bank through (diagnose failure scope; repair default bank) or correct the schema text to state the actual behavior."
+    }
+  ],
+  "dismissed": [
+    "Test-only change to mcp_read_conformance.rs (adding an explicit timestamp to the triple_add seed) is a legitimate determinism fix: triple_add uses args.timestamp as created_at (clio-write/src/triple.rs:202), so the parity flake was real.",
+    "All five 450-line checks pass; the largest staged file is 444 lines.",
+    "No dependency version upgrades; Cargo.lock only adds the new local clio-ops package.",
+    "Roadmap isolation is clean; no phase numbers or roadmap/crates.md references in code.",
+    "doctor genuinely performs zero store mutation at dry_run=false; verified in code and test.",
+    "The aggregate/per-file coverage claim is accurate; independently reproduced."
+  ],
+  "verification": [
+    {
+      "claim": "Final coverage gate: 220 files, 0 below 90% fn/line; totals 98.75% fn / 97.84% ln",
+      "classification": "Established",
+      "source_note": "Independent `cargo llvm-cov --workspace --locked --json --fail-under-lines 90 --fail-under-functions 90` (DATABASE_URL=compose pg) exited 0; parsed JSON gave 220 files, 0 below 90%, totals 98.754/97.845."
+    },
+    {
+      "claim": "cargo test --locked --workspace green (41 suites)",
+      "classification": "Established",
+      "source_note": "Independent run exited 0; log contains 41 'test result: ok' lines and no failures."
+    },
+    {
+      "claim": "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings clean",
+      "classification": "Established",
+      "source_note": "Independent run exited 0."
+    },
+    {
+      "claim": "cargo fmt --all -- --check clean",
+      "classification": "Established",
+      "source_note": "Independent run exited 0."
+    },
+    {
+      "claim": "CLI exit codes: success 0, repair refused 2, reindex bad target 3",
+      "classification": "Established",
+      "source_note": "Reproduced live with ./target/debug/am (diagnose/verify/doctor/reindex dry=0, repair no confirm=2, reindex --target bogus=3)."
+    },
+    {
+      "claim": "CLI verify failure exits 1",
+      "classification": "Uncertain",
+      "source_note": "No test or transcript exercises it; the branch is uncovered in the coverage JSON. Code reads correctly but is unverified."
+    },
+    {
+      "claim": "Ops output never contains item plaintext or secrets",
+      "classification": "Supported",
+      "source_note": "ops_tools_tests.rs:322-356 seeds an sk-live secret gist/snapshot and asserts diagnose/verify/doctor output lacks it; code emits counts/codes only. Credential redaction is not covered (see issue 2)."
+    },
+    {
+      "claim": "Phase 100110 rebuild semantics unchanged",
+      "classification": "Contradicted",
+      "source_note": "The sweep no longer routes embeddings through embed_and_observe, dropping rolling latency/error observability for rebuild calls (issue 5). Functional output otherwise matches."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Whether real Postgres driver errors contain the connection URL with userinfo (issue 2 materiality)",
+      "why_unknown": "No failing-connection test asserts the exact driver error text.",
+      "what_would_resolve_it": "Force a connection failure with a credentialed URL and inspect the returned message.",
+      "materiality": "Medium"
+    },
+    {
+      "what": "Whether MCP ops tools are exercised end-to-end over the Streamable HTTP and stdio transports (not just direct dispatch)",
+      "why_unknown": "ops_tools_tests call write_tools::dispatch directly; mcp_read_conformance exercises read tools only.",
+      "what_would_resolve_it": "Add ops calls to the stdio/HTTP parity fixture.",
+      "materiality": "Low"
+    }
+  ],
+  "strengths": [
+    "Clean crate boundary: clio-ops owns semantics, clio-store owns SQL, clio-mcp/clio-lib own bindings; headers accurately describe ownership.",
+    "doctor/repair separation is real: doctor cannot mutate, and there is no erase/DEK path in repair.",
+    "Solid unit coverage for refusal, confirmation, allowlist, residual re-verify, and dimension-drift fail-closed paths.",
+    "MCP structured-failure shape is consistent and the shared dispatch path means stdio and HTTP get identical semantics.",
+    "Independent coverage, test, lint, format, and CLI transcript reproduction all match the phase's claims."
+  ],
+  "regrets": [
+    "The developer left /tmp/cov-final.json as the failed pre-fix run, making it easy to mistake for the final evidence; naming it cov-failed.json would avoid ambiguity.",
+    "The verify-failure exit path was mapped but never demonstrated, so the strongest CI guarantee rests on code reading."
+  ],
+  "process_changes": [
+    "Require a captured transcript for every exit code named in an acceptance criterion, not just the ones easy to trigger.",
+    "Apply one shared redaction helper across CLI and MCP error surfaces rather than adding it per-caller."
+  ],
+  "plan_1hr": [
+    "Add an ops_cli test that forces a failing verify and asserts exit 1; record the transcript.",
+    "Apply the CLI redactor inside MCP error_envelope and repair action details.",
+    "Document the optional MemTree ancestor reindex omission in Known Limitations."
+  ],
+  "plan_unlimited": [
+    "Make orphan cleanup bank-scoped (or skip on scoped reindex) and add a hostile multi-bank test.",
+    "Thread the resolved context bank through repair/reindex so the shared-bank gate cannot be bypassed by omitting bank.",
+    "Restore rebuild-sweep observability by routing coordinator sweeps through the observing embed path.",
+    "Add ops tools to the stdio/HTTP parity suite and a transactional test asserting no cross-bank mutation."
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "AC-100230-05/T100230-08 claimed but the failed-verify CLI exit-1 path is untested",
+      "evidence": "crates/clio-lib/src/ops_cli.rs:144-161 (run_verify), line 156 uncovered in /tmp/cov-adversary.json; tests at ops_cli.rs:313-421 contain no failing-verify case; roadmap/phase-100230-ops-doctor-repair.md:308,324,341",
+      "requirement_ref": "NFR-8; phase AC-100230-05 / T100230-08",
+      "recommendation": "Add a CLI test that plants an integrity fault so verify exits 1, and capture the transcript in Completion Evidence."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "MCP ops error and repair-detail messages are not credential-redacted",
+      "evidence": "crates/clio-mcp/src/ops_tools.rs:145-158; crates/clio-ops/src/repair.rs:280,325; only redaction is CLI-only at crates/clio-lib/src/ops_cli.rs:283-290",
+      "requirement_ref": "requirement.md §4.9.7; phase §7 Sensitive Data Rules",
+      "recommendation": "Apply one shared URL-userinfo redactor in error_envelope and to every ActionOutcome detail built from an error."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Bank-scoped reindex performs whole-store orphan cleanup",
+      "evidence": "crates/clio-index/src/rebuild.rs:84-101; crates/clio-store/src/index_store.rs:141-145; crates/clio-store/src/sqlite_index.rs:333-349",
+      "requirement_ref": "phase §2 (bank or whole store); §4.9.5.C reindex",
+      "recommendation": "Cleanup once per call and make it bank-scoped when a bank is given."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "Shared-bank permission bypassed by bank-less reindex",
+      "evidence": "crates/clio-mcp/src/ops_tools.rs:109-122; crates/clio-mcp/src/runtime.rs:278-302; crates/clio-index/src/rebuild.rs:75-78",
+      "requirement_ref": "phase §7 Security Acceptance Conditions",
+      "recommendation": "Use the resolved context bank or reject bank-less reindex when shared is disabled."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Rebuild sweep drops worker latency/error observability",
+      "evidence": "crates/clio-index/src/worker.rs:191-201; crates/clio-index/src/rebuild.rs:174-191; crates/clio-index/src/worker.rs:257-282",
+      "requirement_ref": "phase §2 Must Not Change: Phase 100110 rebuild semantics",
+      "recommendation": "Route coordinator rebuild embeds through an observing wrapper."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "New Postgres open test bypasses PG_TEST_LOCK",
+      "evidence": "crates/clio-mcp/src/runtime_tests.rs:302-315; coverage.md §4.4; crates/clio-store/src/pg_ops_tests.rs:97-113",
+      "requirement_ref": "coverage.md §4.4",
+      "recommendation": "Serialize or drop the open test."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Optional MemTree ancestor reindex silently omitted",
+      "evidence": "crates/clio-index/src/report.rs:26-32; roadmap/phase-100230-ops-doctor-repair.md:428-431",
+      "requirement_ref": "phase Task 5; developer Known-Limitations wording rule",
+      "recommendation": "Add an explicit Known Limitations bullet with what/why/owner."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "Attribution row agent label mismatch",
+      "evidence": "roadmap/phase-100230-ops-doctor-repair.md:6",
+      "requirement_ref": null,
+      "recommendation": "Correct the Developer attribution string."
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "MCP schema bank-scope descriptions for diagnose/repair do not match behavior",
+      "evidence": "crates/clio-mcp/src/schema_ops_defs.rs:39,79; crates/clio-mcp/src/ops_tools.rs:62-69; crates/clio-ops/src/repair.rs:272-275",
+      "requirement_ref": "§4.9.5.C",
+      "recommendation": "Wire the bank through or correct the schema text."
+    }
+  ]
+}

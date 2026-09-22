@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100340: Hosted Extraction Adapter (OpenAI-Compatible Chat Completions)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100340: Hosted Extraction Adapter (OpenAI-Compatible Chat Completions)</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">2 important · 3 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">Phase 100340 delivers the hosted OpenAI-compatible chat extraction adapter, deterministic prompt assembly, factory dispatch, config/env wiring, secret scrubbing, and span-verification integration with 97.9% line coverage and clean clippy checks. However, `cargo fmt` formatting fails on two staged files (contradicting completion claims), and newly created test files omit the mandatory AGENTS.md header ownership and boundary sections.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-22</span>
+      <span><b>Applies to</b>master (staged diff)</span>
+      <span><b>Source</b>crates/clio-write, crates/clio-config, docs, phase-100340 doc</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md core principles: honesty, truthful verification, &lt;=450 lines per Rust file, exact file headers with ownership/boundary</li>
+        <li>Coverage gate: &gt;=90% aggregate and per-file function and line coverage on all reported Rust source files</li>
+        <li>Roadmap phase 100340 acceptance criteria (AC-100340-01 through AC-100340-09) and required scenarios (T100340-01 through T100340-11)</li>
+        <li>requirement.md: FR-4 (span-verified extraction, retry once then refuse), FR-5/PR-4 (structured snapshot vs gist separation), Section 4.9.5.E/FR-32 (config allowlist and secret masking)</li>
+        <li>Security: opt-in hosted egress, secret scrubbing prior to egress, credential masking in config and diagnostics, fail-closed parsing</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">9 of 11 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100340-01: Chat adapter maps a valid response to ExtractCandidate</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Verified in `t34_01_valid_response_maps_to_candidate` and `t34_08_openai_factory_selects_chat_extractor_with_key`; snapshot and gist parsed accurately.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100340-02: Malformed output fails closed and never commits</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Verified in `t34_02_non_json_content_fails_closed`, `t34_03_fenced_content_is_a_validation_failure`, `t34_05_wrong_snapshot_or_gist_shape_fails_closed`, `oversized_content_is_rejected`, and `t34_02_pipeline_refuses_commit_on_malformed_content`.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100340-03: Prompt includes schema + retry feedback deterministically</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`t34_03_golden_prompt_is_deterministic_and_delimited` passes; user message contains schema template, scrubbed source, and retry feedback in delimited sections.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100340-04: Provider/key/env config wired and masked</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`extract_knob_tests` passes (env wiring, allowlist, masking via `config_get`, bearer precedence); raw keys never appear in masked output.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100340-05: Hosted extraction is opt-in; no default egress</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`extract_provider_defaults_to_template` and `t34_09_default_is_template_without_egress` verify default provider is `template` with zero network egress.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100340-06: Source scrubbed before egress</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`t34_10_source_is_scrubbed_before_egress` passes; inline secrets are masked before request assembly while caller request remains intact.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100340-07: Span verification still rejects ungrounded snapshots</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`t34_11_ungrounded_snapshot_is_refused_by_span_verify` verifies pipeline refuses ungrounded snapshots and retains non-authoritative gist.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100340-08: Local template path unchanged</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">TemplateApiExtractor wire shape untouched; existing `template_api_uses_transport` and workspace tests pass.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100340-09: Factory selects the configured extractor from effective config</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`build_extractor_from` dispatch tests pass (`t34_07_unknown_provider_fails_closed`, `t34_08_openai_factory_fails_closed_without_key_or_target`, `t34_09_default_is_template_without_egress`).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Code formatting passes cargo fmt check</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">`cargo fmt --all -- --check` fails with diffs in `crates/clio-write/src/extract_chat.rs:133` and `crates/clio-write/src/extract_chat_tests.rs:231, 239`.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md File Header compliance across all created/modified files</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">`crates/clio-write/src/extract_chat_tests.rs` and `crates/clio-write/src/extract_factory_tests.rs` lack the mandatory Owns, Does not own, and Boundary sections.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">02</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Staged files fail cargo fmt check</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Code formatting checks are enforced as part of project standards; claiming `cargo fmt` is clean when it fails indicates missing verification after late changes.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Failure of `cargo fmt --all -- --check` and `make check`.</dd></div>
+              <div><dt>Evidence</dt><dd>`cargo fmt --all -- --check` outputs diffs in `crates/clio-write/src/extract_chat.rs:133` and `crates/clio-write/src/extract_chat_tests.rs:231, 239`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Run `cargo fmt --all` and stage the formatted changes.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>New test source files omit mandatory AGENTS.md header sections</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md mandates that every Rust source file MUST include ## Owns, ## Does not own, and ## Boundary sections.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Governance non-compliance in `crates/clio-write/src/extract_chat_tests.rs` and `crates/clio-write/src/extract_factory_tests.rs`.</dd></div>
+              <div><dt>Evidence</dt><dd>`extract_chat_tests.rs:1-8` and `extract_factory_tests.rs:1-8` omit the mandatory ownership and boundary sections.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add full AGENTS.md header blocks with Owns, Does not own, and Boundary documentation to both test files.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">03</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Test identifier collision and missing explicit T100340-04 test function</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Automated test traceability tools and human reviewers rely on 1:1 mapping of test IDs (T100340-01..T100340-11) to test function names.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Duplicate test ID prefix `t34_03_` and missing explicit `t34_04_` function weakens audit traceability.</dd></div>
+              <div><dt>Evidence</dt><dd>`extract_chat_tests.rs:76` and `extract_chat_tests.rs:158` both use `t34_03_`; T100340-04 scenario is only checked as an anonymous case inside `t34_02`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Separate T100340-04 into its own test function `t34_04_empty_choices_fails_closed` and update Section 9 AC table accordingly.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Unescaped XML tags in user prompt assembly permit delimiter breakouts</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>If source_text contains `&lt;/source_text&gt;`, the model&#39;s parser could interpret subsequent text as instructions outside the source data block.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Potential prompt injection surface, mitigated downstream by span grounding.</dd></div>
+              <div><dt>Evidence</dt><dd>`extract_chat.rs:62-88` interpolates unescaped source_text into `&lt;source_text&gt;` XML tags.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Escape or sanitize delimiter tags in source_text, tool_payload, and verify_feedback.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Tool payload is not scrubbed of inline secrets before egress</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Tool payloads may contain API keys or auth headers which could leak to the hosted extraction provider.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Potential secret leakage if tool payloads carry unredacted tokens.</dd></div>
+              <div><dt>Evidence</dt><dd>`extract_chat.rs:70-76` serializes `tool_payload` without passing it through `scrub_inline_secrets`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Pass serialized `tool_payload` through `clio_config::secret::scrub_inline_secrets`.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Roadmap phrase &#39;later phases&#39; in `extract_factory.rs:14`: evaluated for roadmap isolation violation, dismissed because it is a generic phrase rather than a specific phase number, file path, or roadmap reference.</li>
+        <li>HTTP vs HTTPS enforcement for bearer key: `clio_index::post_json` allows plain `http://` for local test containers; while hosted APIs should use HTTPS, local development/testing with mock servers requires HTTP support.</li>
+        <li>Empty gist string handling: `parse_chat_response` treats empty string as `Some(&quot;&quot;)`, matching existing `TemplateApiExtractor` behavior.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace test suite passes completely — Independently verified with `cargo test --locked --workspace`: 132/132 unit/integration tests passed with exit code 0.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Aggregate and per-file coverage &gt;= 90% lines and functions — Independently verified with `make coverage`: 98.90% aggregate functions, 97.89% aggregate lines, 0 files below 90%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>cargo fmt is clean workspace-wide — Independently verified with `cargo fmt --all -- --check`: returned exit code 1 with diffs in `extract_chat.rs` and `extract_chat_tests.rs`.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All new and modified Rust files &lt;= 450 lines — Independently verified with `wc -l`: maximum file size is 423 lines (`crates/clio-config/src/config/mod.rs`), satisfying the hard limit.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Hosted extraction defaults to template without egress — Verified by `extract_knob_tests::extract_provider_defaults_to_template` and `extract_factory_tests::t34_09_default_is_template_without_egress`.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Live OpenAI-compatible endpoint compatibility under latency and transient failures</p>
+          <p class="d">CI and test environments intentionally prohibit live network egress by design · Phase 100350 live runtime wiring and end-to-end integration testing against real endpoints · Low for this phase since factory and mock transport seams are verified</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean architectural boundaries: `clio-write` reuses existing `clio-index` transport without introducing new third-party dependencies or circular dependencies.</li>
+        <li>Comprehensive test suite covering T100340-01 through T100340-11 scenarios with 100% function coverage and 93%+ line coverage on new modules.</li>
+        <li>Strict adherence to the 450-line file size limit across all refactored and new files.</li>
+        <li>Robust downstream span-verification integration ensures ungrounded candidate snapshots fail closed and never commit.</li>
+        <li>Complete secret masking across env vars, `config_get`, and inline secret scrubbing before egress.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Formatting check was not re-run after the late coverage catch-up edits at 12:24, resulting in a false completion claim.</li>
+          <li>Test file headers were constructed without the full AGENTS.md ownership and boundary blocks.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Always run `cargo fmt --all -- --check` as the very last pre-stage verification step after all code and test modifications.</li>
+          <li>Use a pre-commit or pre-staging check to validate file header structure on all newly created files.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Run `cargo fmt --all` and stage the updated files to restore clean format checks.</li>
+          <li>Add complete AGENTS.md file headers to `extract_chat_tests.rs` and `extract_factory_tests.rs`.</li>
+          <li>Disambiguate test names by creating `t34_04_empty_or_missing_choices_fails_closed`.</li>
+          <li>Pass `tool_payload` through `scrub_inline_secrets` in `build_user_message`.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Implement XML tag escaping or structured delimiter envelopes in `build_user_message` to prevent prompt tag breakout.</li>
+          <li>Add structured error extraction when hosted providers return standard error JSON payloads rather than a generic Internal error.</li>
+          <li>Support provider-specific structured outputs / JSON schema modes where supported while keeping fallback JSON parsing.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-9uC9pO/report.html</span>
+          <span><b>Findings:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-9uC9pO/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

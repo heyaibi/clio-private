@@ -1,0 +1,13 @@
+2026-09-20 00:44:42 START developer-task-r2 phase-100200 (resumed; prior r1 work present in tree)
+2026-09-20 00:44:42 inspected state: 20 tracked + 21 new files; cargo check clean; clippy clean; fmt clean
+2026-09-20 00:44:42 split oversized crates/clio-store/src/batch_tests.rs (639 lines) into batch_tests.rs/batch_pg_tests.rs/batch_test_support_tests.rs (all <=450)
+2026-09-20 00:44:42 added AGENTS.md headers to 7 new *_tests.rs files
+2026-09-20 00:44:42 cargo test --workspace: 875 passed
+2026-09-20 00:56:14 verified resumed state: cargo check + clippy -D warnings + fmt clean; workspace tests green
+2026-09-20 00:56:14 added tests/additive_tools_conformance_test.rs (mixed 7-op batch, admission rollback, scratchpad_clear, shared_retrieve/shared_discard, explicit canonical item id)
+2026-09-20 00:56:14 fixed per-file function coverage: additive_tools.rs 100%, batch_preflight.rs 93.75%, batch_preflight_records.rs 100%
+2026-09-20 00:56:14 cargo test --workspace: 880 passed (37 suites); cargo test -p clio-mcp: 149 passed
+2026-09-20 00:56:14 make coverage exit 0: aggregate lines 94.65% functions 98.71%; no reported file below 90% funcs/lines
+2026-09-20 00:56:14 updated phase-100200 Acceptance/DoD/Completion Evidence + attribution (Developer r1 done)
+2026-09-20 00:56:14 all changed/new Rust files <=450 lines; no roadmap/crates.md refs in code; staging with git add -- . :!.workflows/
+DEVELOPER_DONE 294c447d

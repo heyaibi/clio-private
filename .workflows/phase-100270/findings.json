@@ -1,0 +1,532 @@
+{
+  "run": "phase-100270",
+  "phase": "100270",
+  "subject": "Phase 100270 - consolidated-only recall preset and prefer-consolidated dedup (staged diff)",
+  "verdict": "Adequate (remediated r1: all 12 findings addressed)",
+  "verdict_justification": "All twelve adversarial findings were addressed and verified. Four changed behavior: prefer-consolidated suppression and the near-duplicate cap are now page-aware, so a raw is dropped only when a parent that survives into the returned page claims it (the previous code suppressed raws for a parent below the page boundary and silently lost content), the near-duplicate counter now counts returned-page items only, the explain payload omits the dedup block when the report is inert (restoring byte-identical plain-call traces), and the in-process JSON surface gained a ReadPolicyResolver seam so a binding can supply the same bank policy the MCP binding resolves. The cross-bank test was rebuilt into a fixture that can actually fail, the schema typo and two stale doc comments were fixed, the FR-17 pre-dedup choice is now stated in requirement.md, the schema-edit approval request is recorded in the phase file, and the completion-evidence numbers were re-derived from the post-remediation runs. The one item that could not be implemented (canonical consolidation outputs are not eligible for consolidated_only) is now documented as a not-implemented limitation rather than a passing claim, because the durable marker is writer-side work outside this phase's scope and approval boundary. Verification: one make check pass exit 0 and one make coverage pass exit 0 (TOTAL lines 97.88%, functions 98.89%; 253 reported files, 0 below 90% on either metric).",
+  "metadata": {
+    "generated": "2026-09-21",
+    "applies_to": "phase-100270 (staged developer snapshot) + remediation r1 (unstaged diff)",
+    "source": "crates/clio-retrieve/src/{dedup,dedup_tests,finalize,hybrid,hybrid_rank,compose,surface,types,lib}.rs; crates/clio-mcp/src/{read_retrieve,read_dedup_tests,schema_read_defs}.rs; crates/clio-config/src/{retention,retention_resolved,retention_schema,retention_tests,lib}.rs; requirement.md; docs/recall-scope-and-dedup.md; roadmap/phase-100270-consolidated-recall-dedup.md; benchmark.md",
+    "remediated": "2026-09-21"
+  },
+  "standard": [
+    "roadmap/phase-100270-consolidated-recall-dedup.md - In Scope, Tasks 1-3, Must Not Change, Acceptance Criteria AC-100270-01..08, Definition of Done, Known Limitations",
+    "requirement.md - P1, PR-1, PR-7, FR-17, FR-20, FR-24, NFR-3, NFR-4, 4.3, 4.5, 4.9.4.B, 4.9.2 item 3",
+    "AGENTS.md - 450-line per-file limit, exact header structure, coverage gate (>=90% function and line per file), roadmap isolation",
+    "coverage.md - authoritative gate `make coverage`, per-file >=90% line and function",
+    "Task rules - no out-of-scope refactors, SQL schema edits only, no git commit/push/stash, evidence must be real"
+  ],
+  "requirements": [
+    {
+      "requirement": "recall_scope=consolidated_only filters to consolidated units and signals scope_empty instead of widening",
+      "status": "Partially satisfied",
+      "evidence": "dedup.rs:201-208 filters only items where is_consolidated_item is true; dedup.rs:90-92 defines eligible as kind==Semantic && source_ref==\"hub_distill\"; canonical consolidation outputs (ingest.rs:239-243) carry no marker and are never eligible. T100270-01/T100270-04 pass. Phase task 1 defines a consolidated_item as 'a canonical consolidation output or a hub-distilled semantic item' (roadmap phase-100270 line 144).",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "remediation": "Remediation r1: the claim was narrowed instead of the predicate widened. The phase file now records canonical-output eligibility as not implemented and states why (no durable marker; writer-side ownership; approval boundary), and the operator doc says a canonical-only bank returns empty with scope_empty=true. Hub-distilled eligibility is unchanged and tested (dedup_tests::t27_01/t27_04, read_dedup_tests::t27_05)."
+    },
+    {
+      "requirement": "prefer_consolidated drops raw items whose consolidated parent is also returned and backfills freed slots without shrinking coverage",
+      "status": "Partially satisfied",
+      "evidence": "dedup.rs:212-231 collects claimed source ids from every parent in the full filtered candidate list before page truncation; finalize.rs:85-90 truncates to the returned page afterwards. Phase doc line 176 says 'any returned parent' and line 33 says the parent 'is also returned'.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "remediation": "Remediation r1: suppression is page-aware and re-checked after backfill (dedup.rs narrow_page loop). Evidence: dedup_page_tests::prefer_consolidated_keeps_raws_when_the_parent_falls_below_the_limit / _below_the_budget / page_narrowing_suppresses_a_raw_that_only_the_backfill_admits; clio-retrieve 123 passed, 0 failed."
+    },
+    {
+      "requirement": "Bank recall_scope_default applies when the call omits scope; explicit call param always wins",
+      "status": "Partially satisfied",
+      "evidence": "clio-mcp/src/read_retrieve.rs:97-112 resolves the bank profile default and explicit override (T100270-05 passes). The in-process JSON surface clio-retrieve/src/surface.rs:149-168 and 206-225 hardcodes RecallScope::Full and DuplicateTolerance::Balanced, so the bank default is not honored on that binding.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "remediation": "Remediation r1: the in-process JSON surface gained the ReadPolicyResolver seam (retrieve_from_json_with_policy / compose_from_json_with_policy), so a binding can apply the same bank default as MCP; the plain entry points are documented as explicit-parameter-only. Evidence: surface_tests::retrieve_json_surface_applies_the_bank_read_policy_when_a_resolver_is_supplied / compose_json_surface_applies_...."
+    },
+    {
+      "requirement": "Read-time near-duplicate cap driven by duplicate_tolerance_read with strict 0.80 / balanced 0.90 / lenient 0.95 and per-request counters",
+      "status": "Fully satisfied",
+      "evidence": "clio-config/src/retention.rs:98-106 constants, read_similarity_cap at 221-231; dedup.rs:257-303 cap_near_duplicates; DedupReport counters dedup.rs:120-143. T100270-06 passes (near_dup_suppressed=2) and read_cap_levels_differ_between_strict_and_balanced passes.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Backfill never exceeds the token budget or item limit; persona partition preserved (PR-1)",
+      "status": "Fully satisfied",
+      "evidence": "finalize.rs:58-81 select_page enforces limit+budget; compose.rs:220-268 partitions persona budget; T100270-07 (read_dedup_tests::compose_scope_keeps_the_persona_partition_and_budget) passes and asserts total_tokens<=256.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-24 explicit retrieve/compose executes even when the intent gate would skip",
+      "status": "Fully satisfied",
+      "evidence": "T100270-08 passes (read_dedup_tests.rs:164-183).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "FR-17 co-activation reinforcement documents which set it observes",
+      "status": "Partially satisfied",
+      "evidence": "hybrid.rs:151-160 reinforces the pre-dedup page and documents it in a code comment; requirement.md:344 still only says 'Co-activation updates apply on result sets' and does not state the pre-dedup choice.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "remediation": "Remediation r1: requirement.md section 4.9.4.B now states that reinforcement observes the pre-dedup candidate page under the same limit and budget; the operator doc repeats it."
+    },
+    {
+      "requirement": "Default behavior without the new params is byte-identical to pre-phase retrieval",
+      "status": "Partially satisfied",
+      "evidence": "read_retrieve.rs:140 and :211 unconditionally insert a dedup key into the explain payload, so a plain retrieve with explain=true gains fields. The top-level outcome omits dedup via DedupReport::is_inert (types.rs:174-177). test plain_retrieve_payload_keeps_the_prior_shape only checks the non-explain payload.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes",
+      "remediation": "Remediation r1: the explain trace now omits an inert dedup block in both retrieve and compose (read_retrieve.rs), and plain_retrieve_payload_keeps_the_prior_shape covers explain=true while compose_explanation_reports_dedup_only_for_a_non_inert_call covers compose. The top-level payload was already byte-identical."
+    },
+    {
+      "requirement": "Scope params published in the versioned tool_schema pack with required approval (phase decision boundary)",
+      "status": "Partially satisfied",
+      "evidence": "schema_read_defs.rs:106,113,135,142 publish both params and read_dedup_tests::scope_params_are_published_in_the_versioned_schema_pack passes. roadmap phase-100270 line 260 requires approval for publishing them in the versioned pack; the Completion Evidence and DoD ('Required approval is obtained', line 359) contain no approval request section (contrast phase-100170 lines 413-428).",
+      "severity": "Medium",
+      "confidence": "Medium",
+      "correction_needed": "Yes",
+      "remediation": "Remediation r1: the phase file now carries an 'Approval requested' subsection enumerating the additive schema edits and the pinned protocol revision; the downstream Remedy Approver step records the decision."
+    },
+    {
+      "requirement": "Cross-bank isolation preserved through scope and dedup",
+      "status": "Fully satisfied",
+      "evidence": "Items are loaded per bank (hybrid.rs load_items) and suppression only removes ids from the same candidate set; T100270-09 passes. Note the test itself cannot fail for the property it names (finding F-08).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "No fusion/rerank regression; required tests green",
+      "status": "Fully satisfied",
+      "evidence": "I reran `cargo test --locked --workspace` -> EXIT=0, 45 result blocks all 0 failed (clio-retrieve 116, clio-mcp lib 201, clio-config 108); `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` EXIT=0; `cargo fmt --all -- --check` EXIT=0.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Coverage gate: aggregate and per-file >=90% function and line",
+      "status": "Fully satisfied",
+      "evidence": "I reran `make coverage` -> EXIT=0, TOTAL lines 97.87%, functions 98.92%. Parsed all 253 reported files: 0 below 90% on function or line (lowest function 90.00% hub_distill_model.rs).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "Every created/modified Rust file <=450 lines and carries the AGENTS.md header",
+      "status": "Fully satisfied",
+      "evidence": "Line counts: dedup.rs 307, dedup_tests.rs 402, hybrid_rank.rs 127, hybrid.rs 400, finalize.rs 146, compose.rs 364, types.rs 192, surface.rs 246, retention.rs 418, retention_resolved.rs 94, read_retrieve.rs 256, read_dedup_tests.rs 360, schema_read_defs.rs 343. All carry a Responsibility/Owns/Does not own/Boundary header; statements match the code.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No",
+      "remediation": "Remediation r1: re-checked over the remediation diff; max touched file 444 lines (read_dedup_tests.rs), all with accurate headers."
+    },
+    {
+      "requirement": "Roadmap isolation: no phase numbers or roadmap/crates.md references in code or comments",
+      "status": "Fully satisfied",
+      "evidence": "Grep of the touched production files for 'roadmap', 'phase-', 'Phase 0', 'crates.md' returned nothing. The existing pack_publishes_no_roadmap_phase_number test passes.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "prefer_consolidated suppresses raws claimed by a parent that is NOT in the returned page",
+      "severity": "Important",
+      "why_it_matters": "The phase promises to drop raw items only when their consolidated parent is also returned, and that coverage does not shrink. The code suppresses a raw whenever any parent in the fetched candidate list claims it, even when that parent is truncated out of the returned page, so the raw content disappears with no consolidated replacement.",
+      "impact": "Silent recall loss under prefer_consolidated=true whenever a parent ranks below the limit/budget boundary but its raw sources rank inside it. The returned page differs from the documented contract and from a page-only implementation.",
+      "evidence": "crates/clio-retrieve/src/dedup.rs:212-231 builds `claimed` from every parent in `filtered` before truncation and then retain()s the raws; crates/clio-retrieve/src/finalize.rs:85-90 truncates to the page afterwards. Phase doc roadmap/phase-100270-consolidated-recall-dedup.md:176 says 'any returned parent' and :33 says the parent 'is also returned'.",
+      "confidence": "High",
+      "proposed_fix": "Compute the page first (or the set of parent ids that actually survive select_page over the deduped/scope-filtered candidates) and only suppress raws whose id is claimed by a parent present in that returned page; recompute after truncation or make suppression page-aware.",
+      "resolution": "Fixed in `crates/clio-retrieve/src/dedup.rs`: `dedupe_candidates` now takes `limit`/`budget` and loops `narrow_page`, which selects the page with `select_page` first and suppresses only raws claimed by parents that survive into that page; a drop frees a slot and the loop repeats until a pass drops nothing, so a backfilled raw claimed by a returned parent is suppressed on the next pass too. `hybrid.rs` passes `req.limit`/`req.budget_tokens`. Evidence: `dedup_page_tests::prefer_consolidated_keeps_raws_when_the_parent_falls_below_the_limit` and `..._below_the_budget` (parent outside the page -> `raw_suppressed=0`) and `dedup_page_tests::page_narrowing_suppresses_a_raw_that_only_the_backfill_admits` (freed slot admits the raw, next pass suppresses it); `cargo test -p clio-retrieve --locked` -> 123 passed, 0 failed.",
+      "status": "resolved"
+    },
+    {
+      "id": 2,
+      "title": "consolidated_only never returns canonical consolidation outputs",
+      "severity": "Important",
+      "why_it_matters": "Task 1 defines a consolidated_item as a canonical consolidation output OR a hub-distilled semantic item. The eligibility predicate recognizes only the hub_distill marker, so the primary consolidated unit class is excluded from the scope preset.",
+      "impact": "On a bank whose only consolidation is canonical (the default ingest path, ingest.rs admit_canonical_units), consolidated_only returns empty with scope_empty=true even though consolidated units exist. The feature headline ('return consolidated knowledge instead of every raw fact') is only half delivered.",
+      "evidence": "crates/clio-retrieve/src/dedup.rs:90-92 (only source_ref==HUB_DISTILL_SOURCE_REF); canonical path stores source_ref = unit.source_refs.join(\",\") at crates/clio-write/src/ingest.rs:239-243 with chunk provenance in AdmittedLeaf, not on the item; phase doc :144.",
+      "confidence": "High",
+      "proposed_fix": "Add a durable marker for canonical consolidation outputs (e.g. a source_ref/kind convention or an item flag) and extend is_consolidated_item to include it; until then, document explicitly that consolidated_only is empty for canonical-only banks and treat it as a named limitation, not a passing AC.",
+      "resolution": "Resolved by narrowing the claim, not by adding a writer-side marker. `is_consolidated_item` still recognizes hub-distilled items only: canonical outputs carry no durable consolidated marker (their `source_ref` is a comma-joined provenance string and chunk ids live on the ingest leaf), and inventing one is writer-side work owned by the 006/013 lineage plus an eligibility-definition change behind the phase's decision boundary. The phase file now states this as a **not implemented** limitation (Known Limitations in section 9 and section 12), AC-100270-01 reads 'PASS for hub-distilled units' with the canonical exclusion spelled out instead of a full PASS, and `docs/recall-scope-and-dedup.md` gained a 'Which units count as consolidated' section stating that a canonical-only bank returns empty with `scope_empty=true`. `requirement.md`'s general wording was left unchanged: narrowing a normative requirement needs approval.",
+      "status": "resolved"
+    },
+    {
+      "id": 3,
+      "title": "In-process JSON surface ignores bank read-policy defaults, so tool semantics differ across bindings",
+      "severity": "Important",
+      "why_it_matters": "FR-20 requires tool semantics to be identical across bindings. retrieve/compose via MCP resolve the bank recall_scope_default and duplicate_tolerance_read; the in-process JSON handlers hardcode full/balanced.",
+      "impact": "A caller using clio_retrieve::retrieve_from_json / compose_from_json gets different scope behavior than the same call over MCP for the same bank.",
+      "evidence": "crates/clio-retrieve/src/surface.rs:149-168 and 206-225 set duplicate_tolerance_read: DuplicateTolerance::Balanced and parse_scope(default)=Full; a JSON call with recall_scope=consolidated_only works, but omitting it ignores the bank default. MCP resolution is in crates/clio-mcp/src/read_retrieve.rs:97-112.",
+      "confidence": "High",
+      "proposed_fix": "Thread an optional retention-profile resolver into the JSON surface handlers, or explicitly document that the JSON surface is explicit-parameter-only and not a supported binding for bank defaults.",
+      "resolution": "Fixed additively in `crates/clio-retrieve/src/surface.rs`: new `ReadPolicyResolver` trait plus `retrieve_from_json_with_policy` / `compose_from_json_with_policy`; an explicit `recall_scope` still wins over the resolved bank default and the tolerance comes from the resolver. The plain entry points stay explicit-parameter-only and now say so in their doc comments, matching the binding-injects-context convention the MCP handler uses. Evidence: `surface_tests::retrieve_json_surface_applies_the_bank_read_policy_when_a_resolver_is_supplied` and `compose_json_surface_applies_the_bank_read_policy_when_a_resolver_is_supplied` (bank default applies; explicit call wins; no resolver -> call parameters only). `docs/recall-scope-and-dedup.md` gained a 'Which binding resolves the bank policy' section.",
+      "status": "resolved"
+    },
+    {
+      "id": 4,
+      "title": "Required approval for the versioned tool_schema edit is not recorded",
+      "severity": "Important",
+      "why_it_matters": "The phase's Agent Decision Boundary makes approval mandatory for publishing recall_scope/prefer_consolidated in the versioned tool_schema pack, and the DoD claims 'Required approval is obtained'.",
+      "impact": "The downstream approver has no 'Approval requested' section describing the schema change, so the governance step cannot assess it. The checked DoD box is unsupported by evidence.",
+      "evidence": "crates/clio-mcp/src/schema_read_defs.rs:106,113,135,142 publish the params; roadmap/phase-100270 line 260 requires approval; line 359 checks approval obtained; Completion Evidence (lines 361-379) has no approval request (compare roadmap/phase-100170 lines 413-428).",
+      "confidence": "Medium",
+      "proposed_fix": "Add an 'Approval requested' section naming the additive schema edits (retrieve/compose_context gain recall_scope and prefer_consolidated) so the downstream approver can sign off, or state explicitly that the round's approver step covers it.",
+      "resolution": "Fixed in the phase file: a new '### Approval requested: read-tool `tool_schema` additions' subsection enumerates the two additive optional properties (`recall_scope`, `prefer_consolidated` on `retrieve` and `compose_context`), names the publication test and the pinned `mcp_protocol_revision=2025-11-25`, states that no tool was renamed or removed, and gives the removal path if the approver rejects them. The DoD line now reads 'Required approval is obtained (additive schema edits are enumerated under \"Approval requested\"; the downstream Remedy Approver step records the decision).'",
+      "status": "resolved"
+    },
+    {
+      "id": 5,
+      "title": "explain output is not byte-identical for a plain call, contradicting the phase's byte-identical guarantee",
+      "severity": "Important",
+      "why_it_matters": "The phase guarantees 'Default behavior without the new params is byte-identical to pre-phase retrieval', and the negative-testing section claims prior behavior is byte-identical.",
+      "impact": "Any client consuming explain=true sees a new dedup object on every retrieve/compose_context call, including calls that use none of the new parameters.",
+      "evidence": "crates/clio-mcp/src/read_retrieve.rs:140 (retrieve_explanation inserts 'dedup': outcome.dedup) and :211 (compose_explanation inserts 'dedup': pack.dedup); DedupReport has no whole-struct skip, only per-field skips for the id lists.",
+      "confidence": "High",
+      "proposed_fix": "Omit explanation.dedup when the report is inert (reuse DedupReport::is_inert), or reword the guarantee to say only the top-level payload is unchanged and extend plain_retrieve_payload_keeps_the_prior_shape to cover explain and compose.",
+      "resolution": "Fixed in `crates/clio-mcp/src/read_retrieve.rs`: both `retrieve_explanation` and `compose_explanation` attach `dedup` only when the report is not inert (`DedupReport::is_inert()`), so a plain call's explain trace no longer gains a field. Evidence: `plain_retrieve_payload_keeps_the_prior_shape` now also calls with `explain=true` and asserts no `explanation.dedup` (and no top-level `dedup`); new `compose_explanation_reports_dedup_only_for_a_non_inert_call` proves the same for compose while a `consolidated_only` compose still carries `explanation.dedup`. `cargo test -p clio-mcp --locked` -> lib 202 passed, 0 failed. The guard was sensitivity-checked: removing it fails both new assertions.",
+      "status": "resolved"
+    },
+    {
+      "id": 6,
+      "title": "Near-duplicate cap runs over the fetched candidate list and counts suppressions outside the returned page",
+      "severity": "Minor",
+      "why_it_matters": "Task 3 says similarity MUST be computed over the returned page only, and the doc defines near_dup_suppressed as page items dropped by the cap.",
+      "impact": "The returned page happens to be identical whether the cap scans the page or the full candidate list (suppression only removes later duplicates of earlier kept items), but the near_dup_suppressed counter and the duplicate-rate metric are inflated by duplicate pairs that were never in the page. This can mislead operators tuning the knob.",
+      "evidence": "crates/clio-retrieve/src/dedup.rs:233-241 caps `filtered` (full candidate list) before truncation; the cap is invoked from crates/clio-retrieve/src/hybrid.rs:152-167 before finalize.rs:85 truncates; phase doc :223 and docs/recall-scope-and-dedup.md:35.",
+      "confidence": "High",
+      "proposed_fix": "Apply the cap to the selected page (or the first `limit` budget-admitted candidates) so the counter reflects returned-page items, and note the page-bounded ceiling in the module doc.",
+      "resolution": "Fixed with issue 1 in `dedup.rs`: the near-duplicate cap now compares page items only (inside `narrow_page`), the count is `cap_page.len() - kept.len()` (returned-page items dropped), and when a cap drop frees a slot the next pass re-caps the newly admitted page item. Evidence: `dedup_page_tests::near_dup_counter_counts_only_returned_page_items` (a one-item page reports 0 where the old full-list cap reported 2) and `dedup_page_tests::cap_rechecks_the_page_after_a_freed_slot_backfills_a_duplicate` (2); the existing `dedup_tests::t27_06_*` still reports `near_dup_suppressed=2`.",
+      "status": "resolved"
+    },
+    {
+      "id": 7,
+      "title": "Published schema description typos the enum value as consolidation_only",
+      "severity": "Minor",
+      "why_it_matters": "The machine-readable tool_schema is the contract an external client reads; a value that does not exist in the enum is misleading.",
+      "impact": "An operator reading the schema may send recall_scope=consolidation_only, which is rejected with invalid_argument.",
+      "evidence": "crates/clio-config/src/retention_schema.rs:130 description says 'consolidation_only returns eligible consolidated units only' while the enum (line 124) is 'consolidated_only'. The MCP pack (schema_read_defs.rs:108,137) uses the correct spelling.",
+      "confidence": "High",
+      "proposed_fix": "Change 'consolidation_only' to 'consolidated_only' in the retention schema description.",
+      "resolution": "Fixed: `crates/clio-config/src/retention_schema.rs` line 130 now reads `consolidated_only`; no other text changed. `cargo test -p clio-config --locked` -> 108 passed, 0 failed.",
+      "status": "resolved"
+    },
+    {
+      "id": 8,
+      "title": "T100270-09 cross-bank isolation test cannot fail for the property it names",
+      "severity": "Minor",
+      "why_it_matters": "AC-100270-05 (bank isolation) is evidenced by this test, but the scenario places the linking parent in bank-a and queries bank-b, where the parent is never a candidate, so the assertion holds regardless of whether dedup leaked across banks.",
+      "impact": "The bank-isolation acceptance criterion has no test that would actually catch a cross-bank suppression bug.",
+      "evidence": "crates/clio-mcp/src/read_dedup_tests.rs:186-219: the parent P-a is written to bank-a, then a bank-b retrieve with prefer_consolidated=true asserts only bank-b ids and absence of dedup.",
+      "confidence": "High",
+      "proposed_fix": "Rewrite the fixture so the queried bank contains a parent whose source_ids name ids that also exist in another bank, and assert suppression stays within the queried bank's items map.",
+      "resolution": "Rewritten `read_dedup_tests::t27_09_scope_and_dedup_never_cross_banks`: bank-b holds a parent `Pb` whose `neighbor_ids` claim `shared-A` (an id that exists only in bank-a) plus its own raw `raw-b`; bank-a holds the raw `shared-A`. The test now proves bank-b suppression is active (`raw_suppressed=1`, `suppressed_raw_ids=[\"raw-b\"]`) and that bank-a's `shared-A` still returns with an inert (omitted) report, so it fails if another bank's parent can suppress - which the previous fixture could not detect.",
+      "status": "resolved"
+    },
+    {
+      "id": 9,
+      "title": "read_similarity_cap doc comment omits strict/lenient activation",
+      "severity": "Minor",
+      "why_it_matters": "The comment contradicts read_cap_active() and the published schema's applies_when text.",
+      "impact": "A maintainer reading the method comment believes a cap only runs under a scope preset or prefer_consolidated, missing that duplicate_tolerance_read=strict/lenient activates it on a plain full call.",
+      "evidence": "crates/clio-config/src/retention.rs:221-224 comment vs crates/clio-retrieve/src/dedup.rs:81-85 read_cap_active and crates/clio-config/src/retention_schema.rs:89-93 applies_when.",
+      "confidence": "High",
+      "proposed_fix": "Extend the comment to include the non-neutral tolerance levels, matching read_cap_active and the schema.",
+      "resolution": "Fixed: the `read_similarity_cap` doc comment in `crates/clio-config/src/retention.rs` now matches `read_cap_active()` and the schema `applies_when`: a scope preset or `prefer_consolidated`, or a `strict`/`lenient` level; the neutral `balanced` default applies no cap on a plain full call.",
+      "status": "resolved"
+    },
+    {
+      "id": 10,
+      "title": "Unrelated pre-existing benchmark.md edit is staged into the phase diff",
+      "severity": "Minor",
+      "why_it_matters": "The phase diff should contain only phase-100270 work; the developer log itself notes the change predates the phase.",
+      "impact": "Reviewers and the downstream remediation step see one out-of-scope documentation change bundled with the phase ('### 2.5 Mnemosyne (Heyaibi)' -> '### 2.5 Mnemosyne'). Not harmful, but it muddies attribution and bisection.",
+      "evidence": "`git diff --cached -- benchmark.md` shows the heading change at benchmark.md line 60; the developer log entry at .workflows/phase-100270/developer-task-r1.log acknowledges it as pre-existing.",
+      "confidence": "High",
+      "proposed_fix": "Leave it only if the operator wants it; otherwise exclude benchmark.md from the phase staging (outside this review's authority to change).",
+      "resolution": "No code or index action possible this round: the remediation rules forbid touching the git index, so the pre-existing `benchmark.md` edit cannot be removed from the staged snapshot I inherited. It is now recorded in the phase file's Remediation r1 paragraph and the developer log, and this round's unstaged diff does not touch it (`git diff -- . ':!.workflows/'` shows no `benchmark.md` change), so the approver can exclude it from the phase commit.",
+      "status": "resolved"
+    },
+    {
+      "id": 11,
+      "title": "Completion-evidence numbers are stale or slightly wrong",
+      "severity": "Minor",
+      "why_it_matters": "The phase file is the record of truth; numbers that do not match a rerun weaken the evidence.",
+      "impact": "Low; no behavioral consequence, but it means the recorded evidence was not re-verified after the last code change.",
+      "evidence": "roadmap phase-100270 line 370 records 'clio-retrieve 115 passed'; my rerun shows 116. Line 374 records 'dedup.rs 99.38% lines' and 'functions 98.89%'; my rerun shows dedup.rs 99.51% lines and TOTAL functions 98.92%.",
+      "confidence": "High",
+      "proposed_fix": "Refresh the test counts and coverage percentages from the final run.",
+      "resolution": "Refreshed from the post-remediation runs. `make check` exit 0; scoped real counts `clio-retrieve` 123 passed, `clio-mcp` lib 202 passed, `clio-config` 108 passed, all 0 failed. `make coverage` exit 0 with TOTAL lines 97.88% / functions 98.89%, 253 reported files, 0 below 90% on either metric; per-file rows in the phase file updated (`dedup.rs` 99.02/100, `surface.rs` 98.31/100, `hybrid.rs` 99.26/100, `finalize.rs` 97.56/100, `compose.rs` 100/100, `retention.rs` 99.33/100, `read_retrieve.rs` 97.77/100).",
+      "status": "resolved"
+    },
+    {
+      "id": 12,
+      "title": "requirement.md not updated for the pre-dedup FR-17 reinforcement choice",
+      "severity": "Minor",
+      "why_it_matters": "The phase requires that the FR-17 interaction be documented, not silently changed. The code changed what is reinforced from the returned page to the pre-dedup page, but the normative requirement text was not updated.",
+      "impact": "requirement.md and the code disagree on what 'co-activation updates apply on result sets' means; a future implementer may regress one to match the other.",
+      "evidence": "crates/clio-retrieve/src/hybrid.rs:151-160 and :285-296 reinforce select_page(&fused) pre-dedup; requirement.md:344 still says only 'Co-activation updates apply on result sets (4.5)'.",
+      "confidence": "High",
+      "proposed_fix": "Add one clause to the requirement.md retrieve row (or FR-17) stating reinforcement observes the pre-dedup candidate page.",
+      "resolution": "Fixed: `requirement.md` section 4.9.4.B retrieve row now states 'Co-activation updates apply on result sets (section 4.5); reinforcement observes the pre-dedup candidate page under the same limit and budget, so suppression never silently drops reinforcement.' The operator doc repeats the same choice and the `hybrid.rs` code comment already carried it.",
+      "status": "resolved"
+    }
+  ],
+  "dismissed": [
+    "Hub-distill snapshot over-claiming neighbors: build_distill_item stores all neighbors in neighbor_ids and top_neighbors is capped at DEFAULT_HUB_NEIGHBORS (8), so source_ids never claims more than the gist covered. No finding.",
+    "Duplicate-rate telemetry/inspect surface: the per-request dedup block plus explain is a reasonable reading of the existing surface, and the operator doc defines the rate. I did not treat the absence of a separate aggregate counter as a defect.",
+    "recall_scope=consolidated_only + prefer_consolidated being a no-op is correct and tested (scope_page contains only parents).",
+    "backfill_exhausted computation is consistent with suppression counts and the documented meaning.",
+    "450-line and header checks are clean; no roadmap-isolation strings in code."
+  ],
+  "verification": [
+    {
+      "claim": "Workspace tests pass after the phase",
+      "classification": "Established",
+      "source_note": "I ran `cargo test --locked --workspace` with the Makefile DATABASE_URL: EXIT=0, 45 'test result: ok' blocks, 0 failures (clio-retrieve 116, clio-mcp lib 201, clio-config 108)."
+    },
+    {
+      "claim": "Clippy and rustfmt are clean",
+      "classification": "Established",
+      "source_note": "`cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` EXIT=0; `cargo fmt --all -- --check` EXIT=0. I did not run `make check` because it runs `cargo fmt` (writes files)."
+    },
+    {
+      "claim": "Coverage gate passes with no per-file failures",
+      "classification": "Established",
+      "source_note": "`make coverage` EXIT=0; TOTAL lines 97.87%, functions 98.92%; parsed 253 file rows, 0 below 90% on either metric (lowest function 90.00%)."
+    },
+    {
+      "claim": "Hub-distilled items are the only items carrying a queryable parent->source link",
+      "classification": "Established",
+      "source_note": "build_distill_item writes snapshot {hub_id, neighbor_ids, neighbor_count} and source_ref=\"hub_distill\" (crates/clio-write/src/hub_distill_model.rs:144-160); canonical ingest stores comma-joined source refs and keeps chunk_ids in AdmittedLeaf (crates/clio-write/src/ingest.rs:239-243, 267-272)."
+    },
+    {
+      "claim": "Default (no new params) top-level retrieve payload keeps the prior shape",
+      "classification": "Supported",
+      "source_note": "types.rs:174-177 skips dedup when inert and types.rs:480-484 skips consolidated=false; test plain_retrieve_payload_keeps_the_prior_shape passes. The explain sub-payload does change (issue 5)."
+    },
+    {
+      "claim": "Near-dup cap computes over the returned page only",
+      "classification": "Contradicted",
+      "source_note": "dedup.rs:233-241 caps the full filtered candidate list before finalize truncation (hybrid.rs:152-167, finalize.rs:85)."
+    },
+    {
+      "claim": "Required approval for the tool_schema edit was obtained",
+      "classification": "Uncertain",
+      "source_note": "No approval request section in the phase file, though phase-100170 set that precedent. The pipeline's Remedy Approver row is marked approved."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Whether bank recall_scope_default/duplicate_tolerance_read persist and round-trip through the CLI surface in real deployments",
+      "why_unknown": "The JSON surface has no profile handle; I verified the MCP path only via the unit test T100270-05.",
+      "what_would_resolve_it": "An end-to-end CLI test that sets a bank profile and calls retrieve without recall_scope.",
+      "materiality": "Medium"
+    },
+    {
+      "what": "How often a hub-distilled parent ranks below the limit boundary while its raws rank inside it",
+      "why_unknown": "No production corpus; I reasoned from the code and the fusion scoring (hub-distill items have admission_score None, so no importance boost).",
+      "what_would_resolve_it": "A fixture where a parent is placed below the limit and a raw above it, asserting the returned page.",
+      "materiality": "High"
+    }
+  ],
+  "strengths": [
+    "Genuinely clean module decomposition: dedup.rs and hybrid_rank.rs were extracted so no touched file exceeds 450 lines, and the ownership headers match reality.",
+    "The eligibility predicate and link accessor are total functions with malformed-snapshot tests, so unknown shapes never panic.",
+    "Determinism is explicitly tested (t27_02 reruns the same candidate set and compares order).",
+    "The diff respects the two-full-gate budget and the developer's recorded coverage numbers are close to my independent rerun.",
+    "FR-17 fail-closed behavior is preserved and the pre-dedup choice is at least documented in code and the phase file."
+  ],
+  "regrets": [
+    "The developer marked every AC and DoD box PASS without recording the schema-approval request or the canonical-eligibility scope reduction as an explicit decision, which is exactly where an adversarial pass adds value.",
+    "The stage command is `git add -- . ':!.workflows/'`, which swept a pre-existing unrelated doc edit into the phase diff; a narrower staging intent would have avoided it."
+  ],
+  "process_changes": [
+    "Before declaring a phase pass, re-derive test counts and per-file coverage from the final run instead of pasting earlier numbers.",
+    "When a phase has a decision-boundary approval rule, add the approval-request section as part of the change, not only check the DoD box.",
+    "Add a test that constructs the failure the AC names (e.g. a parent below the page boundary) rather than a passing scenario that cannot exercise it."
+  ],
+  "plan_1hr": [
+    {
+      "item": "Fix issue 1: make prefer_consolidated suppression page-aware and add a fixture with the parent below the limit",
+      "status": "done - dedup.rs narrow_page loop; dedup_page_tests::{prefer_consolidated_keeps_raws_when_the_parent_falls_below_the_limit, ..._below_the_budget, page_narrowing_suppresses_a_raw_that_only_the_backfill_admits}"
+    },
+    {
+      "item": "Fix issue 5: omit explanation.dedup when the report is inert and extend the byte-identical test to explain and compose",
+      "status": "done - read_retrieve.rs retrieve_explanation/compose_explanation; plain_retrieve_payload_keeps_the_prior_shape extended; compose_explanation_reports_dedup_only_for_a_non_inert_call added"
+    },
+    {
+      "item": "Fix issue 7 (consolidation_only typo) and refresh the stale numbers (issue 11)",
+      "status": "done - retention_schema.rs description corrected; phase-file counts and coverage percentages re-derived from the post-remediation make check and make coverage runs"
+    }
+  ],
+  "plan_unlimited": [
+    {
+      "item": "Decide and implement canonical-consolidation eligibility (issue 2): add a durable marker so consolidated_only returns canonical outputs, or explicitly narrow the contract",
+      "status": "partially done (documented-narrowing path chosen): phase file states the capability as not implemented (section 9 + section 12), AC-100270-01 no longer claims canonical coverage, operator doc states a canonical-only bank returns empty. No marker was added: writer-side work owned by the 006/013 lineage and behind the phase's approval boundary; requirement.md was not narrowed because changing a normative requirement needs approval."
+    },
+    {
+      "item": "Unify the JSON and MCP bindings on one bank-policy resolver (issue 3)",
+      "status": "done for the JSON surface: ReadPolicyResolver makes the binding supply the policy MCP resolves; each binding still holds its own profile handle, which is the intended split. The binding-parity evidence is in surface_tests."
+    },
+    {
+      "item": "Rewrite the cross-bank isolation test to be falsifiable (issue 8) and add an end-to-end CLI retention-default test",
+      "status": "falsifiable rewrite done. The CLI retention-default test was not added: the `am` CLI has no retrieve command (it exposes mcp/ops/retention only), so there is no CLI read binding to exercise; if a CLI read tool is added later this becomes due."
+    },
+    {
+      "item": "Record the schema-edit approval request (issue 4) and update requirement.md's FR-17 text (issue 12)",
+      "status": "done - phase file 'Approval requested' subsection enumerating the additive tool_schema edits; requirement.md section 4.9.4.B now states that reinforcement observes the pre-dedup candidate page"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "prefer_consolidated suppresses raws claimed by a parent not in the returned page",
+      "evidence": "crates/clio-retrieve/src/dedup.rs:212-231 (claimed from all filtered candidates before truncation); crates/clio-retrieve/src/finalize.rs:85-90 (truncation after); roadmap/phase-100270-consolidated-recall-dedup.md:176 and :33 say 'returned parent'",
+      "requirement_ref": "phase-100270 Task 2 / Expected Outcome 'parent is also returned'",
+      "recommendation": "Restrict suppression to source ids claimed by parents that actually survive the returned page; add a below-boundary parent fixture.",
+      "resolution": "Fixed in `crates/clio-retrieve/src/dedup.rs`: `dedupe_candidates` now takes `limit`/`budget` and loops `narrow_page`, which selects the page with `select_page` first and suppresses only raws claimed by parents that survive into that page; a drop frees a slot and the loop repeats until a pass drops nothing, so a backfilled raw claimed by a returned parent is suppressed on the next pass too. `hybrid.rs` passes `req.limit`/`req.budget_tokens`. Evidence: `dedup_page_tests::prefer_consolidated_keeps_raws_when_the_parent_falls_below_the_limit` and `..._below_the_budget` (parent outside the page -> `raw_suppressed=0`) and `dedup_page_tests::page_narrowing_suppresses_a_raw_that_only_the_backfill_admits` (freed slot admits the raw, next pass suppresses it); `cargo test -p clio-retrieve --locked` -> 123 passed, 0 failed.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "consolidated_only excludes canonical consolidation outputs",
+      "evidence": "crates/clio-retrieve/src/dedup.rs:90-92 (only source_ref==hub_distill); crates/clio-write/src/ingest.rs:239-243 (canonical items have only comma-joined chunk refs); roadmap/phase-100270 line 144 defines consolidated_item to include canonical consolidation output",
+      "requirement_ref": "phase-100270 Task 1; AC-100270-01",
+      "recommendation": "Add a canonical marker and include it in is_consolidated_item, or explicitly narrow the AC and limitation wording and stop marking AC-100270-01 fully satisfied.",
+      "resolution": "Resolved by narrowing the claim, not by adding a writer-side marker. `is_consolidated_item` still recognizes hub-distilled items only: canonical outputs carry no durable consolidated marker (their `source_ref` is a comma-joined provenance string and chunk ids live on the ingest leaf), and inventing one is writer-side work owned by the 006/013 lineage plus an eligibility-definition change behind the phase's decision boundary. The phase file now states this as a **not implemented** limitation (Known Limitations in section 9 and section 12), AC-100270-01 reads 'PASS for hub-distilled units' with the canonical exclusion spelled out instead of a full PASS, and `docs/recall-scope-and-dedup.md` gained a 'Which units count as consolidated' section stating that a canonical-only bank returns empty with `scope_empty=true`. `requirement.md`'s general wording was left unchanged: narrowing a normative requirement needs approval.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "In-process JSON surface ignores bank read-policy defaults (cross-binding semantics differ)",
+      "evidence": "crates/clio-retrieve/src/surface.rs:149-168, 206-225 hardcode Full/Balanced; crates/clio-mcp/src/read_retrieve.rs:97-112 resolves bank defaults",
+      "requirement_ref": "requirement.md FR-20; phase Task 2 'both transports'",
+      "recommendation": "Thread a bank-profile resolver into the JSON surface or document it as explicit-params-only.",
+      "resolution": "Fixed additively in `crates/clio-retrieve/src/surface.rs`: new `ReadPolicyResolver` trait plus `retrieve_from_json_with_policy` / `compose_from_json_with_policy`; an explicit `recall_scope` still wins over the resolved bank default and the tolerance comes from the resolver. The plain entry points stay explicit-parameter-only and now say so in their doc comments, matching the binding-injects-context convention the MCP handler uses. Evidence: `surface_tests::retrieve_json_surface_applies_the_bank_read_policy_when_a_resolver_is_supplied` and `compose_json_surface_applies_the_bank_read_policy_when_a_resolver_is_supplied` (bank default applies; explicit call wins; no resolver -> call parameters only). `docs/recall-scope-and-dedup.md` gained a 'Which binding resolves the bank policy' section.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "Required approval for publishing scope params in the versioned tool_schema pack is not recorded",
+      "evidence": "crates/clio-mcp/src/schema_read_defs.rs:106,113,135,142; roadmap/phase-100270 line 260 (approval required), line 359 (DoD checked), Completion Evidence has no approval section; contrast roadmap/phase-100170 lines 413-428",
+      "requirement_ref": "phase-100270 Agent Decision Boundary; DoD 'Required approval is obtained'",
+      "recommendation": "Add an 'Approval requested' section enumerating the additive schema edits.",
+      "resolution": "Fixed in the phase file: a new '### Approval requested: read-tool `tool_schema` additions' subsection enumerates the two additive optional properties (`recall_scope`, `prefer_consolidated` on `retrieve` and `compose_context`), names the publication test and the pinned `mcp_protocol_revision=2025-11-25`, states that no tool was renamed or removed, and gives the removal path if the approver rejects them. The DoD line now reads 'Required approval is obtained (additive schema edits are enumerated under \"Approval requested\"; the downstream Remedy Approver step records the decision).'",
+      "status": "resolved"
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "explain payload is not byte-identical for plain calls",
+      "evidence": "crates/clio-mcp/src/read_retrieve.rs:140, 211 always insert 'dedup'; roadmap/phase-100270 line 437 guarantees byte-identical default behavior",
+      "requirement_ref": "phase-100270 Phase Exit Contract 'Guarantees Provided to Downstream Phases'",
+      "recommendation": "Skip explanation.dedup when inert and extend the byte-identical test to explain and compose.",
+      "resolution": "Fixed in `crates/clio-mcp/src/read_retrieve.rs`: both `retrieve_explanation` and `compose_explanation` attach `dedup` only when the report is not inert (`DedupReport::is_inert()`), so a plain call's explain trace no longer gains a field. Evidence: `plain_retrieve_payload_keeps_the_prior_shape` now also calls with `explain=true` and asserts no `explanation.dedup` (and no top-level `dedup`); new `compose_explanation_reports_dedup_only_for_a_non_inert_call` proves the same for compose while a `consolidated_only` compose still carries `explanation.dedup`. `cargo test -p clio-mcp --locked` -> lib 202 passed, 0 failed. The guard was sensitivity-checked: removing it fails both new assertions.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Near-dup cap scans the full candidate list; counter counts items outside the page",
+      "evidence": "crates/clio-retrieve/src/dedup.rs:233-241; crates/clio-retrieve/src/hybrid.rs:152-167; crates/clio-retrieve/src/finalize.rs:85; roadmap/phase-100270 line 223; docs/recall-scope-and-dedup.md:35",
+      "requirement_ref": "phase-100270 Task 3 Implementation Constraints",
+      "recommendation": "Apply the cap to the selected page so the counter matches page items.",
+      "resolution": "Fixed with issue 1 in `dedup.rs`: the near-duplicate cap now compares page items only (inside `narrow_page`), the count is `cap_page.len() - kept.len()` (returned-page items dropped), and when a cap drop frees a slot the next pass re-caps the newly admitted page item. Evidence: `dedup_page_tests::near_dup_counter_counts_only_returned_page_items` (a one-item page reports 0 where the old full-list cap reported 2) and `dedup_page_tests::cap_rechecks_the_page_after_a_freed_slot_backfills_a_duplicate` (2); the existing `dedup_tests::t27_06_*` still reports `near_dup_suppressed=2`.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Schema description says consolidation_only instead of consolidated_only",
+      "evidence": "crates/clio-config/src/retention_schema.rs:130 vs enum at :124 and crates/clio-mcp/src/schema_read_defs.rs:108,137",
+      "requirement_ref": "requirement.md 4.9.2 item 3 / FR-20",
+      "recommendation": "Fix the spelling.",
+      "resolution": "Fixed: `crates/clio-config/src/retention_schema.rs` line 130 now reads `consolidated_only`; no other text changed. `cargo test -p clio-config --locked` -> 108 passed, 0 failed.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "T100270-09 cross-bank isolation test cannot fail for its named property",
+      "evidence": "crates/clio-mcp/src/read_dedup_tests.rs:186-219 (parent in bank-a, query in bank-b)",
+      "requirement_ref": "AC-100270-05 / phase 100070 Security Acceptance Conditions",
+      "recommendation": "Build a falsifiable fixture where a queried-bank parent links ids that also exist in another bank.",
+      "resolution": "Rewritten `read_dedup_tests::t27_09_scope_and_dedup_never_cross_banks`: bank-b holds a parent `Pb` whose `neighbor_ids` claim `shared-A` (an id that exists only in bank-a) plus its own raw `raw-b`; bank-a holds the raw `shared-A`. The test now proves bank-b suppression is active (`raw_suppressed=1`, `suppressed_raw_ids=[\"raw-b\"]`) and that bank-a's `shared-A` still returns with an inert (omitted) report, so it fails if another bank's parent can suppress - which the previous fixture could not detect.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "read_similarity_cap doc comment omits strict/lenient activation",
+      "evidence": "crates/clio-config/src/retention.rs:221-224 vs crates/clio-retrieve/src/dedup.rs:81-85 and crates/clio-config/src/retention_schema.rs:89-93",
+      "requirement_ref": null,
+      "recommendation": "Update the comment.",
+      "resolution": "Fixed: the `read_similarity_cap` doc comment in `crates/clio-config/src/retention.rs` now matches `read_cap_active()` and the schema `applies_when`: a scope preset or `prefer_consolidated`, or a `strict`/`lenient` level; the neutral `balanced` default applies no cap on a plain full call.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "title": "Unrelated pre-existing benchmark.md edit staged into the phase diff",
+      "evidence": "benchmark.md:60 heading change shown by `git diff --cached -- benchmark.md`; developer log acknowledges it as pre-existing",
+      "requirement_ref": null,
+      "recommendation": "Exclude it from the phase diff unless the operator wants it.",
+      "resolution": "No code or index action possible this round: the remediation rules forbid touching the git index, so the pre-existing `benchmark.md` edit cannot be removed from the staged snapshot I inherited. It is now recorded in the phase file's Remediation r1 paragraph and the developer log, and this round's unstaged diff does not touch it (`git diff -- . ':!.workflows/'` shows no `benchmark.md` change), so the approver can exclude it from the phase commit.",
+      "status": "resolved"
+    },
+    {
+      "id": "F-11",
+      "severity": "low",
+      "title": "Stale completion-evidence numbers (clio-retrieve 115 vs 116; dedup.rs 99.38% vs 99.51%, totals 98.89% vs 98.92%)",
+      "evidence": "roadmap/phase-100270 lines 370, 374 vs my reruns",
+      "requirement_ref": "phase-100270 Verification Rule",
+      "recommendation": "Refresh the numbers from the final run.",
+      "resolution": "Refreshed from the post-remediation runs. `make check` exit 0; scoped real counts `clio-retrieve` 123 passed, `clio-mcp` lib 202 passed, `clio-config` 108 passed, all 0 failed. `make coverage` exit 0 with TOTAL lines 97.88% / functions 98.89%, 253 reported files, 0 below 90% on either metric; per-file rows in the phase file updated (`dedup.rs` 99.02/100, `surface.rs` 98.31/100, `hybrid.rs` 99.26/100, `finalize.rs` 97.56/100, `compose.rs` 100/100, `retention.rs` 99.33/100, `read_retrieve.rs` 97.77/100).",
+      "status": "resolved"
+    },
+    {
+      "id": "F-12",
+      "severity": "low",
+      "title": "requirement.md not updated for pre-dedup FR-17 reinforcement",
+      "evidence": "crates/clio-retrieve/src/hybrid.rs:151-160, 285-296 vs requirement.md:344",
+      "requirement_ref": "requirement.md FR-17; phase Must Not Change 'co-activation reinforcement still observes the pre-dedup candidate set'",
+      "recommendation": "Add a clause to the retrieve row/FR-17 stating reinforcement observes the pre-dedup page.",
+      "resolution": "Fixed: `requirement.md` section 4.9.4.B retrieve row now states 'Co-activation updates apply on result sets (section 4.5); reinforcement observes the pre-dedup candidate page under the same limit and budget, so suppression never silently drops reinforcement.' The operator doc repeats the same choice and the `hybrid.rs` code comment already carried it.",
+      "status": "resolved"
+    }
+  ],
+  "remediation_r1": {
+    "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+    "date": "2026-09-21",
+    "summary": "All 12 findings resolved. Behavior fixes: page-aware suppression + page-local near-duplicate cap with a backfill re-check loop (clio-retrieve dedup.rs/hybrid.rs, new dedup_page_tests.rs); inert dedup block omitted from the MCP explain trace (read_retrieve.rs); ReadPolicyResolver seam on the in-process JSON surface (surface.rs, surface_tests.rs). Test fix: t27_09 rebuilt into a falsifiable cross-bank fixture. Doc fixes: schema typo, read_similarity_cap comment, warning-free requirement.md FR-17 clause, phase-file approval request and refreshed numbers. Canonical eligibility (F-02) resolved by narrowing the claim and documenting the not-implemented limitation; benchmark.md (F-10) escalated to the approver because this round may not touch the index. Verification: one make check pass (exit 0) and one make coverage pass (exit 0; TOTAL lines 97.88%, functions 98.89%; 253 files, 0 below 90%). No subagent ran make check or make coverage.",
+    "subagents": [
+      "clio-mcp slice (read_retrieve.rs, read_dedup_tests.rs): F-05 + F-08; reviewed by the remediator and re-verified with cargo test -p clio-mcp -p clio-config",
+      "clio-config slice (retention.rs, retention_schema.rs): F-07 + F-09; reviewed and re-verified in the same scoped pass"
+    ]
+  },
+  "observations": [
+    "The two behavior defects that mattered (F-01/F-06 silent recall loss and counter inflation) are fixed by one page-aware narrowing loop in dedup.rs; the loop re-evaluates the page after every freed slot, so a raw or near-duplicate that only enters through backfill is still narrowed.",
+    "F-02 remains an unimplemented capability, now explicitly documented (phase file 'Not implemented' limitation + operator doc). requirement.md still states the general consolidated_only rule because narrowing a normative requirement needs approval; a future writer-side phase that records canonical item-id provenance or a consolidated marker is the owner.",
+    "F-10 (benchmark.md staged with the phase) could not be actioned: the remediation rules forbid any git index change. It is recorded in the phase file for the approver, and this round's unstaged diff does not touch the file.",
+    "One test assertion was added after the single make check pass (surface_tests::retrieve_tool_rejects_bad_axis_domains_and_bank now rejects an unknown recall_scope). It was verified by the scoped clio-retrieve run and by the final full make coverage run, which executes the whole workspace suite with exit 0.",
+    "Out of scope, pre-existing: the phase's test names keep their T27-* tracking ids; the adversary's isolation grep found no roadmap/phase-number references in production code or comments, and the phase file records those names as the real cargo test names.",
+    "Operational note for the approver: benchmark.md went missing from the working tree mid-round (it was present at the start-of-session diff check and absent at the final check; no command the remediator or its subagents ran deleted it). It was restored byte-identically from the recorded baseline with a view-only `git diff HEAD -- benchmark.md` plus a plain file write; `git diff --quiet -- benchmark.md` now reports no difference, so the unstaged diff contains no benchmark.md change and the staged baseline (heading edit included) is intact."
+  ]
+}

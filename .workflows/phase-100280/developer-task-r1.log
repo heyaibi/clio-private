@@ -1,0 +1,18 @@
+2026-09-21T13:06:34Z START developer-task-r1 phase-100280
+2026-09-21T13:08:30Z baseline gate JSON saved to /tmp/cov-baseline.json
+2026-09-21T13:09:49Z baseline coverage gate run complete; per-file check: see next log line
+2026-09-21T13:10:05Z BASELINE OK: 253 reported source files, all >=90% lines+functions. JSON at /tmp/cov-baseline.json. Proceeding.
+2026-09-21T13:11:57Z research done: ureq 3.4.2 API confirmed (Error variants StatusCode/Timeout/Io/ConnectionFailed/HostNotFound/Protocol/Tls non-exhaustive; ConfigBuilder http_status_as_error/max_redirects/timeout_global; body via as_reader for manual 64MiB cap). Plan: fold spike into Task 1 (allowed by phase), two disjoint workers (clio-index transport, clio-config plumbing), docs self.
+2026-09-21T13:12:18Z added ureq 3 to workspace + clio-index; cargo tree below
+2026-09-21T13:12:30Z cargo tree: ureq 3.4.2 locked; +28 crates incl. windows-only; Linux amd64 target tree identical shape
+2026-09-21T13:21:40Z worker A (clio-index transport): http.rs 288L, http_tests.rs 176L, embed.rs 312L; clippy clean, 44/45 tests pass; scoped cov http.rs 93.75f/96.02l OK. BLOCKER handed to parent: embed_tests.rs:101 tei_client_config_fails_closed expects https rejection.
+2026-09-21T13:21:40Z worker B (clio-config plumbing): merge.rs 205L, validate.rs 357L, mod.rs 449L, validate_tests.rs 278L, embed_knob_tests.rs 212L; test 114 pass, clippy clean, scoped cov merge 100/100, mod 99.32l/100f, validate 99.46l/100f OK.
+2026-09-21T13:23:48Z parent integrated: fixed embed_tests.rs https assert (ftp:// now), docs updated (.env.example provider knobs, README provider config section, hardware.md hosted-provider note). Running make check + clean-build timing + final gate.
+2026-09-21T13:30:05Z make check (fmt+clippy -D warnings+test workspace): EXIT 0; fixed clippy match_same_arms in embed_knob_tests.rs (rerank provider tei->cohere)
+2026-09-21T13:33:53Z clean build (cargo build --workspace --locked after cargo clean): 21s wall / 88s user on macOS arm64. cargo tree -i ureq: 28 new crates locked (windows-only crates dormant on non-Windows); Linux amd64 dep tree verified identical via --target x86_64-unknown-linux-gnu. No Linux build host available locally — Linux build relies on CI.
+2026-09-21T13:36:14Z FINAL GATE: make coverage EXIT 0 (aggregate floors pass); fresh JSON per-file scan: all reported files >=90% lines+functions.
+2026-09-21T13:37:42Z masked config_get sample (via throwaway clio-config example, then deleted): embed.provider=openai present; rerank.url/provider set; credentials.embed_api_key=****4321, rerank_api_key=****7890 — no raw keys in view.
+2026-09-21T13:38:54Z phase file updated: AC evidence, DoD, Completion Evidence, Attribution (Developer r1 done), Final Status PASS WITH DOCUMENTED LIMITATIONS. All 9 modified Rust files <=450 lines (largest: config/mod.rs 449).
+2026-09-21T13:38:58Z staged with: git add -- . ':!.workflows/' (exact task-file order)
+2026-09-21T13:39:03Z FINISH: phase 100280 implemented. Verified: baseline gate clean (253 files >=90%); scoped per-file coverage >=90% for all 9 modified files; make check exit 0; final make coverage exit 0 (1316 tests passed / 0 failed, all 253 reported files >=90% lines+functions); masked config_get sample real; ureq dep tree + clean-build time recorded. Not verified: Linux amd64 native build (no Linux host; CI gate covers it), real verified-TLS endpoint round trip (mock TLS needs unapproved cert-dep; https covered via parse + connect-failure tests). Workers: 2 (clio-index transport, clio-config plumbing), both integrated after parent review; 1 blocker (stale https-rejection assert) fixed by parent.
+DEVELOPER_DONE 3f3dc5a9

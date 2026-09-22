@@ -1,0 +1,12 @@
+2026-09-22T21:20:39Z START remediator r1; backup findings.original.json already exists; 3 findings triaged: F-01 clippy while_let_loop (main.rs:103), F-02 racy port rebind in tests (http_bind_tests.rs:35, mcp_http_bind_harness.rs:101), F-03 --bind=VALUE unsupported (main.rs parse_flags). All in clio-lib, coupled slices -> fix serially myself, no workers.
+2026-09-23T00:00:00Z TRIAGE: 3 findings, all coupled in clio-lib -> fixed serially by remediator, no workers. No .workflows-only findings.
+2026-09-23T00:01:00Z F-01 FIXED crates/clio-lib/src/main.rs:103: parse_flags loop -> while let Some(flag) = pending.take().or_else(|| it.next()).
+2026-09-23T00:02:00Z F-03 FIXED main.rs parse_flags: --flag=value via split_once('=') before positional handling; additive for shared consumers (ops/status/retention/compose/mcp). New tests parse_flags_equals_syntax + parse_flags_equals_value_beats_following_flag (main_tests.rs).
+2026-09-23T00:02:00Z F-02 FIXED: retry loops in http_bind_tests.rs explicit_address_is_honored (100 attempts, AddrInUse-tolerant, needless_continue fixed by != guard) and tests/mcp_http_bind_harness.rs explicit_address_is_bound_exactly (10 attempts, announce-mismatch retry).
+2026-09-23T00:03:00Z VERIFY: cargo clippy -p clio --all-targets --all-features --locked -- -D warnings -> exit 0.
+2026-09-23T00:03:30Z NOTE: bare `cargo test -p clio` failed ops_cli::tests::reindex_dense_confirmed_without_embedder_exits_3; root cause is host ~/.config/clio/deployment.json configuring an embed provider. Makefile test/coverage targets export hermetic CLIO_DEPLOYMENT_CONFIG (Makefile:90, coverage.md) so this is documented behavior, not a regression; left as-is and recorded in findings.json.
+2026-09-23T00:04:00Z VERIFY LIVE: `clio mcp http --bind=127.0.0.1:34305 --db sqlite::memory:` -> 'mcp http listening on 127.0.0.1:34305' (F-03 fixed).
+2026-09-23T00:05:00Z make test -> exit 0 (11 ok targets); make check -> exit 0 (48 ok targets, no failures).
+2026-09-23T00:05:30Z FINAL GATES: make lint exit 0; make coverage -> coverage-guard: 280 file(s) checked, TOTAL lines 97.87% functions 98.91%, all per-file >=90% (main.rs 92.73/100).
+2026-09-23T00:06:00Z REPORT: findings.json updated (all 3 issues + plan_1hr resolved, plan_unlimited partially resolved/declined with reasons); phase file Attribution row appended. File sizes: main.rs 374, main_tests.rs 386, http_bind_tests.rs 130, harness 155 - all <=450. Changes left UNSTAGED per rules (no git add).
+REMEDIATOR_DONE bc9eb720

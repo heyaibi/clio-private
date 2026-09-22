@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100250 per-bank retention profiles (staged diff, 48 files)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100250 per-bank retention profiles (staged diff, 48 files)</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">3 important · 7 minor · 10 dismissed</span>
+    </div>
+    <p class="sum">The functional core works: the retention profile object, resolution order, verbosity/tolerance mapping, batch dry-run, MCP binding, schema publication, and CLI are implemented and independently verified (workspace tests exit 0; clippy/fmt clean; coverage gate exit 0 with 0 of 244 files below 90%; all new files &lt;=450 lines). The verdict is held below Good by three substantive defects: a phase number hard-coded into production code and the published tool schema (roadmap-isolation hard-rule violation that was not escalated), completion evidence that misstates the published schema pack (wrong tool count and mapping keys that are not actually embedded), and a gated write path (hub distill) that ignores the resolved bank profile.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-21</span>
+      <span><b>Applies to</b>staged index (git diff --cached -- . &#39;:!.workflows/&#39;)</span>
+      <span><b>Source</b>48 staged files under crates/ plus requirement.md and roadmap/phase-100250-per-bank-retention-profiles.md; surrounding callers in clio-write, clio-store, clio-compliance</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>Developer task rules: implement only the phase; 450-line cap; AGENTS.md header; &gt;=90% per-file coverage; roadmap isolation (no phase numbers / ./roadmap/ / crates.md references in code); SQL schema edited directly, no migrations; never commit/push/stash; stage with git add -- . &#39;:!.workflows/&#39;</li>
+        <li>roadmap/phase-100250-per-bank-retention-profiles.md: In Scope bullets, Tasks 1-3, Required Tests T100250-01..T100250-07, AC-100250-01..AC-100250-06, Security Constraints, Definition of Done, Known Limitations wording rule</li>
+        <li>requirement.md: P1, PR-3, PR-5, PR-6, §4.1, §4.2, §4.9.2, §4.9.4.A, §4.9.4 Core catalog, FR-10, FR-20, FR-22, FR-32</li>
+        <li>AGENTS.md: honesty, verify work, requirement.md consistency edits, coverage gate, file-size constraint</li>
+        <li>Adversary brief: verify every claim independently; omission audit; fudged acceptance criteria; known-limitation wording; downstream guarantees</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">14 of 19 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>In Scope: retention_profile schema, per-bank storage, effective resolution order (bank -&gt; deployment -&gt; builtin)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-config/src/retention.rs (object/validation/mapping), retention_store.rs:82-90 (effective()), retention_store_tests::resolution_order_is_bank_then_deployment_then_builtin passes</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>In Scope: verbosity three-level mapping to threshold offsets and novelty-floor adjustments, documented</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">retention.rs:89-134 (theta_delta/novelty_floor), 26-47 (mapping table), profile_json_schema() x-verbosity-mapping; decision_tests::verbosity_admit_sets_are_monotone_on_a_shared_fixture passes</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>In Scope: duplicate_tolerance_write three-level mapping to the admission-time novelty cutoff</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">retention.rs:176-183 write_novelty_floor(): strict=0.25, balanced=0.0, lenient=0.0; documented in Known Limitations (phase file §12). Two of three levels resolve identically, so the write-side mapping has only two distinct values.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>In Scope: duplicate_tolerance_read reserved with an independent default; honoring belongs to Phase 100270</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">retention.rs:230,245 (field + Balanced default); profile_get returns it only inside accepted_but_inert (retention_tools.rs:64-72); retention_tools_tests::profile_get_defaults_to_builtin_and_hides_inert_fields passes</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>In Scope: batch admit_preview (items[] in, per-item decisions out), read-only</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">retention_tools.rs:122-207; cap 50 at :33,136; store diff assertion in t25_02 and retention_tools_tests::batch_preview_reports_per_item_decisions_and_writes_nothing; http_tests::retention_tools_parity_stdio_vs_http passes</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>In Scope: Config/MCP/CLI surface to get, set, validate a bank profile with secret-safe errors</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-config config/retention_ops.rs; MCP retention_tools.rs profile_get/profile_set bound in lib.rs:110,147-148; CLI retention_cli.rs get|set|schema; errors use enums/bounded numbers</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Task 1 Required Change 2: resolution function called on every gated write and every preview</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">clio-mcp paths resolve (write_tools.rs:130-132, store_write.rs:54-57); but clio-write/src/hub_distill.rs:199 still uses AdmissionPolicy::new(&amp;self.env) (builtin), and hub distill is a production gated write wired into McpState (runtime.rs:249) and reachable via the bound `consolidate` tool</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AC-100250-01 per-bank profile persists and resolves deterministically</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">config/retention_tests::retention_profile_round_trips_across_a_restart; retention_store_tests::save_round_trips_and_reports_io_errors; t25_06/t25_07 pass in /tmp/am-test.log</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100250-02 verbosity monotonicity on shared fixture</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">decision_tests::verbosity_admit_sets_are_monotone_on_a_shared_fixture; t25_01_verbosity_admit_sets_are_monotone (selective &lt; balanced, balanced &lt;= permissive) passes</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100250-03 batch dry-run writes nothing and reports reasons</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t25_02_batch_preview_reports_decisions_and_writes_nothing asserts store count unchanged and id absent; t25_03_profile_override_does_not_persist</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100250-04 transport parity for new tools</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">http_tests::retention_tools_parity_stdio_vs_http asserts identical structuredContent and tools/list names; passes</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100250-05 no taxonomy/weight/formula regression</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">workspace tests exit 0; no changes to factors/weights; gate_boundary_tests::only_gated_path_creates_items green after allowlist move to store_write.rs</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100250-06 new tools published in versioned tool_schema pack</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Pack published: `./target/debug/am mcp schema-export` contains admit_preview_batch, retention_profile_get, retention_profile_set and mcp_protocol_revision 2025-11-25. But the completion-evidence paragraph claims the pack embeds x-retention-profile-version / x-verbosity-mapping / x-duplicate-tolerance-write-mapping / x-theta-offset-bound, and that it publishes 41 tools; the pack contains none of those keys and 67 tools.</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Hard rule: roadmap isolation (no phase numbers in code/comments)</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">retention.rs:209 INERT_FIELDS_HONORED_FROM = &quot;027&quot;; :314 honored_from_phase; :404 x-inert-fields-honored-from; :425/:430 descriptions &quot;honored from phase 100270&quot; which are embedded in the published pack (`am mcp schema-export` output contains &quot;honored from phase 100270&quot;)</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Hard rule: every new/modified Rust file &lt;=450 total lines</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Longest staged file: retention.rs 444; all 16 new .rs files &lt;= 444 (wc -l sweep over staged files)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Hard rule: &gt;=90% function and line coverage per reported file</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">cargo llvm-cov --workspace --locked --json --fail-under-lines 90 --fail-under-functions 90 exit 0; aggregate lines 97.90% (34060/34789), functions 98.86% (2954/2988); 244 files, 0 below 90% (parsed /tmp/adv-cov.json)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Hard rule: SQL schema edited directly, no migrations</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">No .sql or migration files in the staged diff (git diff --cached --stat)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Security: confirmation for persisting a profile change; bank isolation; cross-bank read never returns another bank&#39;s profile</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">retention_tools.rs:92-101 requires confirm; retention_tools_tests::profile_set_requires_confirmation_and_is_bank_scoped; t25_06_cross_bank_profile_isolation</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Guarantee: admission decisions always carry the resolved profile_version for audit</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">admission decisions stamp policy.profile_version() (decision.rs); but span-verify refusals hard-code the builtin constant (clio-write/src/pipeline.rs:164, clio-write/src/store_path.rs:81), so a future non-1 resolved version would be misreported on that path</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">03</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Phase number 027 hard-coded in production code and published tool schema (roadmap-isolation violation)</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The developer hard rule is absolute: never reference phase numbers from code or comments, because the codebase must stand alone after roadmap/ is deleted. The constant also embeds a cross-phase coupling into the public wire contract and published schema, and the developer did not escalate the conflict with the phase doc that mandated `honored_from_phase 100270`.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Any renumbering or removal of the roadmap invalidates the value silently; downstream phases 026/027 receive a wire field naming a roadmap artifact rather than a stable capability token.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/retention.rs:209 `pub const INERT_FIELDS_HONORED_FROM: &amp;str = &quot;027&quot;;`; :314 `&quot;honored_from_phase&quot;: INERT_FIELDS_HONORED_FROM`; :404 `&quot;x-inert-fields-honored-from&quot;`; :425 and :430 `&quot;honored from phase 100270&quot;`. `./target/debug/am mcp schema-export` output contains &quot;honored from phase 100270&quot; (4 occurrences).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Replace the phase-number token with a capability token (e.g. `honored_by: &quot;recall_dedup&quot;`) or, if the phase doc&#39;s exact `honored_from_phase 100270` field is contractually required, stop and escalate the rule conflict per the developer prompt&#39;s requirement-conflict protocol instead of choosing silently.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Completion evidence misstates the published schema pack (wrong tool count and mapping keys not actually embedded)</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase file is the audit artifact for AC-100250-06. The Completion Evidence claims facts that are demonstrably false, so the acceptance evidence is fudged even though the underlying AC is met.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A reader cannot trust the schema evidence; the mapping tables the phase says are published in the pack are absent from it, which weakens the operator-facing contract the phase promised (&#39;mapping table is published in the schema docs&#39;).</dd></div>
+              <div><dt>Evidence</dt><dd>Phase file line 410 claims &#39;`am mcp schema-export` now publishes 41 tools (was 38)&#39; and &#39;the profile JSON Schema embedded (version stamp `x-retention-profile-version: 1`, `x-verbosity-mapping`, `x-duplicate-tolerance-write-mapping`, `x-theta-offset-bound: 0.20`)&#39;. Actual: `./target/debug/am mcp schema-export` emits 67 tools; raw output contains none of `x-verbosity`, `x-retention`, `x-duplicate`, `x-theta`. `crates/clio-mcp/src/schema_retention_defs.rs:71,97` embed only `profile_json_schema()[&quot;properties&quot;]`, dropping the `x-*` metadata and the top-level `additionalProperties`.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Correct the evidence to the real numbers and either (a) embed the full profile schema (or its x-* mapping keys) in the pack, or (b) restate the evidence as &#39;mapping tables are published via `am retention schema`, not in the MCP pack&#39;.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Hub-distill gated write ignores the bank&#39;s resolved retention profile</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 1 Required Change 2 requires the resolution function on every gated write. Hub distill is a production, MCP-reachable gated write that still scores with the builtin policy, so a bank set to `selective` gets default strictness for distilled items.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The phase guarantee &#39;changing a profile controls how strict admission is at write time&#39; does not hold for hub-distilled items; the phase&#39;s own monotonicity property is violated on that path.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/hub_distill.rs:199 `let policy = AdmissionPolicy::new(&amp;self.env);` inside `distill_hub`, which calls `gated_create`. HubDistillEngine is built into McpState (crates/clio-mcp/src/runtime.rs:249) and triggered by the bound `consolidate` tool (clio-write/src/memtree_tools.rs:134-190). No retention snapshot is threaded in.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Thread the resolved `ResolvedRetention` into `HubDistillEngine`/`distill_hub` (or inject a policy factory) so `gated_create` uses `AdmissionPolicy::with_retention`, and add a test that a selective bank rejects a distilled item a balanced bank admits.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">07</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>duplicate_tolerance_write three-level mapping collapses to two values</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The In Scope bullet requires a three-level mapping to the write-side duplicate cutoff; balanced and lenient both resolve to 0.0, so only strict changes behavior. The phase vocabulary also says the two knobs have &#39;independent defaults and mappings&#39;.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Operators selecting `lenient` get no distinct behavior from `balanced`; the knob is partly decorative on the write path.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/retention.rs:176-183 `write_novelty_floor()` returns 0.0 for both Balanced and Lenient; mapping table at :39-43; documented as a Known Limitation in the phase file §12.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Accept the documented limitation as-is (regression constraint) and make the phase doc&#39;s In Scope wording say &#39;three-level enum with strict distinct&#39;, or give lenient a distinct (e.g. negative-clamped) value that preserves the existing default behavior.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Persistence failure leaves the new profile applied in memory while returning an error</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Negative testing requires that a partial failure does not leave invalid state. On a save error the in-memory store already holds the new profile, so the caller is told the write failed yet a subsequent read returns it.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A failed `retention_profile_set`/CLI set changes admission strictness for the process even though the caller saw an error, and a later successful persist is not required to reconcile.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/config/retention_ops.rs:95-96 (`set_bank` mutates, then `persist_retention()?` may fail); crates/clio-mcp/src/runtime_retention.rs:52-58 same pattern. The failure-path test crates/clio-config/src/config/retention_tests.rs:124-141 asserts the error code but never re-reads the store.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Validate, persist to disk first (or roll back the in-memory insertion on save failure), and extend the failure test to assert the stored profile is unchanged after an I/O error.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Span-verify refusals stamp the builtin profile version, not the resolved one</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase guarantee says admission decisions always carry the resolved profile_version for audit. These Decision values hard-code the builtin constant.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Currently inert because every profile is version 1, but a future profile version would be misattributed on the verify-refusal path.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/pipeline.rs:164 and crates/clio-write/src/store_path.rs:81 both set `profile_version: clio_config::retention::RETENTION_PROFILE_VERSION` rather than the policy&#39;s resolved version.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Pass the resolved profile version (or the AdmissionPolicy) into `refuse_decision`/`verify_reject`.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>permissive can be set as the deployment default despite &#39;MUST NOT become a default&#39;</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase states `permissive` is intentionally loose and MUST NOT become a default, but nothing prevents `retention_profile_set(scope=deployment, verbosity=permissive)`.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A single deployment-scope write silently loosens admission for every bank without an override.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-config/src/retention.rs:257-286 `validate()` never inspects verbosity; `RetentionStore::set_deployment` (retention_store.rs:115-119) only validates. MCP scope=deployment path at crates/clio-mcp/src/retention_tools.rs:102-106.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Reject `permissive` for `scope=deployment` (or require an explicit override flag), and add a test.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>AGENTS.md header copyright uses singular &#39;Developer&#39; in store_write.rs</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md prescribes the exact header line &#39;Agent Memoir Developers&#39;.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Cosmetic header inconsistency.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/store_write.rs:1 `// Copyright 2026 Agent Memoir Developer (https://agentmemoir.com/)` vs the plural used by the other new files.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Change &#39;Developer&#39; to &#39;Developers&#39;.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">09</span>
+          <div>
+            <div class="ihead">
+              <h3>Developer attribution row does not match the instructed agent string</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The developer prompt prescribed the exact attribution text; the phase file records a different agent identity.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Attribution is inaccurate for the audit trail.</dd></div>
+              <div><dt>Evidence</dt><dd>Phase file line 7: &#39;OpenCode CLI (Go . Deepseek V4.1 Flash High)&#39;; the developer prompt required &#39;OpenCode CLI (Together . GLM-5.3 Flash High)&#39;. Also repeated in Verification Sign-Off.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Use the instructed string or state the actual agent honestly.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">10</span>
+          <div>
+            <div class="ihead">
+              <h3>Test-count figures in the completion evidence are slightly wrong</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Evidence should be reproducible exactly; these counts are stated as real command output.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Minor credibility issue in the evidence block.</dd></div>
+              <div><dt>Evidence</dt><dd>Phase file Test execution output says `cargo test -p clio-config 87 passed` (actual 88 in /tmp/am-test.log) and `clio 38 bin` (actual 40 for the am main.rs unittests). clio-admission 33 and clio-mcp --lib 183 match.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Refresh the numbers from the final test run.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Claimed coverage numbers differ by one line/function (97.91 vs 97.90, 98.90 vs 98.86): within run-to-run variation, and the substantive claim (0 of 244 files below 90%) is verified.</li>
+        <li>450-line cap: verified for all 16 new files and all modified files (max 444).</li>
+        <li>Header structure of the new files matches the AGENTS.md template (ownership statements are accurate apart from the singular &#39;Developer&#39; nit).</li>
+        <li>store_write.rs extraction: gate_boundary_tests allowlist move is legitimate; the only create_memory_item call sits inside the gated closure.</li>
+        <li>Requirement.md edits are consistent: admit_preview_batch added to §4.2 and §4.9.4, retention tools added to §4.9.2, glossary entry added; inventory contract test passes.</li>
+        <li>Cross-bank read returning the effective (builtin/deployment) profile rather than not-found: it never returns another bank&#39;s override, which is the substance of the security condition.</li>
+        <li>No migrations introduced; no secrets in the staged diff.</li>
+        <li>The known limitations are worded per the rule (what is missing, why, owner), including the NoSignals and process-scoped-store limitations.</li>
+        <li>Batch preview cap/empty/oversize/error paths are covered and clean.</li>
+        <li>Transport parity for the new tools is tested and passes.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace tests pass (exit 0) — cargo test --workspace --locked with DATABASE_URL from coverage.md -&gt; exit=0, 44 test binaries &#39;test result: ok&#39;, no failures</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>clippy -D warnings and cargo fmt --check are clean — cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -&gt; exit 0; cargo fmt --all -- --check -&gt; exit 0</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-blue">Supported</span>
+          <p>Coverage gate exit 0; aggregate lines 97.91% / functions 98.90%; 0 of 244 files below 90% — cargo llvm-cov --workspace --locked --json --fail-under-lines 90 --fail-under-functions 90 -&gt; exit 0; parsed /tmp/adv-cov.json: lines 97.90% (34060/34789), functions 98.86% (2954/2988), 244 files, 0 below 90%</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>The published tool_schema pack embeds the profile schema mapping tables and version stamp — am mcp schema-export raw output contains no x-verbosity/x-retention/x-duplicate/x-theta keys</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>am mcp schema-export publishes 41 tools (was 38) — am mcp schema-export emits 67 tools</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Retention resolution applies on every gated write — hub_distill.rs:199 still uses AdmissionPolicy::new (builtin); no retention snapshot passed</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>AC-100250-01..AC-100250-05 pass — Cited tests exist and pass in /tmp/am-test.log</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Every new/modified Rust file is &lt;=450 lines — wc -l over staged .rs files; max 444 (retention.rs)</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-blue">Supported</span>
+          <p>No direct ungated create path was introduced — gate_boundary_tests passes; only create_memory_item call in store_write.rs:82 is inside the gated closure</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether the pre-change pack really had 38 tools</p>
+          <p class="d">The pre-change tree is not checked out (no git checkout/stash allowed for the reviewer) · Count catalog_defs on the base revision · Low - current count (67) already contradicts the stated 41 regardless of the baseline</p>
+        </div>
+        <div class="card unk">
+          <p class="t">Whether the phase doc&#39;s `honored_from_phase 100270` field is a hard contractual requirement or an illustrative example</p>
+          <p class="d">The phase doc mandates the field but the developer hard rules forbid phase numbers; no human ruling in the repo · Operator decision on which rule wins · Medium - determines whether F-01 is a fix or an approved exception</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean separation: clio-config owns the profile/store, clio-admission stays I/O-free and consumes a Copy snapshot, clio-mcp binds tools and publishes schema.</li>
+        <li>Monotonicity is proven at both unit level (decision_tests) and integration level (T100250-01), including subset (not just count) checks.</li>
+        <li>Batch preview reuses the exact single-item scoring path and is proven write-free by a store diff and a direct id lookup.</li>
+        <li>Failure modes are well covered: invalid enum, unknown offset key, oversize offset, NaN/Inf, oversize/empty batch, per-item error, corrupt store, unwritable path.</li>
+        <li>Transport parity is tested end to end for the new tools rather than asserted.</li>
+        <li>The store_write.rs extraction kept write_tools.rs under the 450-line cap and the gate-boundary allowlist was updated honestly.</li>
+        <li>Known limitations are disclosed with cause and owner instead of hidden.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>The developer chose the phase doc&#39;s phase-number field over the explicit hard rule without escalating, which is exactly the requirement-conflict case the prompt says to stop on.</li>
+          <li>The completion evidence paragraph appears to have been written from expectation (mapping tables in the pack, 41 tools) rather than re-read from the actual schema-export output.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Any evidence block quoting a command&#39;s output should paste the real output; the schema-pack paragraph would have failed a copy-paste check.</li>
+          <li>When a phase doc and a hard rule conflict (phase numbers in code), stop and signal a blocker with two options instead of silently picking one.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix F-01: replace the &#39;027&#39; phase token with a capability token (or escalate the conflict) and regenerate the pack so no phase number ships in the schema.</li>
+          <li>Fix F-02: correct the schema-pack evidence to the real tool count and either embed the x-* mapping metadata or restate the claim.</li>
+          <li>Fix F-03: thread the resolved retention snapshot into HubDistillEngine and add the selective-vs-balanced distill test.</li>
+          <li>Fix F-05: roll back / persist-before-mutate on save failure and assert stored-profile-unchanged in the failure test.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Decide the canonical contract for inert fields (capability token vs phase number) across requirement.md, the pack, and the CLI, and add a CI guard that fails if a phase number appears in published schema output.</li>
+          <li>Add a single &#39;profile-aware gated write&#39; seam so every gated_create caller (store, triple, belief, canonical_put, hub_distill, sync apply) resolves the bank profile through one path, with a test enumerating the callers.</li>
+          <li>Add an end-to-end test that persists a profile to a file, restarts the MCP runtime with AM_RETENTION_PROFILES, and shows admission strictness changes across the restart.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/tmp/adversarial-review-phase025/report.html</span>
+          <span><b>Findings:</b>/tmp/adversarial-review-phase025/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

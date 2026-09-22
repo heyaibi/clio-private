@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100180 — Audit Trail, Inspect, and Correction (staged diff, 48 non-workflow files)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100180 — Audit Trail, Inspect, and Correction (staged diff, 48 non-workflow files)</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">5 important · 5 minor · 8 dismissed</span>
+    </div>
+    <p class="sum">The core surfaces are implemented and the workspace tests plus per-file coverage gate pass, with strong discrete-correction, lineage, and append-only tests. However, two required test scenarios (T100180-04 as_of, T100180-06 total count) are effectively unmet or untested, the coverage gate failed once on a flaky shared-Postgres assertion, and the new SQLite lineage columns have no upgrade path. These are material evidence/completeness gaps, not cosmetic.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-19</span>
+      <span><b>Applies to</b>staged working tree, branch master (no commit)</span>
+      <span><b>Source</b>git diff --cached (48 files); make check; make test; make coverage; requirement.md FR-15/FR-16 §4.12; roadmap/phase-100180</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>requirement.md FR-15 (telemetry sufficient to reconstruct history; audit_trail exposes it)</li>
+        <li>requirement.md FR-16 (§4.12 inspector: inspect/correct/erase_request)</li>
+        <li>requirement.md §4.9.3/§4.9.4.F tool gating and mutator rules</li>
+        <li>phase-100180 §5 tasks 1-5, §7 security acceptance, §8 required tests/scenarios, §9 AC/DoD</li>
+        <li>AGENTS.md: 450-line cap, headers, coverage.md per-file &gt;=90% functions+lines</li>
+        <li>Developer completion evidence must be reproducible and accurate</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">6 of 10 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Telemetry on store/update/discard/invalidate/correct</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">create_memory_item/update_memory_item pre-existing rows; discard/invalidate/correct insert rows in the same transaction (sqlite_discard.rs:118-137, sqlite_triple_read.rs:258-278, sqlite_correct.rs:196-226); tests pass.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>audit_trail reconstructs lifecycle + lineage both ways + ITEM_NOT_FOUND</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">sqlite_audit.rs:73-101,181-230; t18_02_audit_trail_traverses_lineage_from_any_revision (3-revision chain from every id); missing -&gt; ItemNotFound.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>inspect multi-filter, pagination default 50 / max 200, secret masking</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">read_tools.rs:182-215, inspect_query.rs:61-66, model.rs:129-146; T100180-06 total count missing (F-03/F-04).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>correct discrete supersession (both axes, lineage, no DELETE)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">sqlite_correct.rs/postgres_correct.rs; tests assert prior tx_until+valid_until, superseded_by_id/corrects_item_id, admission_score untouched, no DELETE in path.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>correct continuous respects EMA + records attribution/reason</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">correct.rs:117-148 routes to observe_continuous_with_reason; reason/actor persisted on continuous_observe row, but no &#39;correct&#39; operation and no audit_trail visibility (F-05).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Blank/missing reason rejected (400-class)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">correct.rs:99-105; store guards; MCP confirm path; tests.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Telemetry append-only (UPDATE/DELETE rejected)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">sql/002_vectors_{sqlite,postgres}.sql triggers; t18_06_audit_events_reject_update_and_delete; pg parity test.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Files &lt;= 450 lines; headers; coverage per-file &gt;=90%</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">max touched file postgres_store.rs 429; all new files have required headers; my coverage run: 0 files below 90% functions/lines.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>MCP + in-process exposure of audit_trail/inspect/correct</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">bound_write_tools/bound_read_tools updated; clio-compliance public API; CLI is only `am mcp stdio|http`; no stdio test (F-10).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Required test scenarios T100180-01..T100180-06</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">T100180-01/02/03/05/06(immutability) covered; T100180-04 as_of untested (F-02); T100180-06 total count missing (F-03).</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">05</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Pre-existing SQLite databases never receive the new lineage columns</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>A schema change shipped without an upgrade path for the default in-process backend silently breaks correct/audit_trail on any existing SQLite file.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>correct_item/audit_trail SQL references items.corrects_item_id/superseded_by_id; a v6 SQLite DB lacks them and fails at runtime with &#39;no such column&#39;. Only Postgres converges.</dd></div>
+              <div><dt>Evidence</dt><dd>sql/001_core.sql:146-147; sql/002_vectors_postgres.sql:35-36; sql/002_vectors_sqlite.sql (no ALTER); schema_reshape.rs:26 (SCHEMA_VERSION &#39;6&#39;), :29-58 (staleness only class/epistemic_kind).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Bump schema_version and add a SQLite convergence path (guarded ALTER TABLE ADD COLUMN, or extend sqlite_items_stale to detect missing columns).</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>make coverage is not reliably green (flaky shared-Postgres index test)</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase&#39;s completion evidence claims the coverage gate is green; a failing gate contradicts that and can block the pipeline.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>One of three `make coverage` runs failed on index_store_tests::tests::postgres_index_contract; the phase&#39;s new pg tests add index_pending contention to a pre-existing whole-store assertion.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/index_store_tests.rs:239; crates/clio-store/src/postgres_index.rs:243-249 (global LIMIT 10). Failure observed once, passes isolated and 5/5 plain runs.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Scope pending_index_jobs assertion to the test&#39;s own bank, or make the assertion independent of global ordering.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Required scenario T100180-04 (as_of historical query) is never tested</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>NFR-4 past-system-belief queryability is the core claim of non-destructive correction; row-level inspection does not prove the read path returns the old value at as_of.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>No test exercises as_of/time_axis for items after correction; AC-100180-04 is marked PASS on weaker evidence.</dd></div>
+              <div><dt>Evidence</dt><dd>phase §8 T100180-04; grep as_of/time_axis in audit/correct tests = 0; capability exists at clio-retrieve/src/filter.rs:40.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a retrieve/compose as_of test (transaction axis) before/after correction asserting old then new value.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>inspect does not return a total count (T100180-06 unmet)</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>T100180-06&#39;s expected result explicitly requires an accurate total count; pagination without a total is not the specified contract.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Clients cannot know the full result size; AC-100180-03 overstates coverage.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/read_tools.rs:206-211; Store::inspect_items returns Vec only (store.rs:313); no test asserts total.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a count query with the same predicates and return `total`; assert it in the pagination test.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Continuous corrections emit no `correct` telemetry and are invisible to audit_trail</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 4 requires a telemetry record with operation &#39;correct&#39;; the continuous branch records &#39;continuous_observe&#39; with item_id NULL, so the correction is not reconstructable through the audit_trail surface.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>AC-100180-01&#39;s &#39;correct on correction&#39; holds only for discrete items; the Known Limitations wording (&#39;auditable&#39;) overstates what any tool exposes.</dd></div>
+              <div><dt>Evidence</dt><dd>sqlite_attribute.rs:283-295; postgres_attribute.rs; sqlite_audit.rs:55-72; phase file line 489.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Label the continuous-correction audit row operation=&#39;correct&#39; and expose an attribute-key audit view, or reword the limitation to say it is not surfaced.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">05</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Completion-evidence counts and a coverage number are inaccurate</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Reviewer-facing evidence must be accurate; inflated counts/coverage mislead the approver.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>&#39;20 audit/correct tests&#39; is actually 17; audit_correct_tests is 8 not 9; postgres_audit.rs functions are 91.67% not 100%.</dd></div>
+              <div><dt>Evidence</dt><dd>grep &#39;#[test]&#39; counts; target/coverage report (postgres_audit.rs 12 functions, 1 missed).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Correct the phase file numbers.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>MCP correct dry-run does not validate a non-empty reason</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Security acceptance says correct without a reason returns a 400-class error; the dry-run path returns success for a blank reason.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Inconsistent validation between preview and confirmed paths; no state change, so impact is limited to contract clarity.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/mutator_tools.rs:145-172; audit_tools_tests.rs:123-136 only tests confirm=true.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Validate reason/target before returning the preview.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>inspect time_range upper bound is inclusive, not half-open</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 3 specifies [start, end); an inclusive end returns an extra boundary row.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Off-by-one at the upper boundary; pre-existing, unchanged.</dd></div>
+              <div><dt>Evidence</dt><dd>inspect_query.rs:95-103.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Use `&lt;` for the end bound or document inclusive semantics with a boundary test.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">09</span>
+          <div>
+            <div class="ihead">
+              <h3>audit_trail returns parallel arrays, not a single consolidated timeline</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AC-100180-02 wording (&#39;merges ... ordered ascending&#39;) and Task 2&#39;s Expected Result imply one merged sequence.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Consumers must merge three arrays by timestamp themselves; evidence overstates.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-compliance/src/audit.rs:37-48.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Interleave revisions+events into one array, or reword the evidence.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">10</span>
+          <div>
+            <div class="ihead">
+              <h3>No automated stdio test for correct/audit_trail</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>DoD claims end-to-end stdio verification; the staged diff adds no stdio test.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The transport-level claim rests on manual verification only.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/tests/ listing; audit_tools_tests.rs uses in-process dispatch.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a stdio round-trip for correct + audit_trail, or reword the DoD.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>No DELETE in the correction path (verified: none).</li>
+        <li>PR-8 attribution present on discard/invalidate/correct (actor required at store and service).</li>
+        <li>Correcting an already-discarded/superseded prior fails closed.</li>
+        <li>Correction preserves create-time admission score and prior snapshot.</li>
+        <li>Roadmap isolation: no ./roadmap/ or phase-number references in code; T-number test ids match the repo&#39;s established convention.</li>
+        <li>The T-numbered test names (T18-xx) are consistent with prior-phase convention and are not a roadmap-isolation violation.</li>
+        <li>New crate clio-compliance is already listed in crates.md.</li>
+        <li>Aggregate coverage and per-file &gt;=90% both pass in my runs.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace tests pass — make check and make test: 0 failures across all suites (clio-store lib 155 passed).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Per-file &gt;=90% functions/lines — make coverage per-file scan: 0 files below 90% (TOTAL lines 97.99%, functions 98.62%).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>make coverage green — 1 of 3 runs failed on index_store_tests::tests::postgres_index_contract; flaky.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>T100180-04 as_of historical query verified — No as_of/time_axis usage in any audit/correct test.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>T100180-06 accurate total count — inspect payload has no total; no count method.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>postgres_audit.rs 100% functions — Coverage report: 11/12 functions = 91.67%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>20 audit/correct tests in clio-store — Actual 17 (8+5+4).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>No DELETE in correction path (PR-6) — grep of correct impls and clio-compliance: no DELETE.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Telemetry rows immutable on both backends — SQLite RAISE triggers and Postgres BEFORE triggers; direct-SQL tests pass.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether the manual stdio round-trip actually succeeded</p>
+          <p class="d">No automated artifact or transcript is in the repo · A committed stdio test or captured transcript · Low</p>
+        </div>
+        <div class="card unk">
+          <p class="t">Whether any production SQLite DB exists at schema v6</p>
+          <p class="d">No deployment data available · Confirm pre-release status · Medium (determines F-04 impact)</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Discrete correction is atomic and genuinely non-destructive, with both axes closed and lineage linked.</li>
+        <li>Append-only enforcement is at the database layer on both backends, with direct-SQL negative tests.</li>
+        <li>audit_trail lineage traversal is tested from every revision in a 3-revision chain.</li>
+        <li>Reason/actor validation is enforced at service and store layers, not just the binding.</li>
+        <li>All new files respect the 450-line cap and the required header structure; per-file coverage passes.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Should have reproduced the coverage gate more than once before claiming it green.</li>
+          <li>Should have read the phase&#39;s Required Test Scenarios table line by line before accepting AC-100180-04/AC-100180-03 as PASS.</li>
+          <li>Should have tested the SQLite upgrade path, not just the Postgres convergence ALTER.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Treat &#39;make coverage green&#39; as a claim requiring repeated runs when tests share a DB.</li>
+          <li>Check every Required Test Scenario ID against a named test, not just the checklist bullets.</li>
+          <li>For any schema change, verify both fresh-DB and pre-existing-DB paths on every backend.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Add the missing T100180-04 as_of test via retrieve/compose with time_axis=transaction.</li>
+          <li>Add `total` to the inspect payload and assert it in the pagination test.</li>
+          <li>Fix the phase-file counts/coverage claims and reword the continuous-correction limitation.</li>
+          <li>Validate reason on the MCP correct dry-run path.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Bump schema_version and implement a SQLite schema-convergence path for the new columns.</li>
+          <li>Make continuous corrections first-class audit_trail events (operation &#39;correct&#39; + attribute-key view).</li>
+          <li>De-flake the shared-Postgres whole-store index assertions and give each test bank-scoped queries.</li>
+          <li>Add a stdio end-to-end test for correct/audit_trail and inspect.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100180/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100180/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

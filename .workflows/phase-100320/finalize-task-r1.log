@@ -1,0 +1,7 @@
+2026-09-22 02:05:50 START phase-100320 finalize r1: attribution checked (removed stale Remedy Approver r1 pending row - r1 was a REJECT round, contract says rejected approver rounds leave no row; added Finalize r1 done row). Approval checkbox already [x] at roadmap/phase-100320-compose-lifecycle.md:305 (exact task string absent; intent satisfied). Starting final make check.
+2026-09-22 02:06:32 RUN make check: EXIT=0, zero FAILED, clippy -D warnings clean, fmt clean. All test suites green (48 compose tests included; prompt_tty/read_prompt_line tests pass).
+2026-09-22 02:06:40 STAGED git add -A (includes .workflows/phase-100320/). File list: .env.example, README.md, compose.yml, crates/clio-lib/src/{compose_assets,compose_assets_tests,compose_cli,compose_cli_fail_tests,compose_cli_tests,compose_docker,compose_docker_tests,compose_env,compose_env_tests}.rs, crates/clio-lib/src/main.rs, hardware.md, roadmap/phase-100320-compose-lifecycle.md, .workflows/phase-100320/* (pipeline artifacts).
+2026-09-22 02:06:52 COMMIT created.
+2026-09-22 02:06:57 PUSH succeeded; working tree clean after push.
+2026-09-22 02:07:01 FINAL: commit 64cf889 pushed to origin/master (881f7f6..64cf889). Only remaining working-tree change is this finalize log, uncommitted by design. Verification: make check EXIT=0 (zero FAILED, clippy/fmt/test all green); attribution table corrected; approval checkbox already [x].
+FINALIZE_DONE 5d4f6a7e

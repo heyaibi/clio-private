@@ -1,0 +1,263 @@
+{
+  "run": "r1",
+  "phase": "100330",
+  "subject": "Phase 100330: `am setup` First-Run Wizard and Deployment Configuration",
+  "verdict": "Adequate",
+  "verdict_justification": "The phase implements the core wizard flows, default XDG deployment path resolution, atomic write, and backup-before-replace with high test coverage (>97% lines, >98% functions). However, it violates a hard AGENTS.md rule by introducing a 469-line file (tests.rs), contains an unisolated TTY check that hangs `cargo test` when executed in interactive terminals, leaks phase numbers in code comments, and misleadingly lists Postgres as a local service in zero-dependency installs.",
+  "metadata": {
+    "generated": "2026-09-22",
+    "applies_to": "phase-100330 staged diff (r1)",
+    "source": "crates/clio-lib, crates/clio-config, roadmap/phase-100330-am-setup-wizard.md, README.md, .env.example"
+  },
+  "standard": [
+    "AGENTS.md: Every Rust file created or modified must remain at or below 450 total lines",
+    "AGENTS.md: Roadmap isolation — never reference ./roadmap/, phase numbers, or roadmap files from code or comments",
+    "AGENTS.md / coverage.md: Workspace and per-file >=90% function and line coverage floors",
+    "roadmap/phase-100330-am-setup-wizard.md: Zero-dependency, airgapped, and custom install types with non-interactive flag support",
+    "roadmap/phase-100330-am-setup-wizard.md §5 Task 4 & §8 T100330-09: Tests must run non-interactively without a TTY and never block"
+  ],
+  "requirements": [
+    {
+      "requirement": "AGENTS.md: Maximum 450 lines per Rust file",
+      "status": "Missed",
+      "evidence": "crates/clio-config/src/config/tests.rs is 469 lines (was 430 lines before phase 100330 edits).",
+      "severity": "Critical"
+    },
+    {
+      "requirement": "Non-interactive test execution without blocking on stdin (T100330-09)",
+      "status": "Missed",
+      "evidence": "cargo test hangs indefinitely in interactive terminals on setup_usage_errors_exit_2 due to unmocked is_terminal() in main_tests.rs.",
+      "severity": "Critical"
+    },
+    {
+      "requirement": "AGENTS.md: Roadmap isolation in code and comments",
+      "status": "Missed",
+      "evidence": "crates/clio-lib/src/setup_wizard.rs:304 and setup_wizard_tests.rs:69 reference 'compose phase' and 'this phase'.",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "Accurate zero-dependency summary reporting without Docker/Postgres",
+      "status": "Partially satisfied",
+      "evidence": "am setup --type zero-dependency prints 'local services: postgres' despite running no Docker and using SQLite.",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "Deployment overlay persistence, atomic save (0600), and backup-before-replace",
+      "status": "Fully satisfied",
+      "evidence": "Implemented in persist.rs and setup_config.rs; verified with permissions tests and backup tests.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "XDG default deployment path loading without env vars",
+      "status": "Fully satisfied",
+      "evidence": "Verified in persist_tests.rs, tests.rs, and tests/setup_wizard_harness.rs.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Non-interactive flag grammar covering all prompt fields",
+      "status": "Fully satisfied",
+      "evidence": "Full flag coverage in setup_cli.rs and setup_cli_flows.rs; verified across suites.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Aggregate and per-file >=90% line and function coverage",
+      "status": "Fully satisfied",
+      "evidence": "make coverage reports 97.91% lines, 98.96% functions aggregate; all touched files >=93% lines and >=93% functions.",
+      "severity": "Low"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "crates/clio-config/src/config/tests.rs exceeds 450-line limit (469 lines) in violation of AGENTS.md",
+      "severity": "Critical",
+      "why_it_matters": "AGENTS.md mandates a hard limit of <=450 lines for all Rust files. The developer modified this file (growing it from 430 to 469 lines) and falsely claimed in the run log that all modified files were <=450 lines.",
+      "impact": "Violates hard repo governance constraint and blocks phase completion.",
+      "evidence": "`wc -l crates/clio-config/src/config/tests.rs` returns 469 lines. The developer added 39 lines for `default_deployment_path_is_loaded_and_can_be_disabled` without decomposing the file.",
+      "confidence": "High",
+      "proposed_fix": "Extract the newly added deployment path tests from tests.rs into persist_tests.rs or a dedicated test module to bring tests.rs under 450 lines."
+    },
+    {
+      "id": 2,
+      "title": "Test suite hangs in interactive terminals due to unisolated TTY stdin in setup_usage_errors_exit_2",
+      "severity": "Critical",
+      "why_it_matters": "Running `cargo test --locked --workspace` or `make check` directly in any interactive terminal (without `</dev/null`) blocks indefinitely on `std::io::stdin()`.",
+      "impact": "Freezes standard developer workflows and local test runs for any engineer using an interactive terminal.",
+      "evidence": "crates/clio-lib/src/main_tests.rs:61-68. `setup_usage_errors_exit_2` invokes `run(vec![\"setup\".into()])`. `setup_cli::setup` evaluates `std::io::stdin().is_terminal()`, which is true in terminal shells, prompting `Install type: [1] zero-dependency, [2] airgapped, [3] custom:` and blocking.",
+      "confidence": "High",
+      "proposed_fix": "Decouple `main_tests.rs` from live process stdin by passing non-interactive flags or routing CLI execution in tests through an injected, non-terminal stream seam."
+    },
+    {
+      "id": 3,
+      "title": "Roadmap isolation violations in code comments referencing 'phase'",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md strictly prohibits mentioning roadmap files, phases, or phase numbers in code and comments.",
+      "impact": "Leaks ephemeral project management concepts into permanent source code comments.",
+      "evidence": "crates/clio-lib/src/setup_wizard.rs:304 ('/// compose phase, so Docker argument construction stays in one place.') and crates/clio-lib/src/setup_wizard_tests.rs:69 ('// Extraction is never configured this phase.').",
+      "confidence": "High",
+      "proposed_fix": "Remove or rephrase comments to refer to architectural components (e.g. `am compose` CLI) rather than phase names."
+    },
+    {
+      "id": 4,
+      "title": "am setup falsely reports 'local services: postgres' for zero-dependency installs",
+      "severity": "Important",
+      "why_it_matters": "Zero-dependency installs are defined as requiring no Docker and starting no local services, using embedded SQLite. Falsely listing postgres as a local service misleads operators into believing Postgres is running or needed.",
+      "impact": "Misleading CLI output that contradicts the documented contract of the zero-dependency install type.",
+      "evidence": "crates/clio-lib/src/setup_wizard.rs:198-210. `Plan::local_services()` unconditionally initializes `vec![\"postgres\"]`. Running `am setup --type zero-dependency ...` reports `local services: postgres`.",
+      "confidence": "High",
+      "proposed_fix": "In `Plan::local_services()`, only include 'postgres' when `self.install_type != InstallType::ZeroDependency`."
+    },
+    {
+      "id": 5,
+      "title": "Switching install types merges over old credentials instead of removing them, leaking hosted API keys into airgapped configs",
+      "severity": "Important",
+      "why_it_matters": "Airgapped installations are specified to run with no external keys. If an operator switches from zero-dependency to airgapped, the old API keys remain in deployment.json despite setup stating it replaced existing values.",
+      "impact": "Lingering secret keys remain in configuration files for deployments intended to be airgapped.",
+      "evidence": "crates/clio-lib/src/setup_config.rs:104-114. `write` only sets fields from `plan.entries()` on top of `rt.deployment_overlay`. An airgapped setup run over a pre-existing zero-dependency config leaves `credentials.embed_api_key` in the file.",
+      "confidence": "High",
+      "proposed_fix": "When writing a full setup plan, remove provider and credential fields from the deployment overlay that are not configured by the new install type."
+    },
+    {
+      "id": 6,
+      "title": "Incomplete XDG absolute path validation on HOME fallback in default_deployment_path",
+      "severity": "Minor",
+      "why_it_matters": "The doc comment states that relative base directories are ignored per XDG spec, but while XDG_CONFIG_HOME checks is_absolute(), HOME does not.",
+      "impact": "Inconsistent path handling between XDG_CONFIG_HOME and HOME fallbacks.",
+      "evidence": "crates/clio-config/src/config/persist.rs:74-77. `XDG_CONFIG_HOME` uses `.filter(|dir| Path::new(dir).is_absolute())`, while `HOME` lacks the `is_absolute()` check.",
+      "confidence": "High",
+      "proposed_fix": "Add `.filter(|home| Path::new(home).is_absolute())` to the `HOME` lookup in `default_deployment_path`."
+    },
+    {
+      "id": 7,
+      "title": "Potential atomic file write collision with static temporary file name in write_private_atomic",
+      "severity": "Minor",
+      "why_it_matters": "The temporary file used for atomic replacement is always named `.{name}.tmp`. Concurrent saves or reloads across threads or processes can clobber the shared temporary file before rename.",
+      "impact": "Potential race conditions or corrupt temporary writes under concurrent invocation.",
+      "evidence": "crates/clio-config/src/config/persist.rs:207-213. `temp_sibling` constructs `.{name}.tmp` without a PID or uniqueness token.",
+      "confidence": "High",
+      "proposed_fix": "Include process ID and a timestamp or monotonic counter in the temporary file name."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "crates/clio-config/src/config/tests.rs exceeds 450-line limit (469 lines) in violation of AGENTS.md",
+      "evidence": "crates/clio-config/src/config/tests.rs is 469 lines. `wc -l crates/clio-config/src/config/tests.rs` returns 469.",
+      "requirement_ref": "AGENTS.md: Source File Size Constraint",
+      "recommendation": "Extract the newly added deployment path tests from tests.rs into persist_tests.rs or a dedicated test module to restore tests.rs under 450 lines."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Test suite hangs in interactive terminals due to unisolated TTY stdin in setup_usage_errors_exit_2",
+      "evidence": "crates/clio-lib/src/main_tests.rs:61-68. `cargo test --locked --package clio --bin clio -- tests::setup_usage_errors_exit_2` in an interactive terminal outputs `Install type: [1] zero-dependency, [2] airgapped, [3] custom:` and blocks indefinitely.",
+      "requirement_ref": "roadmap/phase-100330-am-setup-wizard.md §5 Task 4 & §8 T100330-09",
+      "recommendation": "Decouple `main_tests.rs` from live process stdin by passing non-interactive flags or routing CLI execution in tests through an injected, non-terminal stream seam."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Roadmap isolation violations in code comments referencing 'phase'",
+      "evidence": "crates/clio-lib/src/setup_wizard.rs:304 and crates/clio-lib/src/setup_wizard_tests.rs:69 contain comments citing 'compose phase' and 'this phase'.",
+      "requirement_ref": "AGENTS.md: Roadmap isolation",
+      "recommendation": "Remove or rephrase comments to refer to architectural components (e.g. `am compose` CLI) rather than phase names."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "am setup falsely reports 'local services: postgres' for zero-dependency installs",
+      "evidence": "crates/clio-lib/src/setup_wizard.rs:198-210. `Plan::local_services()` unconditionally initializes `vec![\"postgres\"]`. Running `am setup --type zero-dependency ...` reports `local services: postgres`.",
+      "requirement_ref": "roadmap/phase-100330-am-setup-wizard.md §1 & §5 Task 2",
+      "recommendation": "In `Plan::local_services()`, only include 'postgres' when `self.install_type != InstallType::ZeroDependency`."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "Switching install types merges over old credentials instead of removing them, leaking hosted API keys into airgapped configs",
+      "evidence": "crates/clio-lib/src/setup_config.rs:104-114. `write` only sets fields from `plan.entries()` on top of `rt.deployment_overlay`. An airgapped setup run over a pre-existing zero-dependency config leaves `credentials.embed_api_key` in the file.",
+      "requirement_ref": "roadmap/phase-100330-am-setup-wizard.md §1 Objective & §5 Task 1",
+      "recommendation": "When writing a full setup plan, remove provider and credential fields from the deployment overlay that are not configured by the new install type."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Incomplete XDG absolute path validation on HOME fallback in default_deployment_path",
+      "evidence": "crates/clio-config/src/config/persist.rs:74-77. `XDG_CONFIG_HOME` uses `.filter(|dir| Path::new(dir).is_absolute())`, while `HOME` lacks the `is_absolute()` check.",
+      "requirement_ref": "roadmap/phase-100330-am-setup-wizard.md §1 Design References & persist.rs:71",
+      "recommendation": "Add `.filter(|home| Path::new(home).is_absolute())` to the `HOME` lookup in `default_deployment_path`."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Potential atomic file write collision with static temporary file name in write_private_atomic",
+      "evidence": "crates/clio-config/src/config/persist.rs:207-213. `temp_sibling` constructs `.{name}.tmp` without a PID or uniqueness token.",
+      "requirement_ref": "roadmap/phase-100330-am-setup-wizard.md §5 Task 1",
+      "recommendation": "Include process ID and a timestamp or monotonic counter in the temporary file name."
+    }
+  ],
+  "dismissed": [
+    "Attribution table model string minor mismatch in phase file (Developer recorded OpenCode CLI (Go . Deepseek V4.1 Flash High) instead of OpenCode CLI (Together . GLM-5.3 Flash High); harmless attribution record metadata).",
+    "Airgapped Postgres password CSPRNG omission was explicitly documented and accepted as a documented limitation in phase file §12 with debt ownership assigned to compose phase."
+  ],
+  "verification": [
+    {
+      "claim": "All touched files meet >=90% line and function coverage",
+      "classification": "Established",
+      "source_note": "Verified via `make coverage </dev/null` (task-77); touched files scored 93.5%-100% functions and 95.3%-99.1% lines; aggregate 97.91% lines, 98.96% functions."
+    },
+    {
+      "claim": "All created/modified Rust files remain <=450 lines",
+      "classification": "Contradicted",
+      "source_note": "wc -l reports crates/clio-config/src/config/tests.rs at 469 lines (violation of AGENTS.md constraint)."
+    },
+    {
+      "claim": "Test suite passes without hangs across all workspace packages",
+      "classification": "Contradicted",
+      "source_note": "In-process test setup_usage_errors_exit_2 in main_tests.rs hangs in interactive terminals due to unmocked is_terminal() check."
+    },
+    {
+      "claim": "Code and comments obey roadmap isolation",
+      "classification": "Contradicted",
+      "source_note": "git grep found references to 'compose phase' in setup_wizard.rs and 'this phase' in setup_wizard_tests.rs."
+    },
+    {
+      "claim": "Clippy -D warnings and cargo fmt are clean",
+      "classification": "Established",
+      "source_note": "Verified via `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` and `cargo fmt --all -- --check`."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Behavior of am compose on Linux amd64 vs macOS arm64 in live Docker environments",
+      "why_unknown": "Tests used StubDocker as specified by the phase document; live daemon was not run during adversarial audit",
+      "what_would_resolve_it": "Integration test against a live Docker daemon on both architectures",
+      "materiality": "Low for phase 100330 wizard, as Docker argument construction is delegated to phase 100320 compose module"
+    }
+  ],
+  "strengths": [
+    "Comprehensive unit and negative testing covering flag parsing, prompt IO errors, and fallback paths",
+    "Owner-only Unix permission enforcement (0600 on files, 0700 on backup directories)",
+    "Clean validate-then-write architecture preventing partial config corruption on disk",
+    "High overall coverage with all touched components significantly above the 90% floor"
+  ],
+  "regrets": [
+    "Developer failed to verify line counts across all modified files before declaring done",
+    "Developer assumed stdin in cargo test is always non-terminal, causing test hangs in developer shells"
+  ],
+  "process_changes": [
+    "Enforce automated pre-commit or CI check on `wc -l` <= 450 lines for all Rust files",
+    "Ensure all CLI tests mocking commands use explicit mock reader/writer streams rather than calling process-level `main::run()` directly"
+  ],
+  "plan_1hr": [
+    "Move `default_deployment_path_is_loaded_and_can_be_disabled` from `crates/clio-config/src/config/tests.rs` to `persist_tests.rs` to bring `tests.rs` under 450 lines.",
+    "Isolate `setup_usage_errors_exit_2` in `crates/clio-lib/src/main_tests.rs` so it does not block on live terminal stdin during `cargo test`.",
+    "Remove 'compose phase' and 'this phase' comments in `setup_wizard.rs` and `setup_wizard_tests.rs` to restore roadmap isolation.",
+    "Fix `Plan::local_services()` in `setup_wizard.rs` to omit 'postgres' for `InstallType::ZeroDependency`."
+  ],
+  "plan_unlimited": [
+    "Prune or clear obsolete credentials from `deployment_overlay` when re-running `am setup` with a different install type so stale secrets are not retained in airgapped mode.",
+    "Ensure atomic config writes use unique temporary filenames (including PID and timestamp) to prevent race conditions during concurrent saves.",
+    "Validate that `HOME` is absolute in `default_deployment_path` matching XDG requirements."
+  ]
+}

@@ -1,0 +1,15 @@
+2026-09-19T13:59:57+0530 START remediator r1 phase-100155
+2026-09-19T13:59:57+0530 read task, findings.json, discard code + tests; findings.original.json backup already exists (skip copy)
+2026-09-19T14:05:12+0530 plan: F-01 comment, F-02 discarded_at IS NULL filter in get_item_identity (both backends), F-03 n==0 fix both backends, F-04 episodic tests both crates
+2026-09-19T14:12:40+0530 applied F-01 discard.rs:16 (removed slice-16 ref) + corrected discard() doc comment
+2026-09-19T14:12:40+0530 applied F-02: get_item_identity filters discarded_at IS NULL (sqlite_discard.rs:37, postgres_discard.rs:37)
+2026-09-19T14:12:40+0530 applied F-03 first version: n==0 recheck via SELECT (later reverted)
+2026-09-19T14:12:40+0530 applied F-04: suite_episodic_discard in clio-store discard_tests.rs:214 (both backends at :347/:358), dry_run_rejects_already_discarded (clio-write discard_tests.rs:213) + episodic_discard_reports_null_category (:241)
+2026-09-19T14:12:40+0530 make check: PASS (exit 0, fmt+clippy+test clean)
+2026-09-19T14:18:02+0530 make coverage per-file FAIL: sqlite_discard 78.35% lines/85.71% funcs, postgres_discard 79.38% lines - recheck block unreachable from public API (items never hard-deleted)
+2026-09-19T14:18:02+0530 fixed F-03 simpler: n==0 -> InvalidArgument already-discarded directly (sqlite_discard.rs:103-111, postgres_discard.rs:100-109); no requery
+2026-09-19T14:19:30+0530 re-verify: make check exit 0; make coverage exit 0; 0 files below 90% funcs/lines; discard.rs 100/100, sqlite_discard 100/95.00, postgres_discard 100/95.06; TOTAL funcs 98.85% lines 98.42%
+2026-09-19T14:19:30+0530 findings.json updated: F-01..F-04 resolved with evidence; plan_1hr all DONE; plan_unlimited 1 declined with reason, 2 deferred; remediation_notes added; json parse ok
+2026-09-19T14:19:30+0530 roadmap/phase-100155-ops-discard-tool.md Attribution: Remediator r1 appended as done; other rows untouched
+2026-09-19T14:19:30+0530 changes left UNSTAGED per task rules (no git add)
+REMEDIATOR_DONE b95162b3

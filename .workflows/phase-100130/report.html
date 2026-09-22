@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100130: Co-Activation Associations and Hub Distillation (developer r2 staged diff)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100130: Co-Activation Associations and Hub Distillation (developer r2 staged diff)</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">3 important · 5 minor · 6 dismissed</span>
+    </div>
+    <p class="sum">The core behavior is implemented and genuinely tested: all 531 workspace tests pass, clippy is clean, fmt is clean, and coverage passes aggregate (fn 98.54% / lines 98.42%) with all 113 reported files at or above 90% on both functions and lines. However, several claims are stronger than the code supports: the ranking-env association knobs are stored but consumed by no production path, the §7.4.5 derivative-decision log failure is silently swallowed, and expand_graph does not honor min_weight for explicit edges. These are real spec gaps rather than cosmetic ones.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-19</span>
+      <span><b>Applies to</b>git staged diff (index) for phase-100130; run adversary-task-r1</span>
+      <span><b>Source</b>git diff --cached -- . &#39;:!.workflows/&#39; plus surrounding unchanged callers (hybrid.rs, store.rs, gated.rs, sql/001_core.sql, requirement.md)</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>requirement.md §4.5 (association_weight_policy: saturating growth, lazy decay, prune, hub distill; explicit sticky edges), FR-17 (durable reinforce handoff, fail closed), FR-18, FR-15, PR-6, PR-8, PR-9, §7.4.5 (affirmative derivative-decision log), §4.9.4.B/E tool semantics</li>
+        <li>roadmap/phase-100130 acceptance criteria AC-100130-01..AC-100130-12, T100130-01..T100130-16, Definition of Done, Completion Evidence</li>
+        <li>AGENTS.md: per-file &gt;=90% function and line coverage; every Rust source file &lt;=450 lines; exact file header structure; no roadmap/phase references in code</li>
+        <li>Developer task: no drive-by refactors, no unapproved public contract changes, no silent soft-drop of FR-17 reinforce, do not claim completion without evidence</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">10 of 14 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100130-01 saturating growth + lazy decay + prune per §4.5 (T100130-01..T100130-03)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-store/src/assoc.rs:103-139 implements grow/effective_weight/should_prune; assoc_policy_tests.rs:35-94 assert the 0.15/0.2775/0.385875 step table, the 30d half-life, future-clock and unparseable-stamp cases; assoc_tests.rs:103-122 assert prune-on-observe deletes the row.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-02 co-retrieve durably reinforces pairs (FR-17), T100130-04/T100130-05</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">hybrid.rs:215-218 reinforces outcome.hits and propagates errors; assoc_tests.rs:49-70 asserts 3 hits -&gt; 3 edges at 0.15. T100130-05 (assoc_tests.rs:163-185) only fails via invalid eta validation, not a durable-handoff/DB failure.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-03/AC-100130-04 associations/graph_link/graph_query semantics (T100130-06/T100130-07)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">assoc_graph.rs:33-234 implements all three; assoc_graph_tests.rs:20-143 and assoc_surface_tests.rs:37-158 cover multi-relationship, hop caps, edge_type mapping, missing-endpoint rejection.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-05 expand_graph uses assoc weights (T100130-08)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">hybrid.rs:169-192 merges expanded ids pre-fusion; assoc_tests.rs:72-100 proves a linked neighbor surfaces only with expand on. But assoc_graph.rs:267-289 does not apply min_weight to explicit edges (observe returns raw for explicit at assoc.rs:138-139), contradicting phase Task 5 &#39;w_eff &gt;= min_weight&#39; and the inline comment at assoc_graph.rs:271.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-06 hub distill gated + non-blocking (T100130-09/T100130-10)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">hub_distill.rs:203-214 routes through clio_admission::gated_create; gated.rs:246-251 writes only when decision.pass. hub_distill_tests.rs:102-169 prove admitted item + prune on pass, edge retention + no item on reject.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-07 assoc path != update_rule / != triples (T100130-13/T100130-16)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">assoc_tests.rs:233-253 source guard on assoc.rs and clio-store/src/assoc.rs; assoc_policy_tests.rs:50-62 proves grow != EMA; sql/001_core.sql:410-424 is a dedicated assoc_edges table with AssocKind coactivation|explicit only (model.rs:22-56).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-08 ranking_env knobs (T100130-12)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">admission_knobs.rs:80-146 adds hub_degree_limit/max_hops + validation; admission_knobs_tests.rs:124-165 prove serde round-trip. But no production path reads RankingEnv.coactivation: hybrid.rs:83-86 hardcodes AssocPolicy::default(); from_coactivation is only called by Default (assoc.rs:47-51); set_assoc_policy/from_coactivation have no non-test callers (grep). t12 sets the policy directly, not via ranking_env.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-09 bank isolation (T100130-11)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">assoc_graph.rs:123-130 rejects endpoints absent from the bank; assoc_graph_tests.rs:146-173 and assoc_edge_tests.rs:224-274 assert cross-bank/empty-bank isolation; all list/delete SQL is bank-scoped.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-10 dual-backend parity (T100130-14)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">pg_assoc_edge_tests.rs:292-391 ran and passed locally against a live Postgres; asserts 0.385875 on both backends and identical explicit multi-relationship rows.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-11 explicit sticky default (T100130-15)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">assoc.rs:138-139 returns raw weight for explicit and never prunes; assoc_tests.rs:204-231 keeps a 10,000-day-old explicit edge at its raw 0.2.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100130-12 graph-metadata model matches requirement v1.8</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">sql/001_core.sql:410-430 dedicated assoc_edges table; no subject/predicate/interval columns; AssocKind is coactivation|explicit only.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Per-file coverage &gt;=90% functions and lines; aggregate gate</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage exit 0; TOTAL fn 98.54% / lines 98.42%; parsed all 113 reported files, none below 90% on either metric.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Every Rust source file &lt;=450 lines; no roadmap/phase references in code</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Largest touched file is hybrid.rs at 417 lines; all new files 97-391 lines. grep for &#39;roadmap/&#39;/Phase 100130/phase-100130 in crates/ returns nothing.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Exact AGENTS.md header structure on new/modified Rust files</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Production new files carry the full header; assoc_policy_tests.rs:1-3 and assoc_edge_tests.rs:1-2 / pg_assoc_edge_tests.rs:1-2 lack the Responsibility/Owns/Does not own/Boundary block (the latter two are pre-existing but were modified).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">03</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Ranking-env co-activation knobs are stored but consumed by no production path</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase Goal and AC-100130-08 present association knobs as operator-tunable without code changes. In fact nothing reads RankingEnv.coactivation when building the retriever, so ranking_env_set(eta=...) has no effect on reinforcement or decay.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Operators can change eta/half_life/w_min in config and observe no behavioral change, silently. The tests pass only because they set the policy object directly.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/hybrid.rs:83-86; crates/clio-store/src/assoc.rs:47-51; grep: from_coactivation/set_assoc_policy have no non-test callers; crates/clio-retrieve/src/assoc_tests.rs:188-202.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Construct AssocPolicy from the live RankingEnv.coactivation at retriever construction (or in the retrieve handler), and add a test that patches eta via ranking_env and observes the changed growth step on retrieve.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>§7.4.5 derivative-decision log failure is silently swallowed</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>requirement.md §7.4.5 states the anonymized-derivative determination MUST be affirmatively logged per item at distillation time. The code discards the log result.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A distilled item can be admitted and retained with no durable record of the derivative decision, so the compliance MUST is not guaranteed.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/hub_distill.rs:361-368.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Propagate record_assoc_audit&#39;s error from distill_hub so the distillation fails (or reports degraded) when the decision cannot be logged.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>expand_graph ignores min_weight for explicit edges and the comment is inaccurate</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Phase Task 5 requires expansion to add neighbors with w_eff &gt;= min_weight. Explicit edges are added at any weight, unlike associations/graph_query, so weak explicit links can pull unrelated items into results.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Inconsistent filtering between tools; a 0.0-1.0 weight explicit edge below w_min is still expanded, defeating the min_weight bound.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/assoc_graph.rs:267-289 and :271 comment; crates/clio-retrieve/src/assoc.rs:138-139.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Apply `eff &lt; min` in expand_ids for both kinds, or explicitly document and test that sticky explicit edges intentionally bypass min_weight; fix the misleading comment.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">05</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>hub_distill is not enqueued and reinforce/hub telemetry is incomplete</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 6 says enqueue a hub_distill job drained by consolidate, and In-Scope lists reinforce/prune/hub-enqueue telemetry. Eligibility is recomputed on every consolidate with no durable queue or pending state, and reinforce emits no telemetry.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>No queue depth/pending visibility; a crash mid-consolidate leaves no record of intended work. FR-15-spirit telemetry for reinforce is absent.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/hub_distill.rs:242-261; crates/clio-write/src/memtree_tools.rs:167-171; no audit call in reinforce_assoc_edge_impl.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Implement a durable/queued hub_distill job with maintenance_status reporting and a PII-safe reinforce telemetry event, or document the deviation as a known non-conformance in the phase.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>T100130-05 durable-handoff failure test only exercises store-side validation</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>FR-17&#39;s hard requirement is fail-closed on durable handoff failure, not merely on a validation error. The test does not exercise a real handoff/DB failure.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A partial-reinforcement or torn-write bug would not be caught by the current suite.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/assoc_tests.rs:163-185.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a store double that fails on the second reinforce and assert retrieve returns Err with no partial-success outcome.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>New/modified test files lack the required AGENTS.md header block</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md requires every Rust source file to carry the exact header structure, and the developer task repeats it for modified files.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Header/ownership discipline erodes on test modules; automated header checks would fail.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/assoc_policy_tests.rs:1-3; crates/clio-store/src/assoc_edge_tests.rs:1-2; crates/clio-store/src/pg_assoc_edge_tests.rs:1-2.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the full Responsibility/Owns/Does not own/Boundary header to the new test files and the modified pre-existing test files.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Phase-file attribution string does not match the instructed value</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Attribution is pipeline provenance; a mismatched agent string makes the record unreliable.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Traceability/audit of which agent ran the developer step is wrong.</dd></div>
+              <div><dt>Evidence</dt><dd>roadmap/phase-100130-coactivation-associations-hub-distillation.md:6 vs the developer prompt&#39;s instructed string.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Correct the attribution row to the instructed agent string or the actual runtime agent.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>Coactivation pair uniqueness is application-enforced only</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 1 specifies one undirected coactivation weight per pair. The DB UNIQUE includes relationship, which is NULL for coactivation, so it does not enforce this.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Any future code path that writes a coactivation row with a non-deterministic id could create duplicates; the guarantee rests on a single helper.</dd></div>
+              <div><dt>Evidence</dt><dd>sql/001_core.sql:423; crates/clio-store/src/sqlite_assoc.rs:221-222.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a partial unique index on (bank_id, source_id, target_id) WHERE assoc_kind=&#39;coactivation&#39;, or document reliance on the deterministic id.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>450-line violations: none found; largest touched file is hybrid.rs at 417 lines.</li>
+        <li>Roadmap isolation: grep for roadmap/, phase-100130, Phase 100130 in crates/ returns nothing.</li>
+        <li>Coverage below 90%: parsed all 113 reported files; none below 90% on functions or lines.</li>
+        <li>update_rule/EMA contamination: source guard and separate tables hold; assoc path never references the continuous engine.</li>
+        <li>Unsafe code or secret logging: no unsafe introduced; audit details are ids/weights only.</li>
+        <li>Dual-backend parity is real: the Postgres test ran and passed locally, not skipped.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo test --workspace --locked: 531 passed, 0 failed — Re-ran make test / cargo test; summed suites = 531 passed, 0 failed.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo clippy --workspace --all-targets --all-features --locked -D warnings: clean — Re-ran make lint; finished with no warnings.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage exit 0; aggregate fn 98.54% / lines 98.42%; no file below 90% — Re-ran make coverage; parsed all 113 file rows; none below 90% on functions or lines.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>pg_assoc_edge_tests::t14_dual_backend_reinforce_parity passes against real Postgres — Test line appeared as &#39;ok&#39; in the test log; a live Postgres was reachable via DATABASE_URL.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo fmt --all applied — cargo fmt --all -- --check exits 0.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>ranking_env knob changes affect reinforcement behavior — No production path reads RankingEnv.coactivation; t12 sets the policy directly.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-amber">Uncertain</span>
+          <p>Anonymized-derivative decision is affirmatively logged per §7.4.5 — The audit write is attempted but its error is discarded, so the guarantee is not enforced.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether any higher-level (later-phase) assembly is expected to wire RankingEnv into HybridRetriever/HubDistillEngine</p>
+          <p class="d">No production constructor for either engine exists in this phase; only tests build them. · A phase doc or downstream design stating where the retriever is constructed from Runtime config. · Determines whether F-01 is a defect now or deferred wiring.</p>
+        </div>
+        <div class="card unk">
+          <p class="t">Whether sticky explicit edges are intentionally exempt from min_weight in expansion</p>
+          <p class="d">The requirement says explicit edges participate in expand_graph but also that expansion uses w_eff &gt;= min_weight. · A normative clarification in requirement.md §4.5. · Determines whether F-03 is a bug or a documentation gap.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Clean separation of the pure weight-policy math (clio-store::assoc) from storage and from traversal, with the EMA engine explicitly excluded.</li>
+        <li>Atomic single-statement saturating upsert on both backends, plus a real 4-thread concurrency test proving no lost increments and no duplicate rows.</li>
+        <li>Hub distillation genuinely routes through clio_admission::gated_create and writes only on pass; reject path retains edges and creates no item.</li>
+        <li>Dual-backend parity is tested against a live Postgres, not mocked.</li>
+        <li>Honest Known Limitations section in the phase file, including the weak T100130-05 failure mode and the missing maintenance_status hub reporting.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>AC-100130-08&#39;s operator-tunability claim was accepted at face value from the config round-trip test; a grep for the knob&#39;s consumer would have exposed the gap immediately.</li>
+          <li>I initially treated expand_ids&#39; &#39;observe prunes below w_min&#39; comment as true before reading observe&#39;s explicit-edge branch.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>For every config knob added, grep for a production consumer, not just a serialization test.</li>
+          <li>For every &#39;MUST log/emit&#39; requirement, check that the error path is propagated rather than discarded.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Wire RankingEnv.coactivation into the retriever&#39;s AssocPolicy construction and add a ranking_env-&gt;retrieve growth test (F-01).</li>
+          <li>Propagate the §7.4.5 derivative-log error in distill_hub (F-02).</li>
+          <li>Apply min_weight in expand_ids and fix the comment (F-03).</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Implement a durable hub_distill job/queue with maintenance_status visibility and reinforce telemetry, or formally narrow the phase spec (F-04).</li>
+          <li>Add a failing-store-double durability test for FR-17 and a partial-failure test for cross-ref writes (F-05).</li>
+          <li>Add a partial unique index for coactivation pairs and a header/ownership CI check (F-06, F-08).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100130/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100130/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

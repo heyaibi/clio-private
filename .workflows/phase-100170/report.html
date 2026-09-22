@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100170: MCP Read, Retrieve, and Compose Surface</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100170: MCP Read, Retrieve, and Compose Surface</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">1 important · 2 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">All 19 Core read tools were successfully bound on the shared MCP dispatcher with verified stdio and Streamable HTTP transport parity, bi-temporal query support, durable co-activation reinforcement, and strict token budget enforcement. Code coverage is exceptional (&gt;98% workspace-wide with zero files below 90%) and all tests pass. Three non-critical defects were identified: module header template non-conformance in three files, omitted parameter declarations in two tool schemas, and an attribution model string mismatch.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-19</span>
+      <span><b>Applies to</b>r1</span>
+      <span><b>Source</b>crates/clio-mcp, crates/clio-store, crates/clio-retrieve, crates/clio-types, roadmap/phase-100170-mcp-read-retrieve-compose-surface.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>requirement.md §4.9.2, §4.9.4 Core tool catalog (FR-5, FR-6, FR-7, FR-8, FR-9, FR-14, FR-16, FR-17, FR-20, FR-24, FR-26, FR-27, FR-28)</li>
+        <li>AGENTS.md core rules (&gt;=90% per-file coverage, &lt;=450 lines per Rust file, exact file header structure, roadmap isolation)</li>
+        <li>roadmap/phase-100170-mcp-read-retrieve-compose-surface.md acceptance criteria AC-100170-01 through AC-100170-07 and definition of done</li>
+        <li>Pinned MCP transport revision 2025-11-25 (Streamable HTTP + stdio)</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">9 of 11 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100170-01 / FR-20: All 19 Core read tools published and callable over MCP</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio_mcp::bound_read_tools() exports 19 read tools; tools/list returns 33 tools total; verified in mcp_read_conformance::ac_17_01_all_read_tools_listed</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100170-02 / AC-100170-03: Stdio and Streamable HTTP transport support with full parity</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Table-driven 18-fixture parity matrix passes identically across stdio (stdio_read_matrix_with_parity) and Streamable HTTP (http_read_matrix_with_parity)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100170-04 / PR-1: compose_context respects token budgets partitioned between persona and memory</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">compose_context tests (t17_03_compose_budget_is_enforced and compose_context_respects_budget_and_prioritizes_persona) verify total_tokens &lt;= 300 with non-empty persona section</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100170-05 / FR-24 / NFR-4: Bi-temporal queries honor as_of and time_axis</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t17_05_triple_query_honors_as_of tests historical as_of query against superseded triples; temporal_history_and_triple_query_bi_temporal passes</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100170-06 / FR-17: retrieve durably persists co-activation edges and fails closed on handoff error</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t17_06_retrieve_persists_assoc_edges confirms edge growth in store; assoc_durable_tests confirms fail-closed behavior with CoactivationHandoffFailed; protocol maps to JSON-RPC -32001</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100170-07: Zero stdout logging on stdio transport during read queries</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">t17_07_stdout_purity_on_reads asserts that all stdout lines emitted during stdio execution parse as valid JSON-RPC frames</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>FR-16: Memory inspection API (inspect) without ciphertext or DEK leaks</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Store::inspect_items implemented for SQLite (sqlite_inspect.rs) and Postgres (postgres_inspect.rs); parity verified in pg_inspect_tests; secret masking applied before response</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Coverage Gate (&gt;=90% aggregate and per-file functions and lines)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage reports total functions 98.63% (1939/1966) and lines 98.14% (21301/21705); lowest function coverage is 90% (hub_distill_model.rs) and lowest line coverage is 91.26% (http.rs)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Source file size constraint (&lt;= 450 lines per Rust file)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">wc -l across all modified and created Rust files confirms maximum file size is 450 lines (hybrid.rs: 450 lines, mcp_read_conformance.rs: 446 lines, schema_defs.rs: 441 lines)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md: Module header specification</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">postgres_inspect.rs, sqlite_inspect.rs, and read_retrieve.rs omit the mandatory closing sentence `//! Keep this module focused on &lt;a single responsibility&gt;.` in their module documentation blocks</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>FR-20: Published tool_schema pack consistency with handler parameters</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">schema_read_defs.rs omits budget_tokens from persona_get and omits as_of, time_axis, expand_graph from compose_context, while handlers extract them and schemas specify additionalProperties: false</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">01</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>AGENTS.md module header specification violation in three newly introduced Rust files</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md requires every Rust source file to have an exact module header structure ending with &#39;//! Keep this module focused on &lt;a single responsibility&gt;.&#39;. Missing this line violates the normative repository code standard.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Code style and consistency violation in production Rust crates (clio-store and clio-mcp).</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/postgres_inspect.rs:18-19, crates/clio-store/src/sqlite_inspect.rs:18-19, crates/clio-mcp/src/read_retrieve.rs:19-21 omit the required closing line.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Append `//! Keep this module focused on &lt;a single responsibility&gt;.` (with appropriate responsibility wording) to the header doc comments of postgres_inspect.rs, sqlite_inspect.rs, and read_retrieve.rs.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">02</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Schema parameter omission for persona_get and compose_context in published tool_schema pack</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>All published MCP tool definitions enforce additionalProperties: false. If a handler parses parameters that are not defined in the schema, strict MCP client validators will reject client calls attempting to supply those parameters.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Clients passing budget_tokens to persona_get or as_of/time_axis/expand_graph to compose_context will fail JSON Schema validation.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/schema_read_defs.rs:127-131 has empty props for persona_get, but read_tools.rs:161-163 reads budget_tokens. Similarly, schema_read_defs.rs:108-116 omits as_of/time_axis/expand_graph for compose_context, while read_retrieve.rs:134-136 extracts them.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the optional property definitions to schema_read_defs.rs (budget_tokens for persona_get; as_of, time_axis, expand_graph for compose_context), or remove their extraction from the handler if intentionally unsupported over MCP.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Attribution mismatch between developer task instructions and phase file</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The task prompt explicitly mandated logging OpenCode CLI (Together . GLM-5.3 Flash High) in the phase attribution table, but the developer recorded OpenCode CLI (Go . Deepseek V4.1 Flash High).</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Audit trail discrepancy in roadmap documentation.</dd></div>
+              <div><dt>Evidence</dt><dd>adversary-task-r1.md line 86 vs roadmap/phase-100170-mcp-read-retrieve-compose-surface.md line 6.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Update line 6 of roadmap/phase-100170-mcp-read-retrieve-compose-surface.md to match the task instructions or record the reason for the variation.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Cargo test hang on un-piped stdin: crates/clio-lib/src/main.rs::mcp_stdio_serves_then_eof blocks on stdin.lock() when stdin is not redirected from /dev/null; dismissed as an issue against Phase 100170 because main.rs was unmodified in this phase and was authored in Phase 100160.</li>
+        <li>Mock MCP client in-process architecture: Task 5 unlimited plan mentions MockMcpClient; implemented cleanly in tests/mcp_read_mock.rs covering drops, mid-stream aborts, and session token drops.</li>
+        <li>Undeclared &#39;timestamp&#39; argument in read tools: runtime.rs::resolve_timestamp accepts an optional timestamp arg used across test fixtures; this is an internal test override helper, not part of the public client contract.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo test --workspace --locked passes across all crates — Re-executed independently with stdin redirected from /dev/null; all 108 tests in clio-store, 83 in clio-mcp lib, 10 in mcp_read_conformance, 5 in mcp_read_mock, and all other workspace tests passed (0 failures).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo clippy --workspace --all-targets --all-features --locked -- -D warnings is clean — Executed independently; finished with 0 warnings or errors.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo fmt --all -- --check is clean — Executed independently; 0 formatting discrepancies found.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage achieves &gt;=90% aggregate and per-file function and line coverage — Executed independently: aggregate functions 98.63% (1939/1966), aggregate lines 98.14% (21301/21705). Awk verification over all reported .rs files confirmed min function coverage 90.00% and min line coverage 91.26%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All modified Rust source files remain at or below 450 total lines — wc -l on all staged Rust files confirmed: maximum size is 450 lines (crates/clio-retrieve/src/hybrid.rs), 446 lines (crates/clio-mcp/tests/mcp_read_conformance.rs), 441 lines (crates/clio-mcp/src/schema_defs.rs).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>No references to roadmap/ or phase numbers in codebase — git diff --cached grep confirmed zero roadmap isolation violations in code or comments.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Long-term deployment plan for attaching embedding sidecar to McpState</p>
+          <p class="d">Documented in Known Limitations as owned by a future deployment/configuration phase; not owned by Phase 100170. · Execution of the deployment wiring phase attaching clio_index::Embedder. · Low - documented limitation compliant with roadmap requirements.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Full 19-tool read catalog bound on the shared MCP dispatcher with rigorous parity testing between stdio and Streamable HTTP transports.</li>
+        <li>Durable co-activation reinforcement failure contract (FR-17) is fully wired and tested with fail-closed behavior mapped to standard JSON-RPC -32001.</li>
+        <li>Comprehensive MockMcpClient harness in tests/mcp_read_mock.rs simulating network disconnects, mid-stream aborts, and dropped session tokens.</li>
+        <li>High-fidelity inspect implementation for both SQLite and Postgres with shared predicate compilation and zero plaintext/ciphertext/DEK leakage.</li>
+        <li>Outstanding test coverage (98.63% functions, 98.14% lines) strictly honoring the workspace coverage gate.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Did not catch the missing closing sentence in module doc headers before staging.</li>
+          <li>Did not audit published tool schemas against handler parameter extraction for persona_get and compose_context.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Add an automated linter or pre-commit check verifying the exact AGENTS.md file header template including the closing &#39;Keep this module focused on...&#39; sentence.</li>
+          <li>Add a schema conformance test verifying that every parameter extracted by a tool handler is explicitly defined in its inputSchema properties when additionalProperties is false.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Add the missing concluding line `//! Keep this module focused on &lt;a single responsibility&gt;.` to `postgres_inspect.rs`, `sqlite_inspect.rs`, and `read_retrieve.rs`.</li>
+          <li>Update `schema_read_defs.rs` to include `budget_tokens` for `persona_get` and `as_of`, `time_axis`, `expand_graph` for `compose_context` so strict schema validators do not reject valid client parameters.</li>
+          <li>Align the Developer Attribution row in `roadmap/phase-100170-mcp-read-retrieve-compose-surface.md` with the model name from `adversary-task-r1.md`.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Refactor `crates/clio-lib/src/main.rs` unit test `mcp_stdio_serves_then_eof` to avoid blocking on `std::io::stdin().lock()` in environments with inherited open stdin.</li>
+          <li>Implement runtime injection of `clio_index::Embedder` into `McpState` to enable full dense retrieval alongside lexical retrieval over MCP once embedding sidecar lifecycle and profile wiring are available.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-sa9IL1/report.html</span>
+          <span><b>Findings:</b>/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/adversarial-review-sa9IL1/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

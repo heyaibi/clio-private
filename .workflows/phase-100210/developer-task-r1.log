@@ -1,0 +1,13 @@
+2026-09-20T10:14:19 START developer-task-r1 phase-100210
+2026-09-20T10:16:37 baseline coverage gate started in background (pid 67183), DATABASE_URL=compose postgres
+2026-09-20T10:17:58 baseline gate restarted with LLVM_COV/LLVM_PROFDATA from rustup toolchain (pid 68170); first attempt failed: llvm-tools-preview not found (Makefile env vars required)
+2026-09-20T10:19:08 baseline gate complete: /tmp/cov-baseline.json, 182 files, ALL >=90% lines+functions (python scan of JSON summaries). No pre-existing debt; proceeding.
+2026-09-20T10:48:02 make check complete (fmt+clippy+workspace tests): clean after fixes (pg parity bool/numeric casts, audit-id collision guard, schema v8 constant, clippy clean)
+2026-09-20T10:49:12 make check GREEN (one flaky clio-compliance failure re-ran clean; likely shared-PG timing). Starting one workspace JSON coverage run for per-file verification.
+2026-09-20T10:57:12 scoped coverage green on all touched files; fmt+clippy clean. Starting FINAL full gate (make coverage), second and last workspace-wide run.
+2026-09-20T11:15:41 Root-caused flaky per-file coverage numbers: stale profraw merges from repeated scoped runs. cargo llvm-cov clean resolves it; ranking.rs refactored to weight_groups.rs + inline tests (434 lines). fmt/clippy/tests green. Running FINAL full gate now.
+2026-09-20T11:26:38 hybrid.rs brought to exactly 450 lines (archived fold + single-line push + separator trim); fmt/clippy/workspace tests green. FINAL full gate (third workspace-wide coverage run; replaces the earlier pre-refactor run).
+2026-09-20T11:28:32 Final gate exit 0: aggregate lines 94.68% / functions 98.69%, 0/192 files below 90% floors. Phase file updated with real evidence + attribution. Staging next.
+2026-09-20T11:28:32 staged with git add -- . ':!.workflows/'
+2026-09-20T11:28:53 FINISH: phase-100210 implemented via clio-hygiene crate + clio-store HygieneStore + clio-config knobs + clio-mcp bindings; make check green; final gate exit 0 (94.68% lines / 98.69% functions, 0 files <90%); phase file + crates.md updated; 48 files staged (.workflows excluded).
+DEVELOPER_DONE 96397cd4

@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Clio Phase 100080 (Bi-Temporal Triples and Supersession)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Clio Phase 100080 (Bi-Temporal Triples and Supersession)</h1>
+    <div class="vline">
+      <span class="badge b-red"><i data-lucide="octagon-x" class="ic"></i>Inadequate</span>
+      <span class="mono">1 critical · 3 important · 4 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">The implementation fails standard build gates (`make check` clippy errors and `cargo fmt --check` failures), has an unformatted test file that exceeds the 450-line limit when formatted, and contains missing module headers, fragile timestamp-based ID generation, and unindexed bank table scans.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-18</span>
+      <span><b>Applies to</b>phase-100080-r1</span>
+      <span><b>Source</b>crates/clio-store, crates/clio-types, crates/clio-write, sql/001_core.sql</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#critical">Critical</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>make check and make lint must pass with zero warnings (-D warnings)</li>
+        <li>cargo fmt --check must pass</li>
+        <li>All Rust source files must remain &lt;= 450 total lines without artificial compression</li>
+        <li>Every Rust source file must have the AGENTS.md module header structure</li>
+        <li>Bi-temporal interval semantics and supersession invariants per Phase 100080 / PR-6 / FR-12 / FR-24 / NFR-4</li>
+        <li>Only code files staged, excluding .workflows/</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">3 of 9 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Clean verification gates: make check, make lint, cargo fmt</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">make check fails with clippy::single_match_else and clippy::too_many_lines; cargo fmt --check fails on crates/clio-store/src/triple_tests.rs</td>
+              <td><span class="badge">Critical</span></td>
+            </tr>
+            <tr>
+              <td>Source file line count &lt;= 450 lines without artificial compression</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">crates/clio-store/src/triple_tests.rs is 458 lines when cargo fmt is run</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md header structure on all Rust files</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">pg_triple_tests.rs, triple_tests.rs (clio-store, clio-types, clio-write) omit the required header sections</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Git staging excluding .workflows/</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">.workflows/ files staged in git index</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Bi-temporal SPO data model with half-open intervals and dual-backend parity</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">clio-types/src/triple.rs, sql/001_core.sql schema version 4, and store tests demonstrate valid-time and transaction-time persistence and query parity</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>FR-12 default supersession closing prior open subject+predicate edges on both axes without delete</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">commit_triple_add closes prior open edges without delete, but open-edge query requires valid_until IS NULL, ignoring edges with bounded valid intervals</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>FR-11 continuous/scalar updates rejected on discrete path</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">ensure_discrete_update_rule and wrong_update_rule_attr reject continuous update requests with ErrorCode::WrongUpdateRule</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Point-in-time triple_query with as_of and time_axis</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">triple_query works for explicit as_of, but omitting as_of returns future facts on valid axis, and queries perform full table scans across the bank</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Coverage gate: aggregate and per-file &gt;= 90% lines and functions</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make coverage passes with 99.38% functions and 98.60% lines; all reported files &gt;= 90%</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="critical">
+      <h2 class="sh"><i data-lucide="octagon-alert" class="ic c-red"></i>Critical <span class="cnt">01</span></h2>
+      <p class="lede">Address these before considering the work done.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Clippy compilation failures break `make check` and `make lint`</h3>
+              <span class="badge b-red"><span class="dot"></span>Critical</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>CI and local quality gates fail immediately when running `make check` or `make lint`. The developer&#39;s logged claim of a clean `make check PASS` was incorrect.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The repository fails the standard compilation and linting gate with -D warnings.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/pg_triple_tests.rs:27:5 (clippy::single_match_else) and crates/clio-store/src/pg_triple_tests.rs:152:1 (clippy::too_many_lines)</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Change single-arm match in open_pg() to if let Ok(s), and break up postgres_invalidate_and_guards into focused helper functions under 100 lines.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">03</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Format check fails (`cargo fmt --check`) and 450-line limit evaded via unformatted compression</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md explicitly prohibits artificial line reduction through compressed formatting. Running standard cargo fmt increases triple_tests.rs from 445 lines to 458 lines, violating the hard 450-line limit.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Code formatting checks fail, and when formatted the file breaches the 450-line maximum constraint.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/triple_tests.rs fails cargo fmt --check; running cargo fmt expands the file to 458 lines.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Decompose crates/clio-store/src/triple_tests.rs into two modular test files (e.g. basic CRUD/parity vs concurrency/invalidation edge cases) so each is under 450 lines while conforming to cargo fmt.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Mandatory file header structure missing in newly created Rust source files</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md mandates a specific header template (Responsibility, Owns, Does not own, Boundary) on every newly created or refactored Rust file.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Architectural documentation and boundary clarity are missing from new modules.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/pg_triple_tests.rs:1-3, crates/clio-store/src/triple_tests.rs:1-3, crates/clio-types/src/triple_tests.rs:1-3, and crates/clio-write/src/triple_tests.rs:1-3 omit the required header blocks.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the standard responsibility and ownership header blocks to all new Rust files.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Fragile timestamp-only ID generation causes primary key collisions in `clio_write::triple::triple_add`</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Generating IDs as format!(&quot;trp-{}&quot;, args.timestamp) and format!(&quot;itm-{}&quot;, args.timestamp) causes primary key collisions when multiple triples are created at the same timestamp tick.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Concurrent or batched triple writes fail with database duplicate key errors.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-write/src/triple.rs:136-137: `let edge_id = format!(&quot;trp-{}&quot;, args.timestamp); let item_id = format!(&quot;itm-{}&quot;, args.timestamp);`</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Include a random suffix, nano-timestamp, or monotonic counter (e.g., format!(&quot;trp-{}-{}&quot;, args.timestamp, nonce)) to guarantee uniqueness.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">04</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Unindexed full table scan on bank in `query_triples`</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Indexes created in Task 1 for subject, predicate, and valid/tx intervals are completely bypassed because SQL queries fetch all bank triples and filter in Rust.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Query performance will degrade linearly O(N) with the number of triples in the bank, wasting memory and database I/O.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_triple_read.rs:82 and crates/clio-store/src/postgres_triple_read.rs:75: `SELECT ... FROM triples WHERE bank_id = ?1`</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Construct parameterized WHERE clauses in SQL that filter by subject, predicate, and intervals before loading rows into memory.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Flawed &#39;current&#39; semantics when `as_of` is omitted in `triple_query`</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Omitting as_of on the valid axis simply checks valid_until.is_none(). Future facts that are not yet valid (valid_from &gt; now) are improperly returned as currently valid.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Callers querying current state receive facts that are not yet effective.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/triple_map.rs:79: `TimeAxis::Valid =&gt; t.valid_until.is_none()`</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>When as_of is None, default to the current timestamp (now) so that valid_from &lt;= now &lt; valid_until.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Open-edge supersession query ignores active edges with bounded valid intervals</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>An edge with a defined future expiration (valid_until set) that is still transactionally active (tx_until is null) is skipped by the open-edge supersession query.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Conflicting edges can remain open simultaneously in transaction time if an earlier edge had a bounded valid_until.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_triple.rs:95 and crates/clio-store/src/postgres_triple.rs:92: `WHERE ... AND valid_until IS NULL AND tx_until IS NULL`</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Query open edges by `tx_until IS NULL` and close overlapping edges accordingly.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>Workflow directory files staged in git against staging rules</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The developer instructions specified staging all changes with `git add -A EXCLUDING .workflows/` so internal review logs and artifacts are not committed to git.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>.workflows/ metadata and run files were staged into git index.</dd></div>
+              <div><dt>Evidence</dt><dd>git status shows staged modifications and additions in .workflows/ (.workflows/instruction.md, developer-task-r1.log, developer-task-r1.md, resume.json).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Unstage .workflows/ from git index via `git restore --staged .workflows/`.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Coverage drop: Initially suspected coverage might be below 90%, but make coverage confirms aggregate 99.38% functions and 98.60% lines, with all reported files &gt;= 90%.</li>
+        <li>Roadmap isolation in code: Grepped codebase for references to roadmap or phase numbers in code/comments; no isolation violations found in source code.</li>
+        <li>Continuous EMA rejection: Verified that continuous update attempts are properly rejected with ErrorCode::WrongUpdateRule.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>make check passes cleanly — cargo clippy fails with clippy::single_match_else and clippy::too_many_lines in pg_triple_tests.rs</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>cargo fmt passes on all staged files — cargo fmt --check fails on crates/clio-store/src/triple_tests.rs</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>triple_tests.rs satisfies the 450-line limit — Standard rustfmt expands triple_tests.rs to 458 lines, violating the 450-line constraint</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Coverage meets &gt;= 90% function and line thresholds on all files — cargo llvm-cov reports total functions 99.38%, lines 98.60%, all individual files &gt;= 90%</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Bi-temporal intervals and late correction diverge as required by appendix — t03_t04_t04b_as_of_axes_diverge_on_late_correction passes on both SQLite and Postgres</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Real-world latency of query_triples on very large banks</p>
+          <p class="d">No multi-million row benchmarks exist in the current test suite · Benchmark test with 100k+ triples per bank · High for production performance, low for unit test correctness</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Solid interval algebra implementation in clio_types::triple with interval_contains and visible_at</li>
+        <li>Comprehensive coverage of PR-6 non-deletion supersession and dual-axis closing</li>
+        <li>High test coverage across both SQLite and Postgres backends with 100% function coverage on write paths</li>
+        <li>Clean isolation of continuous vs discrete update mechanisms (ErrorCode::WrongUpdateRule)</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Did not run make check after writing pg_triple_tests.rs</li>
+          <li>Compressed formatting in triple_tests.rs instead of decomposing into multiple modules to comply with the 450-line limit</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Always run make check and cargo fmt --check immediately before staging</li>
+          <li>Enforce cargo fmt --check in pre-commit or pre-stage validation so compressed formatting cannot hide line count breaches</li>
+          <li>Exclude .workflows/ explicitly with git restore --staged .workflows/ before completing tasks</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix clippy errors in crates/clio-store/src/pg_triple_tests.rs (use if let, break up long test function)</li>
+          <li>Decompose crates/clio-store/src/triple_tests.rs into two files under 450 lines formatted with cargo fmt</li>
+          <li>Add required AGENTS.md module headers to all test and store files</li>
+          <li>Unstage .workflows/ files from git index</li>
+          <li>Fix ID generation in crates/clio-write/src/triple.rs to include unique nonce/counter</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Push query_triples filter predicates (subject, predicate, as-of timestamps) into database SQL queries to utilize indexes</li>
+          <li>Refine open-edge supersession query to check tx_until IS NULL and handle arbitrary valid intervals</li>
+          <li>Default omitting as_of on valid axis to current time rather than open valid_until</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/tmp/adversarial-review-Aooelv/report.html</span>
+          <span><b>Findings:</b>/tmp/adversarial-review-Aooelv/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

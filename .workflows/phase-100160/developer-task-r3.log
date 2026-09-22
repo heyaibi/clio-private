@@ -1,0 +1,10 @@
+2026-09-19T08:57:18Z START developer-task-r3 phase-100160 (resumed; r2 crashed with no output)
+2026-09-19T08:57:18Z r1 blocker re-checked: discard IS implemented (clio-write/src/discard.rs, clio-store discard backend, discard_tests.rs); blocker void, proceeding with implementation
+2026-09-19T09:01:40Z design locked: new crate clio-mcp (lib schema.rs schema_defs.rs runtime.rs write_tools.rs protocol.rs stdio.rs http.rs + tests/conformance.rs); stdlib-only transports (no new deps); 14 write tools bound; schemas for full Core catalog
+2026-09-19T09:01:40Z CLI: am mcp-stdio / am mcp-http / am mcp-schema-export in clio-lib main.rs
+2026-09-19T09:28:54Z workspace green: 690 tests pass; clippy -D warnings clean; fmt clean
+2026-09-19T09:42:58Z fresh coverage run after --clean
+2026-09-19T10:01:14Z final chain green: fmt clean, clippy -D warnings clean, 710 tests pass, make coverage exit 0 (lines 95.14% / functions 98.68% aggregate; every file >=90% both)
+2026-09-19T10:02:42Z phase doc updated: Attribution Developer r1 -> done, DoD checked, Completion Evidence replaced with r3 implementation + real results
+2026-09-19T10:03:04Z staged with: git add -- . ':!.workflows/' (27 files, .workflows/ excluded by pathspec)
+DEVELOPER_DONE 6154f333

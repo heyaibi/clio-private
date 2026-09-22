@@ -1,0 +1,152 @@
+{
+  "run": "r1",
+  "phase": "100360",
+  "subject": "Phase 100360: Per-File Coverage Guard for the Lines/Functions Floor",
+  "verdict": "Good",
+  "verdict_justification": "The per-file coverage guard is cleanly implemented in stdlib Python, fail-closed, and correctly wired into Makefile and CI without duplicate test runs. All acceptance criteria and test scenarios pass. Minor findings include a missing trailing newline in coverage_guard.py, unhandled --help CLI flags, and host config isolation sensitivity.",
+  "metadata": {
+    "generated": "2026-09-22",
+    "applies_to": "Phase 100360 staged diff",
+    "source": "scripts/coverage_guard.py, Makefile, .github/workflows/ci.yml, coverage.md, roadmap/phase-100360-coverage-guard.md"
+  },
+  "standard": [
+    "Phase 100360 Roadmap acceptance criteria (AC-100360-01 through AC-100360-06)",
+    "Single instrumented test run constraint across Makefile and CI",
+    "Fail-closed behavior on missing or malformed reports",
+    "coverage.md documentation and checklist synchronization",
+    "Zero roadmap or phase leaks into production code and comments"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100360-01: Guard fails when any file is under 90% lines or functions",
+      "status": "Fully satisfied",
+      "evidence": "Synthetic fixtures T100360-01 and T100360-02 in coverage_guard.py --self-test exit 1 and identify offending files.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100360-02: Guard passes on current green tree",
+      "status": "Fully satisfied",
+      "evidence": "make coverage and make coverage-guard pass with 276 files checked and 0 offenders.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100360-03: Regions never gate",
+      "status": "Fully satisfied",
+      "evidence": "Fixture T100360-04 with regions at 50.0% and lines/functions at 95.0% exits 0.",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AC-100360-04: Aggregate gate unchanged and still enforced",
+      "status": "Fully satisfied",
+      "evidence": "--fail-under-lines 90 and --fail-under-functions 90 retained in Makefile and CI; contract test on clio-types with 99.9% exited 1 while writing JSON report.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100360-05: One instrumented run per gate",
+      "status": "Fully satisfied",
+      "evidence": "Makefile and CI run cargo llvm-cov once with --output-path, followed by python3 scripts/coverage_guard.py on the resulting JSON.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100360-06: coverage.md documents column mapping and guard",
+      "status": "Fully satisfied",
+      "evidence": "coverage.md §2 contains new column mapping table and command; §6 checklist updated.",
+      "severity": "Medium"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "Missing trailing newline in scripts/coverage_guard.py",
+      "evidence": "scripts/coverage_guard.py:200 has no trailing newline character (POSIX EOF violation).",
+      "requirement_ref": "AGENTS.md",
+      "recommendation": "Add a trailing newline to scripts/coverage_guard.py."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "--help and -h flags treated as report file path rather than showing usage",
+      "evidence": "Executing `python3 scripts/coverage_guard.py --help` attempts to open `--help` as a file and exits with code 3 (`ReportError: cannot read report --help: [Errno 2] No such file or directory: '--help'`).",
+      "requirement_ref": "roadmap/phase-100360-coverage-guard.md §5 Task 1",
+      "recommendation": "Intercept '-h' and '--help' in `main()` to print usage to stdout and exit 0."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Non-hermetic test execution on hosts with existing deployment.json",
+      "evidence": "When host has ~/.config/am/deployment.json, `make coverage` fails unless AM_DEPLOYMENT_CONFIG is directed to an empty file like /tmp/am-empty-deployment.json; an empty AM_DEPLOYMENT_CONFIG='' causes setup_cli tests to fail due to config directory resolution.",
+      "requirement_ref": "roadmap/phase-100360-coverage-guard.md §9 Completion Evidence Known Limitations",
+      "recommendation": "Document the empty-file requirement in coverage.md or provide default dummy config fallback during test execution."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Missing trailing newline in scripts/coverage_guard.py",
+      "severity": "Minor",
+      "why_it_matters": "POSIX standards and standard Git formatting require text files to end with a newline to prevent concatenation defects and diff noise.",
+      "impact": "Triggers 'No newline at end of file' in git diff and some POSIX linters.",
+      "evidence": "scripts/coverage_guard.py:200",
+      "confidence": "High",
+      "proposed_fix": "Add a trailing newline to the end of scripts/coverage_guard.py."
+    },
+    {
+      "id": 2,
+      "title": "Standard help flags (--help, -h) fail closed as unreadable report files",
+      "severity": "Minor",
+      "why_it_matters": "Developers expecting standard CLI ergonomics who run `python3 scripts/coverage_guard.py --help` see a file read error and exit code 3 instead of usage instructions.",
+      "impact": "Unintuitive CLI behavior for human operators discovering script options.",
+      "evidence": "python3 scripts/coverage_guard.py --help -> coverage-guard: error: cannot read report --help: [Errno 2] No such file or directory: '--help' (exit 3)",
+      "confidence": "High",
+      "proposed_fix": "In main(), check `if '-h' in argv or '--help' in argv:` and print usage then return EXIT_OK."
+    },
+    {
+      "id": 3,
+      "title": "Host deployment config leakage requires explicit dummy config file for hermetic testing",
+      "severity": "Minor",
+      "why_it_matters": "A host with an active sidecar in ~/.config/am/deployment.json fails embedder offline tests, and setting AM_DEPLOYMENT_CONFIG='' breaks setup_cli tests.",
+      "impact": "Local test and coverage runs on developer workstations require AM_DEPLOYMENT_CONFIG pointing to an empty file rather than an empty string.",
+      "evidence": "setup_cli_fail_tests fail when AM_DEPLOYMENT_CONFIG='' ('cannot resolve a config directory'); embedder tests fail when AM_DEPLOYMENT_CONFIG is unset on host with sidecar.",
+      "confidence": "High",
+      "proposed_fix": "Update Makefile or test runner to ensure an isolated empty deployment config is automatically supplied when running make coverage."
+    }
+  ],
+  "dismissed": [
+    "Failure of per-file guard to execute when cargo llvm-cov aggregate fails: by design, make aborts on first failure and aggregate failure is already a gating condition.",
+    "No execution bit on scripts/coverage_guard.py: invoked via python3 in both Makefile and ci.yml, consistent with other scripts in scripts/."
+  ],
+  "verification": [
+    {
+      "claim": "Guard passes on the current workspace with 276 files checked",
+      "classification": "Established",
+      "source_note": "make coverage and make coverage-guard both output 'coverage-guard: 276 file(s) checked against 90.0% floors / all reported files meet the per-file floor'."
+    },
+    {
+      "claim": "Synthetic test cases fail closed on sub-90% lines or functions",
+      "classification": "Established",
+      "source_note": "python3 scripts/coverage_guard.py --self-test passed all 7 test cases including malformed JSON and sub-90% lines/functions."
+    },
+    {
+      "claim": "Aggregate gate still enforced on the same run",
+      "classification": "Established",
+      "source_note": "Scoped contract run with --fail-under-lines 99.9 on clio-types exited 1 and successfully generated the JSON report."
+    }
+  ],
+  "unknowns": [],
+  "strengths": [
+    "Clean, dependency-free Python 3 implementation with thorough self-test suite embedded directly in the script.",
+    "Efficient single-run design preserving the fast aggregate gate while introducing per-file verification.",
+    "Clear documentation update in coverage.md clarifying the column mappings for future agent runs."
+  ],
+  "regrets": [],
+  "process_changes": [],
+  "plan_1hr": [
+    "Add trailing newline to scripts/coverage_guard.py",
+    "Add -h/--help handling in scripts/coverage_guard.py to display usage instructions cleanly",
+    "Add AM_DEPLOYMENT_CONFIG isolation to Makefile coverage targets to avoid host configuration pollution"
+  ],
+  "plan_unlimited": [
+    "Provide a unified test runner environment wrapper in Makefile ensuring full test hermeticity regardless of user host configuration."
+  ]
+}

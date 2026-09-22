@@ -1,0 +1,10 @@
+2026-09-21T17:20:00Z start: approver r1 phase-100300; inspecting findings.json and unstaged git diff
+2026-09-21T17:21:00Z F-01 verified resolved: crates/clio-retrieve/src/rerank.rs:198-204 trims trailing '/' and strips single suffix '/v1' before appending '/v1/rerank'; covered by test rerank_tests::cohere_url_with_trailing_v1_hits_v1_rerank_once asserting POST /v1/rerank exactly once
+2026-09-21T17:21:30Z F-02 verified resolved: crates/clio-retrieve/src/rerank.rs:67-76 implements custom fmt::Debug for HttpReranker redacting bearer as '****'; covered by test rerank_tests::http_debug_masks_the_bearer asserting '****' present and 'sidecar-secret' absent
+2026-09-21T17:22:00Z F-03 verified closed by evidence: fail-closed requirement is explicitly mandated by AC-100300-03 test factory_fails_closed_on_bad_provider_config; documented in roadmap/phase-100300-rerank-providers.md Completion Evidence, README.md:297, and .env.example:70; rollback to local sidecars using rerank.provider = "tei" is documented
+2026-09-21T17:23:00Z verification checks: cargo fmt --check passed cleanly; cargo clippy -p clio-retrieve -D warnings passed with 0 warnings; cargo test -p clio-retrieve --lib passed (141 passed, 0 failed); make check exit code 0
+2026-09-21T17:24:30Z coverage verified: make coverage exit code 0; aggregate functions 98.95% (3106/3139), lines 97.89% (36087/36864); clio-retrieve/src/rerank.rs has 100.00% function (18/18) and line (190/190) coverage; 0 of 261 reported files below 90% floor
+2026-09-21T17:24:45Z file size & isolation verified: rerank.rs is 338 lines and rerank_tests.rs is 337 lines (limit <= 450 lines); AGENTS.md headers truthful; zero roadmap/phase-0 references in crates/
+2026-09-21T17:25:00Z attribution updated: roadmap/phase-100300-rerank-providers.md Remedy Approver row updated to approved
+2026-09-21T17:25:30Z finish: all findings resolved without regressions; issuing APPROVE verdict
+REMEDY_APPROVED b7bd438f

@@ -1,0 +1,12 @@
+2026-09-18T19:47:49Z
+START phase-100130 developer run r2 (resumed): baseline coverage
+2026-09-18T20:27:57Z baseline coverage: aggregate fn 98.80% / lines 98.50%; 0 files below 90% -> proceed
+2026-09-18T20:27:57Z discovery: assoc_edges shelf + Store CRUD exist; GraphExpander seam exists; CoactivationConstants exists; consolidate_tool has hubs=not_implemented placeholder
+2026-09-18T20:27:57Z implemented clio-store assoc policy (saturating/decay/prune/ids) + Store list/reinforce/audit (sqlite+pg+async)
+2026-09-18T20:27:57Z implemented clio-retrieve AssociationEngine + tools (associations/graph_link/graph_query) + StoreGraphExpander + retrieve reinforce hook (fail-closed, pairs_reinforced) + expand_ms
+2026-09-18T20:27:57Z implemented clio-write HubDistillEngine + consolidate hub_distill job kind; clio-config hub_degree_limit/max_hops knobs
+2026-09-18T20:27:57Z cargo test --workspace --locked: 531 passed, 0 failed
+2026-09-18T20:27:57Z cargo clippy --workspace --all-targets --all-features --locked -D warnings: clean
+2026-09-18T20:27:57Z make coverage: exit 0; aggregate fn 98.54% / lines 98.41%; 0 of 113 files below 90%
+2026-09-18T20:27:57Z staged with git add -- . :!.workflows/ (35 files, 3792 insertions, 299 deletions)
+DEVELOPER_DONE 1ad111a8

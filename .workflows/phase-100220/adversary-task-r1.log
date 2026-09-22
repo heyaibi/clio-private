@@ -1,0 +1,25 @@
+2026-09-20T13:55:38+05:30 START phase-100220 adversary r1
+2026-09-20T13:55:38+05:30 initialized run log; inspecting git status and staged diff
+2026-09-20T13:55:46+05:30 git status --short: 48 modified/added files staged in git index, .workflows untracked
+2026-09-20T13:55:50+05:30 git diff --cached --stat: 48 files changed, 4873 insertions(+), 220 deletions(-)
+2026-09-20T13:55:52+05:30 file size audit: all staged Rust source files <= 450 lines (max 450 lines in export_tests.rs)
+2026-09-20T13:56:25+05:30 cargo fmt --all -- --check: clean (exit 0)
+2026-09-20T13:56:38+05:30 make lint: FAILED (exit 101) - clippy -D warnings error on crates/clio-compliance/src/bundle.rs:238:5
+2026-09-20T13:57:01+05:30 roadmap isolation check: clean (exit 1, no forbidden mentions in staged files)
+2026-09-20T13:57:08+05:30 file header audit: all newly added files contain required AGENTS.md header sections
+2026-09-20T13:57:16+05:30 make test: 39 test suites passed (exit 0)
+2026-09-20T13:57:18+05:30 docker ps: postgres container on 127.0.0.1:34310 healthy
+2026-09-20T13:58:35+05:30 make coverage: aggregate 98.60% functions, 97.74% lines; 0 files below 90%
+2026-09-20T14:00:30+05:30 MCP binding audit: export, import, import_provider registered in bound_write_tools and additive dispatch
+2026-09-20T14:02:20+05:30 code review & invariant audit: identified 6 findings across import atomicity, lint gate, ciphertext restore, canonicalization, manifest truncation, and version check
+2026-09-20T14:03:10+05:30 FINDING F-01 (critical): live import un-batched direct store mutations break rollback (crates/clio-compliance/src/import.rs:138, crates/clio-compliance/src/import_apply.rs:151,271,286,370,390, crates/clio-compliance/src/import_rows.rs:250,283)
+2026-09-20T14:03:11+05:30 FINDING F-02 (high): make lint clippy doc-markdown failure (crates/clio-compliance/src/bundle.rs:238:5)
+2026-09-20T14:03:12+05:30 FINDING F-03 (high): ciphertext backup import double-encrypts ciphertext and drops item metadata (crates/clio-compliance/src/import_apply.rs:260-287, crates/clio-store/src/envelope_persist.rs:49-55)
+2026-09-20T14:03:13+05:30 FINDING F-04 (medium): sort_entity_arrays omits ComplianceTombstoneView breaking cross-backend canonical order (crates/clio-compliance/src/bundle.rs:276-288, crates/clio-store/src/sqlite_erase.rs:46, crates/clio-store/src/postgres_erase_read.rs:40)
+2026-09-20T14:03:14+05:30 FINDING F-05 (medium): export silently truncates tasks and failures at HISTORY_LIMIT=10,000 with complete=true (crates/clio-compliance/src/export.rs:47,288,295,404-422)
+2026-09-20T14:03:15+05:30 FINDING F-06 (low): validate_envelope accepts format_version 0 (crates/clio-compliance/src/bundle.rs:313)
+2026-09-20T14:03:55+05:30 findings.json written to .workflows/phase-100220/findings.json (validated JSON parse ok)
+2026-09-20T14:04:02+05:30 generate-report.cjs generated .workflows/phase-100220/report.html and copied style.css
+2026-09-20T14:04:10+05:30 phase file Attribution updated to done for Adversary round r1
+2026-09-20T14:04:26+05:30 FINISH phase-100220 adversary r1 review complete
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100220/findings.json ae54f9ca

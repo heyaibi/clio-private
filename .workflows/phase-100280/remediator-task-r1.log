@@ -1,0 +1,7 @@
+2026-09-21T13:48:32Z START remediator-task-r1 phase-100280 
+13:49:06Z backup exists (findings.original.json). Triaged 7 findings: F-01/F-07 docs self; F-02+F-06 clio-config worker A; F-03+F-04+F-05 clio-index worker B. All verified in source.
+13:57:45Z docs fixed self: .env.example (F-01 note + F-07 removed EMBED_API_BASE/RERANK_API_BASE), README.md:293, hardware.md:22 -> 'upcoming releases'. grep clean. Reviewing worker diffs next.
+13:57:59Z workers integrated after diff review (headers truthful, no test weakening: BadUri/Tls retryability flip IS the F-04 fix; env.rs reviewed). Worker A: mod.rs 370L, env.rs 112L new, validate_tests.rs 299L, 114 tests pass. Worker B: http.rs 403L, http_tests.rs 184L, 48 tests pass, http.rs cov 95.00f/96.85l.
+14:01:10Z make check attempt 1: FAILED 1 test in clio-compliance (stats::stats_tests::counts_reflect_created_items_per_bank) — crate untouched by all fixes; passes alone (1 passed 0 failed). DB-parallel flake. Reran make check once: EXIT 0, 0 FAILED, 45 suites ok.
+14:01:12Z FINAL make coverage: EXIT 0. TOTAL 97.88% lines / 98.98% functions. Modified-file rows: env.rs 100/100, mod.rs 99.55l/100.00f, embed.rs 100/100, http.rs 96.85l/95.00f. Line counts: mod.rs 370, env.rs 112, validate_tests.rs 299, http.rs 403, http_tests.rs 184 — all <=450. findings.json updated (valid JSON, 7/7 resolved); phase-file Attribution Remediator r1 done appended.
+REMEDIATOR_DONE 6d8b3257

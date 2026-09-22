@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100150 — Task, Failure, and Temporal History (staged diff)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100150 — Task, Failure, and Temporal History (staged diff)</h1>
+    <div class="vline">
+      <span class="badge b-amber"><i data-lucide="circle-alert" class="ic"></i>Adequate</span>
+      <span class="mono">4 important · 5 minor · 5 dismissed</span>
+    </div>
+    <p class="sum">The core phase is implemented and independently verified: workspace tests pass, clippy/fmt are clean, and per-file function/line coverage is &gt;=90% with no 450-line or roadmap-isolation violations. However, one medium functional defect (point-in-time triple trajectory truncates before the as_of filter), several required test scenarios are not tested as specified (compose/persona and hybrid retrieve), and the completion evidence overstates function coverage for one file.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-19</span>
+      <span><b>Applies to</b>staged diff of phase-100150 (git diff --cached, .workflows excluded)</span>
+      <span><b>Source</b>crates/clio-history/**, crates/clio-store/src/*history*, crates/clio-types/src/history*.rs, sql/001_core.sql, crates/clio-lib/src/lib.rs, Cargo.toml, crates.md, roadmap/phase-100150-task-failure-temporal-history.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>roadmap/phase-100150-task-failure-temporal-history.md acceptance criteria AC-100150-01..AC-100150-07 and test scenarios T100150-01..T100150-14</li>
+        <li>requirement.md FR-8 (selective history), FR-9 (same+similar retry surfacing), FR-24 (as_of/time_axis), FR-27, NFR-4, P6/P7, §2.8, §4.8, §7.3</li>
+        <li>AGENTS.md hard rules: 450-line cap, exact file header structure, coverage gate (aggregate + per-file &gt;=90% functions and lines), roadmap isolation, no crates.md references in code</li>
+        <li>Developer prompt: no unauthorized changes, stage exactly `git add -- . &#39;:!.workflows/&#39;`, report real evidence only</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">7 of 12 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100150-01 task_upsert/task_get/task_history work (FR-27)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-history/src/task_tests.rs:16-120 (t01/t02/task_get), crates/clio-store/src/sqlite_history_tests.rs:93-120, crates/clio-store/src/pg_history_tests.rs:91-121; `cargo test -p clio-history` 32 passed.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100150-02 FailureRecord gated + lesson-capped (§2.8 / §7.3)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-history/src/failure_tests.rs:12-73 (t03/t04/t05), duplicate test :125-150; cap enforced at crates/clio-history/src/failure.rs:99 via crates/clio-types/src/history.rs:126; DEK sealing at crates/clio-store/src/sqlite_history_write.rs:209-211.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100150-03 failures_for_task exact + similar, &gt;=5 retitle fixtures (FR-9)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-history/src/failure.rs:251-321, crates/clio-history/src/retry.rs:64-100, crates/clio-history/src/similar.rs:99-129 (6 fixtures), crates/clio-history/src/retry_tests.rs:44-99 (t07b passes for all 6).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100150-04 temporal_history façade for triple/preference/belief (FR-27/NFR-4)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-history/src/temporal_tests.rs:50-176 pass; but triple point-in-time is applied after the SQL LIMIT (crates/clio-store/src/sqlite_history_read.rs:282-289, crates/clio-store/src/postgres_history_read.rs:196-207, crates/clio-history/src/temporal.rs:248-263), so as_of can drop versions that satisfy the predicate.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100150-05 selective retrieve, no full-log replay (FR-8)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Bounded limits exist (crates/clio-types/src/history.rs:108-117) and domain predicate tested (crates/clio-history/src/domain_tests.rs:15-98), but no test runs the hybrid retriever with domain=failure, and no explicit assertion that a list-all-messages API is absent.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100150-06 failures not in persona channel / T100150-13 compose persona unchanged</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-history/src/domain_tests.rs:100-124 asserts only `item_in_domains` exclusion for Persona/Semantic; no compose_context/persona-injection test exists.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>AC-100150-07 dual-backend parity (T100150-14)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-history/src/postgres_parity_tests.rs:30-145 ran and passed with AM_PG_HISTORY_PARITY=1; crates/clio-store/src/pg_history_tests.rs:90-196 passes via DATABASE_URL.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Security: cross-bank history access rejected</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">All SQL filters bank_id (e.g. crates/clio-store/src/sqlite_history_read.rs:146-150), so isolation holds structurally, but no test asserts a cross-bank read/write is rejected (grep for cross_bank/bank-b in the new tests returned nothing).</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>450-line cap on every new/modified Rust file</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Largest changed file is crates/clio-store/src/sqlite_history_read.rs at 418 lines; all 28 changed .rs files are &lt;=418.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md exact file header on new/modified Rust files</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">All 11 production files have the full header; 12 new test/support files do not (see F-02). Existing test files such as crates/clio-retrieve/src/assoc_tests.rs:1-8 do have it.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Roadmap isolation and no crates.md references in code</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">grep for roadmap|phase-0|crates.md across crates/ returned no matches.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Coverage gate: aggregate and per-file &gt;=90% functions and lines</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`make coverage` exit 0, TOTAL lines 98.37% functions 98.65%; JSON per-file scan found 0 of 135 files below 90% on functions or lines.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">04</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Point-in-time triple trajectory truncates before the as_of filter</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>temporal_history is the NFR-4 point-in-time read. When a (subject, predicate) has more versions than the hard limit, the SQL LIMIT is applied to the oldest rows first and as_of is filtered afterward, so a query &#39;as of date X&#39; can omit the version that was current at X and answer with an older state.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Silent wrong point-in-time answer whenever version count &gt; limit (default 20, max 200). Untested because T100150-08 uses only 2 versions and the limit test uses no as_of.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/sqlite_history_read.rs:282-289 orders `ORDER BY tx_from, id LIMIT ?4` (ascending, oldest first); crates/clio-store/src/postgres_history_read.rs:196-207 same; crates/clio-history/src/temporal.rs:248-263 filters `valid_from &lt;= as_of` / `tx_from &lt;= as_of` client-side after the fetch.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Push the as_of predicate into the SQL (add as_of/axis parameters to triple_history, or fetch the newest N at/under as_of via a subquery) so filtering happens before limiting; add a regression test with 3+ versions, limit=2, and as_of beyond the limit that asserts the entry current at as_of is returned.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>12 new Rust test/support files lack the AGENTS.md-mandated module header</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>AGENTS.md and the developer prompt require the exact header (`# Responsibility`, `## Owns`, `## Does not own`, `## Boundary`) on every new/modified Rust source file. Existing test files in this repo follow it, so the new files are inconsistent and violate a hard rule.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Process/consistency violation; ownership statements absent for 12 files.</dd></div>
+              <div><dt>Evidence</dt><dd>Missing header in crates/clio-history/src/{domain_tests,failure_tests,lib_tests,postgres_parity_tests,retry_tests,similar_tests,task_tests,temporal_tests,test_support}.rs, crates/clio-store/src/{pg_history_tests,sqlite_history_tests}.rs, crates/clio-types/src/history_tests.rs (each begins with only copyright + a one-line //!). Contrast crates/clio-retrieve/src/assoc_tests.rs:1-8 and crates/clio-store/src/triple_tests.rs:1-6.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add the standard Responsibility/Owns/Does-not-own/Boundary header to each of the 12 files.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>T100150-13 &#39;compose persona unchanged&#39; is not tested as specified</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase&#39;s required scenario T100150-13 says failures must not enter the persona channel, verified by compose persona remaining unchanged. The test only checks a domain-membership predicate; it never runs compose/persona injection. AC-100150-06 is marked PASS on weaker evidence than the scenario demands.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A regression that routed failure carriers into the always-on persona channel would not be caught by the current tests.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-history/src/domain_tests.rs:100-124; roadmap phase file AC-100150-06 row and T100150-13 row.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a regression test that seeds a failure record and asserts compose_context/persona injection output is byte-identical to the same compose without the failure (or that no failure-derived text appears in the persona pack).</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>T100150-11/T100150-12 are tested at the predicate level, not through hybrid retrieve; no explicit no-full-log assertion</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>T100150-11 is specified as &#39;retrieve domain=failure returns only failure hits&#39; and Task 5 required an explicit assertion that a list-all-messages API does not exist. The tests call `item_in_domains` directly and assert limit caps; they do not exercise the retrieve pipeline or assert API absence.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A break in the retrieve/index wiring for failure carriers would pass the current tests.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-history/src/domain_tests.rs:52-55 uses `clio_retrieve::item_in_domains`; :59-98 only checks resolve_limit and returned row counts.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add an integration test that runs the hybrid retriever with domains=[Failure] against a store containing task, failure, and unrelated episodic items and asserts only failure-typed hits; add an explicit negative assertion (e.g. grep-style source assertion or absence of any unbounded-read API) for T100150-12.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">05</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>No cross-bank rejection test for task/failure history</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase&#39;s Security Acceptance Conditions require &#39;Cross-bank task history access rejected&#39;. The SQL is bank-scoped, but the required security test is absent.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Isolation is structurally sound but not regression-guarded.</dd></div>
+              <div><dt>Evidence</dt><dd>grep for cross_bank|bank-b|other_bank in crates/clio-history/src and the new clio-store history tests returned no matches; queries are bank-scoped at crates/clio-store/src/sqlite_history_read.rs:146-150 and :213-216.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add a test that writes a task/failure in bank A and asserts get_task/get_failure/failures_for_task/task_history against bank B return None/empty.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Completion Evidence overstates clio-history function coverage</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase&#39;s Completion Evidence says &#39;clio-history/src/* functions 100%&#39;, but temporal.rs is 11/12 functions (91.67%). Honest evidence is a hard requirement.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A reviewer trusting the phase file would overstate coverage; still above the 90% gate, so no gate failure.</dd></div>
+              <div><dt>Evidence</dt><dd>`cargo llvm-cov report --summary-only`: `clio-history/src/temporal.rs ... 12 1 91.67%` (functions); JSON summary functions {count:12, covered:11, percent:91.67}. Phase file Completion Evidence &#39;Test execution output&#39; bullet.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Correct the phase file to state temporal.rs at 91.67% functions (or add the missing test).</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Default thresholds not documented in config as Task 3 required</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Phase Task 3 Required Changes #3 says &#39;Document default thresholds in config&#39;. Defaults live in clio-types::HistoryPolicy with no clio-config surface; the developer disclosed this as a known limitation.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Deployments cannot tune the similarity threshold/lesson cap through the config tools; behavior is still documented in code.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-history/src/similar.rs:23-28 and crates/clio-types/src/history.rs:29-60; phase Known limitations bullet 3.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Either add a config profile/knob for lesson_max_tokens and similarity_threshold or record an explicit approved exception to the Task 3 requirement.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>failure_record validates attempt_n only after running the admission gate</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>attempt_n &lt; 1 is rejected by the store (draft.validate) only after gated_create has decided and emitted an admit_accept event, so telemetry records an accepted write for a record that is never stored.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Minor telemetry/audit inconsistency; no data loss.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-history/src/failure.rs:94-135 has no attempt_n check before gated_create; crates/clio-store/src/sqlite_history_write.rs:204 calls draft.validate() inside the write closure; crates/clio-history/src/failure_tests.rs:161 expects OutOfRange from the store.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Validate attempt_n &gt;= 1 (and other draft invariants) before constructing the gate request.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">09</span>
+          <div>
+            <div class="ihead">
+              <h3>what_failed is uncapped and returned on every failure read</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Only `lesson` is length-capped; `what_failed` accepts arbitrary free text, is encrypted at rest, and is returned by get_failure/failures_for_task. The phase&#39;s stated abuse control is a lesson cap, but an unbounded what_failed is still a token/abuse vector on the read path.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>A caller can store very large what_failed payloads; bounded read limits cap row count, not row size.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-history/src/failure.rs:97 checks only non-empty; cap applied only to lesson at :99 via crates/clio-types/src/history.rs:126; what_failed read at crates/clio-store/src/sqlite_history_read.rs:129.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Apply a documented cap to what_failed (or document explicitly why only lesson is bounded), and test the over-cap path.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Region coverage below 90% on some files (e.g. clio-write/src/store_path.rs 89.12% regions) — regions are explicitly not gated by AGENTS.md; functions/lines pass.</li>
+        <li>Developer attribution string differs from the literal example in the prompt (&#39;Go . Deepseek V4.1 Flash High&#39; vs &#39;Together . GLM-5.3 Flash High&#39;) — the phase file records the actual agent; treated as noise, not a defect.</li>
+        <li>Phase §8 &#39;Required Tests&#39; checkboxes left unchecked — §8 is a template checklist, not a DoD item the developer was told to fill.</li>
+        <li>HistoryStore::commit_* does not run admission/cap at the store layer — the established repo pattern gates at the tool layer (commit_triple_add is the same), and no agent-facing path bypasses the gate.</li>
+        <li>Embedding similarity leg absent — the requirement and phase allow &#39;lexical and/or embedding&#39;; lexical is implemented and documented.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo test --locked --workspace passes with DATABASE_URL set — Ran `AM_PG_HISTORY_PARITY=1 make test` → exit 0; `cargo test -p clio-history -- --nocapture` → 32 passed including postgres_parity_tests::t14 (not skipped).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>clippy --workspace --all-targets --all-features -D warnings is clean — Ran the exact clippy command → exit 0.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>cargo fmt --check is clean — `cargo fmt --all -- --check` → exit 0 (ran --check to avoid in-place edits).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage exit 0; aggregate lines 98.37% functions 98.65% — Ran `make coverage` → exit 0, TOTAL 18495/302 lines 98.37%, 1707/23 functions 98.65%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>every reported file has &gt;=90% function and line coverage — Parsed cargo-llvm-cov JSON (135 files): 0 below 90% on functions or lines; temporal.rs lowest functions at 91.67%.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>all new/modified Rust files &lt;= 450 lines — wc -l over staged .rs files: max 418 (sqlite_history_read.rs).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>no roadmap/phase/crates.md references in code — grep across crates/ for roadmap|phase-0|crates.md returned no matches.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-blue">Supported</span>
+          <p>phase is PASS WITH DOCUMENTED LIMITATIONS — Core functionality and gates verified; medium issues remain in point-in-time correctness and required test coverage, consistent with &#39;documented limitations&#39; rather than full PASS.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether the failure carrier item is actually indexed and returned by the hybrid retriever under domain=failure</p>
+          <p class="d">No test runs the retrieve pipeline; only the domain predicate is tested. · An end-to-end retrieve test over a store seeded with a failure carrier. · Medium — the phase claims domain wiring but verifies only the predicate.</p>
+        </div>
+        <div class="card unk">
+          <p class="t">Whether compose_context is truly unaffected by failure carriers</p>
+          <p class="d">compose was not modified and not tested with failures present. · A compose regression test with a failure record present. · Medium — T100150-13 explicitly requires it.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Atomic write path mirrors the existing commit_triple_add pattern: gated carrier item + structured row + audit event + index enqueue in one transaction, with DEK-sealed content.</li>
+        <li>Clean separation: clio-types shapes/policy, clio-store HistoryStore contract with per-backend SQL files, clio-history tool/façade layer — each new file stays well under 450 lines.</li>
+        <li>Exact-first then similar-second FR-9 path with 6 retitle fixtures and a passing opt-in Postgres parity test.</li>
+        <li>All reads resolve a hard limit; there is genuinely no full-log API.</li>
+        <li>Lesson over-cap is rejected before any gate/write, and the FailureRecord shape matches §7.3 (epistemic_kind=belief) including a DB CHECK constraint.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>Should have constructed a live &gt;limit + as_of triple fixture to turn the point-in-time finding from code-reading into a reproduced failure; the logic is unambiguous but a runtime demonstration would be stronger.</li>
+          <li>Could not run `make check` literally (it writes formatting via `cargo fmt --all`); ran the three components individually to avoid modifying the working tree.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>For future reviews, add a scratch integration-test crate outside the repo so suspected behavioral bugs can be reproduced without touching the reviewed tree.</li>
+          <li>Diff the phase file&#39;s Completion Evidence numbers against a machine-generated coverage summary line-by-line rather than spot-checking.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix F-01: filter as_of in SQL before LIMIT for triple_history and add a &gt;limit regression test.</li>
+          <li>Fix F-03/F-04: add compose-persona regression and a hybrid-retrieve domain=failure test.</li>
+          <li>Correct the F-06 coverage claim in the phase file.</li>
+          <li>Add the missing AGENTS.md headers (F-02).</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Add an embedding similarity leg behind the documented lexical threshold, with an evaluation set of low-overlap retitles.</li>
+          <li>Expose lesson-cap and similarity defaults through clio-config with a profile and tests.</li>
+          <li>Add cross-bank security tests across every history read/write entry point (F-05).</li>
+          <li>Cap what_failed and add an abuse/oversize test (F-09).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100150/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100150/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

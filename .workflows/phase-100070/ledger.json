@@ -1,0 +1,61 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver",
+    "finalize"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE",
+      "harness": "cursor_cli:auto",
+      "visits": 1,
+      "output_sha256": "76c8f006f986cedf93c7967cfab3f245fa57acc074288bd4569ce8b6059bb0b4",
+      "artifacts": {},
+      "git_head": "4bf276fbdaec539176ec793d75c8a3136c87e302"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100070/findings.json",
+      "harness": "antigravity_cli:gemini-3.8-flash-high",
+      "visits": 1,
+      "output_sha256": "4aefcd25838934cb941b174af75a95ebd461395e527c0824c9ad8d44378fd81b",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 25296,
+          "sha256": "b886572f2908552801006c219bc1aa94f3dd3cf139dae98cedd0afdf85d622ea"
+        }
+      },
+      "git_head": "4bf276fbdaec539176ec793d75c8a3136c87e302"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE",
+      "harness": "opencode_cli:togetherai/zai-org/GLM-5.3-Flash:high",
+      "visits": 1,
+      "output_sha256": "c5a864867585077210ca0ecfb7950896ccc1e83867988ca4aac5e530cfe0db88",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 25296,
+          "sha256": "b886572f2908552801006c219bc1aa94f3dd3cf139dae98cedd0afdf85d622ea"
+        }
+      },
+      "git_head": "4bf276fbdaec539176ec793d75c8a3136c87e302"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED",
+      "harness": "antigravity_cli:gemini-3.8-flash-high",
+      "visits": 1,
+      "output_sha256": "c2db7e35f94e6e0c016dae9cdb269d7ce3c4bce44119be056f83e9885566da08",
+      "artifacts": {},
+      "git_head": "4bf276fbdaec539176ec793d75c8a3136c87e302"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE",
+      "harness": "cursor_cli:auto",
+      "visits": 1,
+      "output_sha256": "800f7108ae5d5a19debe674106ca01a556c6d5f684884be42e6728e50e79291b",
+      "artifacts": {},
+      "git_head": "1d22f39333b6961df491e3b6cc555c3ae9cb13f3"
+    }
+  }
+}

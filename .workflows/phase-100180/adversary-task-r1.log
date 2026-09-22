@@ -1,0 +1,17 @@
+2026-09-19_19:52:07 start: read task + phase file
+2026-09-19_19:52:07 staged files: 48 non-workflow; git status clean except staged + .workflows/ untracked
+2026-09-19_19:53:00 read phase file + requirement FR-15/FR-16/4.12 + AC table; review scope 48 staged files
+2026-09-19_20:05:00 make check: completed, no failures in tail (doc-tests all ok); full log truncated
+2026-09-19_20:08:00 make test: all suites pass, 0 failures
+2026-09-19_20:20:00 make coverage FAILED: index_store_tests::tests::postgres_index_contract - 'backoff is lifted when the cutoff is None' at index_store_tests.rs:239
+2026-09-19_20:22:00 coverage rerun #2 and #3: PASS (TOTAL lines 97.99% functions 98.62%; per-file scan 0 files <90%) -> first failure is flaky
+2026-09-19_20:25:00 git status: all 48 non-workflow files staged, no unstaged/untracked non-workflow changes
+2026-09-19_20:30:00 finding F-01 high: make coverage flaky (index_store_tests.rs:239; postgres_index.rs:243-249 global LIMIT 10)
+2026-09-19_20:31:00 finding F-02 high: T100180-04 as_of untested (no as_of in audit/correct tests; capability at clio-retrieve/src/filter.rs:40)
+2026-09-19_20:32:00 finding F-03 high: inspect has no total count (read_tools.rs:206-211; store.rs:313)
+2026-09-19_20:33:00 finding F-04 high: SQLite upgrade gap (001_core.sql:146-147; 002_vectors_postgres.sql:35-36; no sqlite ALTER; schema_reshape.rs:26,29-58)
+2026-09-19_20:34:00 finding F-05 medium: continuous correct writes continuous_observe item_id NULL (sqlite_attribute.rs:283-295), invisible to audit_trail
+2026-09-19_20:35:00 findings F-06..F-10 low: evidence counts (17 not 20; 8 not 9; postgres_audit 91.67% not 100%), dry-run reason validation (mutator_tools.rs:145-172), inclusive time_range (inspect_query.rs:95-103), parallel arrays vs consolidated (audit.rs:37-48), no stdio test
+2026-09-19_20:36:00 wrote .workflows/phase-100180/findings.json (10 issues) + report.html + style.css via adversarial-review generator
+2026-09-19_20:37:00 phase file Attribution: Adversary r1 row set to done (only phase-file edit)
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100180/findings.json 7c2ed862

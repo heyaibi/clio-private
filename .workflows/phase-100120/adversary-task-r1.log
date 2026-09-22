@@ -1,0 +1,27 @@
+2026-09-18T18:36:25Z adversary r1 start: hostile review of phase-100120 intent gate / hybrid retrieve / compose
+2026-09-18T18:36:25Z scope check: `git diff --cached -- . ':!.workflows/'` is EMPTY; changes are unstaged tracked edits (`git diff --stat`: 7 files) plus untracked crates/clio-retrieve/ (21 files). Reviewed working tree; derived staged-vs-unstaged without `git status` (global AGENTS.md forbids it, only git diff allowed).
+2026-09-18T18:36:25Z read crates/clio-retrieve/src/*.rs (10 prod modules, 10 test modules) plus Cargo.toml/lock, crates.md, clio-index/lib.rs re-export, clio-lib plumbing, phase-100120 + appendix, requirement.md FR-6/7/24/28, NFR-1/3, PR-1, section 4.5/4.9.4.B/8.
+2026-09-18T18:36:25Z `cargo test -p clio-retrieve --locked` -> 78 passed, 0 failed.
+2026-09-18T18:36:25Z `cargo test --workspace --locked` -> 487 passed, 0 failed (developer evidence claimed 486: F-12).
+2026-09-18T18:36:25Z `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` -> clean, exit 0.
+2026-09-18T18:36:25Z `cargo fmt --all -- --check` -> clean, exit 0.
+2026-09-18T18:36:25Z `make coverage` exit 0 -> TOTAL 98.55% lines / 98.87% functions; parsed every row: no reported file below 90% on functions or lines. clio-retrieve: compose 100/100, filter 100/100, finalize 96.97/100, fusion 100/100, hybrid 98.46/100, intent 99.47/100, rerank 100/100, surface 98.68/100, token 100/100, types 100/100.
+2026-09-18T18:36:25Z `DATABASE_URL=... AM_PG_RETRIEVE_PARITY=1 cargo test -p clio-retrieve postgres_and_sqlite_hit_id_parity` -> 1 passed (AC-100120-11 verified).
+2026-09-18T18:36:25Z size check `wc -l` -> hybrid.rs 446, hybrid_tests.rs 449, all other new files smaller; <=450 held.
+2026-09-18T18:36:25Z isolation check rg for roadmap/phase/slice in clio-retrieve -> no matches.
+2026-09-18T18:36:25Z F-01 medium DoD overclaim: phase-100120:412-422 all [x] incl. approval/verification vs :7-10 pending and :515 verifier pending.
+2026-09-18T18:36:25Z F-02 medium retrieve budget overrun: finalize.rs:50-55 `&& !hits.is_empty()` admits first oversized hit; no test covers it. compose re-truncates so PR-1 injection stays bounded.
+2026-09-18T18:36:25Z F-03 medium missing Expected Result: Task 2 'hybrid beats dense-only/lexical-only, documented metric' has no test/metric (hybrid_tests.rs:40-63 checks inclusion only).
+2026-09-18T18:36:25Z F-04 low header gap: 7 test files (intent/compose/hybrid/surface/fusion/filter/rerank _tests.rs:1-4) lack AGENTS.md full header; fixtures/pg_parity have it.
+2026-09-18T18:36:25Z F-05 low section 8 FN tracking absent: intent.rs:90-123 only evaluated/skipped; requirement.md:681 requires separate stricter FN bound.
+2026-09-18T18:36:25Z F-06 low header inaccuracy hybrid.rs:12 claims final hit mapping (owned by finalize.rs:5-17).
+2026-09-18T18:36:25Z F-07 low nothing staged: git diff --cached empty; crates/clio-retrieve untracked; developer log confirms git add skipped over global-rule conflict.
+2026-09-18T18:36:25Z F-08 low schema divergence surface.rs:50-53/77-79 require bank vs requirement.md:342-344 signature without bank.
+2026-09-18T18:36:25Z F-09 low token-accounting mismatch finalize.rs:49 (lexical_text) vs compose.rs:289-326 (gist/snapshot/id).
+2026-09-18T18:36:25Z F-10 low T100120-03 latency assert intent_tests.rs:91-106 is a smoke test (pure in-memory gate vs 50ms threshold).
+2026-09-18T18:36:25Z F-11 low graph_expanded hybrid.rs:164 counts ids already in dense/lexical legs.
+2026-09-18T18:36:25Z F-12 low evidence count mismatch 486 vs 487 (phase-100120:432).
+2026-09-18T18:36:25Z F-13 low AC-100120-11 added to AC table but absent from section 11 traceability (phase-100120:464-474).
+2026-09-18T18:36:25Z wrote .workflows/phase-100120/findings.json (13 findings, 12 issues; validated JSON parses) and generated report.html via adversarial-review generator (42852 bytes); style.css copied beside it.
+2026-09-18T18:36:25Z phase-100120 Attribution: Adversary r1 row set to done (only phase-file edit).
+2026-09-18T18:36:25Z verification summary: all headline developer claims reproduced (tests/clippy/fmt/coverage/parity/size); contradicted: 'files staged' and 'FN tracked'; uncertain: NFR-1 latency meaningfulness. No code fixed; no commit; no restage.ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100120/findings.json 18090576

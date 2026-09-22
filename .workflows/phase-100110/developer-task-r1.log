@@ -1,0 +1,27 @@
+2026-09-18T21:16:18+0530 START phase-100110 developer r1: reading task, phase file, repo docs
+2026-09-18T21:16:21+0530 read phase file; listing repo root
+2026-09-18T21:16:23+0530 listed crates + sql
+2026-09-18T21:16:36+0530 listed all rust files
+2026-09-18T21:16:39+0530 checked compose status
+2026-09-18T21:16:53+0530 grepped embed refs in crates
+2026-09-18T21:17:18+0530 baseline coverage done; scanning per-file floors
+2026-09-18T21:17:30+0530 baseline OK: TOTAL 96.00% lines / 99.10% functions; no per-file floor violation
+2026-09-18T21:16:18+0530 DISCOVERY: clio-index crate does not exist yet; Store trait already has upsert_vector/delete_vector/knn on BOTH backends (sqlite_store.rs, postgres_store.rs); sqlite-vec KNN widening exists (sqlite_knn.rs) = Phase 100020 SQLite vector integration complete (T100110-12 base done).
+2026-09-18T21:16:18+0530 DISCOVERY: lexical storage exists in schema but is UNMAINTAINED: sql/002_vectors_sqlite.sql has items_fts FTS5 (item_id/bank_id UNINDEXED, porter), sql/002_vectors_postgres.sql has items.content_tsv + GIN. No Rust code writes or queries either (grep items_fts/content_tsv = 0 hits).
+2026-09-18T21:16:18+0530 DISCOVERY: no HTTP client dep in workspace (no reqwest/ureq/hyper). clio-write pattern: Extractor trait + Transport trait, fakes in tests, no production HTTP transport yet. clio-write reuses clio_config::secret::scrub_inline_secrets for redaction.
+2026-09-18T21:16:18+0530 DISCOVERY: maintenance handoff pattern (clio-write/maintenance.rs): MaintenanceHook trait + dispatch_async detached thread, signals delivered off write path. Write path passes SharedMaintenanceHook as arg -> clio-index can implement the hook WITHOUT clio-write depending on clio-index (composition root wires it).
+2026-09-18T21:16:18+0530 DISCOVERY: compose sidecars live: TEI embed :34311 (POST /embed {"inputs":[...]} -> JSON array of float arrays; GET /health -> 200; replies with content-length; errors 400/413/422/424/429/503). pgvector/pg16 :34310.
+2026-09-18T21:16:18+0530 DISCOVERY: config has extract.url/model precedent; NO embed.* keys yet -> add embed.url/embed.model/embed.dims defaults + allowlist + env wiring.
+2026-09-18T21:16:18+0530 DISCOVERY: plaintext halves (snapshot/gist) live encrypted in items.content_ciphertext (DualContent v1); worker must decrypt via DekProvider and assemble text; never log plaintext (ids+hashes OK). Items table: kind/category/episodic_type columns for domain filters; valid_until/tx_until for unsearchable policy.
+2026-09-18T21:16:18+0530 RESEARCH: TEI /embed contract pinned by live probe. FTS5: bm25()/rank lower=better, ORDER BY rank; standalone table fine (no external-content triggers needed); escape quotes by doubling, quote each term. Postgres: websearch_to_tsquery('simple',..) verified live; ts_rank_cd higher=better -> normalize; document ts_rank != BM25, slice 100120 fuses by rank (RRF).
+2026-09-18T21:44:17+0530 clio-store index contract green: sqlite_index_contract + postgres_index_contract pass (queue outbox, lexical, dense, coverage, delete cleanup)
+2026-09-18T22:08:24+0530 clio-index tests green (17/17): T100110-01/T100110-02/T100110-06/T100110-07/T100110-08/T100110-11 + fake embed server + HTTP client + rebuild + dim gate
+2026-09-18T22:14:03+0530 workspace tests green; clippy -D warnings clean; fmt applied
+2026-09-18T22:18:14+0530 all sizes <=450 (worker 386, sqlite_index 441); workspace tests green; clippy clean after split
+2026-09-18T22:42:30+0530 coverage gate green: aggregate 98.50% lines / 98.77% functions; every reported file >=90% on both
+2026-09-18T22:46:18+0530 final verify: fmt clean, clippy 0 errors, 409 tests 0 failed, coverage gate exit 0 (98.50%/98.77%, all files >=90% both), roadmap isolation clean, all Rust files <=450 lines
+2026-09-18T22:54:03+0530 FINAL: fmt+clippy clean; 409 tests 0 failed; make coverage exit 0 aggregate 98.49% lines / 98.85% functions; every reported file >=90% lines+functions; roadmap isolation verified; all Rust files <=450 lines
+2026-09-18T21:16:18+0530 DOCS: crates.md clio-index row + dependency table updated; phase-100110 file evidence sections (AC table, T100110-01..T100110-12 results, DoD, Completion Evidence, Attribution done, Final Status PASS WITH DOCUMENTED LIMITATIONS) filled with real results.
+2026-09-18T21:16:18+0530 STAGED: git add -- . ':!.workflows/' (41 files; pipeline dir excluded by construction).
+2026-09-18T21:16:18+0530 FINISH: phase 100110 implementation complete and verified; no blockers.
+DEVELOPER_DONE ae5a75f1

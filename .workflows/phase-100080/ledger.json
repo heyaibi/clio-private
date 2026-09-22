@@ -1,0 +1,61 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver",
+    "finalize"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE",
+      "harness": "cursor_cli:auto",
+      "visits": 1,
+      "output_sha256": "28a014937533a0076b4d0d0618021fa3622d674e24584a037cd0a2615e46e061",
+      "artifacts": {},
+      "git_head": "a207803fa1dd4ed73625d3ac94553fab909f260c"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100080/findings.json",
+      "harness": "antigravity_cli:gemini-3.8-flash-high",
+      "visits": 1,
+      "output_sha256": "7900552951825f277190afb492b35b3c9110e7225c18bfcf5cdc5b811f9ee852",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 19022,
+          "sha256": "7dafde3a08981f0087a260d682ab319f2c90ec21ad02a4f454065317c3562b6d"
+        }
+      },
+      "git_head": "a207803fa1dd4ed73625d3ac94553fab909f260c"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE",
+      "harness": "opencode_cli:opencode-go/deepseek-v4.1-flash:high",
+      "visits": 3,
+      "output_sha256": "d8d30e311dc272d896fee750c8bb4e6e08adcf78db1c9968e05ae6a1db0413f2",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 19022,
+          "sha256": "7dafde3a08981f0087a260d682ab319f2c90ec21ad02a4f454065317c3562b6d"
+        }
+      },
+      "git_head": "a207803fa1dd4ed73625d3ac94553fab909f260c"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED",
+      "harness": "antigravity_cli:gemini-3.8-flash-high",
+      "visits": 2,
+      "output_sha256": "6347291952f92f51acdf1911c9c601d36022b9c486573b5d63bf2db30e92b4ef",
+      "artifacts": {},
+      "git_head": "a207803fa1dd4ed73625d3ac94553fab909f260c"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE",
+      "harness": "opencode_cli:togetherai/zai-org/GLM-5.3-Flash:high",
+      "visits": 1,
+      "output_sha256": "caa13fa18e9be1948899f51e5eabd604deac5a76515a61640599061993ca54f9",
+      "artifacts": {},
+      "git_head": "a207803fa1dd4ed73625d3ac94553fab909f260c"
+    }
+  }
+}

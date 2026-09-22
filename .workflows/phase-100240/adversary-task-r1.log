@@ -1,0 +1,20 @@
+2026-09-20T19:38:00+05:30 START adversary-task-r1 phase-100240
+2026-09-20T19:38:08+05:30 git status: 45 files staged, 0 unstaged outside .workflows/
+2026-09-20T19:38:16+05:30 line count audit: all 45 staged files <= 450 lines (max client.rs at 450 lines)
+2026-09-20T19:38:30+05:30 make check: FAILED exit code 2 (clippy -D warnings unused import ErrorCode in journal_row.rs:29)
+2026-09-20T19:38:57+05:30 roadmap isolation audit: F-05 violation in crates/clio-sync/src/crypto.rs:16 ('Phase 100020 separation')
+2026-09-20T19:41:09+05:30 cargo test --workspace: 109 tests passed, but flakiness observed under high frequency updates
+2026-09-20T19:41:51+05:30 make coverage: aggregate lines 97.68%, functions 97.45%, but 5 files failed per-file >=90% function gate
+2026-09-20T19:42:07+05:30 scoped clio-sync coverage: F-02 contradicted developer claim; protocol.rs (60.0%), server.rs (64.7%), http.rs (69.6%), client.rs (79.2%)
+2026-09-20T19:42:25+05:30 clio-sync test failure: F-03 apply_tests::t24_03 panicked with 'UNIQUE constraint failed: audit_events.id' from item_update.rs:38
+2026-09-20T19:43:20+05:30 scoped clio-store coverage: postgres_sync.rs (80.0% func), sqlite_sync.rs (87.0% func) both under 90% function floor
+2026-09-20T19:44:31+05:30 omission audit: F-04 feed_triples implemented in clio-store but never called in clio-sync/src/client.rs push_bank or sync_status
+2026-09-20T19:45:39+05:30 dlq audit: F-05 decrypt_for_apply in client.rs propagates key.open() errors with ?, failing pull_bank without dead-lettering
+2026-09-20T19:45:58+05:30 server pull audit: F-06 journal_row_to_mutation fails with EOF when content_sealed is None/empty
+2026-09-20T19:46:33+05:30 tie-break audit: F-08 lww_loser in apply.rs hardcodes local device ID as empty string in lww_compare
+2026-09-20T19:46:49+05:30 header audit: all 27 new Rust files verified for AGENTS.md responsibility and boundary header compliance
+2026-09-20T19:47:43+05:30 findings.json written and verified with jsonschema (8 findings: 2 critical, 2 high, 3 medium, 1 low)
+2026-09-20T19:47:47+05:30 generate-report.cjs: rendered report.html and copied style.css into .workflows/phase-100240/
+2026-09-20T19:47:54+05:30 attribution updated in roadmap/phase-100240-multi-host-sync-protocol.md
+2026-09-20T19:48:10+05:30 FINISH: review complete, 8 findings reported
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100240/findings.json 070583ba

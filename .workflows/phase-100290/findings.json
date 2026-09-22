@@ -1,0 +1,147 @@
+{
+  "run": "r1",
+  "phase": "100290",
+  "remediation_round": "r1",
+  "verification": {
+    "make_check": "EXIT=0; 45 test binaries ok; 1136 tests passed; 0 failed",
+    "coverage": "cargo llvm-cov --workspace --locked --fail-under-lines 90 --fail-under-functions 90 --json -> EXIT=0; aggregate lines 97.88% / functions 98.91%; 261 reported files; 0 files below 90% on either metric (/tmp/cov-r1.json)"
+  },
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Per-row model_id is not validated against the active space on write; only the width is checked",
+      "evidence": "crates/clio-store/src/postgres_store.rs:198 calls only `self.validate_dims(&slot.embedding)?` before inserting `slot.model_id` verbatim at :216; crates/clio-store/src/sqlite_store.rs:215/:231 do the same. `validate_dims` (crates/clio-store/src/sqlite.rs:158-161, crates/clio-store/src/postgres.rs:131-134) compares `embedding.len()` to the active width and never inspects model_id. No test rejects a foreign model_id (grep over crates/clio-store/src finds none). The phase file itself admits this at roadmap/phase-100290-multi-model-embeddings.md:440: \"The per-row `model_id` ... is not re-validated against the active model on write ... a direct `upsert_vector` call with a foreign `model_id` is not rejected.\"",
+      "requirement_ref": "phase-100290 §5 Task 2 \"Required Capability or Behavior\" (\"The per-row dims/model_id columns ... must equal the active space; a row that does not match is an error, not silently kept\") and \"Required Changes\" 2",
+      "recommendation": "Reject an upsert whose `model_id` differs from the active space's model in both backends (fail closed, same as a width mismatch), and add a test that a foreign model_id is refused. The stated reason for skipping (\"would require changing the store's existing test fixtures\") is not a valid exemption for an in-scope MUST.",
+      "status": "resolved",
+      "resolution": "Added `EmbeddingSpace::require_model` (crates/clio-store/src/embedding_space.rs) and a `validate_model` store method in both backends (sqlite.rs, postgres.rs); `upsert_vector` now calls `self.validate_model(&slot.model_id)?` before writing in `crates/clio-store/src/sqlite_store.rs` and `crates/clio-store/src/postgres_store.rs`. A foreign model id now fails closed with `InvalidArgument`. Store test fixtures and test-double embedders whose model id did not match the default space were aligned to `DEFAULT_EMBEDDING_MODEL` (clio-store assoc/async/erase tests, clio-index rebuild_tests + FakeEmbedder, clio-retrieve fixtures_tests, clio-ops reindex/repair/diagnose tests). New tests: `foreign_model_id_is_refused_on_upsert` (sqlite_space_tests) and a foreign-model assertion inside `postgres_space_roundtrip_keeps_non_vector_data`.",
+      "evidence_output": "make check -> EXIT=0, 1136 tests passed. clio-store scoped run: `test result: ok. 235 passed; 0 failed`. `embedding_space.rs` coverage lines 100.00 / functions 100.00; `sqlite_store.rs` 100.00/100.00; `postgres_store.rs` 100.00/100.00."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "The recorded halfvec recall@10=1.0000 does not measure the ANN index; both compared runs are sequential scans",
+      "evidence": "crates/clio-store/src/pg_space_tests.rs:380-393: the \"indexed\" run only does `RESET enable_indexscan` and never sets `enable_seqscan=off`, so on the 200-row corpus the planner chooses a Seq Scan. Re-running the calibration (`cargo test -p clio-store pg_space_tests -- --nocapture`) printed: `calibration: width=3072 mode=ann_halfvec hnsw=true plain=[Limit ... | ->  Seq Scan on item_embeddings ...]` and the test printed `halfvec recall@10 at 3072 dims = 1.0000 (100/100)`. Both the \"indexed\" and \"exact\" paths are therefore the same exact scan, so recall 1.0 is vacuous and says nothing about halfvec precision. The phase file records this number as ANN-precision evidence at roadmap/phase-100290-multi-model-embeddings.md:383 and :398.",
+      "requirement_ref": "AC-100290-08 / phase-100290 §5 Task 6 (\"measure recall against exact search at 3072 (halfvec) to confirm the precision cost is acceptable\")",
+      "recommendation": "Force the ANN path in the recall comparison (e.g. `SET enable_seqscan=off` for the indexed run, or `SET hnsw.ef_search` and `enable_seqscan=off`) and re-record the measured recall, or state explicitly that ANN recall could not be measured on a 200-row corpus and that the index-applicability claim rests only on the `enable_seqscan=off` EXPLAIN.",
+      "status": "resolved",
+      "resolution": "The recall test (`postgres_halfvec_recall_at_3072_measures_the_ann_index`, moved into the new `crates/clio-store/src/pg_calibration_tests.rs` when the oversized `pg_space_tests.rs` was split) now runs the indexed comparison with `SET enable_seqscan = off` (and resets it before the exact run), so the indexed path uses the HNSW expression index. It also asserts `EXPLAIN` shows `Index Scan using item_embeddings_embedding_hnsw_inx` for the cast query, guarding against a future planner change turning the run back into an exact scan. The measured number was re-recorded in the phase file (1.0000 -> 0.9800).",
+      "evidence_output": "`cargo test -p clio-store pg_calibration_tests -- --nocapture`: `calibration: halfvec recall@10 at 3072 dims = 0.9800 (98/100)`, `test result: ok. 4 passed; 0 failed`."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "A fresh/empty database configured at a non-default width is refused as a destructive switch, contradicting \"fresh database -> record the configured space\"",
+      "evidence": "sql/001_core.sql:36-41 seeds `embedding_dim='384'` and `embedding_model='BAAI/bge-small-en-v1.5'` with `ON CONFLICT DO NOTHING` for every database, so `read_space` (crates/clio-store/src/sqlite.rs:165-179, crates/clio-store/src/postgres.rs:202-213) can never return the \"absent\" case. `apply_configured_space` (crates/clio-store/src/sqlite.rs:126-128, crates/clio-store/src/postgres.rs:99-101) therefore refuses a mismatch with `ConfigCorrupt` even when `purged_rows` would be 0 and there is nothing to destroy. No test opens a fresh store at a non-default width without `embed.switch_space=true`.",
+      "requirement_ref": "phase-100290 §5 Task 1 \"Required Capability or Behavior\" (\"absent (fresh database) -> record the configured space\")",
+      "recommendation": "Distinguish a genuinely fresh database (no derived vectors and no prior switch) from an existing one, or document that a first-time non-default width also requires the opt-in. Either way, resolve the contradiction with the Task 1 wording.",
+      "status": "resolved",
+      "resolution": "Removed the `embedding_dim`/`embedding_model` seed rows from `sql/001_core.sql` so an absent pair is real; `read_space` in both backends now returns `Result<Option<EmbeddingSpace>>`. At open, an absent space is recorded as the default and the store remembers `space_was_absent`; `apply_configured_space` records the configured space without the destructive-switch opt-in when the space was absent and there are zero derived dense rows, and still refuses (and requires `embed.switch_space=true`) once any derived rows exist. New tests: `fresh_store_adopts_a_configured_space_without_opt_in` (sqlite_space_tests) and `postgres_fresh_schema_adopts_a_configured_space_without_opt_in` (pg_space_tests).",
+      "evidence_output": "clio-store scoped run `test result: ok. 235 passed; 0 failed` (includes both new fresh-adopt tests and the unchanged `unconfirmed_switch_is_refused_and_keeps_rows`). `sqlite.rs` coverage 100.00/100.00; `postgres.rs` 99.39/100.00."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "T100290-13 (old pgvector fails bootstrap closed) is not tested end-to-end; only a pure helper and an error-string constructor are exercised",
+      "evidence": "crates/clio-store/src/pg_space_tests.rs:406-412 asserts only `pgvector_supports_halfvec(\"0.6.2\")==false` and that `halfvec_unsupported(\"0.6.2\")` contains \"0.7.0\"/\"upgrade\". `PostgresStore::open`/`apply_vector_ddl` against a pre-0.7 pgvector is never run. The phase file concedes this at roadmap/phase-100290-multi-model-embeddings.md:435 (\"no pgvector older than 0.7.0 was available to exercise the refusal end to end\").",
+      "requirement_ref": "T100290-13 / phase-100290 §8 \"Required Test Scenarios\" and AC-100290-08",
+      "recommendation": "Add a seam-level test that drives `ensure_halfvec_supported`/`apply_vector_ddl` with an injected old version string so the bootstrap refusal path is actually covered, or downgrade the T100290-13 claim to \"version-gate function tested only\" in the evidence.",
+      "status": "resolved",
+      "resolution": "Refactored the bootstrap DDL step into `apply_vector_ddl_with(client, space, version_reader)` (crates/clio-store/src/postgres.rs), which `apply_vector_ddl` calls with the real `pgvector_version`. Added `old_pgvector_bootstrap_refuses_halfvec_before_ddl` (pg_calibration_tests) that drives that exact gate with an injected `\"0.6.2\"` version and asserts the `ConfigCorrupt` refusal naming `0.7.0`/`upgrade`, so the refusal path (not merely the boolean helper) is exercised without an old extension installed. The phase file's \"not verified\" note was narrowed to state that a real pre-0.7.0 install was still unavailable.",
+      "evidence_output": "`cargo test -p clio-store pg_calibration_tests -- --nocapture`: `test pg_calibration_tests::old_pgvector_bootstrap_refuses_halfvec_before_ddl ... ok`."
+    },
+    {
+      "id": "F-05",
+      "severity": "medium",
+      "title": "An unknown embed provider supplied via env silently disables the ops embedder instead of failing closed with the allowed values",
+      "evidence": "crates/clio-config/src/config/env.rs:61-64 inserts `EMBED_PROVIDER` raw, bypassing the `config_set` allowlist check in crates/clio-config/src/config/validate.rs:318-330. crates/clio-mcp/src/ops_embedder.rs:107-114 then calls `build_embedder(...).ok()`, converting the `ConfigCorrupt` \"must be tei|openai\" error into `None`. crates/clio-mcp/src/runtime_tests.rs asserts exactly that: `build_ops_embedder_from(&cfg(\"cohere\", \"http://127.0.0.1:34311\", \"m\", 384)).is_none()`. So the operator gets \"no embedder\" (dense reindex unavailable) rather than the required fail-closed message naming `tei|openai`.",
+      "requirement_ref": "phase-100290 §5 Task 3 \"Required Capability or Behavior\" (\"Unknown provider fails closed with the allowed values\") and T100290-07",
+      "recommendation": "Validate the provider at effective-config resolution (including the env overlay) or surface the `build_embedder` error instead of discarding it, so an unknown provider fails closed with the allowed values on every configuration path.",
+      "status": "resolved",
+      "resolution": "`build_ops_embedder` and `build_ops_embedder_from` now return `Result<Option<Arc<dyn Embedder>>, AmError>` and propagate the adapter error instead of `.ok()`-ing it, so an unknown provider (including one set only via `EMBED_PROVIDER`) or a rejected endpoint surfaces the `ConfigCorrupt` message naming `tei|openai`. `McpState::open` propagates it with `?`; the `am ops` dispatcher emits it and exits 1. The no-provider and missing-model/zero-dims cases still return `Ok(None)`. `runtime_tests::ops_embedder_builder_config_variants` was updated to assert `is_err` for `cohere` and message contents for `tei|openai`.",
+      "evidence_output": "make check -> EXIT=0, 1136 tests passed; `ops_embedder.rs` coverage lines 100.00 / functions 100.00; `ops_cli.rs` 95.16/97.22; `runtime.rs` 99.44/100.00."
+    },
+    {
+      "id": "F-06",
+      "severity": "medium",
+      "title": "The space switch does not set any explicit \"requires rebuild\" marker, which Task 2 lists as a required change",
+      "evidence": "`switch_sqlite` (crates/clio-store/src/sqlite.rs:201-211) and `switch_pg` (crates/clio-store/src/postgres.rs:236-247) only count rows, drop/recreate the vector table, and write the settings rows; neither enqueues rebuild work nor sets a dirty/rebuild flag. A grep for `requires_rebuild|needs_rebuild|rebuild_required|index_dirty` across crates returns nothing. The operator can only infer the need from `dense_rows < indexable_items`.",
+      "requirement_ref": "phase-100290 §5 Task 2 \"Required Changes\" 3 (\"flag rebuild\") and \"Required Capability or Behavior\" (\"mark the dense index as requiring a rebuild\")",
+      "recommendation": "Set an explicit rebuild-required signal (or enqueue the rebuild) on a confirmed switch and surface it in `diagnose`/`IndexStatus`, or amend the phase text to state that the coverage gap is the intended signal.",
+      "status": "resolved",
+      "resolution": "Took the recommendation's documented alternative and amended the phase text (Task 2 capability + Required Changes 3, and the Known limitations) to state that the rebuild signal is the dense-coverage gap (`dense_rows` below `indexable_items`, already reported by `diagnose`/`index_coverage`) plus the `embedding_space_switch` log. Reason a code flag was not added: it would require new methods on the `Store` and `OpsStore` traits plus implementations in both backends and the `clio-retrieve` test double, and `sqlite_store.rs` is already at the 450-line source-file ceiling after F-01; durable rebuild-required state is owned by the Phase 100350 dense write-path wiring, which the phase file now says explicitly.",
+      "evidence_output": "Phase file updated (grep `rebuild signal`); `make check` EXIT=0."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "README references an internal phase number, which the task's roadmap-isolation rule forbids",
+      "evidence": "README.md:322: \"Measured plans and recall for this matrix are recorded in the phase 100290 completion evidence.\" The developer task's Hard rules state: \"never reference `./roadmap/`, phase numbers, or roadmap files from code or comments.\"",
+      "requirement_ref": "Developer task Hard rules (roadmap isolation)",
+      "recommendation": "Remove the phase-number reference from README.md (link to the width/index policy without naming the internal phase).",
+      "status": "resolved",
+      "resolution": "README.md now reads \"... recorded in the project completion evidence.\" with no phase number.",
+      "evidence_output": "grep of README.md for 'phase 100290' returns nothing."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "openai_tests.rs uses the singular \"Developer\" in the required copyright header",
+      "evidence": "crates/clio-index/src/openai_tests.rs:1 reads `// Copyright 2026 Agent Memoir Developer (https://agentmemoir.com/)`; AGENTS.md requires `// Copyright 2026 Agent Memoir Developers (https://agentmemoir.com/)`. All other new files use the plural.",
+      "requirement_ref": "AGENTS.md \"File Header\"",
+      "recommendation": "Correct the header to the required plural form.",
+      "status": "resolved",
+      "resolution": "`crates/clio-index/src/openai_tests.rs:1` now uses `... Agent Memoir Developers ...`.",
+      "evidence_output": "grep of openai_tests.rs line 1 shows the plural form."
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "Stale doc comment on VectorSlot.embedding still claims the fixed 384 constant is the required length",
+      "evidence": "crates/clio-store/src/model.rs:285: \"Dense vector; length must be [`EMBEDDING_DIMS`].\" After this phase the contract is the active space width, not the constant (crates/clio-store/src/store.rs:189-193, embedding_space::require_dims).",
+      "requirement_ref": "phase-100290 §5 Task 1 (width becomes a runtime value)",
+      "recommendation": "Update the doc comment to reference the active embedding space width.",
+      "status": "resolved",
+      "resolution": "`VectorSlot.embedding` now documents \"length must equal the active embedding space width (default [`EMBEDDING_DIMS`])\", and `VectorSlot.model_id` documents that it must equal the active space's model.",
+      "evidence_output": "model.rs coverage 100.00/100.00."
+    },
+    {
+      "id": "F-10",
+      "severity": "low",
+      "title": "Completion evidence lists model.rs as modified but it is not in the staged diff",
+      "evidence": "roadmap/phase-100290-multi-model-embeddings.md:429 lists `model.rs` under \"Modified\"; `git diff --cached --name-only -- . ':!.workflows/'` contains no `crates/clio-store/src/model.rs` (verified: the name-only grep for model.rs returns nothing). The per-file coverage line for `model` is reported, but the file was not changed this round.",
+      "requirement_ref": "Developer task \"Update the phase file\" (real results only)",
+      "recommendation": "Correct the \"Changed components\" list in the phase file to drop model.rs, or make the intended change.",
+      "status": "resolved",
+      "resolution": "Dropped `model.rs` from the developer-round \"Changed components\" Modified list in the phase file. (This remediation round did subsequently touch `model.rs` for F-09; that is recorded in the new \"Remediation (r1)\" paragraph, keeping the developer-round list accurate.)",
+      "evidence_output": "Phase file Changed components list no longer contains model.rs; `git diff --cached --name-only -- . ':!.workflows/' | grep model.rs` returns nothing (0)."
+    }
+  ],
+  "plan_1hr": [
+    "Fix F-01: add model_id validation to both backends' upsert_vector (compare slot.model_id to the active space) and add a fail-closed test in sqlite_space_tests/pg_space_tests.",
+    "Fix F-02: force the ANN path in the recall test (enable_seqscan=off for the indexed run) and re-record the measured recall, or restate the evidence as index-applicability-only.",
+    "Fix F-07/F-08/F-09/F-10: remove the README phase number, correct the openai_tests header, fix the VectorSlot doc comment, and correct the phase file's changed-components list."
+  ],
+  "plan_unlimited": [
+    "Resolve F-03 with an explicit fresh-database path (record the configured space without the opt-in when the store has no derived rows and no prior switch) and test it on both backends.",
+    "Close F-04 by adding an injected-version seam test for the halfvec bootstrap refusal.",
+    "Close F-05 by validating embed.provider (and other provider names) at effective-config resolution, including the env overlay, and surfacing the allowed-values error.",
+    "Close F-06 by adding an explicit rebuild-required signal on a confirmed switch and reporting it in diagnose/IndexStatus.",
+    "Add diagnose tests asserting index_mode == \"exact_scan\" for a >4000-dim space (T100290-08/T100290-12's \"diagnose says so\" half is currently untested).",
+    "Consider whether a running MCP server should detect a config space change without a restart; today the switch only happens at open."
+  ],
+  "plan_1hr_status": [
+    "F-01 done (resolved).",
+    "F-02 done (resolved; ANN path forced, recall re-recorded at 0.9800).",
+    "F-07/F-08/F-09/F-10 done (resolved)."
+  ],
+  "plan_unlimited_status": [
+    "F-03 done (resolved: fresh-database path implemented and tested on both backends).",
+    "F-04 done (resolved: injected-version bootstrap-refusal test).",
+    "F-05 done (resolved: unknown provider surfaces the allowed-values error on every config path).",
+    "F-06 resolved by amending the phase text to the coverage-gap signal; a persisted rebuild flag was not added (reason in F-06 resolution).",
+    "Diagnose `exact_scan` assertion added: `diagnose_tests::exact_scan_space_is_reported` configures a fresh 4096-dim space and asserts `index_mode == \"exact_scan\"` (clio-ops `test result: ok. 48 passed; 0 failed`).",
+    "Runtime config-change detection without a restart: documented as a known limitation in the phase file; a running server reconciles only at open, so a config change needs a restart. No code change (a live reload path is out of scope for this phase)."
+  ]
+}

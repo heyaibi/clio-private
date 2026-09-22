@@ -1,0 +1,18 @@
+2026-09-19T12:04:00Z START adversary r1 phase-100170 MCP read surface
+2026-09-19T12:04:01Z CMD git status -> all changes staged, untracked only .workflows/phase-100170/
+2026-09-19T12:14:07Z CMD cargo test --workspace --locked < /dev/null -> all suites green (108 store, 83 mcp lib, 10 conformance, 5 mock)
+2026-09-19T12:14:12Z CMD cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> clean (0 warnings)
+2026-09-19T12:14:15Z CMD cargo fmt --all -- --check -> clean
+2026-09-19T12:14:59Z CMD make coverage < /dev/null -> TOTAL functions 98.63% (1939/1966), lines 98.14% (21301/21705); min fn 90.00% (clio-write/src/hub_distill_model.rs), min line 91.26% (clio-mcp/src/http.rs)
+2026-09-19T12:15:17Z CMD file size check -> all 28 staged Rust files <= 450 lines (hybrid.rs max at 450)
+2026-09-19T12:15:26Z CMD roadmap isolation check -> clean (0 matches in staged diff)
+2026-09-19T12:18:43Z CMD cargo test -p clio-store pg_inspect_tests < /dev/null -> passed (1 passed, postgres parity verified)
+2026-09-19T12:18:47Z CMD cargo test -p clio-mcp --test mcp_read_conformance < /dev/null -> passed (10 passed)
+2026-09-19T12:18:51Z CMD cargo test -p clio-mcp --test mcp_read_mock < /dev/null -> passed (5 passed)
+2026-09-19T12:19:00Z FINDING F-01 (medium): crates/clio-store/src/postgres_inspect.rs:18-19, crates/clio-store/src/sqlite_inspect.rs:18-19, crates/clio-mcp/src/read_retrieve.rs:19-21 - missing mandatory header closing line
+2026-09-19T12:19:10Z FINDING F-02 (low): crates/clio-mcp/src/schema_read_defs.rs:127-131, crates/clio-mcp/src/schema_read_defs.rs:108-116 - parameter omission in published tool_schema pack under additionalProperties: false
+2026-09-19T12:19:20Z FINDING F-03 (low): roadmap/phase-100170-mcp-read-retrieve-compose-surface.md:6 vs adversary-task-r1.md:86 - developer attribution model mismatch
+2026-09-19T12:20:16Z CMD node generate-report.cjs -> generated findings.json, report.html, style.css in .workflows/phase-100170/
+2026-09-19T12:20:36Z UPDATE roadmap/phase-100170-mcp-read-retrieve-compose-surface.md:7 -> Adversary attribution marked done
+2026-09-19T12:21:00Z FINISH adversary r1 review complete: verdict Good, 3 findings (0 critical, 0 high, 1 medium, 2 low)
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100170/findings.json 232b2722

@@ -1,0 +1,23 @@
+2026-09-18T11:36:00+05:30 START adversary-task-r1 Phase 100080 review
+2026-09-18T11:36:10+05:30 git status: 32 files staged, .workflows/ files improperly staged, 2 files unstaged
+2026-09-18T11:36:15+05:30 wc -l: all staged Rust source files <= 450 lines (triple_tests.rs at 445 lines staged)
+2026-09-18T11:36:19+05:30 make check: FAIL (cargo clippy exited with code 101; 2 errors in crates/clio-store/src/pg_triple_tests.rs)
+2026-09-18T11:36:49+05:30 cargo test --workspace: PASS (17 clio-types + 84 clio-write + clio-lib tests ok)
+2026-09-18T11:36:54+05:30 cargo test -p clio-store: PASS (76 tests ok including parity and vector suites)
+2026-09-18T11:37:21+05:30 make coverage: PASS (aggregate functions 99.38%, lines 98.60%; all reported files >= 90%)
+2026-09-18T11:37:58+05:30 cargo fmt --check: FAIL (formatting diffs in crates/clio-store/src/triple_tests.rs:394-438, pg_triple_tests.rs, triple_map.rs)
+2026-09-18T11:38:00+05:30 rustfmt line count check: crates/clio-store/src/triple_tests.rs expands to 458 lines when formatted with cargo fmt
+2026-09-18T11:38:35+05:30 roadmap isolation check: PASS (no references to roadmap, phase numbers, or crates.md in code)
+2026-09-18T11:39:10+05:30 finding F-01 crates/clio-store/src/pg_triple_tests.rs:27:5,152:1 (clippy::single_match_else and clippy::too_many_lines break make check and make lint)
+2026-09-18T11:39:15+05:30 finding F-02 crates/clio-store/src/triple_tests.rs:394,402,407,429,438 (fails cargo fmt --check; expands to 458 lines under rustfmt violating 450-line limit)
+2026-09-18T11:39:20+05:30 finding F-03 crates/clio-store/src/pg_triple_tests.rs:1-3, crates/clio-store/src/triple_tests.rs:1-3, crates/clio-types/src/triple_tests.rs:1-3, crates/clio-write/src/triple_tests.rs:1-3 (missing AGENTS.md module header structure)
+2026-09-18T11:39:25+05:30 finding F-04 .workflows/instruction.md, developer-task-r1.log, developer-task-r1.md, resume.json (staged into git index against staging rules)
+2026-09-18T11:39:30+05:30 finding F-05 crates/clio-write/src/triple.rs:136-137 (timestamp-only edge_id and item_id generation causes primary key collisions)
+2026-09-18T11:39:35+05:30 finding F-06 crates/clio-store/src/sqlite_triple_read.rs:82, crates/clio-store/src/postgres_triple_read.rs:75 (query_triples executes full bank table scan bypassing indexes)
+2026-09-18T11:39:40+05:30 finding F-07 crates/clio-store/src/triple_map.rs:79 (omitted as_of returns future facts on valid axis)
+2026-09-18T11:39:45+05:30 finding F-08 crates/clio-store/src/sqlite_triple.rs:95, crates/clio-store/src/postgres_triple.rs:92 (open edge supersession query ignores active edges with bounded valid intervals)
+2026-09-18T11:41:05+05:30 node generate-report.cjs: PASS (generated report.html and copied style.css)
+2026-09-18T11:41:10+05:30 cp artifacts to .workflows/phase-100080: PASS (findings.json, report.html, style.css)
+2026-09-18T11:41:13+05:30 validate findings.json: PASS (schema valid, 8 findings recorded)
+2026-09-18T11:41:50+05:30 FINISH: adversary review complete, verdict Inadequate with 8 findings
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100080/findings.json

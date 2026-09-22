@@ -1,0 +1,16 @@
+2026-09-19T07:35:48Z REMEDIATOR r1 start nonce=f64976c3
+2026-09-19T07:35:48Z FINDINGS 9 issues F-01..F-09; plan_1hr 4 items; plan_unlimited 4 items; backup findings.original.json already present (skip copy)
+2026-09-19T07:50:53Z FIX F-01: HistoryStore::triple_history_at (history_store.rs:138); SQLite impl sqlite_history_triple.rs:65 filters axis<=as_of inside subquery before LIMIT + picks newest N; Postgres impl postgres_history_read.rs:233; temporal.rs calls it when as_of set; regression temporal_tests.rs:96 t08b passes (3 versions, limit=2, as_of beyond keeps current version).
+2026-09-19T07:50:53Z FIX F-02: added Responsibility/Owns/Does-not-own/Boundary headers to 12 bare test/support files (clio-history x9, clio-store x2, clio-types x1); verified all now contain ## Owns/## Does not own/## Boundary.
+2026-09-19T07:50:53Z FIX F-03: retrieve_isolation_tests.rs:150 t13 composes persona before/after a stored failure and asserts persona section byte-identical with no failure text; failure only in memory section.
+2026-09-19T07:50:53Z FIX F-04: retrieve_isolation_tests.rs:56 t11 runs HybridRetriever domains=[failure] over task/failure/unrelated carriers -> only failure hit; :123 t12 source guard asserts no list_all_messages/full_log/dump_all/replay_all + hard-cap.
+2026-09-19T07:50:53Z FIX F-05: sqlite_history_tests.rs:267 history_reads_are_bank_isolated writes bank A and asserts bank B reads None/empty for task+failure.
+2026-09-19T07:50:53Z FIX F-06: phase Completion Evidence corrected to measured numbers; temporal.rs now 100% functions / 97.62% lines after covering TemporalHistoryOutcome::is_empty.
+2026-09-19T07:50:53Z FIX F-07: clio-config/src/history_knobs.rs:59 from_config / :83 to_policy + history.* config paths + config/mod.rs:263 Runtime::history_policy(); tests pass.
+2026-09-19T07:50:53Z FIX F-08: failure.rs:108 rejects attempt_n<1 before the gate; failure_tests.rs:181 asserts admission sink empty and nothing stored.
+2026-09-19T07:50:53Z FIX F-09: documented uncapped what_failed (clio-types/src/history.rs + failure.rs docs); failure_tests.rs:203 proves 2000-char what_failed round-trips while over-cap lesson is rejected.
+2026-09-19T07:50:53Z REFACTOR sqlite_history_read.rs 475->349 lines by extracting SQLite triple reads to new sqlite_history_triple.rs (152); all changed Rust files <=450.
+2026-09-19T07:50:53Z VERIFY make check exit=0 (fmt + clippy -D warnings + workspace tests).
+2026-09-19T07:50:53Z VERIFY cargo llvm-cov report --fail-under-lines 90 --fail-under-functions 90 exit=0; TOTAL lines 98.38% functions 98.72%; 137 files, none below 90% functions or lines.
+2026-09-19T07:50:53Z REPORT findings.json: 9/9 issues and 9/9 findings marked Resolved with fix evidence; plan_1hr all done; plan_unlimited config+cross-bank+what_failed done, embedding leg documented as not adopted (requirement allows lexical-only).
+REMEDIATOR_DONE f64976c3

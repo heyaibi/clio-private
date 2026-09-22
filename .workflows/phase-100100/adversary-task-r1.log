@@ -1,0 +1,25 @@
+2026-09-18T14:20:42Z | r1 | start | adversary-task-r1.md read; scope = staged diff excluding .workflows; git status shows all phase files staged (M/A) and no unstaged non-workflow changes
+2026-09-18T14:20:55Z | r1 | read | roadmap/phase-100100...md, requirement.md §4.9.3/§4.10/§4.11/FR-13/FR-14/FR-15/NFR-4/PR-8, AGENTS.md, coverage.md read
+2026-09-18T14:21:20Z | r1 | cmd | git diff --cached --stat = 31 files, +3475/-90; 10 new production files across clio-belief/clio-store/clio-types
+2026-09-18T14:22:05Z | r1 | read | observe.rs, signals.rs, belief.rs, read.rs, belief_store.rs, sqlite_belief.rs, postgres_belief.rs, schema_reshape.rs, migrate.rs, bootstrap.rs, sqlite.rs, postgres.rs, item.rs read in full
+2026-09-18T14:23:00Z | r1 | cmd | cargo fmt --all -- --check = exit 0 (no output)
+2026-09-18T14:23:40Z | r1 | cmd | cargo clippy --workspace --all-targets --all-features --locked -- -D warnings = exit 0
+2026-09-18T14:24:25Z | r1 | cmd | cargo test --locked --workspace (DATABASE_URL :34310) = exit 0; 18 suites ok, 0 failed incl postgres_belief_parity + pg_beliefs_reshape_guard
+2026-09-18T14:26:10Z | r1 | cmd | make coverage = exit 0; TOTAL lines 96.04% funcs 99.30%; parsed 84 file rows, 0 below 90% func+line (region-only dips ignored)
+2026-09-18T14:26:40Z | r1 | cmd | wc -l all new/modified Rust files = max 393 (schema_reshape.rs); all <=450
+2026-09-18T14:26:55Z | r1 | cmd | grep roadmap/phase/crates.md in crates+sql = no violations
+2026-09-18T14:27:10Z | r1 | cmd | check_index_coverage for 11 cited paths = no_recorded_issue, generation 2026-09-18T14:20:30Z fresh
+2026-09-18T14:27:30Z | r1 | finding | F-01 high concurrent create race: observe.rs:223-268 check-then-insert; sqlite_belief.rs:74-92 unique index; belief_store.rs:135-152 maps loser to InvalidArgument
+2026-09-18T14:27:32Z | r1 | finding | F-02 medium belief admission key not configurable: signals.rs:24-28 claims override; admission_knobs.rs:43-54 KNOWN_ADMISSION_KEYS lacks "belief"; :134-141 rejects unknown keys; :198-203 prior fallback 0.5
+2026-09-18T14:27:34Z | r1 | finding | F-03 medium durable audit omits confidence: sqlite_belief.rs:94-107 + postgres_belief.rs:93-106 write detail_json {"created"/"appended":true}; observe.rs:44-100 BeliefEvent in-memory only
+2026-09-18T14:27:36Z | r1 | finding | F-04 medium beliefs.updated_at stale: sqlite_belief.rs:55-60 set on create, :113-160 append never updates, :190-194 read derives from history
+2026-09-18T14:27:38Z | r1 | finding | F-05 medium AC-100100-01/T100100-07 evidence overstated: clio-types/src/belief_tests.rs:133-157 only validates scalar confidence on a fact; item.rs:224-268 has no confidence_history field
+2026-09-18T14:27:40Z | r1 | finding | F-06 low belief object omits epistemic_kind: clio-types/src/belief.rs:110-127; clio-belief/src/history.rs:30-44; sql/001_core.sql beliefs table
+2026-09-18T14:27:42Z | r1 | finding | F-07 low 9 new files miss "Keep this module focused" header line (history/observe/signals/belief/read/belief_reshape/belief_store/postgres_belief/sqlite_belief)
+2026-09-18T14:27:44Z | r1 | finding | F-08 low belief_history not-found = InvalidArgument: clio-belief/src/history.rs:78-93
+2026-09-18T14:27:46Z | r1 | finding | F-09 low reshape guard counts beliefs rows only: belief_reshape.rs:104-123,129-148 drops entries at :53-58,:90-98
+2026-09-18T14:27:48Z | r1 | finding | F-10 low as_of free-form string compare: sqlite_belief.rs:235-240; postgres_belief.rs:230-235; belief.rs:169-176
+2026-09-18T14:28:20Z | r1 | artifact | findings.json written+validated (10 findings, 10 issues, 8 requirements); report.html + style.css generated via generate-report.cjs; copied to .workflows/phase-100100/
+2026-09-18T14:28:40Z | r1 | edit | phase-100100 Attribution Adversary row updated to OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | done
+2026-09-18T14:28:49Z | r1 | finish | verdict Good; no critical/blocking defects; top items F-01 concurrency, F-02 admission config, F-03 durable telemetry
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100100/findings.json

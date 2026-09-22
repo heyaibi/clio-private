@@ -1,0 +1,18 @@
+2026-09-19T07:13:57Z START phase-100150 adversary r1 nonce=4f081311
+2026-09-19T07:17:14Z RECON staged=33 non-workflow files, all changes staged, .workflows untracked; fmt --check exit=0; pg port 34310 open
+2026-09-19T07:33:46Z VERIFY cargo fmt --all -- --check exit=0; clippy --workspace --all-targets --all-features -D warnings exit=0
+2026-09-19T07:33:46Z VERIFY AM_PG_HISTORY_PARITY=1 make test exit=0; clio-history 32 tests pass incl postgres_parity_tests::t14 (not skipped)
+2026-09-19T07:33:46Z VERIFY make coverage exit=0 TOTAL lines=98.37% funcs=98.65%; JSON 135 files, 0 below 90% funcs/lines; max changed .rs=418 lines
+2026-09-19T07:33:46Z VERIFY roadmap isolation clean (grep roadmap|phase-0|crates.md = 0); staged-only tree, .workflows untracked
+2026-09-19T07:33:46Z F-01 medium temporal_history triple: LIMIT applied before as_of filter (sqlite_history_read.rs:282-289, postgres_history_read.rs:196-207, temporal.rs:248-263) -> point-in-time can drop current version
+2026-09-19T07:33:46Z F-02 medium 12 new test/support files missing AGENTS.md header (domain_tests, failure_tests, lib_tests, postgres_parity_tests, retry_tests, similar_tests, task_tests, temporal_tests, test_support, pg_history_tests, sqlite_history_tests, history_tests)
+2026-09-19T07:33:46Z F-03 medium T100150-13/AC-100150-06 compose-persona-unchanged not tested (domain_tests.rs:100-124 only item_in_domains)
+2026-09-19T07:33:46Z F-04 medium T100150-11/T100150-12 tested only via item_in_domains + limit caps, not hybrid retrieve; no explicit no-full-log assertion (domain_tests.rs:15-98)
+2026-09-19T07:33:46Z F-05 low no cross-bank rejection test (grep cross_bank = 0)
+2026-09-19T07:33:46Z F-06 low Completion Evidence claims clio-history funcs 100% but temporal.rs=91.67% (11/12)
+2026-09-19T07:33:46Z F-07 low Task 3 default thresholds not in clio-config (clio-types HistoryPolicy only)
+2026-09-19T07:33:46Z F-08 low attempt_n validated after admission gate (failure.rs:94-135)
+2026-09-19T07:33:46Z F-09 low what_failed uncapped and returned on reads (failure.rs:97; cap only on lesson)
+2026-09-19T07:33:46Z DELIVERABLE findings.json (9 findings) + report.html + style.css written to .workflows/phase-100150; verdict Adequate
+2026-09-19T07:33:46Z ATTR phase-100150 Adversary row set done; JSON validated parses
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100150/findings.json 4f081311

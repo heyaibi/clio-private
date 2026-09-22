@@ -1,0 +1,244 @@
+{
+  "run": "r1",
+  "phase": "100362",
+  "subject": "Phase 100362: Unified Read-Only clio status Health Command",
+  "verdict": "Adequate",
+  "verdict_justification": "Phase 100362 successfully implements the core clio status health command, port scanning over 34300-34309, Compose ps integration, and ops diagnose aggregation with clean exit code semantics (0/1/2) and 100% test pass rate. However, two material issues were identified: nonexistent SQLite DB paths cause a 512KB schema bootstrap creation violating read-only non-mutation constraints, and 5 source files fail cargo fmt checking.",
+  "metadata": {
+    "generated": "2026-09-22",
+    "applies_to": "staged diff (phase 100362)",
+    "source": "crates/clio-lib/src/{main,port_scan,status_cli,status_report,tests}.rs"
+  },
+  "standard": [
+    "Phase 100362 specification and Acceptance Criteria (AC-100362-01 through 05)",
+    "Non-mutation guarantee: status never writes to store or configuration under any circumstances",
+    "AGENTS.md hard constraints: file size <= 450 lines, per-file coverage >= 90% lines and functions",
+    "Code formatting and linting: make check / cargo fmt cleanliness",
+    "Sensitive data protection: credential redaction in URLs and config secret masking"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100362-01: One read-only command reports setup, DB, ports, Compose, diagnose",
+      "status": "Fully satisfied",
+      "evidence": "clio status command dispatches and renders setup, database, port scan, compose services, and diagnose view across both text and json output modes.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100362-02: Secrets masked everywhere",
+      "status": "Fully satisfied",
+      "evidence": "DB URL userinfo is redacted to postgres://***@host and setup secrets are masked with mask_secret (last-4 suffix); raw planted secret grep count is 0.",
+      "severity": "Critical",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100362-03: Exit codes 0 healthy, 1 degraded, 2 usage",
+      "status": "Fully satisfied",
+      "evidence": "Exit code 0 on healthy stack, exit code 1 on degraded backend or unreachable DB, exit code 2 on unknown --output flag or bad usage.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100362-04: No writes (store/config unchanged)",
+      "status": "Fully satisfied",
+      "evidence": "Config and existing stores remain untouched, and a nonexistent SQLite path is no longer created: `open_chosen` rejects a missing file before SqliteStore::open, so `clio status --backend sqlite --db /tmp/nonexistent-remed-test.db` exits 1 and leaves no file on disk (ls: No such file or directory).",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100362-05: No stdio status added",
+      "status": "Fully satisfied",
+      "evidence": "clio mcp status returns unknown command exit 2; stdio framing purity is preserved.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md: <= 450 lines per Rust source file",
+      "status": "Fully satisfied",
+      "evidence": "All 9 touched Rust files are at or below 450 lines (main.rs: 322, status_cli.rs: 372, status_report.rs: 282, port_scan.rs: 64, test files: 66, 100, 235, 266, 268).",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md & coverage.md: Aggregate and per-file >= 90% lines and functions coverage",
+      "status": "Fully satisfied",
+      "evidence": "make coverage reports 279 files meeting floor; new files: port_scan.rs 100%/100%, main.rs 97.75%/100%, status_cli.rs 97.69%/93.33%, status_report.rs 98.37%/92.86%.",
+      "severity": "High",
+      "confidence": "High",
+      "correction_needed": "No"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Read-only clio status creates a 512KB database and runs schema migrations on nonexistent SQLite path",
+      "severity": "Important",
+      "why_it_matters": "The command is explicitly specified as read-only with a hard guarantee that it never mutates or writes to disk (AC-100362-04). A user inspecting status with a misspelled or not-yet-created database path will find a brand new 512KB SQLite database populated on their filesystem.",
+      "impact": "Violates non-mutation contract (\u00a71, \u00a72, \u00a77, AC-100362-04). If clio status is run by monitoring daemons before initialization, it prematurely boots schemas and creates unexpected files.",
+      "evidence": "Running `target/debug/clio status --backend sqlite --db /tmp/nonexistent-test-123456.db` creates `/tmp/nonexistent-test-123456.db` (512,000 bytes) on disk. In `crates/clio-lib/src/status_cli.rs:207`, `SqliteStore::open(Path::new(&resolved.url), kms)` is called without checking `Path::new(&resolved.url).exists()`.",
+      "confidence": "High",
+      "proposed_fix": "In `open_chosen` (`crates/clio-lib/src/status_cli.rs:207`), check `Path::new(&resolved.url).exists()` before calling `SqliteStore::open`. If the file does not exist, return `Err(AmError::new(ErrorCode::NotFound, \"database file does not exist\"))`, causing status to report a degraded verdict (exit 1) without creating any files.",
+      "status": "resolved",
+      "resolution": "Fixed in crates/clio-lib/src/status_cli.rs:207 (open_chosen): it now checks Path::new(&resolved.url).exists() before SqliteStore::open and returns AmError(ErrorCode::NotFound) when the file is absent. Repro after fix: `target/debug/clio status --backend sqlite --db /tmp/nonexistent-remed-test.db` -> exit 1, `diagnose: not ok ... database file does not exist: /tmp/nonexistent-remed-test.db`, and `ls /tmp/nonexistent-remed-test.db` -> No such file or directory (no file created). New test: status_probe_tests::open_chosen_missing_sqlite_file_degrades_without_creating."
+    },
+    {
+      "id": 2,
+      "title": "Staged files fail cargo fmt --all -- --check, causing make check to dirty working copy",
+      "severity": "Important",
+      "why_it_matters": "Running `make check` executes `cargo fmt --all`, which mutates 5 source files on disk. Automated CI pipelines checking `cargo fmt --check` will fail.",
+      "impact": "Breaks clean checkout consistency and CI formatting verification across 5 newly introduced or modified files.",
+      "evidence": "`cargo fmt --all -- --check` fails with 11 diff blocks in `crates/clio-lib/src/port_scan.rs:56`, `crates/clio-lib/src/status_cli_fault_tests.rs:70`, `crates/clio-lib/src/status_cli_tests.rs:245`, `crates/clio-lib/src/status_probe_tests.rs:67`, `:105`, and `crates/clio-lib/src/status_report_tests.rs:36`, `:120`, `:151`, `:177`, `:204`, `:250`.",
+      "confidence": "High",
+      "proposed_fix": "Format all files with `cargo fmt --all` and include the formatted files in the staged commit.",
+      "status": "resolved",
+      "resolution": "Ran `cargo fmt --all`; `cargo fmt --all -- --check` now exits 0 (clean). Formatted: port_scan.rs:53, status_cli_fault_tests.rs:70, status_cli_tests.rs:245, status_probe_tests.rs:67/105, status_report_tests.rs (all 11 diff blocks). Verified by make check (exit 0)."
+    },
+    {
+      "id": 3,
+      "title": "SetupView secret masking only scans setup_config::WATCHED_FIELDS rather than all deployment overlay keys",
+      "severity": "Minor",
+      "why_it_matters": "If deployment.json contains other sensitive credentials (such as custom extract or API keys), they are not detected or masked under SetupView.secrets.",
+      "impact": "Uncommon custom deployment secrets may not appear in the masked secrets list in status output.",
+      "evidence": "`crates/clio-lib/src/status_cli.rs:309-319` loops over `crate::setup_config::WATCHED_FIELDS` which only contains embed and rerank credentials.",
+      "confidence": "High",
+      "proposed_fix": "Either expose an iterator/accessor for all overlay keys on `clio_config::Runtime` or document the limitation in Phase 100362 Known Limitations.",
+      "status": "resolved",
+      "resolution": "Fixed more strongly than 'document': added clio_config::Runtime::deployment_keys() (crates/clio-config/src/config/mod.rs:221) and build_setup now masks every secret-bearing overlay key discovered from the overlay itself instead of the fixed setup_config::WATCHED_FIELDS allowlist. Evidence: a deployment.json with `extract.token` and `custom.secret` renders `\"secrets\":{\"custom.secret\":\"****7890\",\"extract.token\":\"****mnop\"}` and grep for the raw values returns 0. New test: status_probe_tests::build_setup_masks_secret_keys_outside_the_watched_allowlist."
+    },
+    {
+      "id": 4,
+      "title": "Unit test occupied_port_is_reported does not test port within 34300-34309 range",
+      "severity": "Minor",
+      "why_it_matters": "Scenario T100362-03 specifies verifying 'A listener bound on 34300'. The test binds port 0 to avoid host port collisions, leaving the actual boundary port 34300 covered only by range bounds checks.",
+      "impact": "Slight test contract gap between scenario specification and test fixture.",
+      "evidence": "`crates/clio-lib/src/port_scan_tests.rs:33` binds to ephemeral port 0 (`TcpListener::bind(\"127.0.0.1:0\")`).",
+      "confidence": "High",
+      "proposed_fix": "Add an integration test that attempts binding to 34300 and scans `listening_ports()` if the port is free.",
+      "status": "resolved",
+      "resolution": "Added crates/clio-lib/src/port_scan_tests.rs::listener_on_contract_port_is_reported, which binds 127.0.0.1:34300 (FIRST_PORT, the range's first port) and asserts listening_ports() reports it; when the host already occupies 34300 the test asserts the occupied port is still reported. The existing ephemeral-port test is retained."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Read-only clio status creates a 512KB database and runs schema migrations on nonexistent SQLite path",
+      "evidence": "Running `target/debug/clio status --backend sqlite --db /tmp/nonexistent-test-123456.db` creates `/tmp/nonexistent-test-123456.db` (512,000 bytes) on disk. In `crates/clio-lib/src/status_cli.rs:207`, `SqliteStore::open(Path::new(&resolved.url), kms)` is called without checking `Path::new(&resolved.url).exists()`.",
+      "requirement_ref": "Phase 100362 AC-100362-04, \u00a71, \u00a77",
+      "recommendation": "In `open_chosen` (`crates/clio-lib/src/status_cli.rs:207`), check `Path::new(&resolved.url).exists()` before calling `SqliteStore::open`. Return `AmError` indicating missing file if nonexistent.",
+      "status": "resolved",
+      "resolution": "Fixed in crates/clio-lib/src/status_cli.rs:207 (open_chosen): it now checks Path::new(&resolved.url).exists() before SqliteStore::open and returns AmError(ErrorCode::NotFound) when the file is absent. Repro after fix: `target/debug/clio status --backend sqlite --db /tmp/nonexistent-remed-test.db` -> exit 1, `diagnose: not ok ... database file does not exist: /tmp/nonexistent-remed-test.db`, and `ls /tmp/nonexistent-remed-test.db` -> No such file or directory (no file created). New test: status_probe_tests::open_chosen_missing_sqlite_file_degrades_without_creating."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Staged files fail cargo fmt --all -- --check, causing make check to dirty working copy",
+      "evidence": "`cargo fmt --all -- --check` fails with 11 diff blocks in `crates/clio-lib/src/port_scan.rs:56`, `crates/clio-lib/src/status_cli_fault_tests.rs:70`, `crates/clio-lib/src/status_cli_tests.rs:245`, `crates/clio-lib/src/status_probe_tests.rs:67`, `:105`, and `crates/clio-lib/src/status_report_tests.rs:36`, `:120`, `:151`, `:177`, `:204`, `:250`.",
+      "requirement_ref": "Makefile check target",
+      "recommendation": "Run `cargo fmt --all` and stage the formatted changes.",
+      "status": "resolved",
+      "resolution": "Ran `cargo fmt --all`; `cargo fmt --all -- --check` now exits 0 (clean). Formatted: port_scan.rs:53, status_cli_fault_tests.rs:70, status_cli_tests.rs:245, status_probe_tests.rs:67/105, status_report_tests.rs (all 11 diff blocks). Verified by make check (exit 0)."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "SetupView secret masking only scans setup_config::WATCHED_FIELDS rather than all deployment overlay keys",
+      "evidence": "`crates/clio-lib/src/status_cli.rs:309-319` loops over `crate::setup_config::WATCHED_FIELDS` which only contains embed and rerank credentials.",
+      "requirement_ref": "Phase 100362 \u00a71, FR-32",
+      "recommendation": "Document limitation or expand overlay key traversal in Runtime.",
+      "status": "resolved",
+      "resolution": "Fixed more strongly than 'document': added clio_config::Runtime::deployment_keys() (crates/clio-config/src/config/mod.rs:221) and build_setup now masks every secret-bearing overlay key discovered from the overlay itself instead of the fixed setup_config::WATCHED_FIELDS allowlist. Evidence: a deployment.json with `extract.token` and `custom.secret` renders `\"secrets\":{\"custom.secret\":\"****7890\",\"extract.token\":\"****mnop\"}` and grep for the raw values returns 0. New test: status_probe_tests::build_setup_masks_secret_keys_outside_the_watched_allowlist."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Unit test occupied_port_is_reported does not test port within 34300-34309 range",
+      "evidence": "`crates/clio-lib/src/port_scan_tests.rs:33` binds to ephemeral port 0 (`TcpListener::bind(\"127.0.0.1:0\")`).",
+      "requirement_ref": "Phase 100362 \u00a78 T100362-03",
+      "recommendation": "Add test scenario attempting bind to 34300 when free.",
+      "status": "resolved",
+      "resolution": "Added crates/clio-lib/src/port_scan_tests.rs::listener_on_contract_port_is_reported, which binds 127.0.0.1:34300 (FIRST_PORT, the range's first port) and asserts listening_ports() reports it; when the host already occupies 34300 the test asserts the occupied port is still reported. The existing ephemeral-port test is retained."
+    }
+  ],
+  "dismissed": [
+    "Checking whether positional arguments like 'clio status foo' should be rejected with exit code 2: dismissed because parse_flags ignores non-flag arguments across clio subcommands unless specifically validated.",
+    "Checking whether Docker ps failure crashes the status command: dismissed because probe_compose gracefully falls back to ComposeView::Unavailable."
+  ],
+  "verification": [
+    {
+      "claim": "clio status exits 0 and reports status on healthy store",
+      "classification": "Established",
+      "source_note": "Verified with real execution against in-memory store and live repository stack"
+    },
+    {
+      "claim": "clio status redacts DB URL credentials",
+      "classification": "Established",
+      "source_note": "Verified with postgres://alice:secretpw@127.0.0.1:1/none -> postgres://***@127.0.0.1:1/none"
+    },
+    {
+      "claim": "All touched Rust files <= 450 lines",
+      "classification": "Established",
+      "source_note": "Verified with wc -l (maximum file size 372 lines in status_cli.rs)"
+    },
+    {
+      "claim": "Aggregate and per-file coverage >= 90%",
+      "classification": "Established",
+      "source_note": "Verified with make coverage; all 279 files pass guard floors"
+    },
+    {
+      "claim": "clio status does not mutate the store or create files",
+      "classification": "Established",
+      "source_note": "Established after F-01 fix: missing SQLite path reports degraded (exit 1) and creates no file; existing config/store bytes unchanged."
+    },
+    {
+      "claim": "Staged files pass standard formatting check",
+      "classification": "Established",
+      "source_note": "Established after `cargo fmt --all`: `cargo fmt --all -- --check` exits 0; make check exits 0."
+    }
+  ],
+  "unknowns": [],
+  "strengths": [
+    "Clean architecture and clear separation of concerns between status_cli, status_report, and port_scan",
+    "Excellent test coverage (>97% lines and >92% functions on all new files)",
+    "Strict adherence to line-count constraints (all files <= 372 lines)",
+    "Thorough credential redaction in URLs and error messages"
+  ],
+  "regrets": [
+    "Developer relied on FakeDeps in status_does_not_write_config_or_store, missing the fact that real SqliteStore::open creates files on nonexistent paths"
+  ],
+  "process_changes": [
+    "Ensure `cargo fmt --all -- --check` is run during pre-completion verification before staging",
+    "Test negative filesystem side effects with real file-backed stores rather than solely in-memory/mock dependencies"
+  ],
+  "plan_1hr": [
+    "RESOLVED: Fixed SqliteStore::open invocation in status_cli.rs: `open_chosen` verifies Path::new(&resolved.url).exists() before opening a file-backed SQLite store.",
+    "RESOLVED: Added status_probe_tests::open_chosen_missing_sqlite_file_degrades_without_creating asserting the missing path is rejected and zero files are created.",
+    "RESOLVED: Ran cargo fmt --all; cargo fmt --all -- --check is now clean."
+  ],
+  "plan_unlimited": [
+    "DEFERRED (not this round): a dedicated read-only Store::open_read_only seam in clio-store using SQLITE_OPEN_READONLY. The F-01 defect (creating a missing DB file) is fixed at the status boundary; a genuine read-only open that also skips schema bootstrap/migration on an existing DB is a larger clio-store change affecting ops diagnose too, so it is recorded as known debt rather than done in a remediation round.",
+    "RESOLVED: Exposed clio_config::Runtime::deployment_keys() and status now discovers and masks all secret overlay keys dynamically."
+  ],
+  "remediation": {
+    "round": "r1",
+    "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+    "date": "2026-09-22",
+    "fixed": [
+      "F-01",
+      "F-02",
+      "F-03",
+      "F-04"
+    ],
+    "refuted": [],
+    "deferred": [
+      "plan_unlimited[0] (read-only Store seam) with rationale"
+    ],
+    "verification": "make check exit 0; make coverage exit 0 (279 files, TOTAL lines 97.91% functions 98.87%, all per-file >=90%); scoped per-file: status_cli.rs 97.76%/93.33%, config/mod.rs 99.18%/100%, port_scan.rs 100%/100% (lines/functions)."
+  }
+}

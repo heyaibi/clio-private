@@ -1,0 +1,16 @@
+2026-09-19T10:28:09Z START remediator-task-r1 phase-100160; backup findings.original.json already present (sha match); addressing 11 findings
+2026-09-19T10:35:01Z F-01: added #[cfg(test)] #[path="stdio_tests.rs"] mod stdio_tests; to crates/clio-mcp/src/stdio.rs:52; stdio tests now compile (3)
+2026-09-19T10:35:01Z F-03: write_tools.rs graph_link now uses resolve_ctx + AssociationEngine::graph_link (bank/actor injection); test graph_link_uses_connection_default_bank green
+2026-09-19T10:35:01Z F-05: write_tools.rs store_path flattens decision to top-level pass/admission_score/factors/rejection_reason (+id/dry_run); tests updated
+2026-09-19T10:35:01Z F-02: write_tools.rs dispatch fails closed (structured not_implemented) on dry_run=true for mutators with no no-write path; escalation + owner recorded in phase doc limitation (d)
+2026-09-19T10:35:01Z F-06: removed slice refs in schema_defs.rs:187, schema_read_defs.rs:7/25, README.md:25
+2026-09-19T10:35:01Z F-07: clio-lib/src/main.rs schema-export accepts --path alias of --out; test mcp_schema_export_accepts_path_alias
+2026-09-19T10:35:01Z F-08: http.rs write_simple emits Content-Length 0 and no body for empty message; asserted in http_tests
+2026-09-19T10:35:01Z F-11: http.rs constant-time ct_eq token compare + OS-seeded 128-bit session ids; asserted in http_tests
+2026-09-19T10:35:01Z F-04: .github/workflows/ci.yml main job now cargo test --workspace; MCP job now cargo test -p clio-mcp (schema+unit+conformance)
+2026-09-19T10:35:01Z F-09: requirement.md 4.9.4.D/E signatures reconciled to implemented contract (task_upsert definition/status; triple_end valid_until required)
+2026-09-19T10:35:01Z F-10: phase doc limitation (c) names owning phase; no_signals_are_empty documents empty-signal behavior
+2026-09-19T10:35:01Z findings.json updated: 11/11 findings carry resolutions; phase doc Attribution Remediator r1=done; DoD/evidence/limitations updated
+2026-09-19T10:35:01Z make check exit 0: fmt clean, clippy -D warnings clean, 716 workspace tests pass (clio-mcp 73 unit + 6 conformance)
+2026-09-19T10:35:01Z make coverage exit 0: lines 95.14% / functions 98.68% aggregate; no reported file below 90% on either metric
+REMEDIATOR_DONE 7b3a5e25

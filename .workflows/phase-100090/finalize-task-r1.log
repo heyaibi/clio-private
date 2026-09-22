@@ -1,0 +1,8 @@
+2026-09-18T15:30:18 start: phase 100090 finalize run r1; confirming approved remediation and closing out
+2026-09-18T15:30:18 attribution table found: roadmap/phase-100090-shared-continuous-ema-update-engine.md:3-10; Developer r1 done, Adversary r1 done, Remediator r1 done, Remedy Approver r1 approved; Finalize r1 TBD -> will set done
+2026-09-18T15:30:18 diff inspection: git diff --stat (unstaged remediation, 8 files) + git diff --cached --stat (staged phase work, 20 files, 3003 insertions); all paths phase-100090 scoped except .workflows/ (pipeline-internal)
+2026-09-18T15:30:37 make check PASS: cargo fmt + clippy -D warnings + cargo test --locked --workspace; all suites ok (clio-write 95, clio-store 91, clio-types 59, clio 15, clio-store vec_missing 7, others); 0 failed
+2026-09-18T15:30:37 attribution updated: Finalize r1 -> OpenCode CLI (Together . GLM-5.3 Flash High) | done
+2026-09-18T15:30:37 file list (working tree, excl .workflows/): modified crates/clio-store/src/{attribute_map.rs,postgres_attribute.rs,sqlite_attribute.rs,postgres_store.rs,sqlite_store.rs,store.rs,lib.rs}, crates/clio-types/src/{attribute.rs,triple.rs,lib.rs}, crates/clio-write/src/{update.rs,update_tests.rs,persona.rs,lib.rs}, roadmap/phase-100090-shared-continuous-ema-update-engine.md, sql/001_core.sql; added crates/clio-store/src/{attribute_tests.rs,pg_attribute_tests.rs}, crates/clio-types/src/attribute_tests.rs, crates/clio-write/src/{persona_tests.rs,update_tests.rs already modified+added}
+2026-09-18T15:30:37 close-out: no commit created; changes left uncommitted; roadmap isolation and 450-line limit confirmed by approver r1 and spot-checked (max file 423 lines)
+FINALIZE_DONE

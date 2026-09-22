@@ -1,0 +1,316 @@
+{
+  "run": "r1",
+  "phase": "100280",
+  "subject": "Phase 100280 - HTTPS transport and provider configuration plumbing (staged diff)",
+  "verdict": "Adequate",
+  "remediation": {
+    "round": "r1",
+    "summary": "All 7 findings resolved. Docs phase-number leaks scrubbed (.env.example, README.md:293, hardware.md:22 -> 'upcoming releases'); stale EMBED_API_BASE/RERANK_API_BASE placeholders removed from .env.example; AGENTS.md header added to validate_tests.rs; mod.rs decomposed (449 -> 370 lines, new env.rs 112 lines); http.rs 401/403 body snippets omitted, terminal ureq errors no longer marked '(sidecar unreachable)' (Tls/BadUri/Protocol now non-retryable by design), bracketed IPv6 literals parse correctly. Verified: scoped cargo test -p clio-index -p clio-config (0 failures), make check EXIT 0 (one earlier clio-compliance flake passed on rerun, crate untouched by fixes), make coverage EXIT 0 (TOTAL 97.88% lines / 98.98% functions; modified files: env.rs 100/100, mod.rs 99.03/100.00, embed.rs 100/100, http.rs 96.85 lines/95.00 functions; wc -l all <=450, largest modified file http.rs 403).",
+    "evidence_log": "/tmp/cov-final-r1.log (make coverage), /tmp/make-check-r1.log (make check)"
+  },
+  "verdict_justification": "The core HTTPS transport transition to ureq 3.4.2 and configuration plumbing for embed/rerank providers are implemented cleanly with verified test execution (1316/1316 passing tests) and robust coverage (TOTAL lines 97.88%, functions 98.98%; all 253 reported files >=90%). However, several actionable defects were identified: roadmap isolation leaks referencing 'Phases 029/030' in .env.example, README.md, and hardware.md; missing module responsibility header on modified validate_tests.rs; unredacted HTTP response body snippets in error returns risking secret leakage on 401/403 errors; unconditional 'sidecar unreachable' tagging on static transport errors causing unneeded retries; bare IPv6 literal rejection in HttpEndpoint::parse; and extreme line count saturation (449/450 lines) on clio-config/src/config/mod.rs.",
+  "metadata": {
+    "generated": "2026-09-21",
+    "applies_to": "phase-100280 (staged developer snapshot, commit base HEAD)",
+    "source": "crates/clio-index/src/{http.rs,http_tests.rs,embed.rs,embed_tests.rs}; crates/clio-config/src/config/{merge.rs,mod.rs,validate.rs,validate_tests.rs,embed_knob_tests.rs}; Cargo.toml; Cargo.lock; .env.example; README.md; hardware.md; roadmap/phase-100280-https-transport-config.md"
+  },
+  "standard": [
+    "roadmap/phase-100280-https-transport-config.md - In Scope, Tasks 1-4, Must Not Change, Acceptance Criteria AC-100280-01..06, Definition of Done, Known Limitations",
+    "AGENTS.md - 450-line per-file limit, exact header structure with truthful ownership, coverage gate (>=90% function and line per file), roadmap isolation (never reference roadmap or phase numbers in code/comments)",
+    "coverage.md - authoritative gate `make coverage`, per-file >=90% line and function floors",
+    "requirement.md - §4.9.5.E, FR-32, NFR-6 (no secret leakage)"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100280-01: HTTPS transport with verified TLS behind unchanged contract",
+      "status": "Fully satisfied",
+      "evidence": "clio-index/src/http.rs implemented over ureq 3.4.2 with rustls-verified TLS and webpki-roots; post_json and get_ok signatures unchanged; 45 clio-index tests pass.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100280-02: TEI wire shapes reachable; retry substrings preserved",
+      "status": "Fully satisfied",
+      "evidence": "Fake sidecar tests pass in http_tests.rs and embed_tests.rs; connect failed, sidecar unreachable, read timed out, HTTP 429, HTTP 5 preserved.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100280-03: Provider paths allowlisted and validated",
+      "status": "Fully satisfied",
+      "evidence": "validate.rs validates embed.provider (tei|openai), rerank.provider (tei|cohere), rerank.url, rerank.model, credentials.rerank_api_key; 114 clio-config tests pass.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100280-04: Keys wired and masked; env knobs reach config",
+      "status": "Fully satisfied",
+      "evidence": "apply_process_env wires EMBED_API_KEY, EMBED_PROVIDER, EMBED_DIMS, RERANK_URL, RERANK_MODEL, RERANK_PROVIDER, RERANK_API_KEY; bearer_for implements precedence; credentials.rerank_api_key masked in config_get.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100280-05: Exactly one new dependency (ureq); build green on macOS arm64 and Linux amd64",
+      "status": "Fully satisfied",
+      "evidence": "Cargo.toml adds ureq = '3'; cargo tree confirms clio-index as sole direct owner; clean build passes on macOS arm64; dep-tree on x86_64 target confirmed identical.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AC-100280-06: No-provider behavior unchanged",
+      "status": "Fully satisfied",
+      "evidence": "Full workspace regression suite green (1316 passed / 0 failed); defaults keep embed.provider and rerank.* empty.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "AGENTS.md: Roadmap isolation (no phase numbers or roadmap references in code/comments)",
+      "status": "Partially satisfied",
+      "evidence": ".env.example:59 contains '# NOTE: provider adapters land in Phases 029/030'; README.md:293 and hardware.md:22 contain 'Phases 029/030'.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "AGENTS.md: Exact module responsibility header on new/modified Rust files",
+      "status": "Partially satisfied",
+      "evidence": "crates/clio-config/src/config/validate_tests.rs was modified (59 lines added) but lacks the required AGENTS.md responsibility and boundary doc header.",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    },
+    {
+      "requirement": "AGENTS.md: File size <= 450 lines",
+      "status": "Fully satisfied",
+      "evidence": "All 9 modified Rust files are <= 450 lines; clio-config/src/config/mod.rs is at 449 lines (within boundary but at limit).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "No"
+    },
+    {
+      "requirement": "NFR-6: No secret leakage in error text or telemetry",
+      "status": "Partially satisfied",
+      "evidence": "crates/clio-index/src/http.rs:211-215 formats raw 200-byte error response body snippets into AmError without secret scrubbing on HTTP 401/403.",
+      "severity": "Medium",
+      "confidence": "High",
+      "correction_needed": "Yes"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Roadmap isolation violation: Phase numbers referenced in .env.example, README.md, and hardware.md",
+      "evidence": ".env.example:59 ('# NOTE: provider adapters land in Phases 029/030'), README.md:293 ('Phases 029/030'), hardware.md:22 ('Phases 029/030')",
+      "requirement_ref": "AGENTS.md Hard Rules: 'Roadmap isolation: never reference ./roadmap/, phase numbers, or roadmap files from code or comments.'",
+      "recommendation": "Replace 'Phases 029/030' in .env.example, README.md, and hardware.md with generic product wording such as 'upcoming provider releases' or 'subsequent releases'.",
+      "resolved": true,
+      "resolution": "Fixed r1 by Remediator. All three files now say 'upcoming releases': .env.example note line, README.md:293 ('Provider adapters that actually call these endpoints land in upcoming releases'), hardware.md:22 ('Hosted provider adapters land in upcoming releases'). Post-fix grep for 'Phases 0|029/030' across .env.example, README.md, hardware.md returned no matches (grep exit 1)."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Missing AGENTS.md module header on modified crates/clio-config/src/config/validate_tests.rs",
+      "evidence": "crates/clio-config/src/config/validate_tests.rs:1-4",
+      "requirement_ref": "AGENTS.md File Header: 'Every Rust source file MUST use the following header structure... New/modified Rust files use the exact AGENTS.md header with truthful ownership.'",
+      "recommendation": "Add the standard module responsibility, ownership, and boundary doc header to crates/clio-config/src/config/validate_tests.rs.",
+      "resolved": true,
+      "resolution": "Fixed r1 by remedy worker A. Full AGENTS.md header added (validate_tests.rs now 299 lines); truthfully scoped to validation-rule test coverage. Evidence: cargo test -p clio-config --locked 114 passed; 0 failed; fmt/clippy clean."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Unsanitized HTTP response body snippets in error returns risk secret token leakage in AmError",
+      "evidence": "crates/clio-index/src/http.rs:211-215 (let snippet = String::from_utf8_lossy(&body[..body.len().min(200)]); ... format!('embed endpoint returned HTTP {code}: {}', snippet.trim()))",
+      "requirement_ref": "roadmap/phase-100280-https-transport-config.md Section 7 Security Constraints; requirement.md NFR-6",
+      "recommendation": "Scrub potential bearer tokens and secrets from the error response snippet, or omit the response body snippet on HTTP 401 Unauthorized and 403 Forbidden statuses.",
+      "resolved": true,
+      "resolution": "Fixed r1 by remedy worker B. parse_response_json (http.rs) now omits the body snippet entirely on HTTP 401/403 (returns 'embed endpoint returned HTTP {code}') and keeps the snippet for other non-2xx. New test parse_response_json_hides_body_for_401_403 feeds body 'token abc123 must not leak': 401/403 errors assert snippet absent, 503 still includes it. Evidence: cargo test -p clio-index --locked 48 passed; 0 failed; http.rs coverage 95.00% functions / 96.85% lines."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Unconditional '(sidecar unreachable)' on transport errors misclassifies terminal client errors as retryable",
+      "evidence": "crates/clio-index/src/http.rs:120-125 and crates/clio-index/src/embed.rs:170-176",
+      "requirement_ref": "roadmap/phase-100280-https-transport-config.md Section 10 Expected Failure Modes (TLS verification failure: 'Hard error; never bypassed')",
+      "recommendation": "Omit '(sidecar unreachable)' on deterministic client errors such as ureq::Error::Tls, BadUri, and Protocol so callers fail fast rather than retrying unrecoverable errors.",
+      "resolved": true,
+      "resolution": "Fixed r1 by remedy worker B. transport_error now classifies Tls/BadUri/Protocol as terminal: no '(sidecar unreachable)' marker and no retryable substring, so embed::is_retryable returns false (fail fast). Transient variants (Timeout/Io/ConnectionFailed/HostNotFound) keep the marker and 'connect failed'/'read timed out' substrings unchanged. Test ureq_error_mapping_classifies_retryability now asserts BadUri and Tls are NOT retryable (the flip is the fix); integration test non_json_body_and_malformed_response_are_reported updated to expect 'protocol error' + non-retryable for raw garbage bytes, which ureq 3.4.2 reports as Protocol. Protocol's inner ureq_proto::Error is not re-exported by ureq so it cannot be constructed in a test; it maps identically and this is stated in a code comment. Evidence: cargo test -p clio-index --locked 48 passed; 0 failed."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "HttpEndpoint::parse fails on bare bracketed IPv6 literals due to naive colon splitting",
+      "evidence": "crates/clio-index/src/http.rs:68-77 (authority.rsplit_once(':') splits '[::1]' into ('[:', '1]'))",
+      "requirement_ref": "roadmap/phase-100280-https-transport-config.md Section 5 Task 1",
+      "recommendation": "Check for closing bracket ']' before splitting authority on ':' so IPv6 literals without explicit port default to 80/443 without erroring.",
+      "resolved": true,
+      "resolution": "Fixed r1 by remedy worker B. HttpEndpoint::parse detects a leading '[': bracket content must parse as Ipv6Addr (fail closed otherwise with 'malformed bracketed host'), optional ':port' after ']' parsed as u16, junk after ']' fails closed, stored host keeps no brackets. New tests: endpoint_parse_accepts_bracketed_ipv6 ('http://[::1]' -> '::1'/80, 'https://[::1]' -> 443, 'http://[::1]:8080/embed' -> 8080 with path) and endpoint_parse_fails_closed_on_malformed_brackets ('http://[::1', 'http://[:x]', 'http://[::1]junk', 'http://[::1]:notaport' all error). Evidence: cargo test -p clio-index --locked 48 passed; 0 failed."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "crates/clio-config/src/config/mod.rs reaches 449 lines (1 line below 450-line hard limit)",
+      "evidence": "crates/clio-config/src/config/mod.rs:1-449",
+      "requirement_ref": "AGENTS.md Source File Size Constraint: 'Every Rust source file, whether newly created or refactored, MUST remain at or below 450 total lines.'",
+      "recommendation": "Extract bearer_for or environment overlay mapping into a dedicated submodule to restore adequate headroom.",
+      "resolved": true,
+      "resolution": "Fixed r1 by remedy worker A. reload_env_overlay, apply_process_env, and bearer_for moved into new crates/clio-config/src/config/env.rs (112 lines, full AGENTS.md header) as a second impl Runtime block; mod.rs now 370 lines (was 449). No signature changes; reload_env_overlay widened private -> pub(super) so mod.rs's finish_boot still compiles. Evidence: cargo test -p clio-config --locked 114 passed; 0 failed; make coverage per-file: env.rs 100.00% functions / 100.00% lines, mod.rs 100.00% functions / 99.55% lines; wc -l: mod.rs 370, env.rs 112, all <=450."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "Stale unwired placeholders EMBED_API_BASE and RERANK_API_BASE retained in .env.example",
+      "evidence": ".env.example:68-69",
+      "requirement_ref": "roadmap/phase-100280-https-transport-config.md Section 5 Task 2 item 5",
+      "recommendation": "Remove EMBED_API_BASE and RERANK_API_BASE or replace with commented EMBED_URL and RERANK_URL placeholders matching apply_process_env.",
+      "resolved": true,
+      "resolution": "Fixed r1 by Remediator. Both stale lines removed from .env.example; wired EMBED_URL/RERANK_URL already exist at the top of the file (lines 31-32), so no replacement placeholders were needed. Post-fix grep for 'EMBED_API_BASE|RERANK_API_BASE' across .env.example returned no matches (grep exit 1)."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Roadmap isolation violation: Phase numbers referenced in .env.example, README.md, and hardware.md",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md strictly prohibits referencing roadmap files or phase numbers in code, comments, or repository artifacts to ensure modular decoupling from the planning roadmap.",
+      "impact": "Leaks internal phase numbers to external repo documentation and config comments.",
+      "evidence": ".env.example:59, README.md:293, hardware.md:22 contain 'Phases 029/030'",
+      "confidence": "High",
+      "proposed_fix": "Replace 'Phases 029/030' with 'upcoming releases' in .env.example, README.md, and hardware.md."
+    },
+    {
+      "id": 2,
+      "title": "Unsanitized HTTP response body snippets in error returns risk secret token leakage in AmError",
+      "severity": "Important",
+      "why_it_matters": "External HTTPS endpoints (OpenAI, Cohere, reverse proxies) often echo invalid client credentials in 401/403 error payloads. Embedding the raw body snippet in AmError violates NFR-6.",
+      "impact": "Exposed API keys may leak into telemetry, log files, or MCP tool errors.",
+      "evidence": "crates/clio-index/src/http.rs:211-215 formats body[..200] directly into the returned error message.",
+      "confidence": "High",
+      "proposed_fix": "Mask credentials in error body snippets or omit the response snippet on 401 and 403 status codes."
+    },
+    {
+      "id": 3,
+      "title": "Missing AGENTS.md module header on modified crates/clio-config/src/config/validate_tests.rs",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md requires all new and modified Rust files to have truthful responsibility, ownership, and boundary module doc headers.",
+      "impact": "Header audit inconsistency across modified crate test files.",
+      "evidence": "crates/clio-config/src/config/validate_tests.rs lines 1-4 lack the //! # Responsibility module doc block.",
+      "confidence": "High",
+      "proposed_fix": "Add the standard AGENTS.md module doc header to crates/clio-config/src/config/validate_tests.rs."
+    },
+    {
+      "id": 4,
+      "title": "Unconditional '(sidecar unreachable)' on transport errors misclassifies terminal client errors as retryable",
+      "severity": "Minor",
+      "why_it_matters": "Errors such as ureq::Error::Tls (certificate verification failure) and BadUri are fatal client errors, not transient network drops.",
+      "impact": "Retrying permanent failures wastes client time and delays fail-closed error propagation.",
+      "evidence": "crates/clio-index/src/http.rs:120-125 unconditionally embeds '(sidecar unreachable): {reason}'.",
+      "confidence": "High",
+      "proposed_fix": "Exclude '(sidecar unreachable)' on ureq::Error::Tls, BadUri, and Protocol variants."
+    },
+    {
+      "id": 5,
+      "title": "HttpEndpoint::parse fails on bare bracketed IPv6 literals due to naive colon splitting",
+      "severity": "Minor",
+      "why_it_matters": "Standard IPv6 addresses like [::1] contain multiple colons. Without an explicit port, rsplit_once(':') mistakenly interprets '1]' as the port number.",
+      "impact": "Localhost IPv6 endpoints like http://[::1]/embed fail to parse with 'invalid port 1]'.",
+      "evidence": "crates/clio-index/src/http.rs:68-77 splits authority with rsplit_once(':') without checking bracket boundaries.",
+      "confidence": "High",
+      "proposed_fix": "Handle IPv6 bracketed hosts before splitting on port colons."
+    },
+    {
+      "id": 6,
+      "title": "crates/clio-config/src/config/mod.rs reaches 449 lines (1 line below 450-line hard limit)",
+      "severity": "Minor",
+      "why_it_matters": "The file is within 1 line of failing the 450-line gate. Any subsequent touch will likely violate the constraint.",
+      "impact": "Impedes future maintainability and creates high risk of gate failures during remediation.",
+      "evidence": "crates/clio-config/src/config/mod.rs has 449 total lines.",
+      "confidence": "High",
+      "proposed_fix": "Extract bearer_for or environment overlay mapping into a dedicated submodule (e.g. env.rs or bearer.rs)."
+    },
+    {
+      "id": 7,
+      "title": "Stale unwired placeholders EMBED_API_BASE and RERANK_API_BASE retained in .env.example",
+      "severity": "Minor",
+      "why_it_matters": "apply_process_env wires EMBED_URL and RERANK_URL, not EMBED_API_BASE or RERANK_API_BASE.",
+      "impact": "Operators copying from .env.example may set unwired variables expecting them to work.",
+      "evidence": ".env.example:68-69 retains # EMBED_API_BASE= and # RERANK_API_BASE=.",
+      "confidence": "High",
+      "proposed_fix": "Remove or update legacy placeholders to # EMBED_URL= and # RERANK_URL=."
+    }
+  ],
+  "dismissed": [
+    "ureq 3.4.2 dependency addition was pre-approved by the phase specification and operator rules.",
+    "All 9 modified Rust files satisfy the <= 450 line constraint at present.",
+    "The workspace coverage gate (make coverage) and per-file >=90% line and function criteria pass cleanly across all 253 reported files.",
+    "Compiler checks (cargo fmt and clippy -D warnings) are completely clean across all workspace crates.",
+    "Per-call ureq agent instantiation without connection pooling is a documented and approved intentional design decision."
+  ],
+  "verification": [
+    {
+      "claim": "Full workspace test suite passes with 1316 tests green and 0 failures",
+      "classification": "Established",
+      "source_note": "cargo test --workspace --locked and make coverage exit 0 (1316 passed, 0 failed)"
+    },
+    {
+      "claim": "All reported source files maintain >=90% line and function coverage",
+      "classification": "Established",
+      "source_note": "make coverage exit 0: 253 files checked, 0 below 90% lines or functions (TOTAL 97.88% lines, 98.98% functions)"
+    },
+    {
+      "claim": "Clippy and fmt checks pass with zero warnings",
+      "classification": "Established",
+      "source_note": "cargo clippy --workspace --all-targets --locked -- -D warnings exit 0; cargo fmt --check exit 0"
+    },
+    {
+      "claim": "All modified Rust files remain at or below 450 total lines",
+      "classification": "Established",
+      "source_note": "wc -l verification: largest file is crates/clio-config/src/config/mod.rs at 449 lines"
+    },
+    {
+      "claim": "Secret API keys are masked in config_get and effective config serialization",
+      "classification": "Established",
+      "source_note": "Verified by embed_knob_tests::rerank_api_key_masked_everywhere and embed_rerank_env_knobs_reach_effective_config"
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Real network TLS performance and latency against live hosted endpoints",
+      "why_unknown": "No remote API credentials or internet egress configured in test environment",
+      "what_would_resolve_it": "Integration testing against live OpenAI/Cohere endpoints with mock/real API keys in Phase 100290/100300",
+      "materiality": "Low"
+    }
+  ],
+  "strengths": [
+    "Clean, disciplined drop-in replacement of the raw TcpStream HTTP transport with ureq 3.4.2 preserving error contracts and retry classifications.",
+    "Strict test coverage: 100% of modified files have >=93% line and function coverage with extensive test coverage of failure modes, timeouts, and headers.",
+    "Zero unnecessary dependencies: strictly 1 approved workspace dependency added (ureq).",
+    "Clean secret masking: credentials.rerank_api_key automatically integrates with the existing masking engine across all configuration views."
+  ],
+  "regrets": [
+    "Leaking phase numbers into documentation and configuration comments despite strict AGENTS.md isolation rules.",
+    "Neglecting to add module documentation headers to crates/clio-config/src/config/validate_tests.rs when editing it."
+  ],
+  "process_changes": [
+    "Run automated grep for 'phase' or 'roadmap' across all staged non-workflow files prior to completion signal.",
+    "Check header format on all modified test files as part of pre-completion verification."
+  ],
+  "plan_1hr": [
+    "Scrub 'Phases 029/030' references from .env.example, README.md, and hardware.md to satisfy roadmap isolation.",
+    "Add standard AGENTS.md module header to crates/clio-config/src/config/validate_tests.rs.",
+    "Sanitize or omit response body snippet on HTTP 401/403 in crates/clio-index/src/http.rs to prevent key leakage in error text.",
+    "Fix bare IPv6 literal handling in HttpEndpoint::parse and update .env.example placeholders to match apply_process_env."
+  ],
+  "plan_unlimited": [
+    "Decompose clio-config/src/config/mod.rs to restore comfortable headroom below the 450-line limit.",
+    "Refactor transport_error to classify TLS/protocol errors separately from sidecar connectivity failures.",
+    "Introduce comprehensive mock TLS integration fixtures using ephemeral in-memory certificates."
+  ]
+}

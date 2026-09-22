@@ -1,0 +1,241 @@
+{
+  "run": "r1",
+  "phase": "100350",
+  "subject": "Phase 100350: Wire Dense Indexing, Reranking, and Extraction into the Live MCP Runtime",
+  "verdict": "Good",
+  "verdict_justification": "The developer successfully wired the outbox drain, lexical-only fallback, reranker attachment, and library raw-ingest pipeline without blocking the write path. All 276 files meet the >=90% coverage threshold (97.88% lines / 98.94% functions aggregate) and the 450-line limit. Four minor issues were identified: an omitted AGENTS.md responsibility header in a new test file, silent fallback on partial embed configurations, lack of an end-to-end retrieve assertion in raw ingest tests, and a superficial readiness check for extract_available.",
+  "metadata": {
+    "generated": "2026-09-22",
+    "applies_to": "git staged diff (Phase 100350 r1)",
+    "source": "25 staged files across crates/clio-mcp, clio-index, clio-write, clio-lib, clio-config, clio-store"
+  },
+  "standard": [
+    "Phase 100350 implementation specification (roadmap/phase-100350-live-index-extraction-wiring.md)",
+    "AGENTS.md core principles, file header rules, and 450-line source file limit",
+    "coverage.md gate: >=90% lines and functions aggregate and per-file",
+    "PR-9 / FR-3 (leaf queryable before structural maintenance), NFR-2 (bounded retrievability < 2s)",
+    "FR-4 (verified extraction), FR-28 (maintenance_status inspection)"
+  ],
+  "requirements": [
+    {
+      "requirement": "Construct and run index drain in MCP runtime with lexical-only fallback (Task 1)",
+      "status": "Fully satisfied",
+      "evidence": "IndexCoordinator decoupled; IndexDrain and background sweeper running in clio-mcp; t35_01, t35_03, t35_13, t35_14 all pass",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Non-blocking write path meeting NFR-2 (Task 1)",
+      "status": "Fully satisfied",
+      "evidence": "Write tools nudge sweeper flag; t35_09 verifies 3 stores complete in <500ms without embedding; t35_13 verifies retrievability <2s",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Attach configured reranker to retriever (Task 2)",
+      "status": "Fully satisfied",
+      "evidence": "McpState::build resolves reranker via build_reranker_from and attaches to retriever; t35_04_and_05 tests both active and unset cases",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Resolve providers from effective config with fail-closed behavior (Task 3)",
+      "status": "Partially satisfied",
+      "evidence": "Effective config resolved for embed/rerank/extract; rerank and extract fail closed, but build_ops_embedder_from silently returns Ok(None) when embed.model is omitted",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Library-level raw-turn ingest API with extraction and span verification (Task 4)",
+      "status": "Fully satisfied",
+      "evidence": "clio-write::raw_ingest (ingest_raw / ingest_raw_with_extractor) runs chunk -> extract -> span verify -> gated store; raw_ingest_tests pass",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Observability and pipeline status in maintenance_status (Task 5)",
+      "status": "Fully satisfied",
+      "evidence": "maintenance_status exposes index status with counts and pipeline flags; verified in t35_maintenance_status_reports_index_pipeline",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AGENTS.md 450-line maximum per Rust file",
+      "status": "Fully satisfied",
+      "evidence": "All 21 modified/created Rust files are <= 450 lines (largest is worker.rs at 427 lines, mod.rs at 424 lines, runtime.rs at 408 lines)",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AGENTS.md structured file header on new/modified files",
+      "status": "Partially satisfied",
+      "evidence": "index_drain_tests.rs omitted the required Responsibility/Owns/Does not own/Boundary header sections",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Coverage gate >=90% lines and functions per file",
+      "status": "Fully satisfied",
+      "evidence": "cargo llvm-cov verified: 97.88% lines, 98.94% functions aggregate; 0 of 276 files below 90%",
+      "severity": "Low"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "Missing structured AGENTS.md responsibility header in crates/clio-mcp/src/index_drain_tests.rs",
+      "evidence": "crates/clio-mcp/src/index_drain_tests.rs:1-7",
+      "requirement_ref": "AGENTS.md File Header constraint",
+      "recommendation": "Add the structured AGENTS.md header (Responsibility, Owns, Does not own, Boundary) to crates/clio-mcp/src/index_drain_tests.rs.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Replaced the one-line module doc with the full 4-part header (Responsibility / Owns / Does not own / Boundary, test-only boundary stated). File remains 427 lines (<=450)."
+      }
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Partial embed configuration silently disables dense indexing instead of failing closed",
+      "evidence": "crates/clio-mcp/src/ops_embedder.rs:104-115; crates/clio-mcp/src/runtime.rs:225-226",
+      "requirement_ref": "roadmap/phase-100350-live-index-extraction-wiring.md §5 Task 3",
+      "recommendation": "Update build_ops_embedder_from in ops_embedder.rs so that if embed.url is non-empty, omitting embed.model (when provider is non-empty) or setting dims=0 returns Err(ConfigCorrupt) rather than Ok(None).",
+      "resolution": {
+        "status": "resolved",
+        "how": "build_ops_embedder_from now returns Err(ConfigCorrupt) for a non-empty provider with an empty embed.model, and for embed.dims == 0 with a non-empty embed.url (crates/clio-mcp/src/ops_embedder.rs). The two runtime_tests.rs assertions that pinned the old Ok(None) behavior now assert `Err(err) == ConfigCorrupt` with messages containing `embed.model` / `embed.dims`. Verified: `cargo test -p clio-mcp --locked` = 249 passed, 0 failed."
+      }
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Raw ingest test verifies outbox enqueue but not end-to-end retrievability",
+      "evidence": "crates/clio-write/src/raw_ingest_tests.rs:75-93; roadmap/phase-100350-live-index-extraction-wiring.md:305,314,338",
+      "requirement_ref": "roadmap/phase-100350-live-index-extraction-wiring.md §5 Task 4, §8 T100350-06, §8 T100350-15",
+      "recommendation": "Add an integration test in clio-mcp or tests/ that runs ingest_raw followed by drain_index and retrieve, verifying end-to-end retrievability as claimed in T100350-06.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Added `t35_06_raw_ingest_drains_and_retrieves_end_to_end` in crates/clio-mcp/src/index_drain_tests.rs: a fake HTTP extraction server feeds ingest_raw, the outcome's admitted item drains via state.drain_index() (lexical_only == 1, failed == 0), and `retrieve` returns the admitted item id in its hits. Passes in `cargo test -p clio-mcp --locked` (249 passed, 0 failed)."
+      }
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "extract_available reports true when hosted provider URL is set but API key is missing",
+      "evidence": "crates/clio-mcp/src/runtime.rs:312-317; crates/clio-mcp/src/runtime_index.rs:123",
+      "requirement_ref": "roadmap/phase-100350-live-index-extraction-wiring.md §5 Task 5 / FR-28",
+      "recommendation": "In McpState::build, ensure extract_available requires a bearer token when extract.provider is \"openai\", preventing false-positive operational readiness reporting.",
+      "resolution": {
+        "status": "resolved",
+        "how": "New `extract_available_from(effective)` helper in crates/clio-mcp/src/runtime.rs mirrors the fail-closed rules of clio_write::build_extractor_from: template provider needs a URL; hosted openai additionally needs a non-empty extract.model and a bearer (credentials.extract_api_key / credentials.api_key); unknown providers report not-available. Covered by `extract_available_matches_ingest_fail_closed` in runtime_tests.rs (6 cases: no key, no model, fully configured, template default, no url, unknown provider). Verified: `cargo test -p clio-mcp --locked` = 249 passed, 0 failed."
+      }
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Missing structured AGENTS.md responsibility header in crates/clio-mcp/src/index_drain_tests.rs",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md strictly mandates the responsibility/ownership header structure on every Rust source file.",
+      "impact": "Codebase standards drift and potential compliance violation.",
+      "evidence": "crates/clio-mcp/src/index_drain_tests.rs:1-7",
+      "confidence": "High",
+      "proposed_fix": "Add the standard 4-part AGENTS.md responsibility comment block at the top of crates/clio-mcp/src/index_drain_tests.rs."
+    },
+    {
+      "id": 2,
+      "title": "Partial embed configuration silently disables dense indexing instead of failing closed",
+      "severity": "Minor",
+      "why_it_matters": "Phase 100350 Task 3 mandates that partially configured providers fail closed rather than silently disabling service.",
+      "impact": "Operator misconfiguration (e.g. Setting URL without model) silently falls back to lexical-only search without notifying the operator.",
+      "evidence": "crates/clio-mcp/src/ops_embedder.rs:104-115; crates/clio-mcp/src/runtime.rs:225-226",
+      "confidence": "High",
+      "proposed_fix": "In build_ops_embedder_from, return Err(AmError::new(ErrorCode::ConfigCorrupt, ...)) When URL is present but model or dims are invalid."
+    },
+    {
+      "id": 3,
+      "title": "Raw ingest test verifies outbox enqueue but not end-to-end retrievability",
+      "severity": "Minor",
+      "why_it_matters": "Task 4 and required scenarios T100350-06 / T100350-15 define the expected result as stored and retrievable.",
+      "impact": "Verification claim overstates what is directly tested by raw_ingest_tests (which only asserts outbox job insertion).",
+      "evidence": "crates/clio-write/src/raw_ingest_tests.rs:75-93; roadmap/phase-100350-live-index-extraction-wiring.md:305,314,338",
+      "confidence": "High",
+      "proposed_fix": "Add a cross-component test in clio-mcp that ingests raw turns, executes drain_index, and retrieves the admitted memory item."
+    },
+    {
+      "id": 4,
+      "title": "extract_available reports true when hosted provider URL is set but API key is missing",
+      "severity": "Minor",
+      "why_it_matters": "maintenance_status is intended to surface trustworthy operational readiness for operators.",
+      "impact": "Readiness indicator reports true even though any call to ingest_raw will fail closed on missing credentials.",
+      "evidence": "crates/clio-mcp/src/runtime.rs:312-317; crates/clio-mcp/src/runtime_index.rs:123",
+      "confidence": "High",
+      "proposed_fix": "Verify that bearer_for_effective is Some when provider is openai before marking extract_available as true."
+    }
+  ],
+  "dismissed": [
+    "Pre-existing test flake in clio-compliance stats_tests counts_reflect_created_items_per_bank and clio-ops reindex_space_tests: both are due to timestamp/socket concurrency in test fixtures, not regressions introduced by Phase 100350.",
+    "Lack of Postgres integration test for the runtime drain: the underlying outbox and store queries are backend-shared in clio-store and already covered on Postgres; this is documented in Known Limitations.",
+    "Omission of MCP tool wrapper for raw ingest: Phase 100350 explicitly scoped the library API as the required deliverable and deferred the MCP tool wrapper pending tool_schema publish approval."
+  ],
+  "verification": [
+    {
+      "claim": "Stored items become retrievable without manual seeding",
+      "classification": "Established",
+      "source_note": "Verified via t35_01_store_drain_retrieve_lexical_only in clio-mcp"
+    },
+    {
+      "claim": "Write response is not blocked by embedding (<500ms)",
+      "classification": "Established",
+      "source_note": "Verified via t35_09_write_response_is_not_blocked_by_embedding"
+    },
+    {
+      "claim": "Configured reranker is attached and active in retrieval",
+      "classification": "Established",
+      "source_note": "Verified via t35_04_and_05_rerank_attach_decision with mock HTTP server"
+    },
+    {
+      "claim": "All 276 files meet >=90% line and function coverage",
+      "classification": "Established",
+      "source_note": "Verified via full cargo llvm-cov JSON run (TOTAL: lines=97.88%, funcs=98.94%, 0 files <90%)"
+    },
+    {
+      "claim": "All modified Rust files remain <=450 lines",
+      "classification": "Established",
+      "source_note": "Verified via wc -l across all 21 staged Rust files (max is 427 lines)"
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Behavior of background sweeper thread under heavy outbox contention across multiple processes",
+      "why_unknown": "Agent Memoir runtime is tested as a single-process MCP server; multi-process concurrency on shared SQLite DBs relies on WAL mode and lock timeouts",
+      "what_would_resolve_it": "Multi-process stress benchmark against shared SQLite database",
+      "materiality": "Low for stdio MCP single-client deployment"
+    }
+  ],
+  "strengths": [
+    "Clean architectural separation: outbox processing semantics stay in clio-index, raw ingest stays in clio-write, and runtime scheduling/status stays in clio-mcp.",
+    "Strict line budget adherence: decomposed runtime.rs from 590 to 408 lines by cleanly extracting runtime_context.rs and runtime_index.rs.",
+    "Solid non-blocking design: write tools nudge a condition variable flag with zero synchronous network I/O, safely satisfying NFR-2.",
+    "Thorough test suite: 8 integration tests in index_drain_tests covering lexical fallback, retry backoff, NFR-2 cadence, bounded backlog, and status reporting."
+  ],
+  "regrets": [
+    "Would have included a multi-crate integration test combining raw_ingest -> drain_index -> retrieve to formally close the loop between Task 4 and Task 1."
+  ],
+  "process_changes": [
+    "Add a linter or check script to verify AGENTS.md responsibility header format on all new Rust files before submission."
+  ],
+  "plan_1hr": [
+    "Add AGENTS.md header to crates/clio-mcp/src/index_drain_tests.rs.",
+    "Update build_ops_embedder_from in ops_embedder.rs to fail closed with ConfigCorrupt if embed.url is non-empty but model/dims are invalid.",
+    "Tighten extract_available in McpState::build to require credentials for hosted OpenAI provider.",
+    "Add an integration test in clio-mcp connecting ingest_raw to retrieve."
+  ],
+  "plan_unlimited": [
+    "Implement an event-driven backpressure mechanism for the sweeper to loop immediately while backlog > batch_size without waiting for the 500ms timeout.",
+    "Add Postgres end-to-end integration test suite for the live MCP runtime drain."
+  ],
+  "remediation": {
+    "round": "r1",
+    "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+    "date": "2026-09-22",
+    "summary": "All 4 findings (F-01..F-04) fixed by the remediator directly (small, coupled inside the clio-mcp crate; no worker fan-out warranted). Scoped verify: cargo test -p clio-mcp --locked = 249 passed, 0 failed. Final full runs: make check + workspace cargo llvm-cov gate (see run log remediator-task-r1.log for exact output).",
+    "plan_dispositions": {
+      "plan_1hr": "All 4 items implemented (they map 1:1 onto F-01..F-04).",
+      "plan_unlimited_item_1_sweeper_backpressure": "Rejected with evidence. The sweeper is already event-driven: every write nudges a condvar (runtime_index.rs nudge_index / spawn_index_sweeper_with), so a new outbox row is picked up immediately, not after 500ms; the 500ms wait_timeout is only the fallback covering retries and non-nudging write paths. NFR-2 (<2s retrievability for a stored item) is verified by t35_13_stored_item_retrievable_within_nfr2, and bounded multi-batch draining is the deliberate T100350-14 design (t35_14_backlog_is_visible_and_drains_in_bounded_batches). Looping immediately over the whole backlog adds no NFR-2 benefit and removes the batch bound those tests pin.",
+      "plan_unlimited_item_2_postgres_e2e_suite": "Rejected with evidence for this phase. The drain/outbox/store queries are backend-shared behind the Store/IndexStore traits in clio-store; ran `cargo test -p clio-store --locked postgres` against the live compose Postgres on :34310: 44 passed, 0 failed. The runtime drain wiring itself is backend-agnostic and covered on SQLite (t35_01/03/06/09/13/14), and runtime_tests.rs already opens McpState on Postgres when DATABASE_URL is set. The residual gap (a full drain-on-Postgres scenario test) stays a documented known limitation rather than new code."
+    },
+    "recommendation_changes": "No severity or verdict changes. The two plan_unlimited recommendations above are rejected with reasons (kept visible here rather than deleted)."
+  }
+}

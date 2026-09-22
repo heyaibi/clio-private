@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100240: Multi-Host Sync Protocol Implementation Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100240: Multi-Host Sync Protocol Implementation Review</h1>
+    <div class="vline">
+      <span class="badge b-red"><i data-lucide="octagon-x" class="ic"></i>Inadequate</span>
+      <span class="mono">2 critical · 4 important · 2 minor · 3 dismissed</span>
+    </div>
+    <p class="sum">The Phase 100240 implementation fails critical quality gates: make check / make lint fail due to an unused import (ErrorCode in journal_row.rs:29), and the required 90% per-file function coverage gate failed on 5 source files (postgres_sync.rs, client.rs, http.rs, protocol.rs, server.rs). Furthermore, sub-millisecond item updates crash SQLite due to duplicate audit_events.id, and triples are omitted from the client push change feed.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-20</span>
+      <span><b>Applies to</b>r1 (staged diff: 45 files, 6992 insertions)</span>
+      <span><b>Source</b>git staged diff against main branch</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#critical">Critical</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AGENTS.md: Clean compilation under cargo clippy --workspace --all-targets --all-features --locked -- -D warnings (make check / make lint)</li>
+        <li>AGENTS.md &amp; coverage.md: ≥90% line and function coverage on EVERY reported Rust source file (per-file gate)</li>
+        <li>Hard Rules: Roadmap isolation (never reference ./roadmap/, phase numbers, or crates.md in code or comments)</li>
+        <li>Hard Rules: Source file line limit ≤ 450 lines per Rust file</li>
+        <li>Phase 100240 Specification &amp; Appendix: Full FR-31 surfaces, idempotent apply, DLQ cursor blocking, LWW conflict resolution, client encryption, assoc_edge and triple sync</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">3 of 9 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Clean workspace build and linting (make check / make lint)</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">make lint and make check fail with exit code 101: unused import ErrorCode in crates/clio-sync/src/journal_row.rs:29:25</td>
+              <td><span class="badge">Critical</span></td>
+            </tr>
+            <tr>
+              <td>Per-file ≥90% function and line coverage (AGENTS.md)</td>
+              <td><span class="badge b-red"><i data-lucide="circle-x" class="ic"></i>Missed</span></td>
+              <td class="mut">5 sync files have function coverage &lt;90% in both full gate and scoped package runs (protocol.rs 60.00%, server.rs 64.71%, http.rs 69.57%, client.rs 79.17%, postgres_sync.rs 80.00%, sqlite_sync.rs 87.04%)</td>
+              <td><span class="badge">Critical</span></td>
+            </tr>
+            <tr>
+              <td>Crash-safe and race-free idempotent apply (T100240-02 / T100240-03 / P-lww)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Sub-millisecond item updates fail with UNIQUE constraint failed: audit_events.id due to millisecond timestamp collisions in item_update.rs:38</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>Sync change feed includes all required entity kinds (triples, assoc_edge, items)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">push_bank in client.rs only queries feed_items and feed_assoc, completely omitting feed_triples</td>
+              <td><span class="badge">High</span></td>
+            </tr>
+            <tr>
+              <td>DLQ cursor freeze and ack-skip recovery on corrupted/unopenable ciphertext (Appendix §7)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">decrypt_for_apply propagates key.open() errors with ?, aborting pull_bank without writing to sync_dead_letter, making ack_skip impossible</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Roadmap isolation in code and comments (Hard Rules)</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">crates/clio-sync/src/crypto.rs:16 contains explicit reference to Phase 100020 separation</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Rust source file line limit ≤ 450 lines (AGENTS.md)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All modified/created Rust files stay at or below 450 total lines (max is client.rs at 450 lines)</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AGENTS.md file header and ownership block on all new Rust files</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">All 27 newly created Rust files contain truthful responsibility, owns, does not own, and boundary blocks</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Single-host omission documentation and tooling flags</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates.md, clio-sync/src/lib.rs, and clio-config profile omission flags properly document and gate sync tools for single-host deployments</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="critical">
+      <h2 class="sh"><i data-lucide="octagon-alert" class="ic c-red"></i>Critical <span class="cnt">02</span></h2>
+      <p class="lede">Address these before considering the work done.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>Compilation and Linter Failure on make check / make lint (Unused Import ErrorCode)</h3>
+              <span class="badge b-red"><span class="dot"></span>Critical</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Clippy fails under -D warnings across the workspace; make check and make lint cannot pass.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Blocks CI and fails workspace gate; breaks production compilation under strict warning flags.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-sync/src/journal_row.rs:29:25: use clio_types::{AmError, ErrorCode};. Command make lint exits 101 with error: unused import: ErrorCode.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Remove unused import ErrorCode from crates/clio-sync/src/journal_row.rs:29.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Falsified Coverage Defense and Under-90% Function Coverage Across Five Source Files</h3>
+              <span class="badge b-red"><span class="dot"></span>Critical</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The project enforces a strict ≥90% per-file function coverage gate. The developer claimed that low numbers were an LLVM dual-codegen artifact and that scoped runs were 90-100%, but scoped runs also fail (protocol.rs 60.00%, server.rs 64.71%, http.rs 69.57%, client.rs 79.17%, postgres_sync.rs 80.00%, sqlite_sync.rs 87.04%).</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Multiple production functions across clio-sync and clio-store are unexercised in tests, violating core AGENTS.md rules and masking potential defects.</dd></div>
+              <div><dt>Evidence</dt><dd>Output of make coverage and cargo llvm-cov --package clio-sync: protocol.rs (60.00% func, 8 missed), server.rs (64.71% func, 12 missed), http.rs (69.57% func, 7 missed), client.rs (79.17% func, 5 missed), postgres_sync.rs (80.00% func, 9 missed), sqlite_sync.rs (87.04% func, 7 missed). Functions like subject_is_shredded and dead_letter_status have zero test invocations.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Add comprehensive unit/integration tests targeting unhit functions across clio-sync and clio-store, and prune unneeded functions to bring all reported files above 90% function coverage.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">04</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Race Condition and Flaky Test Failure on Rapid Item Updates (audit_events.id Collision)</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Sub-millisecond updates to the same memory item crash with an internal SQLite UNIQUE constraint violation, causing intermittent test failures and runtime crashes.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Causes random test flakiness during sync apply and crashes in high-throughput or batch sync scenarios.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-store/src/item_update.rs:37-38 uses now_iso() milliseconds for audit_id = format!(&quot;audit-upd-{}-{}&quot;, item.id, ts). Running cargo llvm-cov panicked: apply::apply_tests::t24_03_equal_stamp_tie_broken_by_score_then_device panicked at crates/clio-sync/src/apply_tests.rs:162:33: apply succeeds: AmError { code: Internal, message: &quot;audit update: UNIQUE constraint failed: audit_events.id&quot; }.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Append an atomic sequence number, microsecond/nanosecond component, or UUID suffix to audit_id in item_update.rs to guarantee uniqueness within the same millisecond.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>Client Push Change Feed Silently Omits Triples</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Triples created or closed locally are never discovered by push_bank and never pushed to remote peers.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Multi-host deployments fail to sync facts/triples, causing divergence across nodes despite claimed sync support.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-sync/src/client.rs:205-237 only queries cfg.sync.feed_items() and cfg.sync.feed_assoc(). Although SyncStore::feed_triples is implemented in clio-store, push_bank never calls it. crates/clio-sync/src/client.rs:153-160 also omits feed_triples in pending_push calculation.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Call cfg.sync.feed_triples() in push_bank, convert closed triples into SyncMutation envelopes, and include them in the outbound payload; include triple feed count in sync_status pending_push.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>Pull Loop Permanently Stuck on Unopenable or Corrupted Ciphertext (Bypassing DLQ Quarantine)</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>If a client cannot decrypt an encrypted payload (wrong key, bad ciphertext, or tampering), pull fails with an unhandled error instead of quarantining the mutation to dead-letter.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>The pull pipeline is permanently wedged. Because the mutation is never written to sync_dead_letter, the operator cannot call ack_skip to unfreeze the pull cursor.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-sync/src/client.rs:368 calls let bytes = key.open(cipher)?; in decrypt_for_apply. Any decryption error bubbles up through ?, terminating pull_bank without recording a dead-letter row.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Catch key.open() errors in decrypt_for_apply, quarantine the mutation into sync_dead_letter using quarantine(), and return Ok(None) so the pull cursor safely freezes and can be ack-skipped.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">06</span>
+          <div>
+            <div class="ihead">
+              <h3>Server Pull Fails with HTTP 500 on Mutations with Null or Empty content_sealed</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>If any journal row has NULL content_sealed, the server fails during pull serialization and returns HTTP 500.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Any sync client attempting to pull a page containing such a row receives an HTTP 500 error, halting replication.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-sync/src/server.rs:338-344: let sealed = row.content_sealed.clone().unwrap_or_default(); followed by serde_json::from_str::&lt;clio_store::CiphertextEnvelope&gt;(&amp;sealed). If content_sealed is None, deserializing an empty string fails with EOF.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>In journal_row_to_mutation, handle None / empty content_sealed gracefully by supplying an empty default JSON value rather than attempting to deserialize an empty string as a CiphertextEnvelope.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">02</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">07</span>
+          <div>
+            <div class="ihead">
+              <h3>Roadmap Isolation Hard-Rule Violation in Code Doc-Comments</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Roadmap phase references in production code violate the hard rule that the codebase must remain decoupled and valid if roadmap/ is deleted.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Violates AGENTS.md and Developer task hard isolation constraints.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-sync/src/crypto.rs:16: //! - Subject DEKs or KMS (see clio-store dek — Phase 100020 separation).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Remove — Phase 100020 separation from the doc comment in crates/clio-sync/src/crypto.rs:16.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">08</span>
+          <div>
+            <div class="ihead">
+              <h3>Asymmetric LWW Tie-Breaking Due to Missing Local Device ID on Stored Items</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The LWW tie-breaker compares device IDs lexicographically when timestamps and scores tie, but the local device ID is hardcoded to &quot;&quot;.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Remote mutations always win ties against local items regardless of lexicographical device ID ordering.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-sync/src/apply.rs:395 passes &quot;&quot; as existing device ID in lww_compare. Any non-empty incoming device_id will win ties.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Persist originating device ID in items or pass the local node device ID to allow true symmetric tie-breaking.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Checked file size constraints across all 45 staged files; all files remain at or below the 450-line limit (crates/clio-sync/src/client.rs is at exactly 450 lines).</li>
+        <li>Checked AGENTS.md headers across all 27 new Rust files; all conform to responsibility, ownership, and boundary structure.</li>
+        <li>Checked SQLite and Postgres sync schema migrations; tables were added cleanly to sql/001_core.sql without separate migration files.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>make check passes cleanly — Executed make check; failed at clippy step with error: unused import: ErrorCode in crates/clio-sync/src/journal_row.rs:29:25</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Every reported Rust source file achieves ≥90% line and function coverage — Executed make coverage and scoped cargo llvm-cov; 5 sync files failed function gate (protocol.rs 60%, server.rs 64.7%, http.rs 69.6%, client.rs 79.2%, postgres_sync.rs 80.0%)</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>All unit and integration tests pass reliably — apply::apply_tests::t24_03_equal_stamp_tie_broken_by_score_then_device panicked intermittently due to audit_events.id millisecond collision</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>Triples are included in the sync protocol payload — Source inspection of crates/clio-sync/src/client.rs revealed feed_triples is never called in push_bank or sync_status</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-red">Contradicted</span>
+          <p>No roadmap phase numbers referenced in source code or comments — crates/clio-sync/src/crypto.rs line 16 explicitly mentions Phase 100020 separation</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Long-term performance of the watermark-based client push feed under high deletion/invalidation rates</p>
+          <p class="d">Client change feed queries items/assoc tables with timestamp ranges rather than a dedicated transaction log · Benchmarking push latency with 100k+ items and high churn · Medium</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Comprehensive state machine and property test suite structure (P-no-readmit-divergence, P-dlq-blocks, P-cursor-crash).</li>
+        <li>Clean separation of crypto and storage: server-blind ciphertext storage prevents DEK leakage to the sync server.</li>
+        <li>Strict conformance to the 450-line file limit across all 45 staged files.</li>
+        <li>Well-architected MCP tool bindings (sync_serve, sync_push, sync_pull, sync_status, sync_ack_skip) with robust token masking.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>The developer skipped running the full make check before staging, missing an obvious unused import compiler error.</li>
+          <li>The developer rationalized away the function coverage deficit instead of implementing tests for unhit functions or pruning dead code.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Enforce running make check (which includes clippy -D warnings) as an automated mandatory pre-stage hook.</li>
+          <li>Disallow speculative dual codegen rationalizations when per-file function coverage is below 90%.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Remove unused ErrorCode import in crates/clio-sync/src/journal_row.rs:29 to restore clean compilation under make check and make lint.</li>
+          <li>Fix audit_events.id collision in crates/clio-store/src/item_update.rs by appending an atomic counter or microsecond stamp.</li>
+          <li>Remove Phase 100020 reference from crates/clio-sync/src/crypto.rs:16.</li>
+          <li>Fix decrypt_for_apply error propagation to quarantine decryption failures to sync_dead_letter instead of aborting the pull loop.</li>
+          <li>Handle None / empty content_sealed in crates/clio-sync/src/server.rs:338 to prevent HTTP 500 on pull.</li>
+          <li>Wire cfg.sync.feed_triples() into push_bank in crates/clio-sync/src/client.rs.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Write dedicated unit tests for all unhit functions in protocol.rs, server.rs, http.rs, client.rs, and postgres_sync.rs to bring all files above 90% function coverage.</li>
+          <li>Implement symmetric peer device tracking on items so LWW tie-breaking is truly symmetrical across all nodes.</li>
+          <li>Benchmark and harden the push watermark change feed under heavy mutation volume.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100240/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100240/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

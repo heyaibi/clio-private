@@ -1,0 +1,223 @@
+{
+  "run": "r1",
+  "phase": "100210",
+  "subject": "Phase 100210 Hygiene Audit and Confirmed Cleanup Implementation",
+  "verdict": "Adequate",
+  "verdict_justification": "Core noise scoring, read-only audit scanning, confirmed cleanup with dry-run default, secret masking on previews/logs, and durable log persistence are implemented and tested on both backends. However, duplicate target IDs cause an unhandled database primary key collision in clean, preflight validation for discard reasons misses the keep action, and 8 new Rust files omit the mandatory AGENTS.md responsibility header block.",
+  "metadata": {
+    "generated": "2026-09-20",
+    "applies_to": "Phase 100210 r1 staged diff (48 files, 4237 insertions)",
+    "source": "48 staged files across clio-hygiene, clio-store, clio-config, clio-mcp, clio-retrieve, clio-lib, and sql/001_core.sql"
+  },
+  "standard": [
+    "requirement.md FR-33 / \u00a74.9.5.A: hygiene_audit, hygiene_clean, secret masking, durable log, and hygiene_log_list",
+    "requirement.md PR-6 / \u00a77.4 / FR-23: operations removal only, never compliance erasure or DEK destruction",
+    "phase-100210-appendix-noise-scoring.md: deterministic scoring, 0.90 secret floor, 5-weight default profile, and suggested action bands",
+    "AGENTS.md: file size \u2264 450 lines, required module responsibility header, no roadmap references in code/comments",
+    "coverage.md: \u2265 90% aggregate and per-file lines + functions gate on all reported files"
+  ],
+  "requirements": [
+    {
+      "requirement": "Read-only hygiene_audit scanner with pagination, bank scope, min_score, and deterministic ranking",
+      "status": "Fully satisfied",
+      "evidence": "clio-hygiene::audit::hygiene_audit implemented and tested in audit_tests.rs (t21_01); read-only behavior, descending score sorting, and pagination verified",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Deterministic noise scoring per phase-100210-appendix-noise-scoring.md with secret floor 0.90",
+      "status": "Fully satisfied",
+      "evidence": "clio-hygiene::scoring::score_noise implements appendix weights (0.35/0.25/0.15/0.15/0.10) and secret override; verified in scoring_tests.rs",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Confirmed hygiene_clean with dry-run default when confirm is absent/false",
+      "status": "Partially satisfied",
+      "evidence": "clean.rs implements dry-run counting and confirmed flag/archive/discard/keep; however, duplicate target IDs cause database primary key collisions",
+      "severity": "High"
+    },
+    {
+      "requirement": "Secret detection and masking on responses, dry-run reports, and hygiene audit logs",
+      "status": "Fully satisfied",
+      "evidence": "detect.rs masked_preview redacts secret candidates to [REDACTED]; hygiene_tools.rs applies masked_clone defensively to log entries",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Durable hygiene_audit_log and callable hygiene_log_list tool registered on stdio and Streamable HTTP",
+      "status": "Fully satisfied",
+      "evidence": "hygiene_audit_logs table queried via HygieneStore trait on SQLite and Postgres; schema registered and bound on both MCP transports in clio-mcp",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Hygiene operations removal only, never compliance erasure or DEK destruction",
+      "status": "Fully satisfied",
+      "evidence": "Discard reuses ops discard without KMS shredding (t21_04); erase_request action rejected (t21_06)",
+      "severity": "Low"
+    },
+    {
+      "requirement": "All Rust files at or below 450 total lines",
+      "status": "Fully satisfied",
+      "evidence": "All 40 touched Rust files verified <= 450 lines (hybrid.rs and sqlite_store.rs at exactly 450, ranking.rs at 434)",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AGENTS.md module responsibility and ownership header on every Rust file",
+      "status": "Partially satisfied",
+      "evidence": "crates/clio-store/src/hygiene_seq.rs and 7 newly created test files omit the mandatory //! # Responsibility header block",
+      "severity": "Medium"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Primary key collision in append_log on duplicate target item IDs crashes clean",
+      "evidence": "crates/clio-hygiene/src/clean.rs:301",
+      "requirement_ref": "FR-33, \u00a74.9.5.A, Phase doc Task 3",
+      "recommendation": "Include the target iteration index or a monotonic counter in the log entry ID (e.g. format!(\"hlg-{}-{}-{index}\", args.batch_id, target.item_id)), or deduplicate / reject duplicate target item IDs during target validation."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Missing AGENTS.md responsibility and boundary header in production module and new test files",
+      "evidence": "crates/clio-store/src/hygiene_seq.rs:1-15, crates/clio-hygiene/src/audit_edge_tests.rs:1-10, crates/clio-hygiene/src/audit_tests.rs:1-10, crates/clio-hygiene/src/clean_tests.rs:1-10, crates/clio-hygiene/src/detect_tests.rs:1-10, crates/clio-hygiene/src/scoring_tests.rs:1-10, crates/clio-mcp/src/hygiene_tools_tests.rs:1-10, crates/clio-store/src/pg_hygiene_tests.rs:1-10",
+      "requirement_ref": "AGENTS.md File Header Rule",
+      "recommendation": "Add the required header block (//! # Responsibility, ## Owns, ## Does not own, ## Boundary) with accurate ownership statements to crates/clio-store/src/hygiene_seq.rs and the new test modules."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Preflight validation for confirmed discard reason bypasses CleanAction::Keep",
+      "evidence": "crates/clio-hygiene/src/clean.rs:165",
+      "requirement_ref": "\u00a74.9.2, Phase doc Task 3",
+      "recommendation": "Check during preflight validation whether any target resolves to CleanAction::Discard when args.reason.trim().is_empty() before applying mutations."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "AuditReport omits incomplete signal and deadline handling on large bank scans",
+      "evidence": "crates/clio-hygiene/src/audit.rs:55-65",
+      "requirement_ref": "Phase doc Section 10 Failure Handling",
+      "recommendation": "Add an incomplete: bool field to AuditReport and support early exit / deadline cancellation if large banks require partial scan recovery."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Divergence in hygiene log list field naming from requirement.md \u00a74.9.5.A specification",
+      "evidence": "crates/clio-store/src/hygiene_store.rs:40-61, crates/clio-mcp/src/hygiene_tools.rs:109-115",
+      "requirement_ref": "requirement.md FR-33 / \u00a74.9.5.A Item 4",
+      "recommendation": "Provide timestamp and bank aliases in HygieneLogEntry serialization or the hygiene_log_list MCP response for tighter alignment with \u00a74.9.5.A normative terminology."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Primary key collision in append_log on duplicate target item IDs crashes clean",
+      "severity": "Important",
+      "why_it_matters": "append_log generates entry IDs as format!(\"hlg-{}-{}\", args.batch_id, target.item_id). If a target item ID appears multiple times in args.targets, the second insert into hygiene_audit_logs violates the primary key constraint.",
+      "impact": "In dry-run mode, clean fails with an unhandled database error instead of returning counts. In confirmed mode, an unhandled database error bubbles up via ? after previous mutations were committed, leaving mutations applied without structured abort reporting.",
+      "evidence": "crates/clio-hygiene/src/clean.rs:301: id: format!(\"hlg-{}-{}\", args.batch_id, target.item_id); verified with sqlite UNIQUE constraint failed on duplicate insertion.",
+      "confidence": "High",
+      "proposed_fix": "Include the target iteration index in the generated log ID (format!(\"hlg-{}-{}-{index}\", args.batch_id, target.item_id)) or deduplicate target item IDs during preflight validation."
+    },
+    {
+      "id": 2,
+      "title": "Preflight validation for confirmed discard reason bypasses CleanAction::Keep",
+      "severity": "Important",
+      "why_it_matters": "Line 165 only checks args.action == CleanAction::Discard when validating non-empty reason. When action is Keep, individual targets can resolve to Discard.",
+      "impact": "If an operator calls confirmed clean with keep and an empty reason, validation passes initially, but when the first target resolved to Discard is processed, store.discard_item fails, aborting the batch mid-flight after earlier targets were mutated.",
+      "evidence": "crates/clio-hygiene/src/clean.rs:165: if args.confirm && args.action == CleanAction::Discard && args.reason.trim().is_empty()",
+      "confidence": "High",
+      "proposed_fix": "Extend preflight check to verify non-empty reason if args.action == CleanAction::Discard || (args.action == CleanAction::Keep && args.targets.iter().any(|t| t.suggested_action.as_deref() == Some(\"discard\")))."
+    },
+    {
+      "id": 3,
+      "title": "Missing AGENTS.md responsibility and boundary header in production module and new test files",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md mandates the standard header structure (//! # Responsibility, ## Owns, ## Does not own, ## Boundary) for every Rust source file created or refactored.",
+      "impact": "Violates repository architectural conventions and AGENTS.md hard constraints. New production module crates/clio-store/src/hygiene_seq.rs and 7 new test files omit the header block.",
+      "evidence": "crates/clio-store/src/hygiene_seq.rs:1-15 contains only a one-line doc comment. Test files audit_edge_tests.rs, audit_tests.rs, clean_tests.rs, detect_tests.rs, scoring_tests.rs, hygiene_tools_tests.rs, and pg_hygiene_tests.rs lack the Responsibility block.",
+      "confidence": "High",
+      "proposed_fix": "Add the full AGENTS.md header block with module responsibility and ownership boundaries to crates/clio-store/src/hygiene_seq.rs and the new test files."
+    },
+    {
+      "id": 4,
+      "title": "AuditReport omits incomplete signal and deadline handling on large bank scans",
+      "severity": "Minor",
+      "why_it_matters": "Phase 100210 Section 10 states: Scorer timeout on huge bank -> Deadline / pagination -> Return partial page + incomplete signal; do not mutate.",
+      "impact": "On banks with many items, hygiene_audit performs sequential N+1 item fetches without deadline enforcement or an incomplete status flag on AuditReport.",
+      "evidence": "crates/clio-hygiene/src/audit.rs:55-65: AuditReport struct lacks an incomplete field.",
+      "confidence": "High",
+      "proposed_fix": "Add incomplete: bool to AuditReport and support deadline/cancellation handling."
+    },
+    {
+      "id": 5,
+      "title": "Divergence in hygiene log list field naming from requirement.md \u00a74.9.5.A specification",
+      "severity": "Minor",
+      "why_it_matters": "requirement.md \u00a74.9.5.A defines the hygiene log entry shape as {timestamp, actor, bank, action, item_ids[], noise_scores?, confirm, dry_run, result}.",
+      "impact": "Tool output returns database column names (created_at, bank_id, confirmed, item_id, detail.result) instead of the exact logical names defined in \u00a74.9.5.A.",
+      "evidence": "crates/clio-store/src/hygiene_store.rs:40-61, crates/clio-mcp/src/hygiene_tools.rs:109-115.",
+      "confidence": "Medium",
+      "proposed_fix": "Add timestamp and bank aliases to HygieneLogEntry serialization or hygiene_log_list tool response."
+    }
+  ],
+  "dismissed": [
+    "Investigated whether clio-retrieve/src/hybrid.rs violates the 450-line limit: wc -l reports exactly 450 lines; hybrid.rs satisfies the hard constraint.",
+    "Investigated whether Store::item_is_archived probe allows archived items into search results: verified both SQLite FTS and Postgres TSVECTOR queries include items.archived_at IS NULL.",
+    "Investigated whether hygiene_clean could accidentally destroy DEKs or emit compliance tombstones: verified no crypto-shredding code or tombstone SQL is reachable from the hygiene crate.",
+    "Investigated whether roadmap isolation was violated: grep confirmed zero references to roadmap, phase numbers, or crates.md in production code or comments."
+  ],
+  "verification": [
+    {
+      "claim": "make check passes with 0 compiler warnings, clippy clean, and all workspace tests green",
+      "classification": "Established",
+      "source_note": "make check exited 0 on workspace test suite (109 passed in clio-write, 31+3+34 in clio-hygiene, 11 in clio-mcp, SQLite and Postgres parity)"
+    },
+    {
+      "claim": "make coverage passes with aggregate >=90% and all 194 reported files >=90% lines and functions",
+      "classification": "Established",
+      "source_note": "make coverage exited 0 with 94.68% lines (38229 total, 2034 missed) and 98.69% functions (2365 total, 31 missed); python scan confirmed 0 of 194 files below 90%"
+    },
+    {
+      "claim": "Every Rust file created or modified stays at or below 450 total lines",
+      "classification": "Established",
+      "source_note": "wc -l verified on all 40 touched Rust files (largest: hybrid.rs 450, sqlite_store.rs 450, store.rs 450, postgres_store.rs 449, ranking.rs 434)"
+    },
+    {
+      "claim": "Both stdio and Streamable HTTP MCP transports bind hygiene tools identically",
+      "classification": "Established",
+      "source_note": "Both transports route through shared McpHandler, which binds hygiene_audit, hygiene_clean, and hygiene_log_list from bound_tools()"
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Performance of hygiene_audit on banks with >100k items",
+      "why_unknown": "Test suite tests banks with tens to hundreds of items; near-duplicate comparison is O(n^2) with 64-token sketch",
+      "what_would_resolve_it": "Large-bank stress benchmark with dedicated token inverted index",
+      "materiality": "Low for first release; phase doc already notes 5k ceiling"
+    }
+  ],
+  "strengths": [
+    "Clean, robust implementation of deterministic noise scoring with exact appendix default weights and secret score floor",
+    "Comprehensive test coverage across both SQLite and Postgres backends with 100% of reported files meeting the >=90% function and line floors",
+    "Full roadmap isolation strictly preserved with zero roadmap or phase references across code and comments",
+    "Strict adherence to the 450-line file limit across all 40 touched Rust source files"
+  ],
+  "regrets": [
+    "Did not catch the primary key collision vulnerability on duplicate target IDs during development tests",
+    "Omitted the required AGENTS.md Responsibility header block from hygiene_seq.rs and new test files"
+  ],
+  "process_changes": [
+    "Add an automated pre-commit hook or test assertion verifying that all new .rs files contain the required //! # Responsibility header block",
+    "Add test scenarios covering duplicate item IDs in batch and target parameters across all mutating tools"
+  ],
+  "plan_1hr": [
+    "Fix append_log in clean.rs to include the target iteration index or a monotonic sequence counter in the hygiene_audit_logs.id to prevent primary key collisions on duplicate target item IDs.",
+    "Update preflight validation in clean.rs to check whether any target resolves to Discard when reason is empty under CleanAction::Keep.",
+    "Add the required AGENTS.md responsibility and ownership header block to crates/clio-store/src/hygiene_seq.rs and the new test modules."
+  ],
+  "plan_unlimited": [
+    "Add an explicit batch item fetcher or join in hygiene_audit to eliminate the N+1 get_memory_item query pattern over scanned active items.",
+    "Expose an unarchive action in hygiene_clean / HygieneStore over MCP so operators can reverse accidental item archiving directly via tool dispatch.",
+    "Implement deadline and pagination cancellation in hygiene_audit returning an incomplete status signal as specified in Section 10."
+  ]
+}

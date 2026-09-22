@@ -1,0 +1,66 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver",
+    "finalize"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "d6e7f79459605143fcfab81a7ef77131ff6291514d4dd42ec9fc0ccc97843de6",
+      "artifacts": {},
+      "git_head": "812ed2fcef3c4680908b54f436a2f2fd398afa22"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100100/findings.json",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "add421fb741918be7379eeaa43f16310baff06418ccd33b0d17c23d86ab9be47",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 25722,
+          "sha256": "f63e4c73539296601982dbed24ee8192d8ef018a14fdb21dad7a672685117ed1"
+        }
+      },
+      "git_head": "812ed2fcef3c4680908b54f436a2f2fd398afa22"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "aa7099ceff99fec29d9f7d443f58b0c26ddb8c975c70cd106278954076ef250d",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 25722,
+          "sha256": "f63e4c73539296601982dbed24ee8192d8ef018a14fdb21dad7a672685117ed1"
+        }
+      },
+      "git_head": "812ed2fcef3c4680908b54f436a2f2fd398afa22"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED c1d30e41",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "af7d5a9a5362798af9d3c67a1376994c1082f370e12be7dbd21cef9131c76e2e",
+      "artifacts": {},
+      "git_head": "812ed2fcef3c4680908b54f436a2f2fd398afa22"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 8e067b50",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "5363938f2e5cb277545ddde9461512d068ff89a9df5b87760a7b133ccf2c5205",
+      "artifacts": {},
+      "git_head": "812ed2fcef3c4680908b54f436a2f2fd398afa22"
+    }
+  }
+}

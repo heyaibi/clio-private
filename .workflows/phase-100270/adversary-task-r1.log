@@ -1,0 +1,25 @@
+2026-09-21T08:01:08Z START phase-100270 adversary r1 (OpenCode CLI, deepseek-v4.1-flash); reviewing staged diff plus surrounding callers
+2026-09-21T08:01:08Z git status: 23 staged phase-100270 files + pre-existing benchmark.md change; .workflows/ untracked (out of scope)
+2026-09-21T08:26:22Z review method: git status + git diff --cached -- . ':!.workflows/' + surrounding callers; reran real gates
+2026-09-21T08:26:22Z cmd: cargo test --locked --workspace (DATABASE_URL=postgres://.../agentmemoir) -> EXIT=0, 45 test-result ok blocks, 0 failed (clio-retrieve 116, clio-mcp lib 201, clio-config 108)
+2026-09-21T08:26:22Z cmd: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> EXIT=0 clean
+2026-09-21T08:26:22Z cmd: cargo fmt --all -- --check -> EXIT=0; did NOT run 'make check' because it runs fmt (writes files)
+2026-09-21T08:26:22Z cmd: make coverage -> EXIT=0, TOTAL lines 97.87% functions 98.92%; parsed 253 files, 0 below 90% (lowest function 90.00% hub_distill_model.rs)
+2026-09-21T08:26:22Z cmd: line-count all touched Rust files -> max retention.rs 418 <=450; headers Responsibility/Owns/Does not own/Boundary present
+2026-09-21T08:26:22Z cmd: grep roadmap|phase-|crates.md in touched production files -> no matches (roadmap isolation OK)
+2026-09-21T08:26:22Z F-01 high: prefer_consolidated suppresses raws claimed by a parent not in returned page; dedup.rs:212-231 claimed before finalize.rs:85-90 truncation; phase doc :176/:33 say 'returned parent'
+2026-09-21T08:26:22Z F-02 medium: consolidated_only excludes canonical consolidation outputs; dedup.rs:90-92 only hub_distill; ingest.rs:239-243 canonical has comma-joined refs; phase doc :144 defines both
+2026-09-21T08:26:22Z F-03 medium: in-process JSON surface hardcodes Full/Balanced; surface.rs:149-168,206-225 vs MCP read_retrieve.rs:97-112; FR-20 cross-binding parity
+2026-09-21T08:26:22Z F-04 medium: tool_schema approval not recorded; schema_read_defs.rs:106,113,135,142 published; phase :260 requires approval; DoD :359 checked; no approval-request section
+2026-09-21T08:26:22Z F-05 medium: explain gains dedup unconditionally; read_retrieve.rs:140,211; phase :437 byte-identical guarantee broken for explain=true
+2026-09-21T08:26:22Z F-06 low: near-dup cap scans full candidate list, counter counts out-of-page items; dedup.rs:233-241, hybrid.rs:152-167, finalize.rs:85; returned page itself unchanged
+2026-09-21T08:26:22Z F-07 low: retention_schema.rs:130 description typo consolidation_only vs enum :124 consolidated_only
+2026-09-21T08:26:22Z F-08 low: T100270-09 cross-bank test unfalsifiable; read_dedup_tests.rs:186-219 parent in bank-a, query bank-b
+2026-09-21T08:26:22Z F-09 low: retention.rs:221-224 read_similarity_cap doc omits strict/lenient activation vs dedup.rs:81-85
+2026-09-21T08:26:22Z F-10 low: benchmark.md:60 unrelated pre-existing '(Heyaibi)' removal staged into phase diff
+2026-09-21T08:26:22Z F-11 low: stale evidence numbers; phase :370 'clio-retrieve 115' vs actual 116; :374 dedup.rs 99.38% vs 99.51%, totals 98.89% vs 98.92%
+2026-09-21T08:26:22Z F-12 low: requirement.md:344 not updated for pre-dedup FR-17 reinforcement chosen in hybrid.rs:151-160,285-296
+2026-09-21T08:26:22Z deliverables: findings.json (12 findings) + report.html + style.css written to .workflows/phase-100270/; JSON validated parse
+2026-09-21T08:26:22Z phase file Attribution: Adversary row set to 'OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | done' (only phase-file edit; not restaged)
+2026-09-21T08:26:22Z FINISH: verdict Adequate; must-fix F-01 (coverage loss), then F-02/F-05; process gap F-04
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100270/findings.json 0addc7f8

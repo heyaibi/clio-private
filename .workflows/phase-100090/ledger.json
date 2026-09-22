@@ -1,0 +1,66 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver",
+    "finalize"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE",
+      "harness": "opencode_cli:togetherai/zai-org/GLM-5.3-Flash:high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "8d6765357b289f5fbfff8f98fd2f9334dc7cbb6411e64c33ccfea0772c2215f4",
+      "artifacts": {},
+      "git_head": "34cb8189abaad1abe4502ccbd62b70e7f3c0c141"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100090/findings.json",
+      "harness": "antigravity_cli:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "e0af0966fe45cd9c97c2d996222fc48c33ab6d7fcd3fd9f16e9d3a86d295f1fd",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 17293,
+          "sha256": "0886087cc96300fb1cf252dab27d551a7cb1539c786e127f9951e6c6a6227c8b"
+        }
+      },
+      "git_head": "34cb8189abaad1abe4502ccbd62b70e7f3c0c141"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE",
+      "harness": "opencode_cli:opencode-go/deepseek-v4.1-flash:high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "ae5ca5561cbd73a3d18b8e285b13d169167eba9adeb2efa1913e3b91a9565a4d",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 17293,
+          "sha256": "0886087cc96300fb1cf252dab27d551a7cb1539c786e127f9951e6c6a6227c8b"
+        }
+      },
+      "git_head": "34cb8189abaad1abe4502ccbd62b70e7f3c0c141"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED",
+      "harness": "antigravity_cli:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "65fb44981f382b77bd6404af45446d84ffb9e9180b803f6fe0fbe00b083fae28",
+      "artifacts": {},
+      "git_head": "34cb8189abaad1abe4502ccbd62b70e7f3c0c141"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE",
+      "harness": "opencode_cli:togetherai/zai-org/GLM-5.3-Flash:high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "57769ad6070b5f2e63702bb039d09abff5f22ecefa071a306f7cf1e3bac07559",
+      "artifacts": {},
+      "git_head": "34cb8189abaad1abe4502ccbd62b70e7f3c0c141"
+    }
+  }
+}

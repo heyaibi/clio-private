@@ -1,0 +1,10 @@
+2026-09-18T13:52:19Z | r1 | start | developer-task-r1.md read; beginning discovery + baseline coverage
+2026-09-18T13:53:05Z | r1 | baseline | make coverage PASS: 76 files all >=90% func+line; TOTAL lines 96.14%, funcs 99.22%
+2026-09-18T14:04:07Z | r1 | impl | SQL beliefs reshape (encrypted proposition), clio-types belief/read, clio-admission decide_ungated, clio-store BeliefStore+dual backend, clio-belief crate + tests; make check PASS
+2026-09-18T14:13:22Z | r1 | check | make check PASS; files split to <=450 lines (schema_reshape 395, belief_reshape 149, observe_tests 339); clippy clean
+2026-09-18T14:14:30Z | r1 | coverage | run1 found sqlite_belief.rs funcs 88.89% (dead fallback closures); simplified to expect() invariant; will re-run
+2026-09-18T14:16:49Z | r1 | coverage | run2 PASS: all 85 reported files >=90% func+line; TOTAL lines 96.04%, funcs 99.30%
+2026-09-18T14:20:04Z | r1 | verify | final make check PASS (exit 0, 18 suites ok); make coverage PASS exit 0: TOTAL lines 96.04%, funcs 99.30%; all 85 files >=90%
+2026-09-18T14:20:04Z | r1 | verify | all new/modified Rust files <=450 lines; no roadmap/phase refs in code; dual-backend belief parity green
+2026-09-18T14:20:04Z | r1 | finish | implemented Phase 100100: clio-belief crate, BeliefStore dual backend, encrypted belief objects + append-only confidence history, belief_observe/belief_history, RetrieveHit contract
+DEVELOPER_DONE

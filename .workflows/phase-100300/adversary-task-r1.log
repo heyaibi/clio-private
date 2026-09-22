@@ -1,0 +1,18 @@
+2026-09-21T17:00:00Z start: phase 100300 r1 adversary review initiated
+2026-09-21T17:00:02Z git status: 7 files staged outside .workflows/, 0 unexpected unstaged files
+2026-09-21T17:00:14Z git diff --cached --stat: 7 files changed (+466, -32)
+2026-09-21T17:00:31Z line count check: all modified Rust files <=450L (lib.rs 119, rerank.rs 324, rerank_tests.rs 316, fixtures_tests.rs 338)
+2026-09-21T17:00:53Z roadmap isolation check: 0 matches for phase/roadmap/crates.md in staged crate diff
+2026-09-21T17:01:09Z cargo check --workspace --locked: exit 0, clean build
+2026-09-21T17:01:14Z cargo clippy --workspace --all-targets --all-features --locked -- -D warnings: exit 0, 0 warnings
+2026-09-21T17:01:19Z cargo fmt --check: exit 0, clean formatting
+2026-09-21T17:02:18Z cargo test --locked --workspace: exit 0, all tests pass across all crates
+2026-09-21T17:04:39Z make coverage: exit 0 (aggregate fns 98.95% / lines 97.89%; rerank.rs fns 100.0% / lines 100.0%; all workspace files >=90%)
+2026-09-21T17:06:20Z phase doc attribution updated: Adversary r1 set to done
+2026-09-21T17:06:43Z findings.json written: verdict Good; 3 minor findings recorded
+2026-09-21T17:06:43Z finding F-01 (crates/clio-retrieve/src/rerank.rs:191): potential double /v1 path if RERANK_URL contains /v1 suffix
+2026-09-21T17:06:43Z finding F-02 (crates/clio-retrieve/src/rerank.rs:61-66): HttpReranker derived Debug leaks bearer token if printed
+2026-09-21T17:06:43Z finding F-03 (crates/clio-retrieve/src/rerank.rs:250-255): build_reranker_from strictly requires credentials for Cohere provider, blocking keyless local proxies
+2026-09-21T17:06:50Z report.html and style.css generated via generate-report.cjs in .workflows/phase-100300
+2026-09-21T17:07:00Z finish: adversarial review complete, appending signal line
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100300/findings.json 9c5f3a06

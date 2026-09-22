@@ -1,0 +1,21 @@
+2026-09-22T18:15:35Z START adversary-task-r1 phase 100362 clio status review
+2026-09-22T18:15:41Z git status --porcelain: 9 files staged in clio-lib, roadmap updated, workflows untracked
+2026-09-22T18:15:55Z wc -l on modified Rust files: all 9 files <= 450 lines (main 322, status_cli 372, status_report 282, port_scan 64, tests <= 268)
+2026-09-22T18:16:49Z cargo clippy --workspace --all-targets --all-features --locked -- -D warnings: 0 warnings, clean exit 0
+2026-09-22T18:16:52Z cargo fmt --all -- --check: FAILED with diffs in port_scan.rs:56, status_cli_fault_tests.rs:70, status_cli_tests.rs:245, status_probe_tests.rs:67,105, status_report_tests.rs:36,120,151,177,204,250
+2026-09-22T18:17:45Z make check: runs cargo fmt --all which dirtied working tree, restored cleanly with git checkout -- .
+2026-09-22T18:19:18Z make coverage: 279 files checked, TOTAL lines 97.90% functions 98.87%, all files meet >=90% floors
+2026-09-22T18:19:24Z per-file coverage: main.rs 97.75/100, port_scan.rs 100/100, status_cli.rs 97.69/93.33, status_report.rs 98.37/92.86
+2026-09-22T18:19:31Z roadmap isolation grep: 0 mentions of roadmap/phase/100362 in code or comments
+2026-09-22T18:20:00Z CLI execution verification: clio status healthy exit 0, --output json valid single-line JSON, --output xml exit 2, clio mcp status exit 2, clio help lists status
+2026-09-22T18:21:06Z URL credential redaction verification: postgres://alice:secretpw@127.0.0.1:1/none -> postgres://***@127.0.0.1:1/none, secret absent from output
+2026-09-22T18:22:25Z SQLite non-mutation audit: clio status --backend sqlite --db /tmp/nonexistent-test-123456.db created 512KB database file on disk, violating AC-100362-04
+2026-09-22T18:23:02Z live port scan verification: bound socket on 127.0.0.1:34300 detected in ports list [34300]
+2026-09-22T18:23:37Z finding F-01 crates/clio-lib/src/status_cli.rs:207 SqliteStore::open creates file and schema bootstrap on nonexistent SQLite path
+2026-09-22T18:23:37Z finding F-02 crates/clio-lib/src/port_scan.rs:56, status_cli_fault_tests.rs:70, status_cli_tests.rs:245, status_probe_tests.rs:67, status_report_tests.rs:36 cargo fmt --all -- --check failure
+2026-09-22T18:23:37Z finding F-03 crates/clio-lib/src/status_cli.rs:309 SetupView secret masking bounded to setup_config::WATCHED_FIELDS
+2026-09-22T18:23:37Z finding F-04 crates/clio-lib/src/port_scan_tests.rs:33 unit test binds ephemeral port 0 rather than port 34300
+2026-09-22T18:23:41Z node generate-report.cjs: generated report.html and copied style.css into scratch and workflows/phase-100362
+2026-09-22T18:24:03Z updated roadmap phase attribution row: Adversary r1 done
+2026-09-22T18:24:15Z FINISH adversary-task-r1 verdict Adequate, 4 findings recorded
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/.workflows/phase-100362/findings.json 9011f3d9

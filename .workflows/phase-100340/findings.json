@@ -1,0 +1,290 @@
+{
+  "run": "r1",
+  "phase": "100340",
+  "subject": "Phase 100340: Hosted Extraction Adapter (OpenAI-Compatible Chat Completions)",
+  "verdict": "Adequate",
+  "verdict_justification": "Phase 100340 delivers the hosted OpenAI-compatible chat extraction adapter, deterministic prompt assembly, factory dispatch, config/env wiring, secret scrubbing, and span-verification integration with 97.9% line coverage and clean clippy checks. However, `cargo fmt` formatting fails on two staged files (contradicting completion claims), and newly created test files omit the mandatory AGENTS.md header ownership and boundary sections.",
+  "metadata": {
+    "generated": "2026-09-22",
+    "applies_to": "master (staged diff)",
+    "source": "crates/clio-write, crates/clio-config, docs, phase-100340 doc"
+  },
+  "standard": [
+    "AGENTS.md core principles: honesty, truthful verification, <=450 lines per Rust file, exact file headers with ownership/boundary",
+    "Coverage gate: >=90% aggregate and per-file function and line coverage on all reported Rust source files",
+    "Roadmap phase 100340 acceptance criteria (AC-100340-01 through AC-100340-09) and required scenarios (T100340-01 through T100340-11)",
+    "requirement.md: FR-4 (span-verified extraction, retry once then refuse), FR-5/PR-4 (structured snapshot vs gist separation), Section 4.9.5.E/FR-32 (config allowlist and secret masking)",
+    "Security: opt-in hosted egress, secret scrubbing prior to egress, credential masking in config and diagnostics, fail-closed parsing"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100340-01: Chat adapter maps a valid response to ExtractCandidate",
+      "status": "Fully satisfied",
+      "evidence": "Verified in `t34_01_valid_response_maps_to_candidate` and `t34_08_openai_factory_selects_chat_extractor_with_key`; snapshot and gist parsed accurately.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100340-02: Malformed output fails closed and never commits",
+      "status": "Fully satisfied",
+      "evidence": "Verified in `t34_02_non_json_content_fails_closed`, `t34_03_fenced_content_is_a_validation_failure`, `t34_05_wrong_snapshot_or_gist_shape_fails_closed`, `oversized_content_is_rejected`, and `t34_02_pipeline_refuses_commit_on_malformed_content`.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100340-03: Prompt includes schema + retry feedback deterministically",
+      "status": "Fully satisfied",
+      "evidence": "`golden_prompt_is_deterministic_and_delimited` passes; user message contains schema template, scrubbed source, and retry feedback in delimited sections.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100340-04: Provider/key/env config wired and masked",
+      "status": "Fully satisfied",
+      "evidence": "`extract_knob_tests` passes (env wiring, allowlist, masking via `config_get`, bearer precedence); raw keys never appear in masked output.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100340-05: Hosted extraction is opt-in; no default egress",
+      "status": "Fully satisfied",
+      "evidence": "`extract_provider_defaults_to_template` and `t34_09_default_is_template_without_egress` verify default provider is `template` with zero network egress.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100340-06: Source scrubbed before egress",
+      "status": "Fully satisfied",
+      "evidence": "`t34_10_source_is_scrubbed_before_egress` passes; inline secrets are masked before request assembly while caller request remains intact.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100340-07: Span verification still rejects ungrounded snapshots",
+      "status": "Fully satisfied",
+      "evidence": "`t34_11_ungrounded_snapshot_is_refused_by_span_verify` verifies pipeline refuses ungrounded snapshots and retains non-authoritative gist.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100340-08: Local template path unchanged",
+      "status": "Fully satisfied",
+      "evidence": "TemplateApiExtractor wire shape untouched; existing `template_api_uses_transport` and workspace tests pass.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100340-09: Factory selects the configured extractor from effective config",
+      "status": "Fully satisfied",
+      "evidence": "`build_extractor_from` dispatch tests pass (`t34_07_unknown_provider_fails_closed`, `t34_08_openai_factory_fails_closed_without_key_or_target`, `t34_09_default_is_template_without_egress`).",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Code formatting passes cargo fmt check",
+      "status": "Missed",
+      "evidence": "`cargo fmt --all -- --check` fails with diffs in `crates/clio-write/src/extract_chat.rs:133` and `crates/clio-write/src/extract_chat_tests.rs:231, 239`.",
+      "severity": "Medium"
+    },
+    {
+      "requirement": "AGENTS.md File Header compliance across all created/modified files",
+      "status": "Partially satisfied",
+      "evidence": "`crates/clio-write/src/extract_chat_tests.rs` and `crates/clio-write/src/extract_factory_tests.rs` lack the mandatory Owns, Does not own, and Boundary sections.",
+      "severity": "Medium"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Staged files fail cargo fmt check",
+      "evidence": "Command `cargo fmt --all -- --check` fails with formatting diffs in `crates/clio-write/src/extract_chat.rs:133` and `crates/clio-write/src/extract_chat_tests.rs:231, 239`.",
+      "requirement_ref": "AGENTS.md Section 'Verify your work' / Phase DoD",
+      "recommendation": "Run `cargo fmt --all` on the repository and stage the resulting formatted files.",
+      "status": "resolved",
+      "resolution": "Ran `cargo fmt --all`. `cargo fmt --all -- --check` now exits 0 (no diff); `make check` (whose `fmt` recipe is `cargo fmt --all`) exits 0."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "New test source files omit mandatory AGENTS.md header sections",
+      "evidence": "`crates/clio-write/src/extract_chat_tests.rs:1-8` and `crates/clio-write/src/extract_factory_tests.rs:1-8` contain only a truncated `//! # Responsibility` header without `## Owns`, `## Does not own`, and `## Boundary` blocks.",
+      "requirement_ref": "AGENTS.md Section 'File Header'",
+      "recommendation": "Update headers in `extract_chat_tests.rs` and `extract_factory_tests.rs` to include the standard AGENTS.md structure with truthful ownership and boundaries.",
+      "status": "resolved",
+      "resolution": "Added the full AGENTS.md header (`## Owns`, `## Does not own`, `## Boundary`, plus a one-line focus statement) to `crates/clio-write/src/extract_chat_tests.rs` and `crates/clio-write/src/extract_factory_tests.rs`, matching existing `*_tests.rs` files such as `clio-config/src/config/extract_knob_tests.rs`."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Test function identifier collision and missing explicit T100340-04 test symbol",
+      "evidence": "`crates/clio-write/src/extract_chat_tests.rs:76` and `crates/clio-write/src/extract_chat_tests.rs:158` both use prefix `t34_03_`. Scenario T100340-04 (empty choices) is tested inside `t34_02_non_json_content_fails_closed` but lacks a distinct `t34_04_...` test function symbol and is omitted from the AC-100340-02 evidence mapping table.",
+      "requirement_ref": "roadmap/phase-100340-hosted-extraction-adapter.md Section 8 Required Test Scenarios (T100340-03, T100340-04)",
+      "recommendation": "Rename `t34_03_fenced_content_is_a_validation_failure` or add a dedicated `t34_04_empty_choices_fails_closed` test to cleanly align with the Section 8 test matrix.",
+      "status": "resolved",
+      "resolution": "Renamed the golden-prompt test `t34_03_golden_prompt_is_deterministic_and_delimited` -> `golden_prompt_is_deterministic_and_delimited` (it is not scenario T100340-03; the `t34_03_` prefix was the collision) and added `t34_04_empty_or_missing_choices_fails_closed` covering empty, missing, and non-array `choices`. Phase AC-100340-02/AC-100340-03 evidence strings updated to match. `cargo test -p clio-write --locked` => 137 passed."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Delimiter breakout in user prompt assembly via unescaped closing tags",
+      "evidence": "`crates/clio-write/src/extract_chat.rs:62-88` interpolates raw `source_text`, `verify_feedback`, and `tool_payload` inside XML-like tags (`<source_text>`, etc.) without escaping matching closing tags like `</source_text>`.",
+      "requirement_ref": "roadmap/phase-100340-hosted-extraction-adapter.md Section 5 Task 2 (Prompt, Schema, and Output Validation)",
+      "recommendation": "Sanitize XML delimiter tags in user input strings or use nonced/structured boundaries.",
+      "status": "resolved",
+      "resolution": "Added `neutralize_delimiters` in `extract_chat.rs`: every interpolated section value (schema template, tool payload, source text, verify feedback) has this module's own `<tag>` / `</tag>` delimiters rewritten to `[tag]` / `[/tag]` before embedding, so a crafted value cannot close a section early. Tests: `extract_chat_egress_tests::source_delimiter_tags_cannot_break_out_of_their_section` (a source containing `</source_text>` yields exactly one real opening and one real closing tag) and `payload_and_feedback_delimiter_tags_are_neutralized`."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Structured tool_payload is not scrubbed of inline secrets before egress",
+      "evidence": "`crates/clio-write/src/extract_chat.rs:70-76` interpolates `tool_payload` directly via `serde_json::to_string(payload)` without invoking `scrub_inline_secrets`, whereas `source_text` is scrubbed at line 82.",
+      "requirement_ref": "roadmap/phase-100340-hosted-extraction-adapter.md Section 7 Sensitive Data Rules / NFR-6",
+      "recommendation": "Pass the serialized `tool_payload` JSON string through `scrub_inline_secrets` before embedding in the prompt.",
+      "status": "resolved",
+      "resolution": "`tool_payload` now goes through a new `scrub_payload`: `clio_config::secret::masked_clone` masks secret-looking fields, then `scrub_inline_secrets` scrubs inline `key: secret` prose. Evidence worth noting: inline scrubbing ALONE does not catch JSON `\"api_key\": \"...\"` (the char after the marker is `\"`, not `:`, so `scrub_inline_secrets` skips it), so the structured `masked_clone` pass is what closes the structured-payload leak. Test `extract_chat_egress_tests::tool_payload_secrets_are_masked_before_egress` asserts neither the field value (`supersecret-12345`) nor an inline prose secret (`api_key: othersecret-9`) appears in the prompt, and that masking (`****`) is present."
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Staged files fail cargo fmt check",
+      "severity": "Important",
+      "why_it_matters": "Code formatting checks are enforced as part of project standards; claiming `cargo fmt` is clean when it fails indicates missing verification after late changes.",
+      "impact": "Failure of `cargo fmt --all -- --check` and `make check`.",
+      "evidence": "`cargo fmt --all -- --check` outputs diffs in `crates/clio-write/src/extract_chat.rs:133` and `crates/clio-write/src/extract_chat_tests.rs:231, 239`.",
+      "confidence": "High",
+      "proposed_fix": "Run `cargo fmt --all` and stage the formatted changes."
+    },
+    {
+      "id": 2,
+      "title": "New test source files omit mandatory AGENTS.md header sections",
+      "severity": "Important",
+      "why_it_matters": "AGENTS.md mandates that every Rust source file MUST include ## Owns, ## Does not own, and ## Boundary sections.",
+      "impact": "Governance non-compliance in `crates/clio-write/src/extract_chat_tests.rs` and `crates/clio-write/src/extract_factory_tests.rs`.",
+      "evidence": "`extract_chat_tests.rs:1-8` and `extract_factory_tests.rs:1-8` omit the mandatory ownership and boundary sections.",
+      "confidence": "High",
+      "proposed_fix": "Add full AGENTS.md header blocks with Owns, Does not own, and Boundary documentation to both test files."
+    },
+    {
+      "id": 3,
+      "title": "Test identifier collision and missing explicit T100340-04 test function",
+      "severity": "Minor",
+      "why_it_matters": "Automated test traceability tools and human reviewers rely on 1:1 mapping of test IDs (T100340-01..T100340-11) to test function names.",
+      "impact": "Duplicate test ID prefix `t34_03_` and missing explicit `t34_04_` function weakens audit traceability.",
+      "evidence": "`extract_chat_tests.rs:76` and `extract_chat_tests.rs:158` both use `t34_03_`; T100340-04 scenario is only checked as an anonymous case inside `t34_02`.",
+      "confidence": "High",
+      "proposed_fix": "Separate T100340-04 into its own test function `t34_04_empty_choices_fails_closed` and update Section 9 AC table accordingly."
+    },
+    {
+      "id": 4,
+      "title": "Unescaped XML tags in user prompt assembly permit delimiter breakouts",
+      "severity": "Minor",
+      "why_it_matters": "If source_text contains `</source_text>`, the model's parser could interpret subsequent text as instructions outside the source data block.",
+      "impact": "Potential prompt injection surface, mitigated downstream by span grounding.",
+      "evidence": "`extract_chat.rs:62-88` interpolates unescaped source_text into `<source_text>` XML tags.",
+      "confidence": "Medium",
+      "proposed_fix": "Escape or sanitize delimiter tags in source_text, tool_payload, and verify_feedback."
+    },
+    {
+      "id": 5,
+      "title": "Tool payload is not scrubbed of inline secrets before egress",
+      "severity": "Minor",
+      "why_it_matters": "Tool payloads may contain API keys or auth headers which could leak to the hosted extraction provider.",
+      "impact": "Potential secret leakage if tool payloads carry unredacted tokens.",
+      "evidence": "`extract_chat.rs:70-76` serializes `tool_payload` without passing it through `scrub_inline_secrets`.",
+      "confidence": "High",
+      "proposed_fix": "Pass serialized `tool_payload` through `clio_config::secret::scrub_inline_secrets`."
+    }
+  ],
+  "dismissed": [
+    "Roadmap phrase 'later phases' in `extract_factory.rs:14`: evaluated for roadmap isolation violation, dismissed because it is a generic phrase rather than a specific phase number, file path, or roadmap reference.",
+    "HTTP vs HTTPS enforcement for bearer key: `clio_index::post_json` allows plain `http://` for local test containers; while hosted APIs should use HTTPS, local development/testing with mock servers requires HTTP support.",
+    "Empty gist string handling: `parse_chat_response` treats empty string as `Some(\"\")`, matching existing `TemplateApiExtractor` behavior."
+  ],
+  "verification": [
+    {
+      "claim": "Workspace test suite passes completely",
+      "classification": "Established",
+      "source_note": "Independently verified with `cargo test --locked --workspace`: 132/132 unit/integration tests passed with exit code 0."
+    },
+    {
+      "claim": "Aggregate and per-file coverage >= 90% lines and functions",
+      "classification": "Established",
+      "source_note": "Independently verified with `make coverage`: 98.90% aggregate functions, 97.89% aggregate lines, 0 files below 90%."
+    },
+    {
+      "claim": "cargo fmt is clean workspace-wide",
+      "classification": "Contradicted",
+      "source_note": "Independently verified with `cargo fmt --all -- --check`: returned exit code 1 with diffs in `extract_chat.rs` and `extract_chat_tests.rs`."
+    },
+    {
+      "claim": "All new and modified Rust files <= 450 lines",
+      "classification": "Established",
+      "source_note": "Independently verified with `wc -l`: maximum file size is 423 lines (`crates/clio-config/src/config/mod.rs`), satisfying the hard limit."
+    },
+    {
+      "claim": "Hosted extraction defaults to template without egress",
+      "classification": "Established",
+      "source_note": "Verified by `extract_knob_tests::extract_provider_defaults_to_template` and `extract_factory_tests::t34_09_default_is_template_without_egress`."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Live OpenAI-compatible endpoint compatibility under latency and transient failures",
+      "why_unknown": "CI and test environments intentionally prohibit live network egress by design",
+      "what_would_resolve_it": "Phase 100350 live runtime wiring and end-to-end integration testing against real endpoints",
+      "materiality": "Low for this phase since factory and mock transport seams are verified"
+    }
+  ],
+  "strengths": [
+    "Clean architectural boundaries: `clio-write` reuses existing `clio-index` transport without introducing new third-party dependencies or circular dependencies.",
+    "Comprehensive test suite covering T100340-01 through T100340-11 scenarios with 100% function coverage and 93%+ line coverage on new modules.",
+    "Strict adherence to the 450-line file size limit across all refactored and new files.",
+    "Robust downstream span-verification integration ensures ungrounded candidate snapshots fail closed and never commit.",
+    "Complete secret masking across env vars, `config_get`, and inline secret scrubbing before egress."
+  ],
+  "regrets": [
+    "Formatting check was not re-run after the late coverage catch-up edits at 12:24, resulting in a false completion claim.",
+    "Test file headers were constructed without the full AGENTS.md ownership and boundary blocks."
+  ],
+  "process_changes": [
+    "Always run `cargo fmt --all -- --check` as the very last pre-stage verification step after all code and test modifications.",
+    "Use a pre-commit or pre-staging check to validate file header structure on all newly created files."
+  ],
+  "plan_1hr": [
+    "Run `cargo fmt --all` and stage the updated files to restore clean format checks.",
+    "Add complete AGENTS.md file headers to `extract_chat_tests.rs` and `extract_factory_tests.rs`.",
+    "Disambiguate test names by creating `t34_04_empty_or_missing_choices_fails_closed`.",
+    "Pass `tool_payload` through `scrub_inline_secrets` in `build_user_message`."
+  ],
+  "plan_unlimited": [
+    "Implement XML tag escaping or structured delimiter envelopes in `build_user_message` to prevent prompt tag breakout.",
+    "Add structured error extraction when hosted providers return standard error JSON payloads rather than a generic Internal error.",
+    "Support provider-specific structured outputs / JSON schema modes where supported while keeping fallback JSON parsing."
+  ],
+  "remediation": {
+    "round": "r1",
+    "date": "2026-09-22",
+    "executor": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+    "summary": "All 5 findings resolved (5/5). No workers spawned: F-01..F-05 are coupled through `crates/clio-write/src/extract_chat.rs` + `extract_chat_tests.rs`; only the F-02 factory-test header was disjoint, and one worker for a single header block was not justified. Fixes batched, then verified with one fresh workspace JSON (per-file scan: 272 files, 0 below 90%), one `make check`, and one `make coverage`.",
+    "commands": [
+      "cargo fmt --all -- --check  => exit 0",
+      "cargo test -p clio-write --locked  => 137 passed (was 132; +5 new tests)",
+      "cargo clippy -p clio-write --all-targets --locked -- -D warnings  => no issues found",
+      "cargo llvm-cov --workspace --locked --json --output-path /tmp/cov-r1.json  => per-file scan 272 files, 0 below 90% lines/functions",
+      "make check  => exit 0 (fmt + clippy --workspace --all-targets --all-features -D warnings + test --workspace; 47 'test result: ok')",
+      "make coverage  => exit 0 (--fail-under-lines 90 --fail-under-functions 90); TOTAL 97.90% lines / 98.93% functions; extract_chat.rs 94.27% lines / 100% functions; extract_factory.rs 100/100; extract.rs 100/100"
+    ],
+    "files_changed": [
+      "crates/clio-write/src/extract_chat.rs",
+      "crates/clio-write/src/extract_chat_tests.rs",
+      "crates/clio-write/src/extract_chat_egress_tests.rs (new, 97 lines)",
+      "crates/clio-write/src/extract_factory_tests.rs"
+    ],
+    "plan_1hr_outcomes": [
+      {"item": "Run `cargo fmt --all`", "status": "done", "evidence": "`cargo fmt --all -- --check` exits 0"},
+      {"item": "Add AGENTS.md headers to the two test files", "status": "done", "evidence": "Owns / Does not own / Boundary added to `extract_chat_tests.rs` and `extract_factory_tests.rs`"},
+      {"item": "Create `t34_04_empty_or_missing_choices_fails_closed`", "status": "done", "evidence": "test present and passing; duplicate `t34_03_` prefix removed"},
+      {"item": "Pass `tool_payload` through the scrubber", "status": "done", "evidence": "new `scrub_payload` = `masked_clone` + `scrub_inline_secrets`"}
+    ],
+    "plan_unlimited_outcomes": [
+      {"item": "XML tag escaping / structured delimiter envelopes", "status": "done", "evidence": "`neutralize_delimiters` rewrites all four delimiter tags inside interpolated content"},
+      {"item": "Structured provider-error extraction", "status": "done", "evidence": "`parse_chat_response` surfaces a bounded (256-char) and scrubbed provider `error.message` instead of the generic no-choices error; test `provider_error_body_is_surfaced_bounded_and_scrubbed`"},
+      {"item": "Provider-specific structured-output / JSON-schema modes", "status": "not adopted", "reason": "Phase 100340 section '2. Scope Boundaries / Explicitly Out of Scope' states: 'Streaming, function/tool calling, or structured-output JSON-schema modes that not all providers implement.' Implementing it would violate the phase scope, and the phase requires the adapter to validate plain JSON regardless of provider. Recommendation adjusted: keep provider-agnostic plain-JSON validation; revisit only if a later phase explicitly widens scope."}
+    ],
+    "pre_existing_flake_not_fixed": "`clio-config` test `config::persist::tests::save_is_owner_only_and_round_trips` fails intermittently (~3/20 in isolation): `temp_sibling` (`crates/clio-config/src/config/persist.rs:226`) names temp files as PID+nanos, so two back-to-back calls can collide at `persist_tests.rs:223` (`assert_ne!`). This is untouched by Phase 100340 and unrelated to any finding; it makes workspace test/coverage runs abort occasionally (~15%), so the workspace JSON was retried once. Documented for the owning phase; not fixed here (out of scope, no drive-by).",
+    "not_verified": "Live OpenAI-compatible endpoint behavior under latency/transient failure (no network egress in CI by design; Phase 100350 owns live runtime wiring)."
+  }
+}

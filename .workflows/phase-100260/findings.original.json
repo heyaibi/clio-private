@@ -1,0 +1,194 @@
+{
+  "run": "r1",
+  "phase": "100260",
+  "subject": "Phase 100260: Retention Mission Policy and Coding-Agent First-Run Defaults",
+  "verdict": "Adequate",
+  "verdict_justification": "The developer successfully implemented the core deterministic mission engine, coding-agent defaults, and fixture calibration with 100% passing tests and high coverage across all crates. However, adversarial review revealed a broken JSON Schema $ref in the published tool schema pack, an omission of secret pattern validation at profile set time, and minor header standard non-compliances.",
+  "metadata": {
+    "generated": "2026-09-21",
+    "applies_to": "phase-100260 r1",
+    "source": "git diff --cached -- . ':!.workflows/'"
+  },
+  "standard": [
+    "AGENTS.md file size constraint (<= 450 lines) and header structure",
+    "Roadmap phase 100260 requirements, acceptance criteria, and security constraints",
+    "Full workspace test pass and >=90% line and function coverage per file",
+    "PR-3 closed taxonomy, PR-5 logged decisions, FR-20 versioned schema pack",
+    "Safe upgrade behavior with zero unexpected state mutation"
+  ],
+  "requirements": [
+    {
+      "requirement": "Task 1: Mission Schema and Specificity Guardrails",
+      "status": "Partially satisfied",
+      "evidence": "Schema, validation caps, duplicate checks, and specificity lint implemented; however, the published JSON Schema carries an invalid $ref pointer, and secret pattern rejection was omitted.",
+      "severity": "High"
+    },
+    {
+      "requirement": "Task 2: Deterministic Mission Influence on Admission",
+      "status": "Fully satisfied",
+      "evidence": "Arithmetic utility adjustments (-0.30 drop / +0.15 keep), drop veto with mission_drop reason, gate order preservation, and audit rule IDs are fully implemented and verified in tests.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Task 3: Coding-Agent First-Run Default",
+      "status": "Fully satisfied",
+      "evidence": "coding_default_profile implemented with standard 20-line chatter fixture calibrating to 4 admit / 16 drop; wired to new repo: banks at resolution time.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "Section 7: Security Constraints",
+      "status": "Partially satisfied",
+      "evidence": "Regex evaluation is timeout-bounded by a 50k step budget, and labels scrub secrets in previews; however, mission examples with secret patterns are not rejected at set time.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100260-06: Schema Pack Publication",
+      "status": "Partially satisfied",
+      "evidence": "Tool schema pack carries mission properties and descriptions, but profile_json_schema contains a broken $ref pointer and MCP tools omit x-mission-entry.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AGENTS.md File Size & Header Compliance",
+      "status": "Partially satisfied",
+      "evidence": "All 48 files are strictly <= 450 lines (max 443 lines), but four new test files omit the required //! # Responsibility header section.",
+      "severity": "Low"
+    }
+  ],
+  "issues": [
+    {
+      "id": 1,
+      "title": "Broken JSON Schema $ref pointer in published profile_json_schema and missing definition in MCP tool schemas",
+      "severity": "Important",
+      "why_it_matters": "MCP clients and tooling validating tool calls or config against profile_json_schema fail with PointerToNowhere errors because the $ref points to /properties/mission/x-mission-entry which does not exist. Furthermore, x-mission-entry is missing from the MCP tool schemas.",
+      "impact": "Any standard JSON Schema validator fails on tool parameter validation for retention_profile_set and admit_preview_batch.",
+      "evidence": "crates/clio-config/src/retention_schema.rs:105, 112, 123. Running python jsonschema.validate() produces '_WrappedReferencingError PointerToNowhere: /properties/mission/x-mission-entry does not exist'.",
+      "confidence": "High",
+      "proposed_fix": "Move x-mission-entry into definitions or under mission.properties, update the $ref paths to point correctly to the definition, and ensure schema_retention_defs embeds the definition."
+    },
+    {
+      "id": 2,
+      "title": "Secret-bearing mission patterns are not rejected at set time and persist unmasked in profile configuration",
+      "severity": "Important",
+      "why_it_matters": "Section 7 Security Constraints explicitly requires: 'Never commit secrets; mission examples containing secret patterns are rejected with guidance to use hygiene tooling instead.' Unchecked examples store credentials in plaintext on disk.",
+      "impact": "Users or tools providing secret patterns in keep/drop examples cause raw API keys or passwords to be persisted in profiles.json.",
+      "evidence": "crates/clio-config/src/retention_mission.rs:143-215 (RetentionMission::validate). Executing 'am retention set' with an api_key string succeeds and writes the unmasked credential to disk.",
+      "confidence": "High",
+      "proposed_fix": "Add secret pattern detection using clio_config::secret to RetentionMission::validate(), returning an InvalidArgument error guiding the user to hygiene tools."
+    },
+    {
+      "id": 3,
+      "title": "Pre-existing unconfigured repo: banks automatically switch to coding_default_profile on upgrade without mention in Known Limitations",
+      "severity": "Minor",
+      "why_it_matters": "Existing banks created before Phase 100260 with repo: prefix that did not set an explicit profile previously had balanced verbosity and no mission; after upgrade they immediately resolve coding default.",
+      "impact": "Unexpected admission behavior change for pre-existing unconfigured repositories without notice in Known Limitations.",
+      "evidence": "crates/clio-config/src/retention_store.rs:106-109 applies coding_default_profile to all repo: banks lacking a stored profile. Phase file §9 and §12 Known Limitations do not disclose this upgrade behavior.",
+      "confidence": "High",
+      "proposed_fix": "Document in §9 and §12 Known Limitations that pre-existing repo: banks without stored profiles resolve coding_default_profile rather than the builtin default."
+    },
+    {
+      "id": 4,
+      "title": "Missing # Responsibility and AGENTS.md module header structure in newly added and modified Rust test files",
+      "severity": "Minor",
+      "why_it_matters": "AGENTS.md strictly requires every Rust source file to use the exact responsibility/ownership header structure.",
+      "impact": "Code style and architectural boundary documentation inconsistency.",
+      "evidence": "crates/clio-admission/src/decision_mission_tests.rs:1-6, crates/clio-config/src/mission_match_tests.rs:1-6, crates/clio-config/src/retention_mission_tests.rs:1-6, crates/clio-lib/tests/retention_mission_harness.rs:1-5.",
+      "confidence": "High",
+      "proposed_fix": "Add //! # Responsibility and the standard ownership/boundary comments to all four test files."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Broken JSON Schema $ref pointer in published profile_json_schema and missing definition in MCP tool schemas",
+      "evidence": "crates/clio-config/src/retention_schema.rs:105, 112 points $ref to '#/properties/mission/x-mission-entry' which does not exist (x-mission-entry is at the schema root). jsonschema.validate fails with PointerToNowhere.",
+      "requirement_ref": "AC-100260-06, FR-20, §4.9.2",
+      "recommendation": "Move x-mission-entry definition inside $defs / definitions or directly under mission properties, and ensure MCP tool schemas in crates/clio-mcp/src/schema_retention_defs.rs include the entry definition."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Secret-bearing mission patterns are not rejected and persist unmasked in profile configuration",
+      "evidence": "crates/clio-config/src/retention_mission.rs:143-215 (RetentionMission::validate). Executing 'am retention set --bank testbank --profile ...' with api_key=sk-... succeeds and writes raw secret to profiles.json on disk.",
+      "requirement_ref": "Phase 100260 §7 Security Constraints",
+      "recommendation": "Add secret pattern detection to RetentionMission::validate() using clio-config::secret markers, rejecting any secret-bearing mission with guidance to use hygiene tooling."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "Pre-existing unconfigured repo: banks automatically switch to coding_default_profile on upgrade without mention in Known Limitations",
+      "evidence": "crates/clio-config/src/retention_store.rs:106-109 applies coding_default_profile to all repo: banks lacking a stored profile. Phase file §9 and §12 Known Limitations do not disclose this upgrade behavior.",
+      "requirement_ref": "Phase 100260 §1 Expected Outcome, §9/§12 Known Limitations",
+      "recommendation": "Document in §9 and §12 Known Limitations that pre-existing repo: banks without stored profiles resolve coding_default_profile rather than the builtin default."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Missing # Responsibility and AGENTS.md module header structure in newly added and modified Rust test files",
+      "evidence": "crates/clio-admission/src/decision_mission_tests.rs:1-6, crates/clio-config/src/mission_match_tests.rs:1-6, crates/clio-config/src/retention_mission_tests.rs:1-6 lack '//! # Responsibility'. crates/clio-lib/tests/retention_mission_harness.rs:1-5 lacks all AGENTS.md header sections.",
+      "requirement_ref": "AGENTS.md File Header",
+      "recommendation": "Add the standard //! # Responsibility, //! ## Owns, //! ## Does not own, and //! ## Boundary doc comments to these test files."
+    }
+  ],
+  "dismissed": [
+    "Step-budget exhaustion handling: initially suspected unbounded recursion or memory leaks; verified that step-budget of 50,000 steps deterministically cuts off ReDoS patterns and logs once.",
+    "Category gate bypass risk: verified that Category::parse and gate_reject run before five-factor scoring and mission evaluation; keep bonus cannot rescue category rejection.",
+    "File length limit violation: checked all 48 modified/created files; all are under the 450-line limit.",
+    "Aggregate and per-file coverage floors: verified using make coverage and awk scan that all files exceed 90% lines and functions."
+  ],
+  "verification": [
+    {
+      "claim": "Workspace build, test, and clippy pass",
+      "classification": "Established",
+      "source_note": "make check and make lint exited with 0 across all 45 test suites."
+    },
+    {
+      "claim": "All touched files meet >=90% line and function coverage",
+      "classification": "Established",
+      "source_note": "make coverage passed; minimum function coverage is 90.0% and minimum line coverage is 91.26%."
+    },
+    {
+      "claim": "Published profile schema is valid JSON Schema",
+      "classification": "Contradicted",
+      "source_note": "jsonschema.validate failed with PointerToNowhere due to invalid $ref pointer to /properties/mission/x-mission-entry."
+    },
+    {
+      "claim": "Secrets in mission examples are rejected at set time",
+      "classification": "Contradicted",
+      "source_note": "am retention set successfully stored an unmasked api_key to disk without error."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Downstream behavior of memory-constrained environments on deep regex backtracking",
+      "why_unknown": "Step budget is 50,000 steps which is safe on 8MB stacks, but recursion could consume stack frames on tight embedded threads.",
+      "what_would_resolve_it": "Convert regex matcher from recursion to an iterative loop with explicit state stack.",
+      "materiality": "Low for CLI/desktop, Medium for constrained runtimes."
+    }
+  ],
+  "strengths": [
+    "Zero-allocation FNV-1a 64 content hashing provides deterministic, stable rule IDs across edits.",
+    "Complete gate-order preservation: category gate and span verification are strictly evaluated before scoring and cannot be overridden by keep bonuses.",
+    "High test coverage with comprehensive scenario testing across 44 suites plus an integration harness.",
+    "All 48 staged files comply with the 450-line file length limit, including refactored schema modules."
+  ],
+  "regrets": [
+    "Did not run standard external JSON Schema validators against published tool schemas during dev phase, missing the dangling $ref pointer.",
+    "Did not add explicit security test cases attempting to set secret tokens in mission examples."
+  ],
+  "process_changes": [
+    "Incorporate automated JSON Schema reference validation into schema-pack tests.",
+    "Add negative security test suites specifically targeting credential injection in config fields."
+  ],
+  "plan_1hr": [
+    "Fix JSON pointer in crates/clio-config/src/retention_schema.rs so $ref correctly resolves to the entry schema.",
+    "Add secret-pattern rejection in RetentionMission::validate() and add unit test verifying rejection with hygiene guidance.",
+    "Update crates/clio-mcp/src/schema_retention_defs.rs to properly include the entry definition in MCP tool schemas.",
+    "Fix doc comment headers in decision_mission_tests.rs, mission_match_tests.rs, retention_mission_tests.rs, and retention_mission_harness.rs to include //! # Responsibility."
+  ],
+  "plan_unlimited": [
+    "Implement an iterative (non-recursive) regex matcher in mission_match.rs to ensure zero risk of stack overflow on deeply nested repetitions in memory-constrained thread environments.",
+    "Add integration tests in clio-mcp validating the entire published schema pack using an authoritative JSON Schema draft validator.",
+    "Add a migration/opt-in mechanism allowing bank operators to explicitly choose whether existing pre-Phase-100260 repo: banks adopt coding_default_profile or retain builtin balanced settings."
+  ]
+}
