@@ -16,7 +16,7 @@ You run from the repo root, but this file lives in `private/clio-private/` — a
 What stays private — the entire `private/` directory:
 
 - `requirement.md`, `coverage.md`, `hardware.md`, this `AGENTS.md`
-- `roadmap/`, `.workflows/`, `scripts/`, `dev-note.md`, `benchmark.md`, `crates.md`
+- `roadmap/`, `runs/`, `harness/`, `scripts/`, `dev-note.md`, `benchmark.md`, `crates.md`
 - Rotation state, run ledgers, run logs, finalize logs, approval markers
 
 What you must never do:
@@ -24,7 +24,7 @@ What you must never do:
 1. Never commit or push anything under `private/` to the public repo. The folder is git-ignored globally; never `git add -f` it and never weaken that ignore rule.
 2. Never reference `private/...` paths in any public file: docs, code comments, Makefile, CI workflows, SQL, compose files. Past scrubs removed them all; keep it that way.
 3. Never paste private file contents (requirement text, roadmap phases, worker prompts, run logs) into public files, issues, PRs, or CI output. CI logs are public — never `cat` a private file from a workflow step.
-4. Never create root symlinks into `private/`. The root currently has zero; keep zero.
+4. Never create root symlinks into `private/`. The root currently has exactly one — the git-ignored `AGENTS.md` convenience link. Keep it at one.
 5. This `AGENTS.md` itself is private. Never copy it to the repo root.
 
 Pushing the private repo to its own private remote is fine and expected. Pushing the root repo must only ever carry public content.

@@ -5,12 +5,10 @@
 # Clio unattended phase driver.
 #
 # Canonical layout: this script lives at
-# private/clio-private/scripts/phase-driver.sh in the nested private repo.
-# Root symlinks (scripts/, .workflows/, roadmap/) preserve the old call
-# sites, so every invocation below still runs with the repo root as cwd.
-# Call from the root, e.g.:
-#   bash private/clio-private/scripts/phase-driver.sh --check
-# (bash scripts/phase-driver.sh --check also works via the root symlink).
+# private/clio-private/harness/phase-driver.sh in the nested private repo.
+# Every invocation below runs with the repo root as cwd. Call from the
+# root, e.g.:
+#   bash private/clio-private/harness/phase-driver.sh --check
 #
 #   phase-driver.sh [--dry-run]                  # cron entrypoint
 #   phase-driver.sh --check                      # report environment readiness
@@ -27,7 +25,7 @@
 # profile below.
 #
 # Optional untracked overrides live in
-# private/clio-private/.workflows/.driver.env (sourced if present):
+# private/clio-private/runs/.driver.env (sourced if present):
 # HERMES_PROFILE_NAME, DISCORD_CHANNEL, DISCORD_FALLBACK_CHANNEL,
 # HEARTBEAT_URL, STALE_AFTER_SEC, LOG_KEEP_DAYS.
 #
@@ -39,10 +37,8 @@
 #   DRIVER_RUN_DIR=<dir>  isolate runtime state (used by --self-test)
 set -euo pipefail
 
-# Resolve the repo root from this script's location. Handles both call
-# sites: via the root symlink (scripts/phase-driver.sh ->
-# private/clio-private/scripts/phase-driver.sh) and via the canonical
-# private path. Falls back to git when the layout is unexpected.
+# Resolve the repo root from this script's location. Falls back to git
+# when the layout is unexpected.
 _SCRIPT_SRC="${BASH_SOURCE[0]}"
 while [ -L "$_SCRIPT_SRC" ]; do
   _SCRIPT_SRC="$(readlink "$_SCRIPT_SRC")"
@@ -52,9 +48,9 @@ while [ -L "$_SCRIPT_SRC" ]; do
   esac
 done
 _SCRIPT_DIR="$(cd "$(dirname "$_SCRIPT_SRC")" && pwd)"
-if [ "$(basename "$_SCRIPT_DIR")" = "scripts" ] \
+if [ "$(basename "$_SCRIPT_DIR")" = "harness" ] \
   && [ "$(basename "$(dirname "$_SCRIPT_DIR")")" = "clio-private" ]; then
-  REPO="$(cd "$_SCRIPT_DIR/../.." && pwd)"
+  REPO="$(cd "$_SCRIPT_DIR/../../.." && pwd)"
 else
   REPO="$(cd "$_SCRIPT_DIR/.." && pwd)"
 fi
@@ -67,8 +63,8 @@ fi
 
 # Canonical private locations (all invoked with $REPO as cwd).
 PRIV="private/clio-private"
-WF="$REPO/$PRIV/.workflows"
-SCRIPTS="$REPO/$PRIV/scripts"
+WF="$REPO/$PRIV/runs"
+HARNESS="$REPO/$PRIV/harness"
 
 # Optional untracked overrides; keep secrets/ids out of the committed file.
 # shellcheck disable=SC1091
@@ -83,7 +79,7 @@ SCRIPTS="$REPO/$PRIV/scripts"
 : "${DRIVER_RUN_DIR:=$WF/.driver}"
 : "${SESSION_NAME:=development}"
 
-PIPELINE="private/clio-private/.workflows/pipelines/default.yaml"
+PIPELINE="private/clio-private/harness/pipelines/default.yaml"
 SESSION="$SESSION_NAME"
 PROFILE="$HERMES_PROFILE_NAME"
 CHANNEL="$DISCORD_CHANNEL"
@@ -218,7 +214,7 @@ run_session() {
     sleep "${DRIVER_STUB_SLEEP:-2}"
     rc="$DRIVER_STUB_RC"
   else
-    "$PYTHON" "$PRIV/.workflows/runner.py" --pipeline "$PIPELINE" \
+    "$PYTHON" "$HARNESS/runner.py" --pipeline "$PIPELINE" \
       --input "phase_number=$number" --input "phase_file=$rel" || rc=$?
   fi
   state="$(phase_state "$number")"
@@ -227,7 +223,7 @@ run_session() {
     130) notify "phase $number interrupted; will resume on the next tick" ;;
     *)   printf 'phase %s rc=%s state=%s at %s\n' \
            "$number" "$rc" "${state:-unknown}" "$(ts)" >"$HALT"
-          notify "phase $number HALTED: ${state:-exit $rc}. Line stopped; see $PRIV/.workflows/phase-$(printf '%06d' "$number")/" ;;
+          notify "phase $number HALTED: ${state:-exit $rc}. Line stopped; see $PRIV/runs/phase-$(printf '%06d' "$number")/" ;;
   esac
   rm -f "$CURRENT" "$PIDFILE"
   exit "$rc"
@@ -291,13 +287,13 @@ _drive() {
     tmux has-session -t "$SESSION" 2>/dev/null \
       && { log "dry-run: session '$SESSION' is running; would skip"; return 0; }
     local out
-    if ! out="$("$PYTHON" "$SCRIPTS/next_phase.py" --repo "$REPO")"; then
+    if ! out="$("$PYTHON" "$HARNESS/next_phase.py" --repo "$REPO")"; then
       log "dry-run: no uncompleted phase"
       return 0
     fi
     local number="${out%%$'\t'*}" rel="${out#*$'\t'}"
     log "dry-run: would launch phase $number in tmux '$SESSION'"
-    printf 'would launch: tmux new-session -d -s %s -c %s "bash %s/private/clio-private/scripts/phase-driver.sh --session %s %s"\n' \
+    printf 'would launch: tmux new-session -d -s %s -c %s "bash %s/private/clio-private/harness/phase-driver.sh --session %s %s"\n' \
       "$SESSION" "$REPO" "$REPO" "$number" "$rel"
     return 0
   fi
@@ -340,7 +336,7 @@ _drive() {
   prune
 
   local out rc=0
-  out="$("$PYTHON" "$SCRIPTS/next_phase.py" --repo "$REPO")" || rc=$?
+  out="$("$PYTHON" "$HARNESS/next_phase.py" --repo "$REPO")" || rc=$?
   if [ "$rc" -ne 0 ]; then
     log "no uncompleted phase (next_phase rc=$rc)"
     return 0
@@ -357,7 +353,7 @@ _drive() {
   [ -z "${DRIVER_STUB_RC:-}" ] || envs="$envs DRIVER_STUB_RC='$DRIVER_STUB_RC'"
   [ -z "${DRIVER_STUB_SLEEP:-}" ] || envs="$envs DRIVER_STUB_SLEEP='$DRIVER_STUB_SLEEP'"
   [ -z "${DRIVER_RUN_DIR:-}" ] || envs="$envs DRIVER_RUN_DIR='$DRIVER_RUN_DIR'"
-  local launch="${envs:+$envs }bash '$REPO/$PRIV/scripts/phase-driver.sh' --session '$number' '$rel'"
+  local launch="${envs:+$envs }bash '$REPO/$PRIV/harness/phase-driver.sh' --session '$number' '$rel'"
 
   tmux new-session -d -s "$SESSION" -c "$REPO" "$launch" \
     || { notify "phase $number failed to launch in tmux"; return 1; }
@@ -492,7 +488,7 @@ check() {
   [ -f "$WF/.driver.env" ] && echo "env file: present" || echo "env file: none (defaults in use)"
   echo "heartbeat: ${HEARTBEAT_URL:-unset}"
   echo "stall threshold: ${STALE_AFTER_SEC}s"
-  "$PYTHON" "$SCRIPTS/next_phase.py" --self-test
+  "$PYTHON" "$HARNESS/next_phase.py" --self-test
 }
 
 case "${1:-}" in

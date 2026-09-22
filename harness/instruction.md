@@ -1,0 +1,93 @@
+# Executing the phase pipeline
+
+```bash
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml \
+   --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060-parallel-write-canonical-consolidation.md --dry-run
+```
+
+1. Run from the repo root. Authenticate `agent`, `agy`, `hermes`, `opencode` once. Hermes needs an OpenRouter key (`hermes model`); opencode carries its own Together auth.
+2. `--self-test`: static harness checks, no spend. `--live` adds one-word inference probes.
+3. Drop `--dry-run` for the real run. Every harness runs attached in your terminal: cursor, agy, and opencode open interactive sessions seeded with the task pointer; hermes seeds a chat. agy runs with `--dangerously-skip-permissions`; opencode runs with `--auto` and the full TUI (mandated by the stages); cursor and the others may ask you to approve tool calls as they work. The runner closes any session itself ~15 s after the final signal lands in the run log — opencode's TUI would otherwise idle after finishing.
+4. Result: JSON summary on stdout, detail in `private/clio-private/runs/phase-100060/run.json`, per-invocation run logs beside the task files (`<step>-task-r<N>.log`) — the runner reads each step's final-line signal from that log.
+5. Exits: 0 completed, 1 rejected/blocked, 2 config error, 130 interrupted.
+
+Flow: developer → adversary → remediator ⇄ approver (3 rounds max) → finalize. Empty findings skip to finalize. Any `*_BLOCKED` ends the run. Each step rotates its two harnesses round-robin.
+
+## Canary (after stage/worker edits)
+
+Run one phase, then prove birth-die compliance from the run logs: each worker spawned with disjoint FILES, no worker signal line (only the main's signal routes), workers left the index alone (`git diff --cached` shows main's staging only), and the main ran the full gate exactly twice (implement) or at most once plus one `make check` (remedy). If any check fails, fix the prompt, not the worker output.
+
+## Foreground
+
+One harness at a time, attached in this terminal. No tmux, no pipes. Run the command, watch it work, approve tool prompts as they appear. Ctrl-C kills the step; rerunning the same command resumes it (finished runs refuse — use `--fresh`, which archives the old dir; interrupted runs continue automatically with round counts and harness rotation restored). `--resume` does the same plus a worthiness verdict on stderr; `--from-step S` jumps to S after proving its predecessors in `ledger.json`. The resumed harness gets the original prompt plus a resume preamble with git/file evidence — never a redo.
+
+Prompts travel as task files: the harness receives a 2-line pointer telling it to read `<step>-task-r<N>.md` and finish by writing its final-line signal as the last line of `<step>-task-r<N>.log`. If a log idles 5 minutes with no signal the runner prints the exact recovery line; work that is verified done advances with `--mark-done STEP SIGNAL` (no harness invoked).
+
+## Directories
+
+- `private/clio-private/runs/phase-{NNNNNN}/`: run dir (runner creates). Holds `run.json`, `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>.log` run logs, `<step>-resume-r<N>.md` resume prompts, `resume.json` (deleted on clean finish, kept after Ctrl-C or step failure), `ledger.json` (per-step completion proofs), `findings.json`, `findings.original.json`.
+- Dry-run, `--self-test`, and `--fuzz` create nothing in the repo (`--fuzz` uses temp dirs only).
+
+`--pipeline` is required.
+
+## Commands phases 100010-100520
+
+
+```bash
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100010 --input phase_file=private/clio-private/roadmap/phase-100010-runtime-profiles-packaging.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100020 --input phase_file=private/clio-private/roadmap/phase-100020-dual-backend-persistence.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100030 --input phase_file=private/clio-private/roadmap/phase-100030-memory-item-core.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100040 --input phase_file=private/clio-private/roadmap/phase-100040-taxonomy-admission.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100050 --input phase_file=private/clio-private/roadmap/phase-100050-online-extraction-span-verification.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060-parallel-write-canonical-consolidation.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100070 --input phase_file=private/clio-private/roadmap/phase-100070-memtree-dirty-path-maintenance.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100080 --input phase_file=private/clio-private/roadmap/phase-100080-bitemporal-triples-supersession.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100090 --input phase_file=private/clio-private/roadmap/phase-100090-shared-continuous-ema-update-engine.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100100 --input phase_file=private/clio-private/roadmap/phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100110 --input phase_file=private/clio-private/roadmap/phase-100110-dense-lexical-index-pipelines.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100120 --input phase_file=private/clio-private/roadmap/phase-100120-intent-gate-hybrid-retrieve-compose.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100130 --input phase_file=private/clio-private/roadmap/phase-100130-coactivation-associations-hub-distillation.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100140 --input phase_file=private/clio-private/roadmap/phase-100140-persona-companion-object.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100150 --input phase_file=private/clio-private/roadmap/phase-100150-task-failure-temporal-history.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100155 --input phase_file=private/clio-private/roadmap/phase-100155-ops-discard-tool.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100160 --input phase_file=private/clio-private/roadmap/phase-100160-mcp-schemas-write-surface.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100170 --input phase_file=private/clio-private/roadmap/phase-100170-mcp-read-retrieve-compose-surface.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100180 --input phase_file=private/clio-private/roadmap/phase-100180-audit-trail-inspect-correction.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100190 --input phase_file=private/clio-private/roadmap/phase-100190-compliance-erase-path.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100200 --input phase_file=private/clio-private/roadmap/phase-100200-additive-harness-workspace-tools.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100210 --input phase_file=private/clio-private/roadmap/phase-100210-hygiene-audit-confirmed-cleanup.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100220 --input phase_file=private/clio-private/roadmap/phase-100220-json-export-import.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100230 --input phase_file=private/clio-private/roadmap/phase-100230-ops-doctor-repair.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100240 --input phase_file=private/clio-private/roadmap/phase-100240-multi-host-sync-protocol.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100250 --input phase_file=private/clio-private/roadmap/phase-100250-per-bank-retention-profiles.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100260 --input phase_file=private/clio-private/roadmap/phase-100260-retention-mission-coding-defaults.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100270 --input phase_file=private/clio-private/roadmap/phase-100270-consolidated-recall-dedup.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100280 --input phase_file=private/clio-private/roadmap/phase-100280-https-transport-config.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100290 --input phase_file=private/clio-private/roadmap/phase-100290-multi-model-embeddings.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100300 --input phase_file=private/clio-private/roadmap/phase-100300-rerank-providers.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100310 --input phase_file=private/clio-private/roadmap/phase-100310-default-database-path.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100320 --input phase_file=private/clio-private/roadmap/phase-100320-compose-lifecycle.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100330 --input phase_file=private/clio-private/roadmap/phase-100330-am-setup-wizard.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100340 --input phase_file=private/clio-private/roadmap/phase-100340-hosted-extraction-adapter.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100350 --input phase_file=private/clio-private/roadmap/phase-100350-live-index-extraction-wiring.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100360 --input phase_file=private/clio-private/roadmap/phase-100360-coverage-guard.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100362 --input phase_file=private/clio-private/roadmap/phase-100362-clio-status-unified-health.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100364 --input phase_file=private/clio-private/roadmap/phase-100364-mcp-http-auto-bind-port-scan.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100366 --input phase_file=private/clio-private/roadmap/phase-100366-full-cli-core-and-retrieval-reads.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100368 --input phase_file=private/clio-private/roadmap/phase-100368-full-cli-history-graph-reads.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100370 --input phase_file=private/clio-private/roadmap/phase-100370-full-cli-safe-core-writes.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100372 --input phase_file=private/clio-private/roadmap/phase-100372-full-cli-safe-workspace-writes.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100374 --input phase_file=private/clio-private/roadmap/phase-100374-full-cli-confirmed-memory-mutations.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100376 --input phase_file=private/clio-private/roadmap/phase-100376-full-cli-hygiene-portability-compliance.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100378 --input phase_file=private/clio-private/roadmap/phase-100378-full-cli-config-ranking-sync.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100380 --input phase_file=private/clio-private/roadmap/phase-100380-binding-closure.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100400 --input phase_file=private/clio-private/roadmap/phase-100400-live-path-hardening.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100420 --input phase_file=private/clio-private/roadmap/phase-100420-history-temporal-invariant.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100440 --input phase_file=private/clio-private/roadmap/phase-100440-fidelity-latency-acceptance.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100460 --input phase_file=private/clio-private/roadmap/phase-100460-benchmark-spike.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100480 --input phase_file=private/clio-private/roadmap/phase-100480-benchmark-runner-build.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100500 --input phase_file=private/clio-private/roadmap/phase-100500-first-provider-adapter.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100520 --input phase_file=private/clio-private/roadmap/phase-100520-scale-ceilings-docs.md --dry-run
+```
+
+The runner only accepts integer phase numbers (`{phase:06d}` run-dir formatting), so slice 100155 runs as `phase_number=100155`: roadmap file `phase-100155-ops-discard-tool.md` is the authoritative slice, and its run state lands in `private/clio-private/runs/phase-100155`. Slice 100155 must be accepted before slice 100160 (it closes the phase-100160 r1 blocker).

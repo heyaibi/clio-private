@@ -22,7 +22,7 @@ workers - commit/push must stay single-owner to avoid split-brain.
 ## Task
 
 Your remedy was approved. Stage all files in both repos (main + nested
-`private/clio-private`), including `private/clio-private/.workflows/` folder
+`private/clio-private`), including `private/clio-private/runs/` folder
 contents, write a commit message per repo, create the commits, and push both
 to GitHub. Here's the message from Remedy Approver agent.
 
@@ -43,8 +43,8 @@ to GitHub. Here's the message from Remedy Approver agent.
 - Run `make check` once and confirm it passes.
 - In the active `private/clio-private/roadmap/phase-*.md` file, change `- [ ] Required approval is obtained (downstream pipeline step).` to `- [x] Required approval is obtained (downstream pipeline step).` Include that change in the same commit.
 - This stage order is the authorization. Do not ask the operator for separate per-command git approvals. Automatically select commit-all with a fixed accurate message (the previously chosen option): if the staged scope is broader than one file, write the broader message covering all staged work.
-- Stage all files in both repos, including `private/clio-private/.workflows/` folder contents (e.g. `git add -A` in the main repo, then `cd private/clio-private && git add -A` in the nested private repo); do not exclude pipeline-internal `.workflows/` paths.
-- Confirm `git status` in both repos shows only intended working-tree changes, including the staged `.workflows/` changes.
+- Stage all files in both repos, including `private/clio-private/runs/` folder contents (e.g. `git add -A` in the main repo, then `cd private/clio-private && git add -A` in the nested private repo); do not exclude pipeline-internal `runs/` paths.
+- Confirm `git status` in both repos shows only intended working-tree changes, including the staged `runs/` changes.
 - Write a clear commit message describing the change.
 - Create the commit.
 - Push the code to GitHub and confirm the push succeeds.

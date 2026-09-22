@@ -11,7 +11,7 @@
 
 **Index slice 100155 (remediation insert between slices 100150 and 16) · **Effort:** `1×` · **Scope:** remediation slice added 2026-09-19; not part of the original index slice plan (see Provenance).
 
-**Runner invocation note:** the runner formats integer phase numbers (`{phase:03d}`), so this slice runs with `phase_number=100155` and its run dir is `.workflows/phase-100155`. The roadmap slice number is 15.5; this file is the authoritative definition regardless of the numeric prompt placeholder.
+**Runner invocation note:** the runner formats integer phase numbers (`{phase:03d}`), so this slice runs with `phase_number=100155` and its run dir is `runs/phase-100155`. The roadmap slice number is 15.5; this file is the authoritative definition regardless of the numeric prompt placeholder.
 
 ### Provenance (why this slice exists)
 

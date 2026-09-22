@@ -3,20 +3,17 @@
 # SPDX-License-Identifier: Apache-2.0
 """Pick the next uncompleted phase from the private roadmap.
 
-Canonical layout: roadmap and workflow state live at
-private/clio-private/roadmap and private/clio-private/.workflows in the
-nested private repo. Root symlinks (roadmap/, .workflows/) preserve the old
-call sites, so this script accepts both: it prefers the canonical private
-paths and falls back to the root-level symlinks. Always invoke with the repo
-root as cwd, e.g.:
-  python3 private/clio-private/scripts/next_phase.py --repo .
+Canonical layout: roadmap and run state live at
+private/clio-private/roadmap and private/clio-private/runs in the
+nested private repo. Always invoke with the repo root as cwd, e.g.:
+  python3 private/clio-private/harness/next_phase.py --repo .
 
 A phase is complete when any of these holds:
-  * private/clio-private/.workflows/phase-<N>/run.json exists with
+  * private/clio-private/runs/phase-<N>/run.json exists with
     "state": "completed";
-  * private/clio-private/.workflows/phase-<N>/ledger.json records a finalize
+  * private/clio-private/runs/phase-<N>/ledger.json records a finalize
     step with signal "FINALIZE_DONE";
-  * a private/clio-private/.workflows/phase-<N>/finalize-task-r*.log ends
+  * a private/clio-private/runs/phase-<N>/finalize-task-r*.log ends
     with FINALIZE_DONE;
   * the phase file carries a checked
     "- [x] ... Required approval is obtained" box (the finalize stage flips it);
@@ -48,10 +45,10 @@ PRIV = Path("private") / "clio-private"
 
 
 def _resolve_dir(repo, name):
-    """Canonical private dir first, root symlink second.
+    """Canonical private dir first, legacy layout second.
 
     repo/private/clio-private/<name> is authoritative. repo/<name> is the
-    root symlink kept for back-compat. Returns None when neither exists.
+    legacy fallback. Returns None when neither exists.
     """
     canonical = repo / PRIV / name
     if canonical.is_dir():
@@ -66,8 +63,8 @@ def roadmap_dir(repo):
     return _resolve_dir(repo, "roadmap")
 
 
-def workflows_dir(repo):
-    return _resolve_dir(repo, ".workflows")
+def runs_dir(repo):
+    return _resolve_dir(repo, "runs")
 
 
 def file_approved(path):
@@ -79,9 +76,9 @@ def file_approved(path):
 
 
 def run_dir(repo, number):
-    base = workflows_dir(repo)
+    base = runs_dir(repo)
     if base is None:
-        base = repo / PRIV / ".workflows"
+        base = repo / PRIV / "runs"
     return base / f"phase-{number:06d}"
 
 
@@ -236,19 +233,19 @@ def self_test():
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp)
         (repo / "roadmap").mkdir()
-        (repo / ".workflows" / "phase-100030").mkdir(parents=True)
-        (repo / ".workflows" / "phase-100040").mkdir(parents=True)
+        (repo / "runs" / "phase-100030").mkdir(parents=True)
+        (repo / "runs" / "phase-100040").mkdir(parents=True)
         (repo / "roadmap" / "phase-100010-alpha.md").write_text(
             "- [x] Required approval is obtained.\n")
         (repo / "roadmap" / "phase-100020-appendix-notes.md").write_text("x\n")
         (repo / "roadmap" / "phase-100020-beta.md").write_text(
             "- [ ] Required approval is obtained.\n")
         (repo / "roadmap" / "phase-100030-gamma.md").write_text("x\n")
-        (repo / ".workflows" / "phase-100030" / "run.json").write_text(
+        (repo / "runs" / "phase-100030" / "run.json").write_text(
             json.dumps({"state": "completed"}))
         # 100040: only index.md marks it Complete (template drift case).
         (repo / "roadmap" / "phase-100040-delta.md").write_text("x\n")
-        (repo / ".workflows" / "phase-100040" / "run.json").write_text(
+        (repo / "runs" / "phase-100040" / "run.json").write_text(
             json.dumps({"state": "rejected"}))
         (repo / "roadmap" / "index.md").write_text(
             "| 100040 | `1×` | [x](phase-100040-delta.md) | Complete — PASS |\n"
@@ -268,47 +265,47 @@ def self_test():
         (repo / "roadmap").mkdir()
         unchecked = "- [ ] Required approval is obtained.\n"
         (repo / "roadmap" / "phase-100010-alpha.md").write_text(unchecked)
-        rd = repo / ".workflows" / "phase-100010"
+        rd = repo / "runs" / "phase-100010"
         rd.mkdir(parents=True)
         (rd / "ledger.json").write_text(
             json.dumps({"steps": {"finalize": {"signal": "FINALIZE_DONE"}}}))
         (repo / "roadmap" / "phase-100020-beta.md").write_text(unchecked)
-        rd2 = repo / ".workflows" / "phase-100020"
+        rd2 = repo / "runs" / "phase-100020"
         rd2.mkdir(parents=True)
         (rd2 / "finalize-task-r1.log").write_text(
             "2026-01-01T00:00:00Z close-out complete\nFINALIZE_DONE r1nonce\n")
         (repo / "roadmap" / "phase-100030-gamma.md").write_text(unchecked)
-        rd3 = repo / ".workflows" / "phase-100030"
+        rd3 = repo / "runs" / "phase-100030"
         rd3.mkdir(parents=True)
         (rd3 / "ledger.json").write_text(
             json.dumps({"steps": {"developer": {"signal": "DEVELOPER_DONE"}}}))
         (rd3 / "finalize-task-r1.log").write_text(
             "2026-01-01T00:00:00Z close-out complete\nFINALIZE_DONE\n")
         (repo / "roadmap" / "phase-100040-delta.md").write_text(unchecked)
-        rd4 = repo / ".workflows" / "phase-100040"
+        rd4 = repo / "runs" / "phase-100040"
         rd4.mkdir(parents=True)
         (rd4 / "finalize-task-r1.log").write_text(
             "2026-01-01T00:00:00Z close-out blocked\nFINALIZE_BLOCKED: trouble\n")
         (repo / "roadmap" / "phase-100050-epsilon.md").write_text(unchecked)
-        (repo / ".workflows" / "phase-100050").mkdir(parents=True)
+        (repo / "runs" / "phase-100050").mkdir(parents=True)
         (repo / "roadmap" / "phase-100060-zeta.md").write_text(unchecked)
         got = select_next(repo)
         assert got is not None and got[0] == 100030, got
         assert got[1].name == "phase-100030-gamma.md", got
     with tempfile.TemporaryDirectory() as tmp:
         # Canonical private layout: private/clio-private/roadmap +
-        # private/clio-private/.workflows. Helpers must prefer it and the
+        # private/clio-private/runs. Helpers must prefer it and the
         # reported path must stay repo-relative for --input phase_file.
         repo = Path(tmp)
         priv_map = repo / PRIV / "roadmap"
-        priv_wf = repo / PRIV / ".workflows" / "phase-100010"
+        priv_wf = repo / PRIV / "runs" / "phase-100010"
         priv_map.mkdir(parents=True)
         priv_wf.mkdir(parents=True)
         (priv_map / "phase-100010-alpha.md").write_text(
             "- [ ] Required approval is obtained.\n")
         (priv_map / "index.md").write_text("Plan ready\n")
         assert roadmap_dir(repo) == priv_map, roadmap_dir(repo)
-        assert workflows_dir(repo) == priv_wf.parent, workflows_dir(repo)
+        assert runs_dir(repo) == priv_wf.parent, runs_dir(repo)
         got = select_next(repo)
         assert got is not None and got[0] == 100010, got
         assert got[1].relative_to(repo) == (

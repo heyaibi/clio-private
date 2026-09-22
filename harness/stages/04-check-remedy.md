@@ -35,25 +35,25 @@ The Remediator agent says the following, please validate and indicate whether yo
 ## Validation method
 
 - For EACH finding, verify the fix is real, complete, and regression-free:
-  read the unstaged diff (`git diff -- . ':!private/clio-private/.workflows/'`), read the
+  read the unstaged diff (`git diff -- . ':!private/clio-private/runs/'`), read the
   surrounding code, and where
   permitted, re-run `make check`/`make test` yourself. Quote
   real output as evidence. Never accept the remediator's summary as proof.
-  `.workflows/` paths are out of scope: their presence in any diff is
+  `runs/` paths are out of scope: their presence in any diff is
   not a finding and never blocks approval.
 - Confirm the findings report was updated honestly (findings marked resolved
   match the diff; no findings silently deleted; backup exists and is
   unmodified).
 - Confirm nothing regressed: staged snapshot vs unstaged changes should show
   remediation work only - flag unrelated changes as new findings.
-  Compare with `git diff -- . ':!private/clio-private/.workflows/'` semantics: `.workflows/`
+  Compare with `git diff -- . ':!private/clio-private/runs/'` semantics: `runs/`
   paths in either diff are ignored, never new findings.
 - Confirm the coverage/size/roadmap-isolation constraints still hold for any
   files the remediator touched.
 
 ## Birth-die review workers (many findings only)
 
-Few findings: verify serially yourself. Many findings with disjoint files: stay orchestrator - triage yourself, then read `private/clio-private/.workflows/workers/review-worker.md` and spawn one ephemeral worker per disjoint file-group in parallel. Workers report per-finding verdicts with evidence and die; they never decide approval. You re-verify, merge, and issue the verdict yourself. Verdict, Attribution edit (on APPROVE only), run log, and finish signal are never delegated.
+Few findings: verify serially yourself. Many findings with disjoint files: stay orchestrator - triage yourself, then read `private/clio-private/harness/workers/review-worker.md` and spawn one ephemeral worker per disjoint file-group in parallel. Workers report per-finding verdicts with evidence and die; they never decide approval. You re-verify, merge, and issue the verdict yourself. Verdict, Attribution edit (on APPROVE only), run log, and finish signal are never delegated.
 
 ## Verdict rules
 

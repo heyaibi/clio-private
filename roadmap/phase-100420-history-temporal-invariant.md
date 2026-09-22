@@ -67,7 +67,7 @@ If work outside this scope appears necessary: stop, document the reason, request
 ### Dependencies
 | Dependency | Required State | Validation |
 |------------|----------------|------------|
-| Phase 100060 run dir | Logs, findings, ledger present | `.workflows/phase-100060/` |
+| Phase 100060 run dir | Logs, findings, ledger present | `runs/phase-100060/` |
 | Phases 003/005 files | Implementation plans present | `roadmap/phase-0000{3,5}-*.md` |
 | Triples DDL | Partial indexes exist | `sql/001_core.sql` |
 | Triple write path | Closes/inserts in a known order | `clio-store` triple tests |
@@ -88,7 +88,7 @@ The agent MUST re-verify the following; the facts below were confirmed at plan t
 - Confirm the schema-version bump mechanism.
 
 ### Discovery Output
-- **006 close-out missing.** Of 31 workflow phase dirs, 30 carry `FINALIZE_DONE`; `.workflows/phase-100060/` has developer/adversary/approver logs plus `finalize-task-r1.md` and `ledger.json` but no `finalize-task-r1.log`.
+- **006 close-out missing.** Of 31 workflow phase dirs, 30 carry `FINALIZE_DONE`; `runs/phase-100060/` has developer/adversary/approver logs plus `finalize-task-r1.md` and `ledger.json` but no `finalize-task-r1.log`.
 - **003/005 predate the pipeline.** Phase 100030 shows only Developer + Adversary rows; Phase 100050 shows a fuller set. The gap flags 003 (ungated repo create path, legacy `put_item`) and 005 (fixtures-only live extractor in CI) as the highest risks.
 - **No unique constraint; only non-unique partial indexes.** `sql/001_core.sql:246-255` defines `triples_bank_id_subject_predicate_inx`, `triples_bank_id_subject_predicate_open_inx` (`WHERE valid_until IS NULL`), and `triples_bank_id_subject_predicate_open_both_inx` (`WHERE valid_until IS NULL AND tx_until IS NULL`) — all with `CREATE INDEX`, none unique. Two open edges for the same `(bank_id, subject, predicate)` are prevented by code alone.
 - **"Open" is defined here as both ends NULL.** The requirement's supersession rule sets both `valid_time.end` and `transaction_time.end` on invalidation, so a current edge has both `valid_until IS NULL` and `tx_until IS NULL`. This phase treats that both-NULL state as the open-edge identity case. A partially closed edge (one end set) and valid-time-range overlap are outside this constraint's predicate; if the requirement is meant to cover those, that needs a separate range/exclusion approach and operator confirmation (see Task 3).

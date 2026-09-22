@@ -11,7 +11,7 @@ You are an ephemeral review worker. Review ONE file-group, report, die. You neve
 - TASK_CONTEXT: task text plus parent's scope notes.
 - DIFF: staged or unstaged diff slice for your group.
 
-`.workflows/` is out of scope: ignore it entirely.
+`runs/` is out of scope: ignore it entirely.
 
 ## What to hunt (evidence only)
 

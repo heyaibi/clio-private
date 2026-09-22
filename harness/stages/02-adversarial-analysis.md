@@ -27,19 +27,19 @@ Here's the original prompt:
 
 The developer agent (another coding assistant) has indicated that it has completed the task according to the above prompt. The files are git staged for review.
 
-`.workflows/` is pipeline-internal and out of scope: review only
-non-workflow paths with `git diff --cached -- . ':!private/clio-private/.workflows/'`, and
-never file findings on `.workflows/` entries in any git state
+`runs/` is pipeline-internal and out of scope: review only
+non-workflow paths with `git diff --cached -- . ':!private/clio-private/runs/'`, and
+never file findings on `runs/` entries in any git state
 (staged, unstaged, or untracked).
 
 Perform adversarial review of this session per the rules below, and write the report as instructed there.
 
 ## Review scope and method
 
-- Review the STAGED diff (`git diff --cached -- . ':!private/clio-private/.workflows/'`)
+- Review the STAGED diff (`git diff --cached -- . ':!private/clio-private/runs/'`)
   plus the surrounding code it depends on - a diff-only review misses
   broken invariants in unchanged callers. Check `git status` to
-  understand what is staged vs unstaged (ignoring `.workflows/` paths)
+  understand what is staged vs unstaged (ignoring `runs/` paths)
   and say so in the report.
 - Verify every claim independently. Run `make test`, `make lint`, `make
   check`, and `make coverage` yourself as needed and quote real output as
@@ -65,7 +65,7 @@ Perform adversarial review of this session per the rules below, and write the re
 
 ## Birth-die review workers (large diffs only)
 
-Small diffs: review serially yourself. Large diffs (many files, context pressure): stay orchestrator - triage file-groups yourself, then read `private/clio-private/.workflows/workers/review-worker.md` and spawn one ephemeral worker per disjoint file-group in parallel. Workers report findings with evidence and die; they never write findings.json. You merge, deduplicate, re-verify each claimed finding yourself, then write findings.json. Findings-report write, Attribution row, run log, and finish signal are never delegated.
+Small diffs: review serially yourself. Large diffs (many files, context pressure): stay orchestrator - triage file-groups yourself, then read `private/clio-private/harness/workers/review-worker.md` and spawn one ephemeral worker per disjoint file-group in parallel. Workers report findings with evidence and die; they never write findings.json. You merge, deduplicate, re-verify each claimed finding yourself, then write findings.json. Findings-report write, Attribution row, run log, and finish signal are never delegated.
 
 ## Deliverables
 

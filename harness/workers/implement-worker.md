@@ -20,7 +20,7 @@ You never read `private/clio-private/roadmap/` yourself. Parent hands you what y
 - Slice compiles, slice tests pass.
 - Every Rust file you created or modified: <=450 total lines, >=90% function and line coverage.
 - Coding constraints: `rust-best-practices`, `rust-async-patterns`, `bloat-buster`; AGENTS.md header format with truthful ownership; `*_tests.rs` naming; `PG_TEST_LOCK` serialization; roadmap isolation (no phase numbers, no `./roadmap/` or `crates.md` references in code or comments); SQL schema edited directly, no migrations.
-- NEVER commit, push, stash, or `git add`. NEVER touch the index. NEVER touch `.workflows/`.
+- NEVER commit, push, stash, or `git add`. NEVER touch the index. NEVER touch `runs/`.
 - NEVER run the full gate or `make coverage`. Verify scoped only:
   `cargo llvm-cov --package <crate> --locked --no-clean --summary-only` (narrow with `--lib` or `--test <name>`), same `DATABASE_URL` as parent, compare against BASELINE_JSON.
 

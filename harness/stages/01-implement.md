@@ -43,7 +43,7 @@ Do adequate online research once, yourself, before delegating. Hand slice-releva
 - After changing any Rust crate, follow `private/clio-private/coverage.md`: verify aggregate AND per-file >=90% function and line before finishing.
 - Roadmap isolation: never reference `private/clio-private/roadmap/`, phase numbers, or roadmap files from code or comments. Do not reference `crates.md` in code comments.
 - SQL: edit schema files directly; no migrations.
-- Git: NEVER commit, push, or stash. When done, stage the main repo with exactly `git add -- . ':!private/clio-private/.workflows/'` from the repo root, then stage the nested private repo (`cd private/clio-private && git add -- roadmap/ .workflows/` for the phase-file and pipeline artifacts you touched). The next agent reviews both staged diffs.
+- Git: NEVER commit, push, or stash. When done, stage the main repo with exactly `git add -- . ':!private/clio-private/runs/'` from the repo root, then stage the nested private repo (`cd private/clio-private && git add -- roadmap/ runs/` for the phase-file and pipeline artifacts you touched). The next agent reviews both staged diffs.
 - Vocabulary clash or requirement conflict: stop, do not guess. Signal `DEVELOPER_BLOCKED` with two options (2 pros, 2 cons each), recommendation first.
 - Conditional out-of-scope bullets are owed work when their condition holds. Implement if unambiguous; else signal `DEVELOPER_BLOCKED`. Never mark complete while such an item is silently skipped.
 - Known limitations state (a) what is missing, (b) why, (c) which phase owns the debt. Never phrase "not implemented" as "implemented with boundary".
@@ -60,7 +60,7 @@ You keep context low by giving birth to workers that do their slice and die. You
 - Default to doing intertwined work yourself. Fan out only when the phase decomposes into disjoint files, crates, or modules that never touch the same paths.
 - Do shared groundwork yourself first: decomposition, research, shared traits/types/skeletons/fixtures. Workers only fill disjoint slices on top.
 - Partition by file or crate. One worker owns one slice: files it alone may create or modify. Two workers never share a file, helper, or fixture; serialize any that would. If two slices need a common interface, you own it. If slices turn out coupled, drop the parallel plan and finish serially yourself.
-- To spawn, read `private/clio-private/.workflows/workers/implement-worker.md` (slices) or `private/clio-private/.workflows/workers/coverage-worker.md` (coverage catch-up) and fill its slots per worker: exact FILES, slice requirements quoted from task + phase file, relevant research notes, baseline JSON path, DATABASE_URL. Workers never read `private/clio-private/roadmap/` themselves.
+- To spawn, read `private/clio-private/harness/workers/implement-worker.md` (slices) or `private/clio-private/harness/workers/coverage-worker.md` (coverage catch-up) and fill its slots per worker: exact FILES, slice requirements quoted from task + phase file, relevant research notes, baseline JSON path, DATABASE_URL. Workers never read `private/clio-private/roadmap/` themselves.
 - Spawn disjoint workers in parallel. Collect all results before integrating: review every diff against the hard rules, resolve blockers yourself (two options, recommendation first), re-verify the union with your own scoped run, then run the final full gate yourself.
 - Coverage catch-up uses the same pattern after main work is integrated: one worker per file-group, same disjointness, you re-verify combined, then final gate.
 

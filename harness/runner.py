@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Generic stage-pipeline runner.
 
-Reads a pipeline YAML (see private/clio-private/.workflows/pipelines/default.yaml
+Reads a pipeline YAML (see private/clio-private/harness/pipelines/default.yaml
 for the contract), renders each step's stage file by binding its {{PLACEHOLDERS}},
 invokes the stage's harness CLI, matches the final-line signal, and routes.
 
-Usage (run from the repo root; root symlinks also work):
-  python3 private/clio-private/.workflows/runner.py --pipeline private/clio-private/.workflows/pipelines/default.yaml \
+Usage (run from the repo root):
+  python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml \
       --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060-parallel-write-canonical-consolidation.md
 
   --dry-run validates everything and prints rendered prompts without
@@ -28,7 +28,7 @@ Conventions (load-bearing, do not change silently):
 
 Foreground: every harness runs attached in the operator's terminal with
 inherited stdio; the runner polls the step's run log and closes the
-session ~15 s after the final signal lands (autoexit.md). Ctrl-C kills
+session ~15 s after the final signal lands. Ctrl-C kills
 the step; rerunning the same command resumes. See instruction.md.
 """
 import argparse
@@ -62,7 +62,7 @@ INT_INPUTS = {"phase_number", "max_remedy_rounds"}
 
 EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
 
-# Auto-exit (autoexit.md): TUI harnesses idle after finishing, so the runner
+# Auto-exit: TUI harnesses idle after finishing, so the runner
 # polls the run log and closes the session once the final signal is stable.
 AUTOEXIT_POLL_S = 1.0
 AUTOEXIT_STABLE_POLLS = 2
@@ -141,13 +141,8 @@ def display_name(harness):
 # This is what makes round-robin span executions instead of restarting at
 # slot 0. Different pipeline files rotate independently.
 def rotation_file(repo, key):
-    # Canonical private location; the legacy root path is the fallback for
-    # runs started before the workflows moved (no root symlink exists now).
-    canonical = repo / "private/clio-private/.workflows" / f".harness-rotation-{key}.json"
-    if canonical.is_file():
-        return canonical
-    legacy = repo / f".workflows/.harness-rotation-{key}.json"
-    return canonical if not legacy.is_file() else legacy
+    # Run state lives under private/clio-private/runs/.
+    return repo / "private/clio-private/runs" / f".harness-rotation-{key}.json"
 
 
 def rotation_key_for(pipe_path):
@@ -478,7 +473,7 @@ class Run:
                nonce=None, sid=None):
         """Run the harness attached in the foreground: inherited stdio, the
         operator watches and approves prompts, the runner closes the session
-        ~15 s after the final signal lands in the run log (autoexit.md).
+        ~15 s after the final signal lands in the run log.
         The log text doubles as the step output. Returns (log_text, meta)."""
         cli, provider, model, effort = parse_harness(harness)
         provider = resolve_provider(cli, provider)
@@ -2049,7 +2044,7 @@ def fuzz(n):
 
 
 def autoexit_test():
-    """Scripted auto-exit checks (autoexit.md Verify, no inference spend):
+    """Scripted auto-exit checks (no inference spend):
     a fake harness that writes its final signal then sleeps must be closed
     by the runner (~grace + stability polls); a fake harness that exits
     nonzero without a signal must stay a step failure."""

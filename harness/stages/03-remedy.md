@@ -35,7 +35,7 @@ If empty, this is round 1: work from the findings report. If it names unresolved
 - Never weaken tests, thresholds, scanner rules, or coverage gates. Never invent unreachable code.
 - Same code constraints as developer: 450-line Rust limit, AGENTS.md headers, `private/clio-private/coverage.md` procedure, roadmap isolation, no migrations.
 - Git: NEVER commit or push. Do NOT run `git add` - leave changes UNSTAGED. Never touch the index (`reset`, `restore --staged`). Approver reviews `git diff` (unstaged); staged snapshot is the baseline.
-- A finding on only `.workflows/` paths is out of scope: close it yourself citing scoped-diff evidence (`git diff -- . ':!private/clio-private/.workflows/'` shows nothing). No worker for it.
+- A finding on only `runs/` paths is out of scope: close it yourself citing scoped-diff evidence (`git diff -- . ':!private/clio-private/runs/'` shows nothing). No worker for it.
 - Update the findings report yourself afterward: mark each resolved with how it was fixed, quoting real output. Adjust recommendations only with reasons.
 - In phase file "Attribution", append `| Remediator | r<N> | {{harness}} | done |` (`blocked` if blocked), N your round from `ROUND_INFO`.
 - Blocker or vocabulary clash: stop, two options (2 pros, 2 cons each), recommendation first, signal `REMEDIATOR_BLOCKED`.
@@ -47,9 +47,9 @@ Full gate (`make coverage`) at most once, as final verification. No worker ever 
 
 ## Birth-die workers
 
-- Triage every finding yourself first. Close out-of-scope (`.workflows`-only) yourself. Resolve by-evidence-alone findings yourself. Fix coupled or cross-cutting findings yourself. Fan out only independent findings over disjoint files, crates, or modules.
+- Triage every finding yourself first. Close out-of-scope (`runs`-only) yourself. Resolve by-evidence-alone findings yourself. Fix coupled or cross-cutting findings yourself. Fan out only independent findings over disjoint files, crates, or modules.
 - On rounds after round 1, unresolved items from the previous verdict go in the first wave.
-- To spawn, read `private/clio-private/.workflows/workers/remedy-worker.md` (fixes) or `private/clio-private/.workflows/workers/coverage-worker.md` (coverage catch-up) and fill per worker: exact FILES it alone may edit, assigned findings quoted in full, gate, scoped verify commands. Workers never edit the findings report or backup; you hand them finding text. Two workers never share a file, helper, or fixture.
+- To spawn, read `private/clio-private/harness/workers/remedy-worker.md` (fixes) or `private/clio-private/harness/workers/coverage-worker.md` (coverage catch-up) and fill per worker: exact FILES it alone may edit, assigned findings quoted in full, gate, scoped verify commands. Workers never edit the findings report or backup; you hand them finding text. Two workers never share a file, helper, or fixture.
 - Spawn disjoint workers in parallel. Collect all before integrating: review every diff, resolve blockers yourself, re-verify union with one scoped pass, then run single `make check` yourself. Only you update the findings report afterward, quoting worker output as evidence. If slices prove coupled, drop parallel plan and finish serially.
 - Coverage catch-up after integration uses the same pattern: one worker per file-group, you re-verify combined, then final gate.
 
