@@ -15,8 +15,8 @@ You run from the repo root, but this file lives in `private/clio-private/` — a
 
 What stays private — the entire `private/` directory:
 
-- `requirement.md`, `coverage.md`, `hardware.md`, this `AGENTS.md`
-- `roadmap/`, `runs/`, `harness/`, `scripts/`, `dev-note.md`, `benchmark.md`, `crates.md`
+- `baseline/requirement.md`, `baseline/coverage.md`, `hardware.md`, this `AGENTS.md`
+- `roadmap/`, `runs/`, `harness/`, `scripts/`, `dev-note.md`, `baseline/benchmark.md`, `baseline/crates.md`
 - Rotation state, run ledgers, run logs, finalize logs, approval markers
 
 What you must never do:
@@ -79,14 +79,14 @@ Plain English beats clever phrasing.
 
 ## Coverage Gate
 
-Before starting and after completing any phase that modifies Rust crates, follow **`private/clio-private/coverage.md`**.
+Before starting and after completing any phase that modifies Rust crates, follow **`private/clio-private/baseline/coverage.md`**.
 
 The workspace Makefile enforces **≥90% aggregate LLVM coverage** for functions and lines. Agents must additionally verify that **every reported Rust source file** has:
 
 - ≥90% function coverage
 - ≥90% line coverage
 
-Run `make coverage` and follow any additional procedure required by `private/clio-private/coverage.md`.
+Run `make coverage` and follow any additional procedure required by `private/clio-private/baseline/coverage.md`.
 
 `make coverage` is incremental (`cargo llvm-cov --no-clean`): it keeps the warm instrumented build in `target/llvm-cov-target`, so repeated gates reuse unchanged crates. Run `make coverage-clean` for an authoritative from-scratch gate after large refactors, or when per-file numbers look wrong. Raw `cargo llvm-cov` commands must also pass `--no-clean`.
 
@@ -155,9 +155,9 @@ Every Rust source file MUST use the following header structure:
 
  The responsibility and ownership statements MUST accurately describe the actual module. Do not copy placeholder text into production files.
 
- ## Editing `requirement.md`
+ ## Editing `baseline/requirement.md`
 
- The normative requirements live in `private/clio-private/requirement.md` (singular). Treat every edit as a consistency change, not a local append.
+ The normative requirements live in `private/clio-private/baseline/requirement.md` (singular). Treat every edit as a consistency change, not a local append.
 
  ### Before adding or changing a requirement
 
@@ -185,6 +185,6 @@ Every Rust source file MUST use the following header structure:
 
  - Verify the relevant tests and checks.
 - Verify the Rust source-file size constraint for every Rust file created or refactored.
-- If the phase touched Rust crates, complete the required `private/clio-private/coverage.md` procedure and verify both aggregate coverage and the per-file ≥90% function and line thresholds.
-- For `private/clio-private/requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
+- If the phase touched Rust crates, complete the required `private/clio-private/baseline/coverage.md` procedure and verify both aggregate coverage and the per-file ≥90% function and line thresholds.
+- For `private/clio-private/baseline/requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
 - Clearly state what was verified and identify anything that could not be verified.

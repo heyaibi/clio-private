@@ -17,7 +17,7 @@ You never modify the findings report or its backup. You never touch `runs/`.
 
 - Every assigned finding addressed, slice compiles, slice tests pass.
 - Every Rust file created or modified: <=450 total lines; where a finding concerns coverage, >=90% function and line.
-- Never weaken tests, thresholds, scanner rules, or coverage gates. Never invent unreachable code. AGENTS.md header format; `*_tests.rs` naming; `PG_TEST_LOCK` serialization; `private/clio-private/coverage.md` procedure; roadmap isolation; no migrations.
+- Never weaken tests, thresholds, scanner rules, or coverage gates. Never invent unreachable code. AGENTS.md header format; `*_tests.rs` naming; `PG_TEST_LOCK` serialization; `private/clio-private/baseline/coverage.md` procedure; roadmap isolation; no migrations.
 - NEVER commit, push, stash, `git add`, or touch the index in any way.
 - NEVER run `make check` or `make coverage`. Verify scoped only: `cargo check -p <crate>`, `cargo test -p <crate>`, and where coverage is relevant `cargo llvm-cov --package <crate> --locked --summary-only`.
 

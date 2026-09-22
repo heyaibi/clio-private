@@ -33,7 +33,7 @@ If empty, this is round 1: work from the findings report. If it names unresolved
 - First action: copy {{FINDINGS_PATH}} to {{BACKUP_PATH}} before touching anything (skip if backup exists). Spawn nothing before the backup exists.
 - Batch fixes, verify ONCE with `make check`. One pass to fix, one to verify.
 - Never weaken tests, thresholds, scanner rules, or coverage gates. Never invent unreachable code.
-- Same code constraints as developer: 450-line Rust limit, AGENTS.md headers, `private/clio-private/coverage.md` procedure, roadmap isolation, no migrations.
+- Same code constraints as developer: 450-line Rust limit, AGENTS.md headers, `private/clio-private/baseline/coverage.md` procedure, roadmap isolation, no migrations.
 - Git: NEVER commit or push. Do NOT run `git add` - leave changes UNSTAGED. Never touch the index (`reset`, `restore --staged`). Approver reviews `git diff` (unstaged); staged snapshot is the baseline.
 - A finding on only `runs/` paths is out of scope: close it yourself citing scoped-diff evidence (`git diff -- . ':!private/clio-private/runs/'` shows nothing). No worker for it.
 - Update the findings report yourself afterward: mark each resolved with how it was fixed, quoting real output. Adjust recommendations only with reasons.

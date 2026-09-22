@@ -31,8 +31,8 @@ Do adequate online research once, yourself, before delegating. Hand slice-releva
 
 ## Before coding
 
-- Read `private/clio-private/AGENTS.md`, `private/clio-private/requirement.md` sections cited by the task, `private/clio-private/crates.md`, and the phase file.
-- Run the full gate once for the pre-change baseline and save the JSON (`cargo llvm-cov --workspace --locked --no-clean --json --output-path /tmp/cov-baseline.json` with `DATABASE_URL` from `private/clio-private/coverage.md`). Later per-file numbers come from re-reading it, not re-running. If any Rust file is already below 90% on either metric, stop and signal `DEVELOPER_BLOCKED` with the offending files. Do not fix old debt unprompted.
+- Read `private/clio-private/AGENTS.md`, `private/clio-private/baseline/requirement.md` sections cited by the task, `private/clio-private/baseline/crates.md`, and the phase file.
+- Run the full gate once for the pre-change baseline and save the JSON (`cargo llvm-cov --workspace --locked --no-clean --json --output-path /tmp/cov-baseline.json` with `DATABASE_URL` from `private/clio-private/baseline/coverage.md`). Later per-file numbers come from re-reading it, not re-running. If any Rust file is already below 90% on either metric, stop and signal `DEVELOPER_BLOCKED` with the offending files. Do not fix old debt unprompted.
 - Spawn nothing before this baseline exists. Workers compare against it instead of re-running the gate.
 
 ## Hard rules
@@ -40,8 +40,8 @@ Do adequate online research once, yourself, before delegating. Hand slice-releva
 - Implement only what the task asks. No drive-by refactors.
 - Every Rust file you create or modify stays at or below 450 total lines.
 - New/modified Rust files use the exact AGENTS.md header with truthful ownership.
-- After changing any Rust crate, follow `private/clio-private/coverage.md`: verify aggregate AND per-file >=90% function and line before finishing.
-- Roadmap isolation: never reference `private/clio-private/roadmap/`, phase numbers, or roadmap files from code or comments. Do not reference `crates.md` in code comments.
+- After changing any Rust crate, follow `private/clio-private/baseline/coverage.md`: verify aggregate AND per-file >=90% function and line before finishing.
+- Roadmap isolation: never reference `private/clio-private/roadmap/`, phase numbers, or roadmap files from code or comments. Do not reference `baseline/crates.md` in code comments.
 - SQL: edit schema files directly; no migrations.
 - Git: NEVER commit, push, or stash. When done, stage the main repo with exactly `git add -- . ':!private/clio-private/runs/'` from the repo root, then stage the nested private repo (`cd private/clio-private && git add -- roadmap/ runs/` for the phase-file and pipeline artifacts you touched). The next agent reviews both staged diffs.
 - Vocabulary clash or requirement conflict: stop, do not guess. Signal `DEVELOPER_BLOCKED` with two options (2 pros, 2 cons each), recommendation first.
