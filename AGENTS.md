@@ -9,6 +9,26 @@
 - **Question unrealistic constraints.** If a requested constraint makes the stated requirements impossible or materially risks correctness, explain the conflict and ask for a decision. Otherwise, use reasonable engineering judgment rather than stopping unnecessarily.
 - **Verify your work.** Run appropriate checks and tests when possible. Clearly state what was and was not verified.
 
+## Private / Public Boundary
+
+You run from the repo root, but this file lives in `private/clio-private/` — a separate private repo (`heyaibi/clio-private`) accessible to a few people only. The root repo (`heyaibi/clio`) is public. Everything under `private/` stays on this machine and in the private remote. Never let it leak into the public repo.
+
+What stays private — the entire `private/` directory:
+
+- `requirement.md`, `coverage.md`, `hardware.md`, this `AGENTS.md`
+- `roadmap/`, `.workflows/`, `scripts/`, `dev-note.md`, `benchmark.md`, `crates.md`
+- Rotation state, run ledgers, run logs, finalize logs, approval markers
+
+What you must never do:
+
+1. Never commit or push anything under `private/` to the public repo. The folder is git-ignored globally; never `git add -f` it and never weaken that ignore rule.
+2. Never reference `private/...` paths in any public file: docs, code comments, Makefile, CI workflows, SQL, compose files. Past scrubs removed them all; keep it that way.
+3. Never paste private file contents (requirement text, roadmap phases, worker prompts, run logs) into public files, issues, PRs, or CI output. CI logs are public — never `cat` a private file from a workflow step.
+4. Never create root symlinks into `private/`. The root currently has zero; keep zero.
+5. This `AGENTS.md` itself is private. Never copy it to the repo root.
+
+Pushing the private repo to its own private remote is fine and expected. Pushing the root repo must only ever carry public content.
+
 ## Communication
 
 - Speak in **plain, concise English**.
