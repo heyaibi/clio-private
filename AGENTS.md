@@ -15,8 +15,8 @@ You run from the repo root, but this file lives in `private/clio-private/` — a
 
 What stays private — the entire `private/` directory:
 
-- `baseline/requirement.md`, `baseline/coverage.md`, `hardware.md`, this `AGENTS.md`
-- `roadmap/`, `runs/`, `harness/`, `scripts/`, `dev-note.md`, `baseline/benchmark.md`, `baseline/crates.md`
+- `baseline/requirement.md`, `baseline/coverage.md`, `baseline/hardware.md`, this `AGENTS.md`
+- `roadmap/`, `runs/`, `harness/`, `scripts/`, `harness/dev-note.md`, `baseline/benchmark.md`, `baseline/crates.md`
 - Rotation state, run ledgers, run logs, finalize logs, approval markers
 
 What you must never do:
