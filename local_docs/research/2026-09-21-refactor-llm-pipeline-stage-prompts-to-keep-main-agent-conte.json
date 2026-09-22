@@ -1,0 +1,237 @@
+{
+  "query": "Refactor LLM pipeline stage prompts to keep main agent context low via ephemeral spawn-delegate-die subagents",
+  "mode": "flat",
+  "generated_at": "2026-09-21T18:19:15.081226+05:30",
+  "sub_questions": [
+    "What proven patterns keep orchestrator main agent context window low in multi-agent LLM pipelines?",
+    "How do ephemeral spawn-delegate-die subagents work in Claude Code OpenCode and similar harnesses?",
+    "What are best practices for splitting large prompt files into lean orchestrator prompts plus detailed worker prompts?",
+    "How to enforce disjoint file ownership and safe integration when parallel subagents edit code?",
+    "What verification patterns avoid repeated full test coverage gates while keeping per-file guarantees?"
+  ],
+  "findings": [
+    {
+      "sub_question": "What proven patterns keep orchestrator main agent context window low in multi-agent LLM pipelines?",
+      "claim": "Give each subagent its own context window so it explores in parallel and returns only condensed findings to the lead agent.",
+      "url": "https://www.anthropic.com/engineering/multi-agent-research-system",
+      "quote": "Subagents facilitate compression by operating in parallel with their own context windows, exploring different aspects of the question simultaneously before condensing the most important tokens for the lead research agent.",
+      "domain": "www.anthropic.com",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "How we built our multi-agent research system | Anthropic",
+      "source_id": 1
+    },
+    {
+      "sub_question": "What proven patterns keep orchestrator main agent context window low in multi-agent LLM pipelines?",
+      "claim": "Delegate side work that would flood the main conversation to a subagent that works in its own context and returns only a summary.",
+      "url": "https://code.claude.com/docs/en/sub-agents.md",
+      "quote": "Use one when a side task would flood your main conversation with search results, logs, or file contents you won't reference again: the subagent does that work in its own context and returns only the summary.",
+      "domain": "code.claude.com",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "Create custom subagents",
+      "source_id": 2
+    },
+    {
+      "sub_question": "What proven patterns keep orchestrator main agent context window low in multi-agent LLM pipelines?",
+      "claim": "Keep one manager agent owning the final answer while specialist agents handle bounded subtasks via tools or handoffs.",
+      "url": "https://openai.github.io/openai-agents-python/multi_agent/",
+      "quote": "A manager agent keeps control of the conversation and calls specialist agents through Agent.as_tool().",
+      "domain": "openai.github.io",
+      "confidence": "medium",
+      "needs_depth": false,
+      "title": "Agent orchestration - OpenAI Agents SDK",
+      "source_id": 3
+    },
+    {
+      "sub_question": "How do ephemeral spawn-delegate-die subagents work in Claude Code OpenCode and similar harnesses?",
+      "claim": "Claude Code runs each subagent in its own context window and delegates matching tasks to it, which works independently and returns only results.",
+      "url": "https://code.claude.com/docs/en/sub-agents",
+      "quote": "When Claude encounters a task that matches a subagent’s description, it delegates to that subagent, which works independently and returns results.",
+      "domain": "code.claude.com",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "Create custom subagents - Claude Code Docs",
+      "source_id": 4
+    },
+    {
+      "sub_question": "How do ephemeral spawn-delegate-die subagents work in Claude Code OpenCode and similar harnesses?",
+      "claim": "OpenCode lets primary agents automatically invoke subagents for specialized tasks, or users manually invoke them with @ mentions.",
+      "url": "https://opencode.ai/docs/agents/",
+      "quote": "Subagents are specialized assistants that primary agents can invoke for specific tasks.",
+      "domain": "opencode.ai",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "Agents | OpenCode",
+      "source_id": 5
+    },
+    {
+      "sub_question": "What are best practices for splitting large prompt files into lean orchestrator prompts plus detailed worker prompts?",
+      "claim": "Keep the orchestrator prompt lean by making it own only planning, delegation-prompt writing, dispatch, and result evaluation while workers do all execution work.",
+      "url": "https://www.learninternetgrow.com/orchestrator-worker-pattern/",
+      "quote": "It reads the task, decides how to decompose it, writes the delegation prompts, dispatches workers, evaluates what comes back, and decides whether to iterate, escalate, or finish.",
+      "domain": "learninternetgrow.com",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "The Orchestrator-Worker Pattern for AI Coding Agents",
+      "source_id": 6
+    },
+    {
+      "sub_question": "What are best practices for splitting large prompt files into lean orchestrator prompts plus detailed worker prompts?",
+      "claim": "Give each worker prompt only three things: a task-scoped system prompt, the minimum necessary context, and a strict expected output format.",
+      "url": "https://www.promptengines.com/labnotes/articles/2026-03-14-orchestrator-pattern-agent-design-v3.html",
+      "quote": "The orchestrator creates a subagent with three things: a system prompt scoped to the specific task, the minimum necessary context, and an expected output format.",
+      "domain": "promptengines.com",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "The Orchestrator Pattern (Agent) — Prompt Engines Lab",
+      "source_id": 7
+    },
+    {
+      "sub_question": "What are best practices for splitting large prompt files into lean orchestrator prompts plus detailed worker prompts?",
+      "claim": "Isolate each worker with its own clean context, prompt, tool subset, and scratch space so workers do not pollute each other or the orchestrator.",
+      "url": "https://detached-node.dev/agentic-design-patterns/orchestrator-workers",
+      "quote": "Justified where each sub-task benefits from a clean context (its own prompt, tool subset, and scratch space) so workers do not pollute each other or the orchestrator.",
+      "domain": "detached-node.dev",
+      "confidence": "medium",
+      "needs_depth": false,
+      "title": "Orchestrator-Workers | detached-node",
+      "source_id": 8
+    },
+    {
+      "sub_question": "How to enforce disjoint file ownership and safe integration when parallel subagents edit code?",
+      "claim": "Supervise isolated subagents with context quarantine so workers share no state and the main agent integrates only final results.",
+      "url": "https://docs.langchain.com/oss/python/deepagents/subagents",
+      "quote": "Subagents isolate this detailed work—the main agent receives only the final result, not the dozens of tool calls that produced it.",
+      "domain": "docs.langchain.com",
+      "confidence": "medium",
+      "needs_depth": true,
+      "title": "Subagents - Docs by LangChain",
+      "source_id": 9
+    },
+    {
+      "sub_question": "How to enforce disjoint file ownership and safe integration when parallel subagents edit code?",
+      "claim": "Decompose parallel work into focused stateless subtasks owned by independent subagents and merge their returned summaries centrally.",
+      "url": "https://code.visualstudio.com/docs/agents/run/subagents",
+      "quote": "A subagent is an independent AI agent that performs focused work, such as researching a topic, analyzing code, or reviewing changes, and reports the results back to the main agent.",
+      "domain": "code.visualstudio.com",
+      "confidence": "medium",
+      "needs_depth": true,
+      "title": "Use subagents in Visual Studio Code",
+      "source_id": 10
+    },
+    {
+      "sub_question": "What verification patterns avoid repeated full test coverage gates while keeping per-file guarantees?",
+      "claim": "Gate pull requests on diff and patch coverage instead of re-running full project coverage gates.",
+      "url": "https://docs.codecov.com/docs/quick-start",
+      "quote": "By default, Codecov will gate and report on coverage changes on Git diff in the Pull request; with overall project coverage reporting available on the Codecov dashboard.",
+      "domain": "docs.codecov.com",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "Quick Start",
+      "source_id": 11
+    },
+    {
+      "sub_question": "What verification patterns avoid repeated full test coverage gates while keeping per-file guarantees?",
+      "claim": "Use --changedSince to run only tests related to changes since a branch or commit.",
+      "url": "https://jestjs.io/docs/cli",
+      "quote": "Runs tests related to the changes since the provided branch or commit hash.",
+      "domain": "jestjs.io",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "Jest CLI Options · Jest",
+      "source_id": 12
+    },
+    {
+      "sub_question": "What verification patterns avoid repeated full test coverage gates while keeping per-file guarantees?",
+      "claim": "Use affected commands to run tasks only on projects impacted by a pull request instead of re-testing everything.",
+      "url": "https://nx.dev/docs/features/ci-features/affected",
+      "quote": "As your workspace grows, re-testing, re-building, and re-linting all projects becomes too slow.",
+      "domain": "nx.dev",
+      "confidence": "high",
+      "needs_depth": false,
+      "title": "Run Only Tasks Affected by a PR | Nx",
+      "source_id": 13
+    }
+  ],
+  "sources": [
+    {
+      "id": 1,
+      "url": "https://www.anthropic.com/engineering/multi-agent-research-system",
+      "domain": "www.anthropic.com",
+      "title": "How we built our multi-agent research system | Anthropic"
+    },
+    {
+      "id": 2,
+      "url": "https://code.claude.com/docs/en/sub-agents.md",
+      "domain": "code.claude.com",
+      "title": "Create custom subagents"
+    },
+    {
+      "id": 3,
+      "url": "https://openai.github.io/openai-agents-python/multi_agent/",
+      "domain": "openai.github.io",
+      "title": "Agent orchestration - OpenAI Agents SDK"
+    },
+    {
+      "id": 4,
+      "url": "https://code.claude.com/docs/en/sub-agents",
+      "domain": "code.claude.com",
+      "title": "Create custom subagents - Claude Code Docs"
+    },
+    {
+      "id": 5,
+      "url": "https://opencode.ai/docs/agents/",
+      "domain": "opencode.ai",
+      "title": "Agents | OpenCode"
+    },
+    {
+      "id": 6,
+      "url": "https://www.learninternetgrow.com/orchestrator-worker-pattern/",
+      "domain": "learninternetgrow.com",
+      "title": "The Orchestrator-Worker Pattern for AI Coding Agents"
+    },
+    {
+      "id": 7,
+      "url": "https://www.promptengines.com/labnotes/articles/2026-03-14-orchestrator-pattern-agent-design-v3.html",
+      "domain": "promptengines.com",
+      "title": "The Orchestrator Pattern (Agent) — Prompt Engines Lab"
+    },
+    {
+      "id": 8,
+      "url": "https://detached-node.dev/agentic-design-patterns/orchestrator-workers",
+      "domain": "detached-node.dev",
+      "title": "Orchestrator-Workers | detached-node"
+    },
+    {
+      "id": 9,
+      "url": "https://docs.langchain.com/oss/python/deepagents/subagents",
+      "domain": "docs.langchain.com",
+      "title": "Subagents - Docs by LangChain"
+    },
+    {
+      "id": 10,
+      "url": "https://code.visualstudio.com/docs/agents/run/subagents",
+      "domain": "code.visualstudio.com",
+      "title": "Use subagents in Visual Studio Code"
+    },
+    {
+      "id": 11,
+      "url": "https://docs.codecov.com/docs/quick-start",
+      "domain": "docs.codecov.com",
+      "title": "Quick Start"
+    },
+    {
+      "id": 12,
+      "url": "https://jestjs.io/docs/cli",
+      "domain": "jestjs.io",
+      "title": "Jest CLI Options · Jest"
+    },
+    {
+      "id": 13,
+      "url": "https://nx.dev/docs/features/ci-features/affected",
+      "domain": "nx.dev",
+      "title": "Run Only Tasks Affected by a PR | Nx"
+    }
+  ]
+}
