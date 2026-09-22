@@ -40,8 +40,8 @@
 # round-robin: each invocation of that step uses the next entry, wrapping
 # around, with a per-step counter, so remedy-loop rounds alternate
 # harnesses. Counters persist across runs in
-# .workflows/.harness-rotation-<pipeline>-<hash>.json (one file per pipeline
-# file), so consecutive runs keep alternating. --fresh does not reset
+# private/clio-private/.workflows/.harness-rotation-<pipeline>-<hash>.json
+# (one file per pipeline file), so consecutive runs keep alternating. --fresh does not reset
 # rotation: it archives run state, and alternation is independent of it. Always quote entries: YAML reads [opencode: model] as a
 # mapping, not a string.
 #
@@ -66,7 +66,7 @@
 #   or sub source steps that do not resolve; non-positive max_rounds;
 #   a step with neither/both of when/end; end states outside ends.
 version: 1
-run_dir: .workflows/phase-{phase:06d}
+run_dir: private/clio-private/.workflows/phase-{phase:06d}
 # No attribution inputs: the harness for each step is declared exactly once,
 # in the stage file frontmatter `harness:` list. The runner derives the
 # display name (HARNESS_DISPLAY) per invocation and writes Attribution rows

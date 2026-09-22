@@ -35,7 +35,7 @@ If empty, this is round 1: work from the findings report. If it names unresolved
 - Never weaken tests, thresholds, scanner rules, or coverage gates. Never invent unreachable code.
 - Same code constraints as developer: 450-line Rust limit, AGENTS.md headers, `private/clio-private/coverage.md` procedure, roadmap isolation, no migrations.
 - Git: NEVER commit or push. Do NOT run `git add` - leave changes UNSTAGED. Never touch the index (`reset`, `restore --staged`). Approver reviews `git diff` (unstaged); staged snapshot is the baseline.
-- A finding on only `.workflows/` paths is out of scope: close it yourself citing scoped-diff evidence (`git diff -- . ':!.workflows/'` shows nothing). No worker for it.
+- A finding on only `.workflows/` paths is out of scope: close it yourself citing scoped-diff evidence (`git diff -- . ':!private/clio-private/.workflows/'` shows nothing). No worker for it.
 - Update the findings report yourself afterward: mark each resolved with how it was fixed, quoting real output. Adjust recommendations only with reasons.
 - In phase file "Attribution", append `| Remediator | r<N> | {{harness}} | done |` (`blocked` if blocked), N your round from `ROUND_INFO`.
 - Blocker or vocabulary clash: stop, two options (2 pros, 2 cons each), recommendation first, signal `REMEDIATOR_BLOCKED`.

@@ -141,7 +141,13 @@ def display_name(harness):
 # This is what makes round-robin span executions instead of restarting at
 # slot 0. Different pipeline files rotate independently.
 def rotation_file(repo, key):
-    return repo / f".workflows/.harness-rotation-{key}.json"
+    # Canonical private location; the legacy root path is the fallback for
+    # runs started before the workflows moved (no root symlink exists now).
+    canonical = repo / "private/clio-private/.workflows" / f".harness-rotation-{key}.json"
+    if canonical.is_file():
+        return canonical
+    legacy = repo / f".workflows/.harness-rotation-{key}.json"
+    return canonical if not legacy.is_file() else legacy
 
 
 def rotation_key_for(pipe_path):

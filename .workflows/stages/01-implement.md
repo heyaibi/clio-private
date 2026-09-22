@@ -43,7 +43,7 @@ Do adequate online research once, yourself, before delegating. Hand slice-releva
 - After changing any Rust crate, follow `private/clio-private/coverage.md`: verify aggregate AND per-file >=90% function and line before finishing.
 - Roadmap isolation: never reference `private/clio-private/roadmap/`, phase numbers, or roadmap files from code or comments. Do not reference `crates.md` in code comments.
 - SQL: edit schema files directly; no migrations.
-- Git: NEVER commit, push, or stash. When done, stage the main repo with exactly `git add -- . ':!.workflows/'` from the repo root, then stage the nested private repo (`cd private/clio-private && git add -- roadmap/ .workflows/` for the phase-file and pipeline artifacts you touched). The next agent reviews both staged diffs.
+- Git: NEVER commit, push, or stash. When done, stage the main repo with exactly `git add -- . ':!private/clio-private/.workflows/'` from the repo root, then stage the nested private repo (`cd private/clio-private && git add -- roadmap/ .workflows/` for the phase-file and pipeline artifacts you touched). The next agent reviews both staged diffs.
 - Vocabulary clash or requirement conflict: stop, do not guess. Signal `DEVELOPER_BLOCKED` with two options (2 pros, 2 cons each), recommendation first.
 - Conditional out-of-scope bullets are owed work when their condition holds. Implement if unambiguous; else signal `DEVELOPER_BLOCKED`. Never mark complete while such an item is silently skipped.
 - Known limitations state (a) what is missing, (b) why, (c) which phase owns the debt. Never phrase "not implemented" as "implemented with boundary".

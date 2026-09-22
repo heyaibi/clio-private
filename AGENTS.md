@@ -137,7 +137,7 @@ Every Rust source file MUST use the following header structure:
 
  ## Editing `requirement.md`
 
- The normative requirements live in `requirement.md` (singular). Treat every edit as a consistency change, not a local append.
+ The normative requirements live in `private/clio-private/requirement.md` (singular). Treat every edit as a consistency change, not a local append.
 
  ### Before adding or changing a requirement
 
@@ -166,5 +166,5 @@ Every Rust source file MUST use the following header structure:
  - Verify the relevant tests and checks.
 - Verify the Rust source-file size constraint for every Rust file created or refactored.
 - If the phase touched Rust crates, complete the required `private/clio-private/coverage.md` procedure and verify both aggregate coverage and the per-file ≥90% function and line thresholds.
-- For `requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
+- For `private/clio-private/requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
 - Clearly state what was verified and identify anything that could not be verified.

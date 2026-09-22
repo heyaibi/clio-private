@@ -88,7 +88,7 @@ Do **not** open HTML / JSON coverage parsers until step 4.
 `--fail-under-*` flags gate only the **TOTAL** row. The per-file floor is enforced by the guard script:
 
 ```bash
-python3 private/clio-private/scripts/coverage_guard.py <llvm-cov.json>
+python3 scripts/coverage_guard.py <llvm-cov.json>
 ```
 
 It prints a TOTAL line plus any per-file offenders and exits non-zero when a reported file is under 90% lines **or** functions. `make coverage` produces one JSON report, runs the aggregate gate on it, then runs the guard on the same report (one instrumented test run per gate); CI mirrors both steps.

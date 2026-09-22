@@ -35,7 +35,7 @@ The Remediator agent says the following, please validate and indicate whether yo
 ## Validation method
 
 - For EACH finding, verify the fix is real, complete, and regression-free:
-  read the unstaged diff (`git diff -- . ':!.workflows/'`), read the
+  read the unstaged diff (`git diff -- . ':!private/clio-private/.workflows/'`), read the
   surrounding code, and where
   permitted, re-run `make check`/`make test` yourself. Quote
   real output as evidence. Never accept the remediator's summary as proof.
@@ -46,7 +46,7 @@ The Remediator agent says the following, please validate and indicate whether yo
   unmodified).
 - Confirm nothing regressed: staged snapshot vs unstaged changes should show
   remediation work only - flag unrelated changes as new findings.
-  Compare with `git diff -- . ':!.workflows/'` semantics: `.workflows/`
+  Compare with `git diff -- . ':!private/clio-private/.workflows/'` semantics: `.workflows/`
   paths in either diff are ignored, never new findings.
 - Confirm the coverage/size/roadmap-isolation constraints still hold for any
   files the remediator touched.

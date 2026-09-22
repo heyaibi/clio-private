@@ -28,7 +28,7 @@ Here's the original prompt:
 The developer agent (another coding assistant) has indicated that it has completed the task according to the above prompt. The files are git staged for review.
 
 `.workflows/` is pipeline-internal and out of scope: review only
-non-workflow paths with `git diff --cached -- . ':!.workflows/'`, and
+non-workflow paths with `git diff --cached -- . ':!private/clio-private/.workflows/'`, and
 never file findings on `.workflows/` entries in any git state
 (staged, unstaged, or untracked).
 
@@ -36,7 +36,7 @@ Perform adversarial review of this session per the rules below, and write the re
 
 ## Review scope and method
 
-- Review the STAGED diff (`git diff --cached -- . ':!.workflows/'`)
+- Review the STAGED diff (`git diff --cached -- . ':!private/clio-private/.workflows/'`)
   plus the surrounding code it depends on - a diff-only review misses
   broken invariants in unchanged callers. Check `git status` to
   understand what is staged vs unstaged (ignoring `.workflows/` paths)
@@ -44,7 +44,7 @@ Perform adversarial review of this session per the rules below, and write the re
 - Verify every claim independently. Run `make test`, `make lint`, `make
   check`, and `make coverage` yourself as needed and quote real output as
   evidence. Never trust the developer's summary; re-verify it.
-- Hunt for: requirement violations (against `requirement.md` and the phase
+- Hunt for: requirement violations (against `private/clio-private/requirement.md` and the phase
   doc's own acceptance criteria), missing or fudged acceptance criteria,
   test gaps, coverage below the 90% per-file bar, spec inconsistencies,
   unsafe changes, 450-line violations, header/ownership inaccuracies,

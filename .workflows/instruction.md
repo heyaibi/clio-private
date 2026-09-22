@@ -8,7 +8,7 @@ python3 private/clio-private/.workflows/runner.py --pipeline private/clio-privat
 1. Run from the repo root. Authenticate `agent`, `agy`, `hermes`, `opencode` once. Hermes needs an OpenRouter key (`hermes model`); opencode carries its own Together auth.
 2. `--self-test`: static harness checks, no spend. `--live` adds one-word inference probes.
 3. Drop `--dry-run` for the real run. Every harness runs attached in your terminal: cursor, agy, and opencode open interactive sessions seeded with the task pointer; hermes seeds a chat. agy runs with `--dangerously-skip-permissions`; opencode runs with `--auto` and the full TUI (mandated by the stages); cursor and the others may ask you to approve tool calls as they work. The runner closes any session itself ~15 s after the final signal lands in the run log (`autoexit.md`) — opencode's TUI would otherwise idle after finishing.
-4. Result: JSON summary on stdout, detail in `.workflows/phase-100060/run.json`, per-invocation run logs beside the task files (`<step>-task-r<N>.log`) — the runner reads each step's final-line signal from that log.
+4. Result: JSON summary on stdout, detail in `private/clio-private/.workflows/phase-100060/run.json`, per-invocation run logs beside the task files (`<step>-task-r<N>.log`) — the runner reads each step's final-line signal from that log.
 5. Exits: 0 completed, 1 rejected/blocked, 2 config error, 130 interrupted.
 
 Flow: developer → adversary → remediator ⇄ approver (3 rounds max) → finalize. Empty findings skip to finalize. Any `*_BLOCKED` ends the run. Each step rotates its two harnesses round-robin.
@@ -25,7 +25,7 @@ Prompts travel as task files: the harness receives a 2-line pointer telling it t
 
 ## Directories
 
-- `.workflows/phase-{NNNNNN}/`: run dir (runner creates). Holds `run.json`, `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>.log` run logs, `<step>-resume-r<N>.md` resume prompts, `resume.json` (deleted on clean finish, kept after Ctrl-C or step failure), `ledger.json` (per-step completion proofs), `findings.json`, `findings.original.json`.
+- `private/clio-private/.workflows/phase-{NNNNNN}/`: run dir (runner creates). Holds `run.json`, `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>.log` run logs, `<step>-resume-r<N>.md` resume prompts, `resume.json` (deleted on clean finish, kept after Ctrl-C or step failure), `ledger.json` (per-step completion proofs), `findings.json`, `findings.original.json`.
 - Dry-run, `--self-test`, and `--fuzz` create nothing in the repo (`--fuzz` uses temp dirs only).
 
 `--pipeline` is required.
@@ -90,4 +90,4 @@ python3 private/clio-private/.workflows/runner.py --pipeline private/clio-privat
 python3 private/clio-private/.workflows/runner.py --pipeline private/clio-private/.workflows/pipelines/default.yaml --input phase_number=100520 --input phase_file=private/clio-private/roadmap/phase-100520-scale-ceilings-docs.md --dry-run
 ```
 
-The runner only accepts integer phase numbers (`{phase:06d}` run-dir formatting), so slice 100155 runs as `phase_number=100155`: roadmap file `phase-100155-ops-discard-tool.md` is the authoritative slice, and its run state lands in `.workflows/phase-100155`. Slice 100155 must be accepted before slice 100160 (it closes the phase-100160 r1 blocker).
+The runner only accepts integer phase numbers (`{phase:06d}` run-dir formatting), so slice 100155 runs as `phase_number=100155`: roadmap file `phase-100155-ops-discard-tool.md` is the authoritative slice, and its run state lands in `private/clio-private/.workflows/phase-100155`. Slice 100155 must be accepted before slice 100160 (it closes the phase-100160 r1 blocker).
