@@ -80,6 +80,44 @@ SIGNAL_SCAN_LINES = 10
 # signal never sits silent (a missing signal alone must not hang the run
 # unnoticed). No timeout: the step still runs until it signals.
 IDLE_NUDGE_S = 300.0
+# Agent-facing idle reminder: when both the run log and the console stop
+# growing with no completion signal, the runner types a short reminder into
+# the harness's own input (the pty) and submits it, so an agent that finished
+# but forgot the log line can still be told to write it. The text is
+# signal-safe: it carries no per-run nonce and no token ending in BLOCKED, so
+# the console-mirror scan can never mistake it for a completion signal. It is
+# delivered only on the pty path (that is where an interactive agent input
+# exists) and only for harnesses that run with permissions auto-approved
+# (REMINDER_CLIS), so it is never typed into a confirmation dialog. The stderr
+# warning above stays in both paths as the fallback. It is rate-limited: first
+# reminder after IDLE_REMIND_S quiet, each later one IDLE_REMIND_BACKOFF times
+# further out, capped at IDLE_REMIND_MAX per invocation, skipped once the
+# operator has typed at all (an attended session is handled by the human), and
+# skipped when the console tail looks like an unanswered prompt. If the first
+# Enter appears swallowed it presses Enter once more after IDLE_REMIND_RESUBMIT_S
+# (the existing auto-submit relies on the same tolerance). It never fabricates
+# a signal and never writes to the run log.
+IDLE_REMIND_S = 300.0
+IDLE_REMIND_BACKOFF = 2.0
+IDLE_REMIND_MAX = 3
+IDLE_REMIND_RESUBMIT_S = 2.0
+IDLE_REMIND_TEXT = (
+    "Pipeline runner reminder: if your task is finished, write the final "
+    "signal line described in your task file as the last line of your run "
+    "log now. If you are still working, ignore this message and continue.")
+IDLE_REMIND_PLAN = {
+    "first_s": IDLE_REMIND_S,
+    "backoff": IDLE_REMIND_BACKOFF,
+    "max": IDLE_REMIND_MAX,
+    "resubmit_s": IDLE_REMIND_RESUBMIT_S,
+    "text": IDLE_REMIND_TEXT,
+    "enabled": True,
+}
+# Harnesses whose stages run with permissions auto-approved (opencode --auto,
+# agy --dangerously-skip-permissions). The reminder targets only these: a
+# harness that may be waiting at a confirmation dialog is never typed into.
+# cursor and hermes are excluded because they can prompt the operator.
+REMINDER_CLIS = {"opencode", "agy"}
 # TUI auto-submit: `opencode --prompt` pre-fills the input box but does not
 # send it, so the runner presses Enter repeatedly until the stage starts
 # (detected by the run log growing). A single press is unreliable: the TUI is
@@ -528,9 +566,10 @@ class Run:
         else:
             raise Fail(f"no command mapping for cli {cli!r}")
         banner(cli, harness, task_path, log_path)
+        reminder = dict(IDLE_REMIND_PLAN, enabled=cli in REMINDER_CLIS)
         text, rc, info = run_attached(cmd, log_path, when, nonce,
                                       cwd=self.repo, env=env,
-                                      autosubmit=autosubmit)
+                                      autosubmit=autosubmit, reminder=reminder)
         if rc != 0 and not log_done(text, when, nonce) \
                 and not info.get("mirror_signal"):
             raise Fail(f"{cmd[0]} exited {rc} (step failed; rerun to resume)")
@@ -1046,6 +1085,77 @@ class _KillStep(Exception):
     pass
 
 
+def reminder_due(now, quiet_since, sent, last_operator, plan, started=True):
+    """True when an agent-facing idle reminder is due. Pure scheduling:
+    enough quiet, budget left, the reminder enabled for this harness, the
+    agent input exists (`started`), and the operator has not typed in this
+    invocation. Any operator keystroke marks the session as attended; a
+    present human is the intended handler, so the runner never injects into
+    their input. `plan` is IDLE_REMIND_PLAN (or a test override with the
+    same keys)."""
+    if not started or not plan.get("enabled", True) or sent >= plan["max"]:
+        return False
+    if last_operator:
+        return False
+    return now - quiet_since >= plan["first_s"] * (plan["backoff"] ** sent)
+
+
+# Console tails that look like an unanswered confirmation or input prompt.
+# The reminder is skipped rather than typed into one: a false skip only costs
+# a nudge (the stderr warning stays), while a false send could answer a
+# dialog. Deliberately narrow: only explicit yes/no and "press" shapes.
+PROMPT_TAIL_RE = re.compile(
+    r"(?:\[[yYnN]/[yYnN]?\]|\([yYnN]/[yYnN]?\)|\b[yY]/[nN]\b|"
+    r"press (?:any key|enter))", re.IGNORECASE)
+
+
+def _looks_like_prompt(mirror):
+    """True when the last non-empty console line looks like a prompt the
+    reminder must not answer. Conservative by design."""
+    lines = [ln.strip() for ln in (mirror or "").splitlines() if ln.strip()]
+    if not lines:
+        return False
+    return PROMPT_TAIL_RE.search(lines[-1]) is not None
+
+
+def _deliver_reminder(master, text):
+    """Send one reminder to the harness input. Default: type the text and
+    press Enter on the pty master (the operator's own channel). Returns True
+    when the bytes were written. This is the single seam a harness-native
+    sender (for example an OpenCode server call) can replace without touching
+    the schedule or the safety rules; the pty write stays the fallback."""
+    try:
+        os.write(master, text.encode() + b"\r")
+    except OSError:
+        return False
+    return True
+
+
+def _report_reminder(log_path, n, quiet_s, text):
+    """Audit one delivered agent-facing reminder. Best-effort: a failed
+    report must never disturb the run, and the text is recorded only in a
+    run-level sidecar, never in the run log the pipeline scans for signals."""
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    line = (f"{stamp} {Path(log_path).name}: reminder #{n} after "
+            f"{int(quiet_s)}s quiet to agent input: {text}")
+    try:
+        print(f"runner: {line}", file=sys.stderr, flush=True)
+    except Exception:  # noqa: BLE001 - audit must never break the run
+        pass
+    try:
+        p = Path(log_path).parent / "reminders.log"
+        with open(p, "a") as fh:
+            fh.write(line + "\n")
+    except Exception:  # noqa: BLE001 - audit must never break the run
+        pass
+
+
+class _PtyUnavailable(Exception):
+    """The pty could not be set up, so the plain spawn is a safe fallback.
+    Raised only before a child is spawned; anything after that fails the
+    step instead of re-spawning the harness."""
+
+
 def _pty_set_size(master, stdin_fd):
     """Mirror the operator's terminal size into the pty (best-effort)."""
     try:
@@ -1059,14 +1169,22 @@ def _pty_set_size(master, stdin_fd):
 
 
 def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
-                      stdin_fd, out_fd=None, autosubmit=False):
+                      stdin_fd, out_fd=None, autosubmit=False, reminder=None):
     """Run cmd under a pty, forwarding stdin->pty and pty->stdout while
     capturing all console output to tui_path. The operator experience is
     unchanged; the runner additionally scans the capture with the same
     signal predicate (nonce included). Operator Ctrl-C keeps today's
     contract (kills the step): the byte still reaches the child first,
-    exactly like a tty interrupt, then the step is torn down."""
-    master, slave = pty.openpty()
+    exactly like a tty interrupt, then the step is torn down. `reminder`
+    overrides IDLE_REMIND_PLAN for tests.
+
+    Setup failures raise _PtyUnavailable so the caller may fall back to a
+    plain spawn. Any failure after the child is spawned terminates it and
+    re-raises: a started harness is never silently re-run."""
+    try:
+        master, slave = pty.openpty()
+    except OSError as e:
+        raise _PtyUnavailable(f"openpty failed: {e}")
     _pty_set_size(master, stdin_fd)
     try:
         proc = subprocess.Popen(cmd, stdin=slave, stdout=slave,
@@ -1076,12 +1194,21 @@ def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
         os.close(master)
         os.close(slave)
         raise Fail(f"harness binary missing ({cmd[0]} not on PATH)")
+    except OSError as e:
+        os.close(master)
+        os.close(slave)
+        raise _PtyUnavailable(f"spawn failed: {e}")
     os.close(slave)
     if out_fd is None:
         out_fd = sys.stdout.fileno()
     try:
         return _pty_forward(proc, master, stdin_fd, out_fd, log_path,
-                            tui_path, when, nonce, autosubmit)
+                            tui_path, when, nonce, autosubmit, reminder)
+    except _KillStep:
+        raise
+    except BaseException:
+        _terminate(proc)     # never leave a half-driven child behind
+        raise
     finally:
         try:
             os.close(master)
@@ -1090,7 +1217,7 @@ def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
 
 
 def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
-                 when, nonce, autosubmit=False):
+                 when, nonce, autosubmit=False, reminder=None):
     try:
         orig_attrs = termios.tcgetattr(stdin_fd)
     except termios.error:
@@ -1113,6 +1240,10 @@ def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
     last_key = (-1, -1)
     last_change = time.time()
     next_nudge = last_change + IDLE_NUDGE_S
+    plan = reminder or IDLE_REMIND_PLAN
+    remind_sent = 0
+    resubmit_at = None
+    last_operator = 0.0
     submit_next = (time.time() + SUBMIT_FIRST_S) if autosubmit else None
     submit_stop = time.time() + SUBMIT_MAX_S
     try:
@@ -1141,6 +1272,7 @@ def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
                 if not data:
                     stdin_open = False
                 else:
+                    last_operator = time.time()
                     try:
                         os.write(master, data)
                     except OSError:
@@ -1199,14 +1331,45 @@ def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
                 rc = proc.poll()
             if rc is not None:
                 break
-            if rc is None and time.time() >= next_nudge and not done:
-                print(f"runner: still no completion signal ({want}) in "
-                      f"{log_path} after {int(IDLE_NUDGE_S)} s idle. If the "
-                      f"agent says it is done, tell it to run: "
-                      f"printf '%s\\n' '<SIGNAL>{' ' + nonce if nonce else ''}'"
-                      f" >> {log_path}",
-                      file=sys.stderr, flush=True)
-                next_nudge = time.time() + IDLE_NUDGE_S
+            now = time.time()
+            if rc is None and not done:
+                try:
+                    # A reminder must never abort the pty run: an exception
+                    # here would otherwise make run_attached re-spawn the
+                    # harness. Everything below is best-effort.
+                    started = log_size > 0
+                    if resubmit_at is not None and now >= resubmit_at:
+                        # The first Enter looked swallowed (no signal yet):
+                        # press it once more, then stop. Safe because the
+                        # reminder is only sent when the operator has never
+                        # typed, so no partial human input can be submitted.
+                        if not done:
+                            try:
+                                os.write(master, b"\r")
+                            except OSError:
+                                pass
+                        resubmit_at = None
+                    if not _looks_like_prompt(mirror) and reminder_due(
+                            now, last_change, remind_sent, last_operator,
+                            plan, started=started):
+                        if _deliver_reminder(master, plan["text"]):
+                            remind_sent += 1
+                            rs = plan.get("resubmit_s", 0)
+                            resubmit_at = now + rs if rs else None
+                            _report_reminder(log_path, remind_sent,
+                                             now - last_change, plan["text"])
+                        else:
+                            remind_sent = plan["max"]   # stop trying this run
+                except Exception:  # noqa: BLE001 - never abort the pty run
+                    pass
+                if now >= next_nudge:
+                    print(f"runner: still no completion signal ({want}) in "
+                          f"{log_path} after {int(IDLE_NUDGE_S)} s idle. If the "
+                          f"agent says it is done, tell it to run: "
+                          f"printf '%s\\n' '<SIGNAL>{' ' + nonce if nonce else ''}'"
+                          f" >> {log_path}",
+                          file=sys.stderr, flush=True)
+                    next_nudge = now + IDLE_NUDGE_S
     except _KillStep:
         _terminate(proc)
         raise KeyboardInterrupt()
@@ -1275,7 +1438,7 @@ def _restore_term():
 
 
 def run_attached(cmd, log_path, when, nonce=None, cwd=None, env=None,
-                 autosubmit=False):
+                 autosubmit=False, reminder=None):
     """Run a harness attached in the foreground and wait for its signal.
 
     Under a terminal the child runs under a pty: the operator sees the
@@ -1283,26 +1446,39 @@ def run_attached(cmd, log_path, when, nonce=None, cwd=None, env=None,
     `<step>-task-r<N>.tui.log` and scanned with the same signal predicate
     (a console-only signal still routes, marked signal_via="mirror"). Without a
     terminal, or when the pty is unavailable, falls back to a plain
-    attached spawn with inherited stdio.
+    attached spawn with inherited stdio (no agent input channel, so no
+    agent-facing idle reminder there; only the stderr warning).
 
     Once the final signal is stable on a quiescent log (AUTOEXIT_STABLE_POLLS
     consecutive polls with no growth), wait AUTOEXIT_GRACE_S so the operator
     can read the on-screen summary, then close the session
     (SIGINT -> SIGTERM -> SIGKILL). Operator Ctrl-C kills the step;
     the KeyboardInterrupt propagates (runner exits 130, resume kept).
-    Returns (log_text, returncode, info) where info carries tui_log and an
-    optional mirror_signal."""
+    Returns (log_text, returncode, info) where info carries tui_log, the
+    chosen attach mode, and an optional mirror_signal.
+
+    The plain spawn is a fallback only for pty *setup* failure. If the pty
+    child already started, a failure fails the step instead of re-spawning
+    the harness (a double run would double-spend and race on the run dir)."""
+    pty_ok = _HAVE_PTY and sys.stdin.isatty() and sys.stdout.isatty()
+    print(f"runner: attach mode: {'pty (console capture on)' if pty_ok else 'plain (no console capture)'}",
+          file=sys.stderr, flush=True)
     try:
         tui_path = Path(log_path).with_name(Path(log_path).stem + ".tui.log")
-        if _HAVE_PTY and sys.stdin.isatty() and sys.stdout.isatty():
+        if pty_ok:
             try:
-                return _run_attached_pty(cmd, log_path, tui_path, when, nonce,
-                                         cwd, env, sys.stdin.fileno(),
-                                         None, autosubmit)
-            except Exception as e:  # noqa: BLE001 - foreground must survive
-                print(f"runner: pty mirror unavailable ({e}); plain spawn",
+                text, rc, info = _run_attached_pty(
+                    cmd, log_path, tui_path, when, nonce,
+                    cwd, env, sys.stdin.fileno(),
+                    None, autosubmit, reminder)
+                info["attach"] = "pty"
+                return text, rc, info
+            except _PtyUnavailable as e:
+                print(f"runner: pty unavailable ({e}); plain spawn",
                       file=sys.stderr, flush=True)
-        return _run_attached_plain(cmd, log_path, when, nonce, cwd, env)
+        text, rc, info = _run_attached_plain(cmd, log_path, when, nonce, cwd, env)
+        info["attach"] = "plain"
+        return text, rc, info
     finally:
         _restore_term()
 
@@ -1721,6 +1897,187 @@ def self_test(run, live=False):
               and pinfo.get("mirror_signal") is None,
               "console captured, log signal wins")
 
+    # Idle reminder, pinned: a quiet pty harness with no signal receives the
+    # reminder on its own input (stdin), the reminder lands in a sidecar audit
+    # file and never in the scanned run log, and the text is never a signal.
+    if _HAVE_PTY:
+        rp = Path(tempfile.mkdtemp(prefix="remind"))
+        rlog = rp / "s-task-r1.log"
+        rtui = rp / "s-task-r1.tui.log"
+        rseen = rp / "seen.bin"
+        (rp / "wait.py").write_text(
+            "import os, select, sys, time\n"
+            "open(sys.argv[1], 'w').write('working, no signal yet\\n')\n"
+            "seen = open(sys.argv[2], 'wb')\n"
+            "end = time.time() + 10\n"
+            "while time.time() < end:\n"
+            "    r, _, _ = select.select([0], [], [], 0.2)\n"
+            "    if not r:\n"
+            "        continue\n"
+            "    data = os.read(0, 4096)\n"
+            "    if not data:\n"
+            "        break\n"
+            "    seen.write(data)\n"
+            "    seen.flush()\n"
+            "    if b'\\n' in data or b'\\r' in data:\n"
+            "        break\n"
+            "seen.close()\n")
+        fast = dict(IDLE_REMIND_PLAN, first_s=0.4, backoff=2.0, max=2,
+                    text="NUDGE_MARKER_XYZ")
+        rdevnull = os.open(os.devnull, os.O_RDONLY)
+        rdevnull_w = os.open(os.devnull, os.O_WRONLY)
+        # Keep these two fds open for every sub-test below: closing and
+        # reopening devnull can hand a later pty the same fd number, which
+        # would feed the console capture back into the pty master.
+        rtext, rrc, rinfo = _run_attached_pty(
+            [sys.executable, str(rp / "wait.py"), str(rlog), str(rseen)],
+            rlog, rtui, ["DEVELOPER_DONE"], "a1b2c3d4", str(rp), None,
+            rdevnull, rdevnull_w, reminder=fast)
+        rgot = rseen.read_bytes().decode("utf-8", "replace")
+        check("reminder: reaches agent input on quiet pty",
+              "NUDGE_MARKER_XYZ" in rgot and "\n" in rgot
+              and rgot.count("NUDGE_MARKER_XYZ") <= fast["max"],
+              f"agent stdin saw {rgot!r}")
+        check("reminder: audited in a run-level sidecar, not the log",
+              (rp / "reminders.log").is_file()
+              and "NUDGE_MARKER_XYZ" in (rp / "reminders.log").read_text()
+              and "NUDGE_MARKER_XYZ" not in rlog.read_text(),
+              "one sidecar per run; run log signal-free")
+        check("reminder: text is never a signal",
+              rinfo.get("mirror_signal") is None
+              and find_signal("NUDGE_MARKER_XYZ", ["DEVELOPER_DONE"],
+                              "a1b2c3d4") is None,
+              "mirror scan sees no completion")
+
+        # The reminder is advisory only: an agent that gets nudged and then
+        # writes the real nonce-bearing signal still routes on the run log.
+        rlog2 = rp / "s2-task-r1.log"
+        rtui2 = rp / "s2-task-r1.tui.log"
+        (rp / "signal.py").write_text(
+            "import os, select, sys, time\n"
+            "open(sys.argv[1], 'w').write('working, no signal yet\\n')\n"
+            "end = time.time() + 10\n"
+            "while time.time() < end:\n"
+            "    r, _, _ = select.select([0], [], [], 0.2)\n"
+            "    if not r:\n"
+            "        continue\n"
+            "    data = os.read(0, 4096)\n"
+            "    if not data:\n"
+            "        break\n"
+            "    if b'\\n' in data or b'\\r' in data:\n"
+            "        open(sys.argv[1], 'a').write('WORK_DONE ' + sys.argv[2] + '\\n')\n"
+            "        break\n"
+            "time.sleep(0.2)\n")
+        r2devnull = os.open(os.devnull, os.O_RDONLY)
+        r2devnull_w = os.open(os.devnull, os.O_WRONLY)
+        try:
+            r2text, r2rc, r2info = _run_attached_pty(
+                [sys.executable, str(rp / "signal.py"), str(rlog2), "a1b2c3d4"],
+                rlog2, rtui2, ["WORK_DONE"], "a1b2c3d4", str(rp), None,
+                r2devnull, r2devnull_w, reminder=fast)
+        finally:
+            os.close(r2devnull)
+            os.close(r2devnull_w)
+        check("reminder: a later real signal still routes",
+              r2rc == 0 and log_done(r2text, ["WORK_DONE"], "a1b2c3d4")
+              and r2info.get("mirror_signal") is None,
+              "run log signal wins after the reminder")
+
+        # Operator typing marks the session attended: no reminder is injected
+        # into a human's input. A pipe stands in for the operator's stdin; the
+        # byte arrives shortly after start.
+        import threading
+        rlog3 = rp / "s3-task-r1.log"
+        rtui3 = rp / "s3-task-r1.tui.log"
+        rseen3 = rp / "seen3.bin"
+        (rp / "opwait.py").write_text(
+            "import os, select, sys, time\n"
+            "open(sys.argv[1], 'w').write('working, no signal yet\\n')\n"
+            "seen = open(sys.argv[2], 'wb')\n"
+            "end = time.time() + 2.5\n"
+            "while time.time() < end:\n"
+            "    r, _, _ = select.select([0], [], [], 0.2)\n"
+            "    if not r:\n"
+            "        continue\n"
+            "    data = os.read(0, 4096)\n"
+            "    if not data:\n"
+            "        break\n"
+            "    seen.write(data)\n"
+            "    seen.flush()\n"
+            "seen.close()\n")
+        op_r, op_w = os.pipe()
+        op_timer = threading.Timer(0.2, os.write, (op_w, b"x"))
+        op_timer.start()
+        try:
+            _run_attached_pty(
+                [sys.executable, str(rp / "opwait.py"), str(rlog3), str(rseen3)],
+                rlog3, rtui3, ["DEVELOPER_DONE"], "a1b2c3d4", str(rp), None,
+                op_r, rdevnull_w, reminder=fast)
+        finally:
+            op_timer.cancel()
+            os.close(op_r)
+            os.close(op_w)
+        check("reminder: operator typing suppresses injection",
+              "NUDGE_MARKER_XYZ" not in rseen3.read_bytes().decode("utf-8", "replace"),
+              "no reminder once a human has typed")
+
+        # A console tail that looks like a confirmation prompt is skipped: the
+        # reminder is never typed into a dialog.
+        rlog4 = rp / "s4-task-r1.log"
+        rtui4 = rp / "s4-task-r1.tui.log"
+        (rp / "prompt.py").write_text(
+            "import sys, time\n"
+            "open(sys.argv[1], 'w').write('working, no signal yet\\n')\n"
+            "print('Overwrite config? [y/N]', flush=True)\n"
+            "time.sleep(2.0)\n")
+        r4devnull = os.open(os.devnull, os.O_RDONLY)
+        try:
+            _run_attached_pty(
+                [sys.executable, str(rp / "prompt.py"), str(rlog4)],
+                rlog4, rtui4, ["DEVELOPER_DONE"], "a1b2c3d4", str(rp), None,
+                r4devnull, rdevnull_w, reminder=fast)
+        finally:
+            os.close(r4devnull)
+        check("reminder: skipped on a confirmation prompt",
+              "NUDGE_MARKER_XYZ" not in rtui4.read_text(),
+              "no reminder typed into a dialog")
+
+        # A swallowed first Enter is retried once: a harness that ignores the
+        # first newline still receives the extra Enter.
+        rlog5 = rp / "s5-task-r1.log"
+        rtui5 = rp / "s5-task-r1.tui.log"
+        rseen5 = rp / "seen5.bin"
+        (rp / "ignore.py").write_text(
+            "import os, select, sys, time\n"
+            "open(sys.argv[1], 'w').write('working, no signal yet\\n')\n"
+            "seen = open(sys.argv[2], 'wb')\n"
+            "end = time.time() + 3.0\n"
+            "while time.time() < end:\n"
+            "    r, _, _ = select.select([0], [], [], 0.2)\n"
+            "    if not r:\n"
+            "        continue\n"
+            "    data = os.read(0, 4096)\n"
+            "    if not data:\n"
+            "        break\n"
+            "    seen.write(data)\n"
+            "    seen.flush()\n"
+            "seen.close()\n")
+        fast5 = dict(fast, resubmit_s=0.2, first_s=0.1, max=1)
+        r5devnull = os.open(os.devnull, os.O_RDONLY)
+        try:
+            _run_attached_pty(
+                [sys.executable, str(rp / "ignore.py"), str(rlog5), str(rseen5)],
+                rlog5, rtui5, ["DEVELOPER_DONE"], "a1b2c3d4", str(rp), None,
+                r5devnull, rdevnull_w, reminder=fast5)
+        finally:
+            os.close(r5devnull)
+        r5got = rseen5.read_bytes().decode("utf-8", "replace")
+        check("reminder: swallowed Enter is retried once",
+              r5got.count("NUDGE_MARKER_XYZ") == 1 and r5got.count("\n") >= 2,
+              f"text once, Enter twice: {r5got!r}")
+        os.close(rdevnull)
+        os.close(rdevnull_w)
+
     # Quiescence-gated stability: growth resets, quiet + signal accumulates,
     # quiet without signal stays at zero.
     check("poll stable: growth resets", _poll_stable(True, True, 5) == 0)
@@ -1728,6 +2085,38 @@ def self_test(run, live=False):
           _poll_stable(True, False, 1) == 2)
     check("poll stable: quiet no-signal stays zero",
           _poll_stable(False, False, 3) == 0)
+
+    # Idle reminder schedule: first after the quiet interval, repeats back off,
+    # the budget caps, a disabled plan stays silent, a started-but-quiet agent
+    # is eligible, any operator typing suppresses injection, and prompt-like
+    # console tails are skipped so the reminder never fights input or dialogs.
+    rp0 = dict(IDLE_REMIND_PLAN)
+    check("reminder: due after first interval",
+          reminder_due(300.0, 0.0, 0, 0.0, rp0)
+          and not reminder_due(299.0, 0.0, 0, 0.0, rp0))
+    check("reminder: repeats back off",
+          not reminder_due(599.0, 0.0, 1, 0.0, rp0)
+          and reminder_due(600.0, 0.0, 1, 0.0, rp0))
+    check("reminder: budget caps",
+          not reminder_due(1e6, 0.0, IDLE_REMIND_MAX, 0.0, rp0))
+    check("reminder: not started stays silent",
+          not reminder_due(1e6, 0.0, 0, 0.0, rp0, started=False))
+    check("reminder: disabled for a prompting harness stays silent",
+          not reminder_due(1e6, 0.0, 0, 0.0, dict(rp0, enabled=False)))
+    check("reminder: any operator typing suppresses",
+          not reminder_due(400.0, 0.0, 0, 1.0, rp0)
+          and not reminder_due(1e6, 0.0, 0, 1.0, rp0))
+    check("reminder: prompt-like tail is skipped",
+          _looks_like_prompt("Overwrite config? [y/N]")
+          and _looks_like_prompt("Continue? (y/n)")
+          and _looks_like_prompt("Press any key to continue")
+          and not _looks_like_prompt("all tests passed, exiting")
+          and not _looks_like_prompt(""))
+    check("reminder: default text is never a signal",
+          find_signal(IDLE_REMIND_TEXT, ["DEVELOPER_DONE"], "a1b2c3d4") is None
+          and find_signal(IDLE_REMIND_TEXT, None, "a1b2c3d4") is None
+          and not any(t.endswith("BLOCKED") for t in IDLE_REMIND_TEXT.split()),
+          "no nonce, no signal word, no BLOCKED token")
 
     # opencode full-TUI shape (v2): `--auto --prompt`, no `run`, no -m. The
     # model is injected through OPENCODE_CONFIG_CONTENT; an effort adds a

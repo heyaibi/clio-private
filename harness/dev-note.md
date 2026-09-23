@@ -84,6 +84,7 @@ process so we stop retrying. A dead profile or dead Discord only costs you the
 messages, never the work.
 
 ## Troubleshooting
+- **A step sits idle with no signal:** the runner prints the exact `printf ... >> <log>` recovery line to stderr and, for `opencode`/`agy` under a terminal, types a short signal-safe reminder into the harness's own input. Check `<run_dir>/reminders.log` for what was sent, and `runner: attach mode: pty (console capture on)` in `session-<N>.log` to confirm the pty path was used. The reminder never writes the signal; if the work is verified done, use `--mark-done STEP SIGNAL`.
 - **A run dies within seconds:** read `private/clio-private/runs/.driver/session-<N>.log` (the pane
   capture — the traceback lands there). The driver auto-selects a `python3` that has
   PyYAML (runner.py needs it); `--check` shows which one.
