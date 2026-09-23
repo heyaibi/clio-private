@@ -27,7 +27,7 @@
 # Optional untracked overrides live in
 # private/clio-private/runs/.driver.env (sourced if present):
 # HERMES_PROFILE_NAME, DISCORD_CHANNEL, DISCORD_FALLBACK_CHANNEL,
-# HEARTBEAT_URL, STALE_AFTER_SEC, LOG_KEEP_DAYS.
+# HEARTBEAT_URL, STALE_AFTER_SEC, LOG_KEEP_DAYS, TMUX_WIDTH, TMUX_HEIGHT.
 #
 # Local test hooks (never set these in cron):
 #   DISABLE_NOTIFY=1      log notifications instead of sending them
@@ -78,6 +78,8 @@ HARNESS="$REPO/$PRIV/harness"
 : "${LOG_KEEP_DAYS:=7}"
 : "${DRIVER_RUN_DIR:=$WF/.driver}"
 : "${SESSION_NAME:=development}"
+: "${TMUX_WIDTH:=164}"
+: "${TMUX_HEIGHT:=48}"
 
 PIPELINE="private/clio-private/harness/pipelines/default.yaml"
 SESSION="$SESSION_NAME"
@@ -293,8 +295,8 @@ _drive() {
     fi
     local number="${out%%$'\t'*}" rel="${out#*$'\t'}"
     log "dry-run: would launch phase $number in tmux '$SESSION'"
-    printf 'would launch: tmux new-session -d -s %s -c %s "bash %s/private/clio-private/harness/phase-driver.sh --session %s %s"\n' \
-      "$SESSION" "$REPO" "$REPO" "$number" "$rel"
+    printf 'would launch: tmux new-session -d -s %s -x %s -y %s -c %s "bash %s/private/clio-private/harness/phase-driver.sh --session %s %s"\n' \
+      "$SESSION" "$TMUX_WIDTH" "$TMUX_HEIGHT" "$REPO" "$REPO" "$number" "$rel"
     return 0
   fi
 
@@ -355,7 +357,15 @@ _drive() {
   [ -z "${DRIVER_RUN_DIR:-}" ] || envs="$envs DRIVER_RUN_DIR='$DRIVER_RUN_DIR'"
   local launch="${envs:+$envs }bash '$REPO/$PRIV/harness/phase-driver.sh' --session '$number' '$rel'"
 
-  9>&- tmux new-session -d -s "$SESSION" -c "$REPO" "$launch" \
+  # Detached geometry: new sessions start at TMUX_WIDTH x TMUX_HEIGHT
+  # (defaults 164x48, overridable via .driver.env). runner.py copies the
+  # pane size into each harness pty, so opencode inherits it with no
+  # second change. This is the initial detached size only: tmux keeps its
+  # default window-size policy, so attaching with a smaller terminal may
+  # shrink the window, and a session already running keeps its old size
+  # until it is relaunched (kill the session or run
+  # `tmux resize-window -t <session> -x <w> -y <h>` once).
+  9>&- tmux new-session -d -s "$SESSION" -x "$TMUX_WIDTH" -y "$TMUX_HEIGHT" -c "$REPO" "$launch" \
     || { notify "phase $number failed to launch in tmux"; return 1; }
   printf '%s\n' "$number" >"$CURRENT"
   tmux pipe-pane -t "$SESSION" -o "cat >> '$RUN_DIR/session-$number.log'" 2>/dev/null || true
@@ -411,6 +421,9 @@ driver_self_test() {
   drive || true
   tmux has-session -t "$SESSION" 2>/dev/null \
     && echo "ok: launched a session" || { echo "FAIL: session not launched"; fail=1; }
+  geom="$(tmux display-message -p -t "$SESSION" '#{window_width}x#{window_height}' 2>/dev/null || true)"
+  [ "$geom" = "${TMUX_WIDTH}x${TMUX_HEIGHT}" ] \
+    && echo "ok: geometry $geom" || { echo "FAIL: geometry ${geom:-gone}, want ${TMUX_WIDTH}x${TMUX_HEIGHT}"; fail=1; }
   drive || true
   grep -q "running; skip" "$LOG" \
     && echo "ok: busy run skipped" || { echo "FAIL: busy run not skipped"; fail=1; }
@@ -488,6 +501,7 @@ check() {
   [ -f "$WF/.driver.env" ] && echo "env file: present" || echo "env file: none (defaults in use)"
   echo "heartbeat: ${HEARTBEAT_URL:-unset}"
   echo "stall threshold: ${STALE_AFTER_SEC}s"
+  echo "tmux geometry: ${TMUX_WIDTH}x${TMUX_HEIGHT} (initial detached size; attaches may resize)"
   "$PYTHON" "$HARNESS/next_phase.py" --self-test
 }
 
