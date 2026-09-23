@@ -1,0 +1,5 @@
+2026-09-23T18:21:32Z finalize r1 start: staging and closing out phase 100376 after REMEDY_APPROVED bec2e323
+2026-09-23T18:21:32Z attribution check: table rows Developer/Adversary/Remediator/Remedy Approver present and well-formed; Finalize row filled with OpenCode CLI (Go . Deepseek V4.1 Flash High), status done
+2026-09-23T18:21:32Z roadmap close-out: added "- [x] Required approval is obtained (downstream pipeline step)." to Definition of Done (line absent in plan; added per prior-phase convention)
+2026-09-23T18:23:41Z make check: PASS. Note: first run failed only because rustdoc was absent from PATH in this shell (cargo could not spawn rustdoc for doctests, os error 2); reran with the rustup toolchain bin on PATH + RUSTDOC set, then fmt + clippy -D warnings + cargo test --locked --workspace (incl. doctests) all green, 47 "test result: ok" blocks, 0 failures, exit 0.
+2026-09-23T18:23:41Z staging: git add -A in root repo; private/clio-private is git-ignored in root (verify) and staged separately with git add -A.

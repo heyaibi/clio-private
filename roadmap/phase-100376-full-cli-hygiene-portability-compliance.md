@@ -4,11 +4,11 @@
 Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
-| Developer | r1 | [TBD] | [TBD] |
-| Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
-| Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
+| Adversary | r1 | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | done |
+| Remediator | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Remedy Approver | r1 | Antigravity CLI (Gemini 3.8 Flash) | approved |
+| Finalize | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
 
 **Follow-up phase 100376 · **Effort:** ~3 days · **Gaps:** `gaps/full-cli.md` §6, §7 step 3 (hygiene, export/import, erase)
 
@@ -228,29 +228,34 @@ Implementation claims must be supported by actual command output and `make cover
 
 | AC ID | Acceptance Criterion | Verification Method | Required Evidence |
 |-------|----------------------|---------------------|-------------------|
-| AC-100376-01 | Hygiene audit/clean/log bound with confirmed gating | T100376-01…T100376-04 | Command output |
-| AC-100376-02 | Export manifest + idempotent import | T100376-05, T100376-06 | Bundle + output |
-| AC-100376-03 | Erase gated, distinct from hygiene/discard | T100376-07, T100376-08 | Output + help |
-| AC-100376-04 | Masking on every report | T100376-01 | Output diff |
-| AC-100376-05 | No regression; coverage green | T100376-09 | `make check`, `make coverage` |
+| AC-100376-01 | Hygiene audit/clean/log bound with confirmed gating | T100376-01…T100376-04 | PASS (with documented cross-process KMS caveat). `clio hygiene audit|clean|log` bound to `hygiene_audit`/`hygiene_clean`/`hygiene_log_list` (`cli_read_hygiene.rs`, `cli_write_hygiene.rs`). 25 hygiene CLI tests pass (15 clean + 10 audit/log) plus 12 `clio-mcp` hygiene tool tests; full `cargo test -p clio --bin clio` 480 passed. Live CLI transcript: `hygiene clean --file cands.json --action discard` without `--confirm` (or with `--dry-run`) → exit 0, "would flag 0, archive 0, discard 1 (zero writes)", `stats` unchanged; with `--confirm --reason` → item discarded (`items_active` 1→0), `hygiene log` shows the durable row. A confirmed batch abort now exits 1 and the text view names the failing target and the pending remainder (`hygiene clean: applied 1 item(s); failed itm-ghost (…); aborted, 1 pending`), while the JSON payload still carries `applied`/`failed`/`pending`. Cross-process dry-run→confirm is collision-free: the clean batch id mixes process id, a nanosecond clock, and the in-process counter, so durable dry-run rows no longer collide with the confirmed insert (regression test `hygiene_clean_dry_run_then_confirm_across_fresh_runtime_instances`). Caveat (limitation 1): `hygiene audit` over content written by another process still fails `forbidden`/`no DEK for subject` because the only key provider is process-local; the CLI now adds an actionable hint naming the durable KMS need. |
+| AC-100376-02 | Export manifest + idempotent import | T100376-05, T100376-06 | PASS (with documented cross-process KMS caveat). Export/import round-trip test: export of 2 seeded items (`--actor harness`) writes a bundle whose manifest reports `complete==true`; import applies (`would_create ≥ 2`); re-importing the same bundle skips everything (`would_create == 0`, `would_skip ≥ 2`); `import --dry-run` reports counts with stats proving zero writes. 11 portability CLI tests pass. Caveat (limitation 1): `export` defaults to `dsar_plaintext`, which decrypts content, so a cross-process export of content written by another process fails `forbidden`/`no DEK for subject` (the in-process `LocalDevKms` is process-local); the round trip is proven in-process, the repo's established test model. |
+| AC-100376-03 | Erase gated, distinct from hygiene/discard | T100376-07, T100376-08 | PASS. Live CLI transcript: `clio erase --subject S --basis B --request R` without `--confirm` → exit 2, error names `--confirm`, zero writes; `--dry-run` → exit 0 preview stating IRREVERSIBILITY and the discard/hygiene distinction; with `--confirm --actor harness` → `status COMPLETED`, `item_count 1`, `tombstones_written 1`, one-way `subject_hash`. |
+| AC-100376-04 | Masking on every report | T100376-01 | PASS. Test: item seeded with a planted `api_key=sk-…` secret; `hygiene audit` output (stdout and stderr) contains no plaintext secret; audit text view never renders the preview field. Export render/mask test: planted secret absent from CLI stdout/stderr. |
+| AC-100376-05 | No regression; coverage green | T100376-09 | PASS. `make check` green (fmt + clippy `-D warnings` workspace + `cargo test --workspace --locked` incl. doctests). `make coverage` final gate after remediation: 307 files checked, TOTAL lines 97.96% / functions 98.91%, per-file guard: all files ≥90% both metrics. New/remediated files: `cli_read_hygiene.rs` 99.19%/100%, `cli_write_hygiene.rs` 96.47%/95.24%, `cli_write_portability.rs` 97.09%/100%, `cli_help_usage.rs` 100%/100%, `cli_help.rs` 100%/100%, `cli_error.rs` 100%/100%, `clio-mcp/hygiene_tools.rs` 99.22%/100%, `clio-mcp/runtime_context.rs` 100%/100%. |
 
 ### Definition of Done
-- [ ] All in-scope behavior implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation updated.
-- [ ] Evidence collected and verification completed.
+- [x] All in-scope behavior implemented.
+- [x] All acceptance criteria pass.
+- [x] Required tests pass.
+- [x] No unauthorized changes introduced.
+- [x] Existing behavior remains intact.
+- [x] Security checks pass.
+- [x] Documentation updated (help catalog, per-command usage lines, `clio help` catalog).
+- [x] Evidence collected and verification completed.
+- [x] Required approval is obtained (downstream pipeline step). — Remedy Approver r1 verdict APPROVE (all findings F-01…F-07 resolved; size, roadmap-isolation, and coverage constraints hold)
 
 ### Completion Evidence
-- Implementation summary
-- Module diffs
-- Export/import round-trip evidence
-- Erase-gate and masking transcripts
-- Coverage report
-- Known limitations
+- **Implementation summary**: New CLI surfaces in `crates/clio-lib/src`: `cli_read_hygiene.rs` (`HygieneReadGroup`: `hygiene audit` → `hygiene_audit` with `--min-score/--limit/--offset` + in-band `truncated` marker; `hygiene log` → `hygiene_log_list`), `cli_write_hygiene.rs` (`HygieneWriteGroup`: `hygiene clean --file candidates.json|- --action flag|archive|discard|delete|keep [--confirm] [--dry-run] [--reason] [--note]`; unconfirmed (or `--dry-run`) = tool dry-run, exit 0; fail-closed candidate-file parsing before any dispatcher call), `cli_write_portability.rs` (`PortabilityWriteGroup`: `export --out FILE …` → `export`; `import --source FILE [--dry-run] [--force]`; `erase --subject S --basis B --request R [--reason-code C]` with the shared confirm gate, `--dry-run` irreversibility preview). Shared wiring: help catalog bindings + usage lines (`cli_help.rs`), dispatch (`main.rs`), group registration (`cli_read.rs`, `cli_write.rs`). Hygiene/export/import/erase semantics, masking, manifests, and DEK logic stay in the existing crates (`clio-hygiene`, `clio-compliance`, `clio-mcp`) — CLI and MCP cannot drift because the CLI calls the in-process dispatcher.
+- **Module diffs**: six new files from r1 (3 modules: `cli_read_hygiene.rs`, `cli_write_hygiene.rs`, `cli_write_portability.rs`; plus their 3 `*_tests.rs`) and `cli_help_usage.rs` extracted from `cli_help.rs` during remediation (7 new files total, all ≤450 lines); five edited shared files in r1 (`cli_help.rs`, `cli_help_tests.rs`, `main.rs`, `cli_read.rs`, `cli_write.rs`). Remediation additionally edited `cli_write_group.rs`, `cli_error.rs`, `cli_read_tests.rs`, `cli_error_tests.rs`, `cli_write_hygiene.rs`/`cli_write_hygiene_tests.rs`, `cli_read_hygiene.rs`/`cli_read_hygiene_tests.rs`, and `clio-mcp` (`hygiene_tools.rs`, `runtime_context.rs`, `hygiene_tools_tests.rs`).
+- **Export/import round-trip evidence**: test suite (in-process, real test output; cross-process CLI transcript not possible today — see limitation 1).
+- **Erase-gate and masking transcripts**: live CLI transcripts quoted in the AC table (exit 2 refusal naming `--confirm`; exit 0 dry-run preview with IRREVERSIBLE + hygiene/discard distinctness; confirmed erase `COMPLETED` with tombstones).
+- **Coverage report**: pre-change baseline JSON (`303 files, TOTAL 97.95% lines / 98.92% functions, guard green` — the earlier "301 files / 98.91% functions" figures were a transcription error); final gate `make coverage` after remediation → `target/coverage/coverage.json` (`307 files, TOTAL 97.96% / 98.91%, guard green`).
+- **Remediation r1 (findings F-01…F-07)**: split the per-command usage table out of `cli_help.rs` into `cli_help_usage.rs` (F-01, keeping every file ≤450 lines); made the hygiene clean batch id collision-free with a cross-process regression test (F-02); added the cross-process KMS caveat to AC-01/02 and a CLI hint at the `no DEK for subject` failure point (F-03); surfaced the confirmed-clean failing target and pending count in the text view and made a batch abort exit 1 while keeping the JSON payload (F-04); surfaced the audit scan-budget `incomplete` flag in the audit text view (F-05); corrected the baseline/count figures here (F-06); accepted `--dry-run` on `hygiene clean` as an explicit zero-write preview that overrides `--confirm` (F-07).
+- **Known limitations**:
+  1. Cross-process CLI flows over encrypted content fail by design today: the only DEK provider is the documented in-process `LocalDevKms` ("keys never enter the item database"), so content written by one one-shot CLI process cannot be decrypted by the next (e.g. `clio hygiene audit` against another process's `remember` output errors `no DEK for subject`). This phase binds commands; a durable DEK provider is owned by the DEK/KMS persistence track outside this phase's scope (this phase must not change the DEK/erase mechanism). All acceptance tests run in-process (single process), which is the repo's established test model. Debt owner: the DEK/KMS persistence track — no phase in the current roadmap is assigned to it; it is the pre-existing unassigned debt first recorded in the Phase 100370 CLI phase. The CLI now adds an actionable hint at the failure point (`the default key provider is process-local; content written by another process needs a durable KMS provider`).
+  2. (Resolved in remediation r1) Cross-process `hygiene clean` dry-run→confirm previously failed the log write: the batch id came from the per-process `next_item_id()` counter (`itm-mcp-<n>`), so a fresh process regenerated the same id and the confirmed insert hit a `hygiene_audit_logs` UNIQUE-constraint abort. `McpState::next_clean_batch_id` now mixes the process id, a nanosecond clock, and the in-process counter, and the regression test `hygiene_clean_dry_run_then_confirm_across_fresh_runtime_instances` runs dry-run then confirm over two fresh runtimes on one durable file DB.
+  3. Hygiene candidate files are inputs; interactive candidate review is not added (as scoped in the phase exit contract).
 
 ---
 
@@ -302,6 +307,7 @@ After this phase is accepted:
 - Erase is distinct and gated.
 
 ### Known Limitations
+- Cross-process reads of encrypted content fail today: the only key provider is the process-local `LocalDevKms`, so a durable DEK/KMS provider is still owed. Debt owner: the DEK/KMS persistence track — no phase in the current roadmap is assigned to it (pre-existing unassigned debt first recorded in the Phase 100370 CLI phase).
 - Hygiene candidate files are inputs; interactive candidate review is not added.
 - Export/import scope is JSON bundles, not provider ingest.
 
@@ -309,10 +315,11 @@ After this phase is accepted:
 - Phase 100378's config/ranking/sync surface completes the CLI catalog.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
-- Verifier: [TBD]
-- Human Approver: not required (unless erase contract changes)
-- Date: [TBD]
+- Implementer: Developer r1 (OpenCode CLI, Together . GLM-5.3 Flash High)
+- Verifier: Developer r1 — `make check` green; `make coverage` final gate green with per-file guard (306 files, all ≥90% lines and functions); live CLI gate/dry-run/confirm transcripts collected
+- Remediator: Remediator r1 (OpenCode CLI, Go . Deepseek V4.1 Flash High) — addressed findings F-01…F-07; `make check` green (fmt + clippy `-D warnings` workspace + `cargo test --workspace --locked`); `make coverage` final gate green (307 files, TOTAL lines 97.96% / functions 98.91%, all files ≥90% both metrics)
+- Human Approver: not required (erase contract unchanged)
+- Date: 2026-09-23

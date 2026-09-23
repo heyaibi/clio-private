@@ -1,0 +1,56 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 06634ce3",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "6b3d931fbfa7f82c53f4c541f6c86898277a4016531bc61ee4cb641c3732050e",
+      "artifacts": {},
+      "git_head": "191b668e1c81f5f85fe55381d55bf317350931a1"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100376/findings.json b04f55ea",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "c14d31241bc5d937a48d88d3cae720dbf03fa55ab79369afca86b4cf9250afd2",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 10063,
+          "sha256": "30327f4eedd9fbd2a570536cf3f16f1334b459d5d881329d78f637187d9dadfe"
+        }
+      },
+      "git_head": "191b668e1c81f5f85fe55381d55bf317350931a1"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE b2657ac4",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "f565e228724a1d6bd9bd50ef9e32e03df2a320dbac87e005f60037b51a6959da",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 10063,
+          "sha256": "30327f4eedd9fbd2a570536cf3f16f1334b459d5d881329d78f637187d9dadfe"
+        }
+      },
+      "git_head": "191b668e1c81f5f85fe55381d55bf317350931a1"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED bec2e323",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "cfc967960f67868536897d3b2cbd6635cae09e1d8611e411f7f6335bf9e14787",
+      "artifacts": {},
+      "git_head": "191b668e1c81f5f85fe55381d55bf317350931a1"
+    }
+  }
+}
