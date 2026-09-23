@@ -272,7 +272,7 @@ CLI/help/docs owners expose the already-defined contract; migration documentatio
 #### Required Changes
 1. Add or update CLI usage text and examples.
 2. Add a migration mapping example using generic external records.
-3. Document that `evidence_ref` confers no document-container semantics and that `doc_id` is deferred to a later research phase (see requirement §9).
+3. Document that `evidence_ref` confers no document-container semantics and that `doc_id` is deferred to the approval-gated Phase 900611 family (see requirement §9).
 4. Document retrieval, redaction, and context-size behavior.
 
 #### Implementation Constraints
@@ -523,7 +523,7 @@ After this phase is accepted:
 
 ### Downstream Prerequisites
 - Any later migration tooling may rely on context and evidence-reference round trips.
-- Any future provider work must use the native contract; `doc_id` container design belongs to a dedicated later phase and must not be smuggled in as a string alias.
+- Any future provider work must use the native contract; `doc_id` container design belongs to the approval-gated Phase 900611 family and must not be smuggled in as a string alias.
 
 ### Final Status
 PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED

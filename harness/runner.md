@@ -21,6 +21,8 @@ python3 private/clio-private/harness/runner.py --autoexit-test
 
 Exit codes: 0 completed, 1 terminal non-complete (rejected/blocked), 2 config error (machine-readable JSON on stdout in all cases), 130 operator Ctrl-C.
 
+Parked phase numbers are `>= 900000`. They remain in the roadmap for planning, but `next_phase.py` never selects them and `runner.py` rejects them with a config error instead of launching a run. See `phase_policy.py` for the shared floor.
+
 ## Harness identifiers
 
 Each stage file declares `harness:` as one identifier or a list of them. Format: `<CLI>:<Provider>/<Model>[@<Effort>]`, where provider and effort are optional. Examples: `opencode:together/glm-5.3-flash@high`, `opencode:go/deepseek-v4.1-flash@high`, `agy:gemini-3.8-flash-high`, `opencode:openrouter/deepseek-v4.1-flash@max`.
