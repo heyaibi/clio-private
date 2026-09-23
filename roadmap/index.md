@@ -1,4 +1,4 @@
-# Agent Memoir — 35 build slices + 9 remediation + 9 follow-up phases (53 total)
+# Agent Memoir — 35 build slices + 9 remediation + 11 follow-up phases (55 total)
 
 Each numbered slice is one staffing unit of roughly **equal engineering effort** (~1×). Relative weights are marked on each heading (`1×` or `1.5×`); the max/min ratio is kept ≤ 1.5. Order is primary build dependency, not priority; independent slices (for example 100310 and 100320, and the extraction adapter 100340) share no dependency with their neighbours and are placed for narrative grouping. No links outside this folder.
 
@@ -221,6 +221,19 @@ Added 2026-09-22 from the gap register in `gap/requirement-gaps.md` (build plan,
 | 100520 | Scale ceilings, TLS pooling, deployment docs | ~4–5 days | [phase-100520-scale-ceilings-docs.md](phase-100520-scale-ceilings-docs.md) | G-13, G-14, G-15, G-16 |
 
 Critical path: 100360 → 100380 → 100400 → 100440 → 100460 → 100480. Total 33–47 ideal days plus review latency (see `gap/requirement-gaps.md` §4). The `batch` widening stays in the backlog as an enhancement.
+
+---
+
+## Native context and evidence-identity phases 100601–100606
+
+Added 2026-09-24 to support provider-neutral source context and migration readiness without a Hindsight adapter. Requirement v1.10 now defines the native `context` and generalized `evidence_ref` contract. Phase 100601 implements that contract in the core memory path; Phase 100606 propagates it through extraction, retrieval, portability, audit, sync, and erasure. These phases intentionally do not implement provider APIs, remote migration, or document-container behavior; external document identifiers may be carried opaquely with no parity claim, and `doc_id` container design is deferred to a later phase (see requirement §9).
+
+| Phase | Scope | Effort | Implementation plan | Dependencies |
+|------:|-------|--------|---------------------|--------------|
+| 100601 | Native source context and evidence identity in the core memory contract | ~5–7 days | [phase-100601-native-source-context.md](phase-100601-native-source-context.md) | Core item/store, encryption, schema, and binding contracts |
+| 100606 | Context lifecycle, retrieval, portability, audit, sync, and erasure | ~4–6 days | [phase-100606-context-lifecycle-portability.md](phase-100606-context-lifecycle-portability.md) | Phase 100601; existing extraction/retrieval/portability/audit/sync/erase contracts |
+
+Dependency order: 100601 → 100606. No phase 100611 is planned at this time because the requested scope explicitly excludes a Hindsight adapter; a later provider-specific phase may be added only under a separate decision.
 
 ---
 

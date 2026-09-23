@@ -1,7 +1,9 @@
 # Clio — Requirements Document
 
-**Document status:** Planning · **Version:** 1.9 · **Owner:** Memory Platform
+**Document status:** Planning · **Version:** 1.10 · **Owner:** Memory Platform
 **Applies to:** any long-horizon agent or companion chat product that must persist information across sessions
+
+**Revision note:** v1.10 adds the native source `context` field and generalizes `evidence_ref` as the stable external source-identity field. Context is descriptive metadata; it is separate from category, epistemic truth, source text, and retrieval composition. Document-container (`doc_id`) semantics are explicitly deferred to a later phase (see §9).
 
 ---
 
@@ -110,6 +112,10 @@ Online extraction MUST NOT run a training loop or a multi-sample sampling loop a
 *Tension:* Reflexion-style free-text self-reflections, appended every failed trial, are themselves a form of monotonically growing memory if left unbounded.
 **Governing principle:** Failure memories (§4.8) are stored as structured `FailureRecord` objects with a length-capped natural-language `lesson` field, subject to the same admission scoring and consolidation path as any other episodic memory — not as an ever-growing free-text log exempt from governance.
 
+### 2.9 Source Context vs. Context Budget vs. Provenance
+*Tension:* A memory benefits from knowing the setting in which it was captured, but the system also needs a bounded model-facing context budget and a stable way to identify its source. Treating one free-form `context` value as all three would blur descriptive metadata, retrieval composition, and provenance.
+**Governing principle → PR-10 (§3):** Source `context` is optional, bounded, descriptive metadata attached to a memory. It MUST NOT determine category or epistemic truth, MUST NOT replace `source_text` for span verification, and MUST NOT be injected without the PR-1 budget. `evidence_ref` is the provider-neutral stable source identity and MAY identify an external memory item, conversation turn, tool call, or other source record. Document-container semantics are a separate deferred concern (see §9).
+
 ---
 
 ## 3. Design Principles (Non-Negotiable)
@@ -123,8 +129,9 @@ Online extraction MUST NOT run a training loop or a multi-sample sampling loop a
 | PR-5 | **Nothing is admitted without a decision.** Every candidate memory passes an explicit, logged admission decision (category gate + five-factor score); there is no implicit/default admission. |
 | PR-6 | **Supersession is invalidation, not erasure.** When a discrete fact is superseded, the prior edge is invalidated and retained for history — never silently overwritten or erased by the supersession path. Routine removal from active use (`discard`, co-activation pruning, hygiene) is a separate, logged operations path (§4.9, §7.4). Compliance-grade destruction of personal content is only via crypto-shredding (§7.4). |
 | PR-7 | **Retrieval is need-based, not turn-based.** Whether memory is searched at all, and which subset is searched, is decided per turn, not fixed. |
-| PR-8 | **Every memory operation is attributable.** Provenance (source turn/session/tool call), confidence, and epistemic kind (fact vs. belief, with source provenance for beliefs) are mandatory fields, not optional metadata. |
+| PR-8 | **Every memory operation is attributable.** Provenance (source turn/session/tool call), confidence, and epistemic kind (fact vs. belief, with source provenance for beliefs) are mandatory fields, not optional metadata. Attribution is satisfied by system-recorded provenance (actor, bank, timestamps, item identity) on every operation; caller-supplied `evidence_ref` is optional on `store` but MUST be preserved when supplied, and provider-import paths MUST supply it. |
 | PR-9 | **Write and structural maintenance are decoupled processes.** New memory becomes queryable before any background re-indexing/re-summarization completes. |
+| PR-10 | **Context describes; evidence identifies.** Source context is bounded descriptive metadata, while `evidence_ref` identifies the source. Neither changes the closed category taxonomy, the fact/belief classification, or the authority of a verified snapshot. |
 
 ---
 
@@ -146,6 +153,8 @@ Two top-level stores, matching the standard semantic/episodic split used across 
 - Compact conversation summaries (gist only, non-authoritative — §2.5)
 - Task/failure/temporal history records (§4.8)
 
+The adjective **contextual** in “semantic (contextual) memory” describes reusable memory; it does not define a new category or a field. The optional per-item `context` field is defined in §4.4, §4.9, and §7 as bounded source metadata. It MUST NOT be used to add a sixth category.
+
 Adding a sixth semantic category or a new episodic record type MUST go through a schema-change review; it MUST NOT be done ad hoc by widening a scoring threshold.
 
 ### 4.2 Admission Control (Second Gate)
@@ -162,6 +171,8 @@ Every candidate that passes the category gate (§4.1) is scored on five factors 
 
 `admission_score = w1·utility + w2·confidence + w3·novelty + w4·recency + w5·type_prior`, weights tunable per deployment, threshold `θ_admit` configurable per category. Items scoring below `θ_admit` are discarded (not silently — logged per PR-5/PR-8). This scoring layer is orthogonal to, and runs after, the category whitelist (§2.4).
 
+`context` MAY be supplied to extraction or retrieval as a descriptive signal, but it MUST NOT make an otherwise ineligible category eligible, change `epistemic_kind`, or replace `source_type`/`source_ref`. A deployment MAY define an additional deterministic context-aware scoring signal only when that policy is documented; this revision does not make context an admission factor by default.
+
 ### 4.3 Write Path
 
 The write path MUST satisfy PR-9: construction and structural maintenance are separate, non-blocking processes.
@@ -171,6 +182,8 @@ The write path MUST satisfy PR-9: construction and structural maintenance are se
 3. **MemTree: a hierarchical temporal index.** Memory is organized as time-ordered trees, not a flat, globally-rewritten summary. Leaves hold granular episodic units; internal nodes hold aggregated, higher-level summaries; the root is the most abstract view. This mirrors the MemTree/MemForest design pattern, which organizes memory as time-ordered trees specifically to avoid rewriting a flat global summary on every update.
 4. **Dirty-path refresh.** When a leaf changes, only the chain of ancestor nodes on the path from that leaf to the root is marked dirty and recomputed — analogous to write-optimized index structures (e.g., LSM-tree-style incremental maintenance) that avoid rewriting the whole structure on every insert.
 5. **Parallel summary refresh.** Dirty ancestor nodes at the same tree depth, across different branches, are recomputed concurrently rather than one at a time.
+
+When a write includes source `context`, the context MUST travel with the candidate through extraction, verification, admission, storage, and read projections. It is descriptive input only: it MUST NOT be concatenated into the structured snapshot as an authoritative field, and it MUST NOT be used as the source-span haystack. The authoritative evidence text remains `source_text`.
 
 A new item MUST become queryable (via the leaf level) immediately after step 2, before steps 3–5 (structural maintenance) complete. This is the concrete mechanism that satisfies P2.
 
@@ -187,6 +200,10 @@ Offline training and packaging of the extractor model is out of scope. If artifa
 
 This two-representation design (structured snapshot + separate prose gist) is the direct implementation of PR-4.
 
+**Source context (normative).** `context` is an optional, bounded, descriptive string that records the setting or circumstances surrounding a memory item, such as a conversation type, document setting, or workflow stage. It MUST be validated as UTF-8, MUST have a published maximum size, and MUST be rejected when empty or oversized rather than silently truncated. A reference maximum of 4 KiB UTF-8 bytes is the default target; deployments MAY lower it but MUST NOT raise it without a reviewed requirement revision. `context` MUST NOT be interpreted as a category, an epistemic kind, a source type, a confidence value, a source span, a model instruction, or a retrieval budget. It MAY be returned as metadata and MAY be used as a documented retrieval signal, but it MUST NOT change the authority of a structured snapshot or bypass §4.4 span verification. Ordinary updates MUST preserve the existing context; replacing it requires an explicit audited correction, and the prior value MUST remain reconstructable via `audit_trail` (prior context is reconstruction history, not queryable point-in-time state).
+
+`evidence_ref` is the provider-neutral stable provenance reference for the source. It MAY identify a source turn, tool call, external memory item, or other source record, and at the item level it populates `source_ref` subject to the precedence rule in the glossary. It is not the `source_text` haystack and MUST NOT be used as an authorization token. It is not a document container: carrying an external document's identifier opaquely preserves identity only and confers no upsert, bulk-delete, or original-text semantics (see §9).
+
 ### 4.5 Retrieval Path
 
 ```
@@ -196,7 +213,10 @@ Intent Gate → Allowed memory domains → Adaptive retrieval → Relevant memor
 1. **Intent Gate.** A lightweight classifier decides, per turn, whether the message plausibly requires old memory at all. Self-contained turns ("hi," "thanks," turns fully resolved by the current context) skip retrieval entirely. This directly targets P4 and is consistent with adaptive retrieval-necessity gating approaches used in current retrieval-augmented systems (retrieve only when the model's own signal indicates a knowledge gap, rather than on every turn).
 2. **Allowed memory domains.** If retrieval is needed, the gate additionally scopes *which* domains (e.g., task history vs. persona vs. failure log) are plausibly relevant, so search hits only the relevant partitions rather than the entire store.
 3. **Adaptive retrieval.** Within the allowed domains, retrieval combines embedding similarity, lexical/BM25 match, and — where a graph structure exists (§4.6) — bounded graph traversal, with reranking. This hybrid combination (dense + lexical + graph, then rerank) matches the retrieval design used in current temporal-knowledge-graph memory systems, which report it outperforming embedding-only search on both accuracy and the temporal-reasoning cases embedding search structurally cannot answer (which fact was true when).
-4. **Co-activation reinforcement and decay.** Memories retrieved together for the same query have the association weight of their link increased (a Hebbian-style "fire together, wire together" update); future queries can then spread activation across strongly linked memories, surfacing related context that pure similarity search would miss.
+
+   Retrieval hits MUST expose optional source `context` as metadata so a consumer can understand the setting of a result. A deployment MAY use the bounded context value as an additional lexical signal, but it MUST remain non-authoritative and MUST NOT change the item's category, `epistemic_kind`, or confidence. `compose_context` MUST count any context it includes against its existing token budget and MUST NOT inject context automatically merely because it was stored. The default composition policy MAY omit context; any policy that includes it MUST be explicit, bounded, and auditable.
+
+4. **Co-activation reinforcement and decay.** Memories retrieved together for the same query have the association weight of their link increased (a Hebbian-style "fire together, wire together" update); future queries can then spread activation across strongly linked memories, surfacing related memories that pure similarity search would miss.
 
    **Association vs triple (normative data model).** Weighted links live as **`assoc_edge`** records in **graph/structure metadata** (the same persistence concern named under Supported storage backends and used by §4.6)—**not** a new memory *domain*, injection tier, or sixth semantic category. An `assoc_edge` links two **memory item ids** and carries `assoc_kind` ∈ {`coactivation`, `explicit`}. It is **not** a bi-temporal SPO triple: triples assert facts with `subject`+`predicate` identity and valid/transaction intervals (§4.6); association edges do not supersede facts and MUST NOT reuse the triple identity key or interval algebra. "Not a new storage tier" means associations MUST NOT bypass PR-1 injection budgets or invent an ungated memory class; dedicated tables/indexes for `assoc_edge` inside graph metadata are permitted and expected. Erase (§7.4) and sync (§4.9.5.D) MUST treat `assoc_edge` rows as graph metadata derived from / referencing item ids: drop or regenerate edges whose endpoints were erased; include association mutations in incremental sync when multi-host is claimed.
 
@@ -244,7 +264,7 @@ A small, bounded object, injected on every turn regardless of the Intent Gate (�
 ```json
 {
   "stable": [
-    { "key": "name", "value": "…", "confidence": 0.95, "source": "explicit", "as_of": "2026-08-01" },
+    { "key": "name", "value": "…", "confidence": 0.95, "source": "explicit", "context": "team chat", "as_of": "2026-08-01" },
     { "key": "communication_style", "value": "concise", "confidence": 0.8, "source": "inferred", "as_of": "2026-09-10" }
   ],
   "preferences": [
@@ -252,7 +272,7 @@ A small, bounded object, injected on every turn regardless of the Intent Gate (�
   ]
 }
 ```
-`stable` entries hold durable **discrete/categorical** attributes (including categorical preference labels such as communication style) and follow the bi-temporal invalidation model (§4.6). `preferences` entries hold **continuous/scalar** intensities only (affinity, sentiment strength, engagement level) and follow the EMA model, carrying a `trend` field — never a categorical string under EMA (PR-2). Categorical preference changes use `persona_put_stable` (or equivalent discrete update); scalar observations use `persona_observe_preference`. The companion object is the **`persona_document`** (always-on channel); it is related to but not identical with semantic **category** `persona` on generic `store`—implementations MUST document a non-overlapping boundary so category-`persona` items do not silently bypass the companion budget. The object MUST stay within a fixed token budget (configurable, default target ≤ 400 tokens). Each entry MUST carry a durable **`admission_score`** stamped at its last gated write (`persona_put_stable` MUST run §4.2 and store the score; `persona_observe_preference` MUST retain the create-time admission score or a documented synthetic score in `[0,1]`). When over budget, entries are ranked by that stored `admission_score` descending (tie-break by `key` ascending) and truncated, never silently grown without bound.
+`stable` entries hold durable **discrete/categorical** attributes (including categorical preference labels such as communication style) and follow the bi-temporal invalidation model (§4.6). `preferences` entries hold **continuous/scalar** intensities only (affinity, sentiment strength, engagement level) and follow the EMA model, carrying a `trend` field — never a categorical string under EMA (PR-2). Categorical preference changes use `persona_put_stable` (or equivalent discrete update); scalar observations use `persona_observe_preference`. The companion object is the **`persona_document`** (always-on channel); it is related to but not identical with semantic **category** `persona` on generic `store`—implementations MUST document a non-overlapping boundary so category-`persona` items do not silently bypass the companion budget. The object MUST stay within a fixed token budget (configurable, default target ≤ 400 tokens). Each entry MUST carry a durable **`admission_score`** stamped at its last gated write (`persona_put_stable` MUST run §4.2 and store the score; `persona_observe_preference` MUST retain the create-time admission score or a documented synthetic score in `[0,1]`). When over budget, entries are ranked by that stored `admission_score` descending (tie-break by `key` ascending) and truncated, never silently grown without bound. Persona entries MAY carry optional source `context`; it is descriptive metadata and MUST NOT change the discrete/continuous update rule or the always-on budget.
 
 ### 4.8 History Subsystem
 
@@ -262,10 +282,10 @@ Four record types, each retrieved selectively rather than replayed in full (sati
 |---|---|---|
 | Episodic | Discrete events with timestamp, participants, outcome | MemTree leaf lookup, time-scoped |
 | Task | Task definition, steps taken, final status | Keyed by task ID; summarized ancestor node for "what have I tried" queries |
-| Failure | `FailureRecord {task_id, attempt_n, what_failed, lesson (capped length), evidence_ref}` | Retrieved when a new attempt at the same/similar task begins |
+| Failure | `FailureRecord {task_id, attempt_n, what_failed, lesson (capped length), evidence_ref, context?}` | Retrieved when a new attempt at the same/similar task begins |
 | Temporal | Snapshots of how a tracked fact/preference changed over time | Bi-temporal edge history (§4.6) or EMA trend series (§4.6) |
 
-Failure records implement verbal reinforcement learning: rather than fine-tuning weights after each failed trial, a natural-language "lesson" is derived from the failure and injected as context on the next attempt at that task — the mechanism demonstrated in the Reflexion framework, where verbal self-reflection on a failed trajectory is stored in episodic memory and conditions the next attempt without any gradient update. Per §2.8, these records are subject to the same admission scoring and category-bounded storage as any other episodic memory; they are not an unbounded exempt log.
+Failure records implement verbal reinforcement learning: rather than fine-tuning weights after each failed trial, a natural-language "lesson" is derived from the failure and used as bounded reflection context on the next attempt at that task — the mechanism demonstrated in the Reflexion framework, where verbal self-reflection on a failed trajectory is stored in episodic memory and conditions the next attempt without any gradient update. Per §2.8, these records are subject to the same admission scoring and category-bounded storage as any other episodic memory; they are not an unbounded exempt log.
 
 ### 4.9 Adaptive Memory Tooling
 
@@ -291,6 +311,7 @@ Per PR-3, agents interact with memory through an open tool interface rather than
 | P11 / §4.10 beliefs | `belief_observe`, `belief_history` | Append-only confidence trajectory |
 | P12 / §4.12 / §7.4 transparency & erasure | `inspect`, `correct`, `audit_trail`, `export`, `erase_request` | Visibility, correction, compliance path |
 | P13 / §4.11 fact vs belief | `store`/`belief_observe` + mandatory `epistemic_kind` on reads | Epistemic kind is a field, not optional metadata |
+| PR-10 / FR-34–35 source context and evidence identity | `store`, `retrieve`, `inspect`, `export`, `import` | Context and stable external source references survive the memory lifecycle without becoming categories or truth claims |
 | §4.1 taxonomy | `store` category enum | Only five semantic categories admit |
 | §4.2 five-factor admission | `admit_preview`, `admit_preview_batch`, gated writes return score/rejection | Decision is explicit and inspectable before/after write |
 | §4.3 MemTree | `memtree_query`, `memtree_get`, `consolidate` | Hierarchical temporal index is agent-reachable |
@@ -306,12 +327,13 @@ Per PR-3, agents interact with memory through an open tool interface rather than
 4. Coding-agent deployments SHALL also expose every **Additive** tool in §4.9.5 unless a reviewed exception documents the omission.
 5. Destructive tools (`discard`, `erase_request`, `hygiene_clean`) MUST require explicit confirmation when invoked from an agent harness, except authorized compliance workflows.
 6. Optional parameters marked `?` MAY be omitted; defaults MUST be those stated here or in the published schema.
+7. Schemas for long-term memory items MUST publish the optional `context` type, maximum size, and preservation semantics when supported. When omitted, context is absent rather than an empty string. `context` is item-level metadata, not a global operation parameter; where a tool accepts `context?` beside an item shell, it populates that item's context field. `evidence_ref` is the stable source-identity parameter. All bindings MUST expose identical semantics for both fields.
 
 #### 4.9.3 Gating matrix
 
 | Class of tool | Category gate (§4.1) | Admission score (§4.2) | Notes |
 |---|---|---|---|
-| Long-term writes (`store`, `triple_add`, `failure_record`, `task_upsert`, `persona_put_stable`, gated `batch` ops, additive `shared_store` / `canonical_put`) | MUST (where category applies) | MUST | Structured rejection required (PR-5). Episodic types use the episodic admission path, not a forged semantic category. |
+| Long-term writes (`store`, `triple_add`, `failure_record`, `task_upsert`, `persona_put_stable`, gated `batch` ops, additive `shared_store` / `canonical_put`) | MUST (where category applies) | MUST | Structured rejection required (PR-5). Episodic types use the episodic admission path, not a forged semantic category. Optional `context` is descriptive metadata and MUST NOT bypass either gate. |
 | Belief writes (`belief_observe`) | N/A | MUST on **create**; **append** validates without full re-admission (see §4.10) | Beliefs are §4.10 objects—not a sixth semantic category and not an episodic type tag. Category gate does not apply. |
 | Mutators (`update`, `invalidate`, `triple_end`, `persona_observe_preference`) | N/A | N/A | Enforce `update_rule` discrete vs continuous (FR-11); emit audit (FR-15). |
 | Reads / inspect / compose / intent | N/A | N/A | Automatic intent gate MAY skip *background* retrieval; explicit tool calls MUST still run. |
@@ -324,10 +346,10 @@ Per PR-3, agents interact with memory through an open tool interface rather than
 
 | Tool | Effect | Traces to |
 |---|---|---|
-| `admit_preview(item, category)` | Run category + five-factor scoring; return `{pass, admission_score, factors, rejection_reason?}` without writing. | §4.2, PR-5 |
-| `admit_preview_batch(items[], bank?, profile_override?)` | Batch dry-run of `admit_preview` over 1–50 candidates under the bank's resolved retention profile (or an unpersisted `profile_override`); return per-item decisions in input order plus `{would_admit, would_reject, by_reason}`. Read-only: zero writes, zero store or index side effects. | §4.2, PR-5 |
-| `store(item, category, epistemic_kind, source_type?, confidence?, evidence_ref?, source_text?, snapshot?, gist?)` | Admit a long-term item. `category` for semantic writes MUST be one of: `task_spec` \| `schema` \| `tool_config` \| `output_constraint` \| `persona`. Episodic writes use an episodic type tag (`triple` \| `gist` \| `task` \| `failure` \| `temporal`) rather than inventing a sixth semantic category. When `snapshot` is present, `source_text` MUST be provided and FR-4 span verification MUST pass before taxonomy/admission scoring; `evidence_ref` is provenance only and aliases into item `source_ref` (it is never the span haystack). Returns `{id, admission_score}` or structured rejection. Leaf MUST be queryable before ancestor refresh completes (PR-9). | §4.1–4.4, P1–P3 |
-| `get(item_id)` | Exact fetch by id (metadata + refs). | §4.12 |
+| `admit_preview(item, category)` | Run category + five-factor scoring; validate optional item `context` when present; return `{pass, admission_score, factors, rejection_reason?}` without writing. | §4.2, PR-5, PR-10 |
+| `admit_preview_batch(items[], bank?, profile_override?)` | Batch dry-run of `admit_preview` over 1–50 candidates under the bank's resolved retention profile (or an unpersisted `profile_override`); each item's optional `context` is validated as in `admit_preview`; return per-item decisions in input order plus `{would_admit, would_reject, by_reason}`. Read-only: zero writes, zero store or index side effects. | §4.2, PR-5, PR-10 |
+| `store(item, category, epistemic_kind, source_type?, confidence?, evidence_ref?, context?, source_text?, snapshot?, gist?)` | Admit a long-term item. `category` for semantic writes MUST be one of: `task_spec` \| `schema` \| `tool_config` \| `output_constraint` \| `persona`. Episodic writes use an episodic type tag (`triple` \| `gist` \| `task` \| `failure` \| `temporal`) rather than inventing a sixth semantic category. `context` is optional, bounded, descriptive source metadata; it is not a category, `source_type`, `epistemic_kind`, source span, or retrieval budget. When `snapshot` is present, `source_text` MUST be provided and FR-4 span verification MUST pass before taxonomy/admission scoring; context MUST NOT substitute for that evidence. `evidence_ref` is the stable provider-neutral source identity and populates item `source_ref` per the glossary precedence rule (it is never the span haystack). Returns `{id, admission_score}` or structured rejection. Leaf MUST be queryable before ancestor refresh completes (PR-9). | §4.1–4.4, PR-10, P1–P3 |
+| `get(item_id)` | Exact fetch by id (metadata + refs, including optional `context` and `source_ref`). | §4.12, PR-10 |
 | `get_snapshot(item_id)` | Return the authoritative structured snapshot only. | PR-4, FR-5 |
 | `get_gist(item_id)` | Return the non-authoritative prose gist only. | PR-4 |
 | `summarize(scope)` | Regenerate gist for a scope; MUST NOT alter snapshots. | PR-4, §4.3 |
@@ -342,8 +364,8 @@ Per PR-3, agents interact with memory through an open tool interface rather than
 | Tool | Effect | Traces to |
 |---|---|---|
 | `intent_gate(turn_text)` | Return `{retrieval_needed, domains[]}` for this turn. Diagnostic/override aid; does not by itself inject memory. | §4.5, P4, FR-6 |
-| `retrieve(query, domains?, limit?, as_of?, time_axis?, expand_graph?, budget_tokens?, recall_scope?, prefer_consolidated?)` | Adaptive retrieval (dense + lexical + optional graph) over domains: `semantic` \| `episodic` \| `task` \| `failure` \| `temporal` \| `persona`. `time_axis` is `valid` (default) or `transaction` for bi-temporal reads. `recall_scope` is `full` (default, unless the bank `recall_scope_default` says otherwise) or `consolidated_only`, which returns consolidated units only and signals `scope_empty` instead of silently widening; `prefer_consolidated` drops raw items whose consolidated parent is also returned and backfills the freed slots from the next-best candidates, and is a no-op when no parent is returned. Scope and dedup never exceed the token budget, never cross banks, and leave explicit caller parameters in control. Co-activation updates apply on result sets (§4.5); reinforcement observes the pre-dedup candidate page under the same limit and budget, so suppression never silently drops reinforcement. | §4.5–4.6, NFR-4, FR-17 |
-| `compose_context(query?, domains?, budget_tokens, recall_scope?, prefer_consolidated?)` | Return the bounded pack the system *would* inject under PR-1 (persona channel + selected memories), without requiring the agent to assemble it ad hoc. MUST respect token budget. `recall_scope` / `prefer_consolidated` apply to the memory section only; the persona channel is always emitted under its own budget. | PR-1, §2.1, §4.7 |
+| `retrieve(query, domains?, limit?, as_of?, time_axis?, expand_graph?, budget_tokens?, recall_scope?, prefer_consolidated?)` | Adaptive retrieval (dense + lexical + optional graph) over domains: `semantic` \| `episodic` \| `task` \| `failure` \| `temporal` \| `persona`. `time_axis` is `valid` (default) or `transaction` for bi-temporal reads. `recall_scope` is `full` (default, unless the bank `recall_scope_default` says otherwise) or `consolidated_only`, which returns consolidated units only and signals `scope_empty` instead of silently widening; `prefer_consolidated` drops raw items whose consolidated parent is also returned and backfills the freed slots from the next-best candidates, and is a no-op when no parent is returned. Retrieval hits expose optional source `context` as metadata; a deployment MAY use bounded context as a documented lexical signal, but it MUST NOT change category, `epistemic_kind`, or confidence. Scope and dedup never exceed the token budget, never cross banks, and leave explicit caller parameters in control. Co-activation updates apply on result sets (§4.5); reinforcement observes the pre-dedup candidate page under the same limit and budget, so suppression never silently drops reinforcement. | §4.5–4.6, PR-10, NFR-4, FR-17 |
+| `compose_context(query?, domains?, budget_tokens, recall_scope?, prefer_consolidated?)` | Return the bounded pack the system *would* inject under PR-1 (persona channel + selected memories), without requiring the agent to assemble it ad hoc. MUST respect token budget. `recall_scope` / `prefer_consolidated` apply to the memory section only; the persona channel is always emitted under its own budget. Stored source `context` is metadata by default; if an explicit policy includes it in a pack, its tokens count against the same budget and the policy MUST be auditable. | PR-1, PR-10, §2.1, §4.7 |
 | `associations(item_id, min_weight?)` | List co-activation / explicit edges and effective weights (after decay). | §4.5, FR-17–18 |
 
 ##### C. Persona (§4.7, P5, P9)
@@ -351,17 +373,17 @@ Per PR-3, agents interact with memory through an open tool interface rather than
 | Tool | Effect | Traces to |
 |---|---|---|
 | `persona_get()` | Return the current bounded persona object (`stable` + `preferences` + trends). | §4.7, FR-7 |
-| `persona_put_stable(key, value, confidence?, evidence_ref?)` | Upsert a discrete/categorical stable entry (invalidation semantics), including categorical preference labels. Enforces persona token budget. MUST reject scalar-intensity payloads that belong on the EMA path. | §4.7, PR-2 |
-| `persona_observe_preference(key, observed_value, confidence?, evidence_ref?)` | EMA-update a continuous/scalar preference intensity; updates `trend`. `observed_value` MUST be numeric. MUST reject categorical strings (use `persona_put_stable` instead). | §4.7, P9, PR-2 |
+| `persona_put_stable(key, value, confidence?, evidence_ref?, context?)` | Upsert a discrete/categorical stable entry (invalidation semantics), including categorical preference labels. Enforces persona token budget. MUST reject scalar-intensity payloads that belong on the EMA path. `context`, when supplied, is bounded descriptive source metadata and does not change the persona update rule. | §4.7, PR-2, PR-10 |
+| `persona_observe_preference(key, observed_value, confidence?, evidence_ref?, context?)` | EMA-update a continuous/scalar preference intensity; updates `trend`. `observed_value` MUST be numeric. MUST reject categorical strings (use `persona_put_stable` instead). `context`, when supplied, is bounded descriptive source metadata and does not change the EMA rule. | §4.7, P9, PR-2, PR-10 |
 
 ##### D. History subsystem (§4.8, P6, P7)
 
 | Tool | Effect | Traces to |
 |---|---|---|
-| `task_upsert(task_id, definition, steps?, status, evidence_ref?)` | Create/update a task history record (gated episodic write). `definition` and `status` are required (the implemented contract rejects an empty definition or status; there is no partial-update form). | §4.8 |
+| `task_upsert(task_id, definition, steps?, status, evidence_ref?, context?)` | Create/update a task history record (gated episodic write). `definition` and `status` are required (the implemented contract rejects an empty definition or status; there is no partial-update form). `context`, when supplied, is bounded descriptive source metadata. | §4.8, PR-10 |
 | `task_get(task_id)` | Fetch task record + optional summarized ancestor view. | §4.8, FR-8 |
 | `task_history(task_id, limit?)` | Prior attempts/steps for a task without full-log replay. | §4.8, P6 |
-| `failure_record(task_id, attempt_n, what_failed, lesson, evidence_ref?)` | Store a structured `FailureRecord` (§7.3); `lesson` length-capped; gated. | §4.8, §2.8, P7 |
+| `failure_record(task_id, attempt_n, what_failed, lesson, evidence_ref?, context?)` | Store a structured `FailureRecord` (§7.3); `lesson` length-capped; gated. `context`, when supplied, is bounded descriptive source metadata. | §4.8, §2.8, P7, PR-10 |
 | `failures_for_task(task_id_or_query, limit?)` | Retrieve prior failures for same/similar task (FR-9). | FR-9, P7 |
 | `memtree_query(time_range?, task_id?, depth?, limit?)` | Query MemTree leaves and/or ancestor summaries by time/task/depth. | §4.3, §4.8 episodic |
 | `memtree_get(node_id)` | Fetch one MemTree node (leaf or aggregate). | §4.3 |
@@ -371,10 +393,10 @@ Per PR-3, agents interact with memory through an open tool interface rather than
 
 | Tool | Effect | Traces to |
 |---|---|---|
-| `triple_add(subject, predicate, object, epistemic_kind, source_type?, valid_from?, valid_until?, confidence?, supersede?, snapshot_ref?, gist_ref?)` | Write bi-temporal SPO edge; default supersede closes prior open subject+predicate. Gated. | §4.6, §7.2, P10 |
+| `triple_add(subject, predicate, object, epistemic_kind, source_type?, valid_from?, valid_until?, confidence?, supersede?, snapshot_ref?, gist_ref?, context?)` | Write bi-temporal SPO edge; default supersede closes prior open subject+predicate. `context`, when supplied, is bounded descriptive source metadata. Gated. | §4.6, §7.2, P10, PR-10 |
 | `triple_query(subject?, predicate?, object?, as_of?, time_axis?)` | Pattern query; point-in-time via `as_of` + `time_axis`. | §4.6, NFR-4 |
 | `triple_end(subject, predicate, object?, valid_until)` | Expire without replacement. `valid_until` is required (the implemented contract has no "end at now" default). | §4.6, PR-6 |
-| `belief_observe(proposition, confidence, evidence_ref, source_type)` | Append a confidence-history entry (create belief if needed). MUST NOT overwrite history. **Create** (no prior belief for the identity key): MUST pass five-factor admission (§4.2); category gate does not apply. **Append** (belief exists): MUST validate enums/ranges, bank/auth, and emit audit; MUST NOT re-run novelty/utility admission as if admitting a new item. | §4.10, FR-13, P11 |
+| `belief_observe(proposition, confidence, evidence_ref, source_type, context?)` | Append a confidence-history entry (create belief if needed). `context`, when supplied, is bounded descriptive source metadata for the belief item; each evidence entry's `evidence_ref` remains the source identity. On append, `context` MUST be omitted or identical to the stored value; a differing value is a usage error (use `correct()` to change context). MUST NOT overwrite history. **Create** (no prior belief for the identity key): MUST pass five-factor admission (§4.2); category gate does not apply. **Append** (belief exists): MUST validate enums/ranges, bank/auth, and emit audit; MUST NOT re-run novelty/utility admission as if admitting a new item. | §4.10, FR-13, P11, PR-10 |
 | `belief_history(belief_id_or_proposition)` | Return full confidence trajectory + source_types. | §4.10, P12, NFR-4 |
 | `graph_link(source_id, target_id, relationship, weight?)` | Declare an explicit `assoc_edge` (`assoc_kind=explicit`). Identity includes `relationship` so multiple distinct relationships between the same item pair are allowed. Sticky by default (§4.5). | §4.5–4.6 |
 | `graph_query(seed_id, max_hops?, edge_type?, min_weight?)` | Bounded multi-hop traversal over `assoc_edge` (filter by `assoc_kind` via `edge_type`). MUST NOT silently treat SPO triples as association weights. | §4.5 |
@@ -383,10 +405,10 @@ Per PR-3, agents interact with memory through an open tool interface rather than
 
 | Tool | Effect | Traces to |
 |---|---|---|
-| `inspect(filter?, limit?, offset?)` | List items for user/session/bank with epistemic_kind, scores, validity windows. | FR-16, §4.12 |
-| `correct(item_id, new_value, reason)` | Auditable correction (uses update/invalidate rules). | FR-16, P12 |
-| `audit_trail(item_id)` | Reconstruct value/confidence/evidence history from write-path data. | §4.12, FR-15 |
-| `export(destination, filter?)` | Export including confidence, admission, telemetry (NFR-6), with a completeness manifest per §4.9.5.B. | NFR-6, P12, §4.9.5.B |
+| `inspect(filter?, limit?, offset?)` | List items for user/session/bank with epistemic_kind, scores, validity windows, optional source `context` subject to read authorization, and `source_ref`/evidence identity. | FR-16, PR-10, §4.12 |
+| `correct(item_id, new_value, reason, context?)` | Auditable correction (uses update/invalidate rules). `context`, when supplied, is an explicit audited replacement; the prior context remains reconstructable via `audit_trail`. | FR-16, P12, PR-10 |
+| `audit_trail(item_id)` | Reconstruct value/confidence/context/evidence history from write-path data; raw context is available only to authorized readers. | §4.12, FR-15, PR-10 |
+| `export(destination, filter?)` | Export including confidence, admission, telemetry, optional source `context`, and `source_ref`/evidence identity (NFR-6), with a completeness manifest per §4.9.5.B. | NFR-6, PR-10, P12, §4.9.5.B |
 | `erase_request(subject_id, legal_basis, request_id)` | Compliance crypto-shred path only (FR-19). MUST NOT alias `discard`. | §7.4, PR-6 |
 
 ##### G. Common parameters (all core tools)
@@ -398,6 +420,8 @@ Per PR-3, agents interact with memory through an open tool interface rather than
 | `dry_run` | Validate and report without durable mutation when the tool mutates. |
 | `explain` | On reads: return score/domain/hop trace (P12). |
 
+`context` is an item/record-level optional field on tools that create or update long-term memory; it is not a common global parameter. `evidence_ref` is the stable source-identity field. Tools that do not create a source-contextual long-term record MUST document that omission in their schema rather than silently accepting an unbounded value.
+
 #### 4.9.5 Additive tools and operations platform
 
 These exist so coding agents and operators can run the system under real harness constraints. They do **not** invent new memory *semantics* beyond this document; if an additive capability is omitted, Core tools must still satisfy all non-ops FRs. Coding-agent deployments SHALL expose the capabilities in this section except where a subsection explicitly allows single-host omission.
@@ -408,8 +432,8 @@ These exist so coding agents and operators can run the system under real harness
 |---|---|---|
 | `batch(operations, dry_run?)` | Atomic multi-mutation of Core write tools. | End-of-turn ergonomics. |
 | `scratchpad_write` / `scratchpad_read` / `scratchpad_clear` | Ephemeral workspace; not long-term memory. | Prevents P1 pollution in practice. |
-| `canonical_put` / `canonical_get` | Single-slot upsert/read with supersession history. | Convenience over `store`+`invalidate`; still gated by §4.1. |
-| `shared_store` / `shared_retrieve` / `shared_discard` | Cross-agent surface bank. | Multi-agent ops. |
+| `canonical_put` / `canonical_get` | Single-slot upsert/read with supersession history; a context-bearing write MUST preserve bounded context and evidence identity. | Convenience over `store`+`invalidate`; still gated by §4.1. |
+| `shared_store` / `shared_retrieve` / `shared_discard` | Cross-agent surface bank; shared long-term writes MUST preserve bounded context and evidence identity when supplied. | Multi-agent ops. |
 | `validate(item_id, action, note?, new_content?)` | Collaborative attest/update/invalidate/delete. | Reviewer loops. |
 | `hygiene_audit` / `hygiene_clean` | Ranked noise audit + confirmed cleanup (§4.9.5.A Hygiene). | Operational anti-bloat (P1). |
 | `stats()` | Counts by bank/tier/category. | Operations. |
@@ -431,13 +455,13 @@ These tools implement operational anti-bloat. They are **operations removal** (�
 | Tool / command surface | Effect |
 |---|---|
 | `export(destination, filter?, content_mode?)` | Write a JSON export of selected memories **plus a completeness manifest**. `content_mode` defaults to `dsar_plaintext` (authorized decrypt → readable content); `ciphertext_backup` MAY emit opaque payloads without DEKs for like-to-like restore. |
-| `import(source, dry_run?, force?)` | Idempotent JSON import from a prior export. |
+| `import(source, dry_run?, force?)` | Idempotent JSON import from a prior export, preserving optional `context` and `source_ref`/evidence identity when present. |
 | `import_provider(provider, credentials?, options?, dry_run?)` | Provider importer (mapped external memory systems — Hindsight, Mem0, Mnemosyne, Honcho, Supermemory; not LLM/chat vendors). **First release MAY stub** this tool (`PROVIDER_IMPORT_UNSUPPORTED`); full adapters are out of first release. |
 
 **Export MUST include:**
 
-1. **Payload** — memory items with snapshot/gist refs, triples, persona, task/failure/temporal records, graph edges including **`assoc_edge`** (coactivation + explicit), confidence/admission/telemetry fields (NFR-6). Under default `content_mode=dsar_plaintext`, content is decrypted in-process under caller authorization before write. Under `ciphertext_backup`, content bodies MAY remain opaque (no DEKs in file); metadata inventory remains complete. Erased subjects contribute tombstone metadata only.
-2. **Completeness manifest** — machine-readable inventory: schema/export format version, `content_mode`, bank id(s), item counts by type/category, content checksums (or equivalent integrity hashes), filter used, generated-at timestamp, and an explicit `complete: true|false` flag. If the export was filtered or truncated, `complete` MUST be `false` and the manifest MUST state what was omitted.
+1. **Payload** — memory items with snapshot/gist refs, optional source `context`, `source_ref`/evidence identity, triples, persona, task/failure/temporal records, graph edges including **`assoc_edge`** (coactivation + explicit), confidence/admission/telemetry fields (NFR-6). Under default `content_mode=dsar_plaintext`, content is decrypted in-process under caller authorization before write. Under `ciphertext_backup`, content bodies MAY remain opaque (no DEKs in file); metadata inventory remains complete. Erased subjects contribute tombstone metadata only.
+2. **Completeness manifest** — machine-readable inventory: schema/export format version, `content_mode`, bank id(s), item counts by type/category, content checksums (or equivalent integrity hashes) covering context and evidence identity when present, filter used, generated-at timestamp, and an explicit `complete: true|false` flag. If the export was filtered or truncated, `complete` MUST be `false` and the manifest MUST state what was omitted.
 3. **No secrets in plaintext** — DEKs, API keys, and sync credentials MUST NOT appear in the export file.
 
 **Import MUST:**
@@ -446,6 +470,7 @@ These tools implement operational anti-bloat. They are **operations removal** (�
 2. Run every candidate through §4.1–§4.2 before commit (same gates as `store`) for `dsar_plaintext` imports.
 3. Support `dry_run=true`, which MUST return a **dry-run report** (would-create / would-skip / would-reject / would-overwrite counts and sample rejection reasons) **without writing**.
 4. For `import_provider`, **when a provider adapter is implemented**, accept credentials only via secure binding parameters or environment; any logged or returned diagnostic MUST **mask** credentials (show last-4 or redacted form only). Provider dry-run MUST produce the same report shape as JSON import dry-run before any write. Provider items enter with provenance `provider:<id>` (external item id in `source_ref`), pass §4.1–§4.2 like JSON imports, skip FR-4 span grounding (no local source span exists), default to `epistemic_kind=belief` with `source_type=third_party` unless independently verified, and are idempotent by external id (repeat pull no-ops; provider-side deletions are not mirrored). **First release MAY ship `import_provider` as a non-writing stub**; the masking rule still applies to any credential parameters accepted by the stub.
+5. Import MUST preserve optional `context` and `source_ref`/evidence identity from the bundle, validate them against §4.4, and carry them through the same admission, audit, sync, and erase paths as the item content. If a provider adapter is implemented later, its context field MUST map to the native `context` field rather than create a parallel provider-specific contract. External document identifiers MAY be carried opaquely in `evidence_ref`; doing so preserves identity only and confers no document-container semantics (see §9).
 
 ##### C. Diagnose / doctor / verify / repair / reindex
 
@@ -483,6 +508,7 @@ Deployments that claim multi-host or multi-device memory SHALL implement a **cli
 7. **Bank scope** — sync SHOULD be selectable per `bank`; default MAY be all banks on that device.
 8. **Modes** — push-only, pull-only, and bidirectional MUST be supported.
 9. **Association edges** — when multi-host sync is claimed, durable `assoc_edge` mutations (coactivation reinforce, explicit `graph_link`, prune) MUST be included in the sync payload with the same idempotent-apply rules as other graph metadata.
+10. **Context and evidence identity** — when multi-host sync is claimed, source `context` and `source_ref`/`evidence_ref` identity MUST travel with the corresponding item mutation, remain subject to the same encryption and erase rules, and use the same idempotent-apply identity.
 
 ##### E. Effective configuration, profiles, and ranking environment
 
@@ -518,6 +544,7 @@ Operators and coding agents SHOULD also use `hygiene_audit`/`hygiene_clean`, `do
 - Return gist-only payloads as authoritative for exact identifiers, versions, ports, hashes, or error codes (PR-4).
 - Auto-inject unbounded scratchpad, full MemTree, or full history into model context (PR-1).
 - Apply EMA updates to discrete/categorical attributes or invalidation to continuous/scalar preferences (PR-2, §4.7). Never pass `fact`/`belief` as `update_rule`, or store `update_rule` in the item `epistemic_kind` column.
+- Treat source `context` as descriptive metadata rather than a category, truth claim, source span, or instruction; never inject it into model context without the PR-1 budget and an explicit policy.
 - Log or return unmasked credentials, DEKs, or sync keys from import, diagnose, doctor, config, sync status, or hygiene (`hygiene_audit` / `hygiene_clean`) surfaces.
 
 The agent decides *when* to call; the system decides *whether gated calls succeed* (§2.3 / PR-3).
@@ -529,6 +556,7 @@ A belief is any proposition that is **not independently verified** (per §4.11) 
 ```json
 {
   "proposition": "user_diet_preference = vegetarian",
+  "context": "team chat",
   "epistemic_kind": "belief",
   "confidence_history": [
     {"as_of": "2026-06-01", "confidence": 0.4, "evidence_ref": "turn_112", "source_type": "agent_inferred"},
@@ -539,7 +567,7 @@ A belief is any proposition that is **not independently verified** (per §4.11) 
 ```
 Each new piece of evidence appends a confidence-history entry rather than overwriting the prior one; the current confidence is the latest entry, but the trajectory remains inspectable — directly serving the transparency requirement (§4.12/P12) and giving a concrete, queryable answer to how a belief evolved over time.
 
-Each confidence-history entry carries a `source_type` (`user_stated` / `agent_inferred` / `third_party`), recording how that piece of evidence arrived. This is what distinguishes a user's stated view from the agent's own inference, without requiring a separate epistemic kind (§4.11).
+Each confidence-history entry carries a `source_type` (`user_stated` / `agent_inferred` / `third_party`), recording how that piece of evidence arrived. This is what distinguishes a user's stated view from the agent's own inference, without requiring a separate epistemic kind (§4.11). A belief item MAY carry an optional item-level `context` describing the setting in which the proposition was captured; each confidence-history entry's `evidence_ref` remains the source identity for that evidence, and context MUST NOT replace it. On append, `context` MUST be omitted or byte-identical to the stored item-level value; a differing value is a usage error, and changing context requires the authorized correction path (`correct()`).
 
 **Admission (normative):** Beliefs are **not** admitted by inventing a sixth semantic category or a new episodic type tag. `belief_observe` uses the §4.9.3 belief-writes row: category gate **N/A**; five-factor admission **MUST** when **creating** a new belief identity; subsequent **appends** to an existing belief MUST validate `confidence` / `source_type` / bank scope and emit audit, and MUST NOT re-score the proposition as a brand-new admission candidate (novelty/utility gates already decided at create).
 
@@ -555,8 +583,8 @@ Retrieval responses MUST surface `epistemic_kind`, and, when `epistemic_kind = b
 
 ### 4.12 Transparency & Audit (addresses P12)
 
-- Every store/update/discard/invalidate/**hygiene_clean** operation MUST emit a telemetry event: `{operation, item_id, category, epistemic_kind, confidence, admission_score, actor (agent/system/user), timestamp}` (hygiene events MAY omit fields that do not apply, but MUST include `operation`, `item_id`, `actor`, `timestamp`, and the hygiene `action`).
-- A queryable audit trail MUST allow reconstructing, for any item, its full history of values, confidences, and the evidence references that produced each change, reusing the confidence-history and bi-temporal structures already required in §4.6/§4.10 — transparency is a read-side view over data the write path already tracks, not a separate logging system to build and keep in sync. Hygiene cleanups MUST additionally be reviewable via the hygiene audit log in §4.9.5.A.
+- Every store/update/discard/invalidate/**hygiene_clean** operation MUST emit a telemetry event: `{operation, item_id, category, epistemic_kind, confidence, admission_score, actor (agent/system/user), timestamp}` (hygiene events MAY omit fields that do not apply, but MUST include `operation`, `item_id`, `actor`, `timestamp`, and the hygiene `action`). For items carrying `context`, telemetry MUST record whether context was present, its length, and a hash for change detection only (the hash is not a confidentiality mechanism for low-entropy values); ordinary telemetry MUST NOT emit raw context.
+- A queryable audit trail MUST allow reconstructing, for any item, its full history of values, confidences, context changes, and the evidence references that produced each change, reusing the confidence-history and bi-temporal structures already required in §4.6/§4.10 — transparency is a read-side view over data the write path already tracks, not a separate logging system to build and keep in sync. Raw context is available only through an authorized content read and MUST be redacted in ordinary diagnostics. Hygiene cleanups MUST additionally be reviewable via the hygiene audit log in §4.9.5.A.
 - A "memory inspector" read/correct/erase path MUST exist for developers (and, where required by applicable regulation, end users) and MUST be exposed through the `inspect`, `correct`, and `erase_request` tools in §4.9 (FR-16).
 
 ---
@@ -579,7 +607,7 @@ Retrieval responses MUST surface `epistemic_kind`, and, when `epistemic_kind = b
 | FR-12 | Superseding a discrete fact SHALL invalidate the prior edge by setting **both** `valid_time.end` and `transaction_time.end` (identity key: `subject`+`predicate` per §4.6); the supersession path SHALL NOT delete the prior edge. Compliance destruction of personal content uses §7.4 crypto-shredding only. Operations `discard`/pruning are a separate logged path and MUST NOT be used as silent supersession. | P10, PR-6 |
 | FR-13 | Belief objects SHALL store a confidence history (append-only) rather than a single overwritten confidence value; agents SHALL append evidence via `belief_observe` and read trajectories via `belief_history`. Creating a new belief identity SHALL pass admission scoring; appending to an existing belief SHALL NOT require re-passing novelty/utility admission. | P11, §4.10 |
 | FR-14 | Every stored item SHALL carry an `epistemic_kind` field with value `fact` or `belief`; every item with `epistemic_kind = belief` SHALL additionally carry, per confidence-history entry, a `source_type` of `user_stated`, `agent_inferred`, or `third_party`. Retrieval responses SHALL surface `epistemic_kind` and, for beliefs, current `source_type` and confidence, to the consumer. | P13, §4.11 |
-| FR-15 | Every store/update/discard/invalidate/hygiene_clean operation SHALL emit a telemetry/audit event sufficient to reconstruct the item's full history (and, for hygiene, the cleanup action); `audit_trail` SHALL expose that history. | P12 |
+| FR-15 | Every store/update/discard/invalidate/hygiene_clean operation SHALL emit a telemetry/audit event sufficient to reconstruct the item's full history, including context changes when present (and, for hygiene, the cleanup action); `audit_trail` SHALL expose that history. | P12, PR-10 |
 | FR-16 | A memory inspector API SHALL allow listing, correcting, and requesting deletion of items associated with a given user or session, via `inspect`, `correct`, and `erase_request`. | P12 |
 | FR-17 | Memories retrieved together within one retrieval call SHALL have their pairwise **co-activation** association weight increased on `assoc_edge` records; retrieval MAY use these weights to spread activation to associated items beyond direct similarity matches; `associations` SHALL expose effective weights. The increase MUST be **durably handed off** before or with the retrieve response (same transaction, or durable outbox/queue). Silently skipping reinforce on transient errors is FORBIDDEN; if durable handoff fails, the retrieve MUST fail closed or return a structured degraded error that forces retry—best-effort soft-drop of FR-17 updates is not compliant. | Co-activation retrieval |
 | FR-18 | Co-activation (`assoc_kind=coactivation`) edge weights SHALL follow the `association_weight_policy` (saturating growth, lazy exponential decay, pruning threshold) in §4.5; such an edge SHALL NOT grow without bound or persist indefinitely once its decayed weight falls below the pruning threshold. Explicit sticky edges follow §4.5 explicit-edge rules, not co-activation decay, unless a documented longer half-life is configured. | §4.5 |
@@ -598,6 +626,8 @@ Retrieval responses MUST surface `epistemic_kind`, and, when `epistemic_kind = b
 | FR-31 | Multi-host deployments SHALL implement the client/server sync protocol in §4.9.5.D (`sync_serve`, `sync_push`, `sync_pull`, `sync_status`) with incremental cursors, idempotent apply, authentication in non-dev mode, a documented deterministic conflict rule, and apply semantics that do not reject already-admitted peer creates solely due to local admission θ. | §4.9.5.D |
 | FR-32 | The system SHALL expose effective-configuration and profile tools (`config_get`, `config_set`, `config_profiles`, `config_profile_apply`) and ranking-environment tools (`ranking_env_get`, `ranking_env_set`) per §4.9.5.E. Secrets in config views SHALL be masked. Profile/ranking changes MUST NOT bypass admission or category gates. | §4.9.5.E, §4.2, §4.5 |
 | FR-33 | Coding-agent deployments (and any deployment that exposes §4.9.5.A hygiene) SHALL provide `hygiene_audit` and `hygiene_clean` per §4.9.5.A: candidates ranked by noise score; confirmed `flag`/`archive`/`discard` (optional `delete` alias) with dry-run when unconfirmed; secret masking on all hygiene I/O; a durable hygiene audit log; and a callable hygiene-log list surface so every cleanup is reviewable. Hygiene MUST NOT perform compliance erasure. | P1, P12, PR-6, §4.9.5.A, §7.4 |
+| FR-34 | The system SHALL support an optional, bounded, UTF-8 `context` field on long-term memory items. `context` MUST be descriptive source metadata; it MUST NOT be a category, `epistemic_kind`, `source_type`, confidence value, `source_text`, or model instruction. It MUST be preserved through create, read, update/correct, import/export, sync, and authorized audit, and MUST be removed or rendered unreadable through the erase lifecycle according to §7.4. `retrieve`, `get`, `inspect`, and `audit_trail` MUST expose it as metadata rather than silently discard it; other domain reads that return context-bearing records (`persona_get`, `task_get`/`task_history`, `temporal_history`, `belief_history`) MUST surface the stored context alongside the record. Context included in a model-facing pack MUST count against the PR-1 budget and require an explicit bounded policy. | P1, P3, P12, PR-1, PR-4, PR-8, PR-10, FR-4, FR-5, FR-15, FR-20, FR-29, NFR-3, NFR-6 |
+| FR-35 | The system SHALL treat `evidence_ref` as the provider-neutral stable source/provenance identity for a memory item. At the item level, the `store` tool's `evidence_ref` MUST populate `source_ref` per the glossary precedence rule; per-entry `evidence_ref` values inside belief confidence history identify individual evidence items and are exempt from the item-level alias. `evidence_ref` MAY identify a source turn, tool call, external memory item, or other source record. It MUST NOT be used as the source-span haystack or as an authorization token. No document-container semantics are implied (see §9). | P12, PR-8, PR-10, §4.4, FR-14, FR-20, FR-29 |
 
 ---
 
@@ -610,13 +640,16 @@ Retrieval responses MUST surface `epistemic_kind`, and, when `epistemic_kind = b
 | NFR-3 | Persona-channel injection SHALL NOT exceed its configured token budget on any turn. |
 | NFR-4 | The system SHALL support point-in-time queries ("what did we believe/know as of date X") for any discrete fact and any belief's confidence trajectory. |
 | NFR-5 | Admission scoring, category gating, and epistemic_kind tagging SHALL be deterministic given identical inputs and configuration. |
-| NFR-6 | All confidence, admission-score, and telemetry fields SHALL be included in any data export produced for audit or data-subject-access purposes. |
+| NFR-6 | All confidence, admission-score, telemetry, source `context`, and `source_ref`/evidence-identity fields SHALL be included in any data export produced for audit or data-subject-access purposes when present and authorized. |
 | NFR-7 | Tool-catalog bindings SHALL remain language-agnostic at the requirements layer: an agent MUST be able to exercise every §4.9 tool through the published schema without depending on a specific implementation language. |
 | NFR-8 | Non-interactive invocations of `verify`, `repair`, and `reindex` that do not fully succeed SHALL exit with a non-zero status code suitable for CI/automation. |
+| NFR-9 | Context values SHALL have a published maximum and SHALL be rejected when they exceed it; context MUST NOT create unbounded storage, retrieval, or model-injection cost. Any context included in `compose_context` SHALL count against the requested token budget. |
 
 ---
 
 ## 7. Data Model (Reference Schemas)
+
+All long-term memory record schemas MAY carry the optional source `context` field defined in §4.4. `context` is descriptive metadata associated with the record's source; it is not a field of the closed category taxonomy and is not authoritative for exact values. The schemas below show the field where the record type is expected to carry it.
 
 ### 7.1 Semantic Item
 ```json
@@ -628,7 +661,8 @@ Retrieval responses MUST surface `epistemic_kind`, and, when `epistemic_kind = b
   "value": "…",
   "confidence": 0.0,
   "admission_score": 0.0,
-  "source_ref": "turn_id or tool_call_id",
+  "source_ref": "turn_id or tool_call_id or namespaced external source id",
+  "context": "…",
   "created_at": "ISO-8601",
   "valid_time": {"start": "ISO-8601", "end": null},
   "transaction_time": {"start": "ISO-8601", "end": null}
@@ -641,6 +675,8 @@ Retrieval responses MUST surface `epistemic_kind`, and, when `epistemic_kind = b
   "subject": "…", "predicate": "…", "object": "…",
   "epistemic_kind": "fact|belief",
   "source_type": "user_stated|agent_inferred|third_party (present only when epistemic_kind=belief)",
+  "source_ref": "turn_id or namespaced external source id",
+  "context": "…",
   "valid_time": {"start": "…", "end": null},
   "transaction_time": {"start": "…", "end": null},
   "snapshot_ref": "atomic_fact_0004",
@@ -653,7 +689,8 @@ Retrieval responses MUST surface `epistemic_kind`, and, when `epistemic_kind = b
 {
   "task_id": "…", "attempt_n": 2,
   "what_failed": "…", "lesson": "≤ N tokens",
-  "evidence_ref": "trace_id", "epistemic_kind": "belief"
+  "evidence_ref": "trace_id or namespaced external source id",
+  "context": "…", "epistemic_kind": "belief"
 }
 ```
 
@@ -667,9 +704,9 @@ Invalidation, operations removal, and compliance erasure are not the same operat
 
 **Compliance erasure (deletion), specified as follows:**
 
-1. **Field-level encryption per data subject.** Every memory item's content payload — the structured snapshot (§7.2), the gist text, the belief proposition text — is stored encrypted under a per-data-subject data encryption key (DEK) held in a key-management service separate from the item store. The bi-temporal *structure* (that an edge existed, its timestamps, its relationships to other edges) is treated as metadata and MAY remain in plaintext; the *content* is unreadable without the DEK.
+1. **Field-level encryption per data subject.** Every memory item's content payload — the structured snapshot (§7.2), the gist text, the belief proposition text, and source `context` when present — is stored encrypted under a per-data-subject data encryption key (DEK) held in a key-management service separate from the item store. The bi-temporal *structure* (that an edge existed, its timestamps, its relationships to other edges) is treated as metadata and MAY remain in plaintext; the *content* is unreadable without the DEK. `source_ref`/`evidence_ref` is provenance metadata and MUST NOT be used as a substitute for content protection when its value can contain personal data.
 2. **Crypto-shredding on verified request.** On a verified erasure request, the subject's DEK is destroyed within the legally mandated window (e.g., without undue delay and in any case within one month under GDPR Art. 12(3)/17, subject to permitted extensions). Destroying the DEK renders every encrypted payload for that subject — in the primary store, replicas, and any encrypted backups sharing the same ciphertext — permanently unrecoverable, without requiring the system to locate and rewrite every historical backup snapshot individually. This is the standard mechanism for satisfying erasure obligations against append-only, versioned, or backed-up storage, and it is what makes PR-6 (supersession retains history) compatible with a real erasure right: PR-6 governs the supersession/structural layer; the DEK governs whether the content behind that structure is legible at all.
-3. **Propagation to derived structures.** Anything that references or paraphrases the erased content — MemTree ancestor summaries (§4.3), gist prose, belief confidence-history entries (§4.10), co-activation edges (§4.5) — MUST be regenerated via the existing dirty-path mechanism (§4.3), so no derived summary continues to describe content that is no longer legible. Deletion triggers the same recomputation pipeline as an ordinary update; it is not a separate code path that can silently fall out of sync with it.
+3. **Propagation to derived structures.** Anything that references or paraphrases the erased content — MemTree ancestor summaries (§4.3), gist prose, belief confidence-history entries (§4.10), source-context-bearing derived projections, co-activation edges (§4.5) — MUST be regenerated via the existing dirty-path mechanism (§4.3), so no derived summary or readable context projection continues to describe content that is no longer legible. Deletion triggers the same recomputation pipeline as an ordinary update; it is not a separate code path that can silently fall out of sync with it.
 4. **Content-free tombstone.** The audit tombstone (PR-8, §4.12) records that a deletion occurred, its legal basis, timestamp, and authorizing request ID — but MUST NOT contain the erased content itself, only the item's category, a one-way hash of the item ID, and a deletion reason code. A tombstone that reconstructed the erased personal data would defeat the erasure it is supposed to evidence.
 5. **Anonymized derivatives are handled explicitly, not assumed exempt.** A distilled hub-cluster semantic item (§4.5) or an aggregate statistic that no longer identifies the individual falls outside the personal-data scope of most erasure obligations and MAY be retained — but this determination MUST be affirmatively logged per item at the time of distillation, not assumed by default merely because the item is "derived."
 
@@ -683,6 +720,8 @@ Crypto-shredding is the sole **compliance** deletion path. Routine memory manage
 - Fidelity (P3/FR-4/FR-5) acceptance: on a held-out set of turns containing exact numbers/names/dates, ≥ 99% of admitted structured snapshots SHALL pass FR-4 span grounding (locatable source span; numbers/dates via span-parse rules in §4.4); failures below this bar block release. Snapshot fields MAY store a documented canonical form of a located span; they MUST NOT admit values with no locatable span.
 - Write-path latency (P2/FR-3/NFR-2) acceptance: time-to-queryable for a new episodic item SHALL be measured independent of any queued structural-maintenance job; the two SHALL be reported as separate metrics, not conflated.
 - Retrieval-skip precision (P4/FR-6) acceptance: the intent gate's false-negative rate (needed memory, gate says skip) SHALL be tracked separately from and held to a stricter bound than its false-positive rate (unneeded memory, gate says search), because a false negative produces a wrong answer while a false positive only costs latency.
+- Context contract (FR-34/NFR-9) acceptance: valid context round-trips through store/read/import/export/sync/audit/erase; empty or oversized context is rejected without silent truncation; context does not change category, epistemic classification, or span verification; and any context included by `compose_context` remains within the requested budget.
+- Evidence identity (FR-35) acceptance: an external document or memory identifier supplied through `evidence_ref` remains stable and attributable through import/export and all bindings, without being used as source-span evidence; no document-container behavior is asserted.
 
 ---
 
@@ -690,6 +729,10 @@ Crypto-shredding is the sole **compliance** deletion path. Routine memory manage
 
 - **Admission-scoring weight drift.** The five weights in §4.2 (`w1`…`w5`) are tuned empirically against how a *deployment* — a distinct instantiation of this specification with its own users and task domain (e.g., a companion chatbot, an autonomous coding agent, an enterprise research assistant, each running on this same memory architecture but configured independently) — actually uses memory in practice. Weights tuned to perform well for one deployment are not guaranteed to perform well for another, because what counts as high "future utility" or a trustworthy "content-type prior" differs by task domain: a coding agent's task-history items and a companion's persona items do not share a utility distribution. This is left open by design: it is an empirical question that must be answered per deployment via measurement and A/B testing, using deployment profiles and the ranking-environment tools in §4.9.5.E (`ranking_env_*`, `config_profile_*`) so weight changes are explicit and attributable — and no fixed constant in this specification can settle it in advance. NFR-5 still requires that, *given* a fixed configuration, online admission remains deterministic. The same caveat applies to the default constants introduced in §4.5 (`η`, `λ`/half-life, `w_min`, hub threshold) — they are reasonable starting points, not values this document can certify as correct for every deployment.
 - **NFR-2 vs live extractor latency.** Time-to-queryable (NFR-2) is measured from ingest completion to leaf readability with maintenance decoupled (§8). Live LLM/extract latency is a separate metric. Deployments MUST NOT conflate slow extraction with a failed NFR-2 leaf-publish path.
+- **Document-container (`doc_id`) parity deferred.** A Hindsight-style `document_id` names a document container with replace-on-re-retain, bulk-delete, and original-text-fetch semantics — behaviors this revision deliberately does not define, because migration rehearsal has not yet shown which of them Clio needs. `evidence_ref` preserves source identity only and MUST NOT be mistaken for that container contract. If migration rehearsal demonstrates container parity is required, a dedicated later phase SHALL research the provider document lifecycle and design a `doc_id` (or equivalent) contract including upsert, bulk operations, and chunk/original-text handling; that phase MUST NOT reuse `evidence_ref` as the container key without an explicit supersession design.
+- **Context privacy and prompt-injection risk.** Source context may contain personal data or instruction-like text. It MUST be bounded, encrypted with content, treated as untrusted data by extractors and retrieval, redacted from ordinary telemetry, and excluded from automatic model injection unless an explicit budgeted policy permits it.
+- **Context relevance and retrieval drift.** Adding context to lexical matching can improve source-aware recall but can also increase noise or alter ranking. Deployments SHOULD evaluate context-aware retrieval against context-free baselines and MUST keep the policy deterministic for identical inputs and configuration.
+- **Evidence-reference collision and identity ambiguity.** An external document or item identifier reused by different providers can collide if it is not namespaced. Provider references SHOULD use a stable provider/kind namespace, and identity/idempotency behavior MUST be documented rather than inferred from display text.
 
 ---
 
@@ -701,9 +744,11 @@ Crypto-shredding is the sole **compliance** deletion path. Routine memory manage
 - **Belief object** — the §4.10 versioned proposition with append-only `confidence_history`; not a sixth §4.1 semantic category and not an episodic type tag.
 - **Bi-temporal** — tracking both when a fact was true in the world (valid time) and when the system recorded/changed it (transaction time).
 - **Completeness manifest** — export inventory stating version, counts, checksums, filters, `content_mode`, and whether the export is complete (§4.9.5.B).
+- **Context** — optional, bounded, descriptive metadata about the setting or circumstances surrounding a memory item. It is not a category, epistemic kind, source type, source span, model instruction, or retrieval budget; `compose_context` is a separate bounded retrieval operation.
 - **Dirty-path refresh** — recomputing only the ancestor chain affected by a change, not the whole index.
 - **Effective configuration** — the resolved settings after defaults, files, environment, profile, and runtime overlays (§4.9.5.E).
 - **Epistemic kind (`epistemic_kind`)** — item/triple/belief field `fact` \| `belief` (FR-14 / §4.11). Durable SQL column name is `epistemic_kind` (not `class`). Never used as the `update` tool's routing parameter.
+- **Evidence reference (`evidence_ref`)** — provider-neutral stable provenance/source identity supplied by a caller. At the item level it populates `source_ref` per the `source_ref` precedence rule and MAY identify a turn, tool call, external memory item, or other source record; it is not the source-span haystack. Per-entry values inside belief confidence history identify individual evidence items. It confers no document-container semantics (see §9).
 - **Export content mode** — `dsar_plaintext` (authorized readable export) or `ciphertext_backup` (opaque bodies, no DEKs) for §4.9.5.B bundles.
 - **Gist** — a lossy, prose summary retained for narrative continuity, never authoritative for exact values. Distinct from the episodic type tag value `gist`, which names a kind of episodic record rather than the PR-4 prose half.
 - **Hygiene audit** — read-only ranking of noise candidates by score; paired with confirmed `hygiene_clean` and a durable cleanup log (§4.9.5.A).
@@ -717,8 +762,8 @@ Crypto-shredding is the sole **compliance** deletion path. Routine memory manage
 - **Scratchpad** — ephemeral, size-bounded agent workspace that MUST NOT be treated as long-term memory (§4.9).
 - **Shared surface** — a cross-agent memory bank for compact, gated conventions and corrections (§4.9).
 - **Snapshot** — a lossless, schema-typed structured extraction of a memory unit.
-- **Source text (`source_text`)** — inline evidence string supplied with a snapshot-bearing `store` / extract call; the FR-4 span verifier searches this haystack. Distinct from provenance ids.
-- **Source ref (`source_ref`)** — durable provenance id on a memory item (e.g. turn id). The `store` tool's `evidence_ref` aliases into `source_ref` when unset; neither field is the span haystack.
+- **Source text (`source_text`)** — inline evidence string supplied with a snapshot-bearing `store` / extract call; the FR-4 span verifier searches this haystack. Distinct from descriptive `context` and provenance ids.
+- **Source ref (`source_ref`)** — durable provenance id on a memory item (e.g. turn id or namespaced external source/item id). The `store` tool's `evidence_ref` populates `source_ref` when `source_ref` is otherwise unset; when both are supplied they MUST agree or the write is rejected; provider import sets `source_ref` directly and the accompanying `evidence_ref` MUST equal it. Neither field is the span haystack.
 - **Span verification** — cheap online check that extractive snapshot entities/numbers/dates are locatable source spans (FR-4 / §4.4); distinct from ops `verify` and peer `validate`.
 - **Sync protocol** — client/server incremental exchange of durable memory mutations (§4.9.5.D), including `assoc_edge` graph-metadata mutations when multi-host sync is claimed; trusted peer-admitted creates MUST NOT be rejected solely by local admission θ.
 - **Tool catalog** — the normative set of agent-callable memory operations defined in §4.9.
