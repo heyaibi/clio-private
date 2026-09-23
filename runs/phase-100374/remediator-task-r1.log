@@ -1,0 +1,11 @@
+2026-09-23T16:11:04Z START Remediator r1 round 1: read task, findings.json (backup identical, cmp OK). Triage: F-01 = comment-only roadmap-isolation fix in crates/clio-lib/src/main_write_tests.rs (single file, no worker spawn); plan_1hr = same fix; plan_unlimited = two "consider" recommendations to evaluate by evidence.
+2026-09-23T16:11:48Z F-01 fixed: crates/clio-lib/src/main_write_tests.rs lines 186 and 205 comments reworded (removed T100374-05 / T100374-07); no worker needed (single-file comment fix).
+2026-09-23T16:11:48Z plan_unlimited-1 closed: deferred to Phase 100376 by phase file lines 326-328; implementing now would be drive-by scope expansion.
+2026-09-23T16:11:48Z plan_unlimited-2 closed by evidence: ops confirm gate is clio-ops policy (ops_cli.rs:254,290 flags.contains_key(confirm); refused reindex exits 3 via clio_ops::reindex) with different contract than cli_confirm exit-2 usage gate; unify would break reindex_dense_live_unconfirmed_exits_3 and documented exit codes. Phase file line 338 assigns gate reuse for future verbs to Phase 100376.
+2026-09-23T16:11:48Z Starting single verification pass: make check
+2026-09-23T16:14:08Z make check: first attempt failed at doc-tests (missing ~/.cargo/bin/rustdoc proxy in this shell; rustdoc present at ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin). Re-ran with toolchain bin on PATH -> exit 0 (fmt + clippy + workspace tests + doc-tests).
+2026-09-23T16:14:08Z Post-fix verification: grep 100374/T100 in main_write_tests.rs -> no matches (exit 1); file 239 lines (<=450); git diff --stat shows only main_write_tests.rs (4 insertions, 4 deletions, comments only); findings.json valid JSON.
+2026-09-23T16:14:08Z No coverage re-run needed: change is comment-only in a test file; coverage rows unaffected.
+2026-09-23T16:14:08Z Attribution updated: Remediator r1 = OpenCode CLI (Together . GLM-5.3 Flash High) = done in phase file. findings.json updated (F-01 resolved, plan_1hr DONE, plan_unlimited both DECLINED with reasons, remediation section appended). Changes left UNSTAGED per rules; no git add/commit/stash.
+2026-09-23T16:14:08Z FINISH: 1 finding fixed (F-01, comment-only), 2 plan_unlimited recommendations declined with evidence, make check exit 0, no remaining issues from this round.
+REMEDIATOR_DONE 5efa57de

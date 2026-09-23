@@ -4,11 +4,11 @@
 Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
-| Developer | r1 | [TBD] | [TBD] |
-| Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
-| Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Adversary | r1 | Antigravity CLI (Gemini 3.8 Flash) | done |
+| Remediator | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
+| Remedy Approver | r1 | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | approved |
+| Finalize | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
 
 **Follow-up phase 100374 · **Effort:** ~2 days · **Gaps:** `gaps/full-cli.md` §6, §7 step 3 (confirmed/destructive memory mutations)
 
@@ -194,12 +194,12 @@ Stop and report if a mutation cannot be invoked in-process, if confirmation cann
 ## 8. Test and Verification Strategy
 
 ### Required Tests
-- [ ] Unit tests (rule selection, confirm-gate decision)
-- [ ] Integration tests (update/invalidate/correct/discard round trips)
-- [ ] Contract tests (semantics identical to MCP; exit codes)
-- [ ] End-to-end tests (golden output for refusal and dry-run)
-- [ ] Regression tests (prior phases unchanged)
-- [ ] Security/failure-mode tests (off-TTY refusal; dry-run no-write; erase distinctness)
+- [x] Unit tests (rule selection, confirm-gate decision) — `cli_confirm_tests.rs` (3 cases), `cli_write_mutate_tests.rs::update_rejects_a_rule_outside_discrete_or_continuous`
+- [x] Integration tests (update/invalidate/correct/discard round trips) — `cli_write_mutate_tests.rs` (20 cases over injected `McpState`)
+- [x] Contract tests (semantics identical to MCP; exit codes) — CLI passes the same tool args; `--rule` validated against the MCP `discrete|continuous` enum; exit 0/1/2 asserted
+- [x] End-to-end tests (golden output for refusal and dry-run) — `main_write_tests.rs::discard_without_confirm_exits_two_end_to_end`, `discard_dry_run_exits_zero_end_to_end`, `update_rejects_an_unknown_rule_end_to_end`
+- [x] Regression tests (prior phases unchanged) — `cargo test -p clio --bin clio` 439 passed
+- [x] Security/failure-mode tests (off-TTY refusal; dry-run no-write; erase distinctness) — discard stats checks (`items_discarded`, `items_total`)
 
 ### Required Test Scenarios
 
@@ -224,32 +224,51 @@ Implementation claims must be supported by actual command output, the red-team r
 
 ## 9. Acceptance Criteria and Evidence
 
-| AC ID | Acceptance Criterion | Verification Method | Required Evidence |
-|-------|----------------------|---------------------|-------------------|
-| AC-100374-01 | Update/invalidate/correct/discard bound | T100374-01…T100374-04, T100374-06 | Command output |
-| AC-100374-02 | Off-TTY destructive requires `--confirm` | T100374-05 | Command output |
-| AC-100374-03 | `--dry-run` zero-write with blast radius | T100374-07 | Output + store check |
-| AC-100374-04 | Discard distinct from erase | T100374-06 + inspection | Docs + behavior |
-| AC-100374-05 | No regression; coverage green | T100374-08 | `make check`, `make coverage` |
-| AC-100374-06 | Red-team review completed | Inspection | Review notes |
+| AC ID | Acceptance Criterion | Verification Method | Required Evidence | Result |
+|-------|----------------------|---------------------|-------------------|--------|
+| AC-100374-01 | Update/invalidate/correct/discard bound | T100374-01…T100374-04, T100374-06 | Command output | PASS — `cli_write_mutate_tests.rs`; binary transcripts in run log |
+| AC-100374-02 | Off-TTY destructive requires `--confirm` | T100374-05 | Command output | PASS — `discard itm-x --reason noise` → exit 2, `hint: pass --confirm (or --yes)…` |
+| AC-100374-03 | `--dry-run` zero-write with blast radius | T100374-07 | Output + store check | PASS — preview `{target,scope,irreversible,would}`; `stats` unchanged |
+| AC-100374-04 | Discard distinct from erase | T100374-06 + inspection | Docs + behavior | PASS — sets `discarded_at`/`discard_reason`; `items_total:1, items_discarded:1`; `erase_request` not bound |
+| AC-100374-05 | No regression; coverage green | T100374-08 | `make check`, `make coverage` | PASS — 439 bin tests; full gate run below |
+| AC-100374-06 | Red-team review completed | Inspection | Review notes | PASS — manual review in run log (skill unavailable, see Known Limitations) |
 
 ### Definition of Done
-- [ ] All in-scope behavior implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass (red-team review done).
-- [ ] Documentation updated.
-- [ ] Evidence collected and verification completed.
+- [x] All in-scope behavior implemented. — `update`/`invalidate`/`discard`/`correct` + shared gate + dry-run previews
+- [x] All acceptance criteria pass. — see AC table above
+- [x] Required tests pass. — `cargo test -p clio --bin clio` 439 passed; `make check` clean
+- [x] No unauthorized changes introduced. — only `crates/clio-lib` CLI files touched; no new dependency
+- [x] Existing behavior remains intact. — full workspace suite + regression coverage green
+- [x] Security checks pass (red-team review done). — manual gate review in run log (AC-100374-06)
+- [x] Documentation updated. — `clio help`/`--help` catalog and per-verb usage lines updated
+- [x] Evidence collected and verification completed. — transcripts, tests, `make check`, `make coverage`
+- [x] Required approval is obtained (downstream pipeline step). — Remedy Approver r1 verdict APPROVE (F-01 resolved; size, roadmap-isolation, and coverage constraints hold)
 
 ### Completion Evidence
-- Implementation summary
-- Mutation-module diffs
-- Confirm-gate and dry-run transcripts
-- Red-team review notes
-- Coverage report
-- Known limitations
+- Implementation summary: `cli_write_mutate.rs` binds the four mutation verbs to their MCP tools;
+  `cli_confirm.rs` is the shared destructive-confirmation gate. `update` maps ID/VALUE/`--rule` to
+  `target`/`new_value`/`update_rule` (the tool keeps the EMA/invalidation split); `invalidate` maps
+  `--replacement` to `replacement_id`; `discard` requires `--confirm`/`--yes` and previews the
+  blast radius under `--dry-run`; `correct` runs the confirmed path (non-destructive; history
+  preserved) and previews under `--dry-run`. All four mirror the published `inputSchema`.
+- Mutation-module diffs: `crates/clio-lib/src/cli_write_mutate.rs` (new), `cli_confirm.rs` (new),
+  plus registration in `cli_write.rs` and `main.rs`.
+- Confirm-gate and dry-run transcripts (binary, temp sqlite):
+  - `clio discard itm-x --reason noise` → exit 2,
+    `{"ok":false,"code":"usage","message":"`discard` is destructive and was refused without confirmation","hint":"pass --confirm (or --yes) to run `clio discard ...`; use --dry-run to preview first"}`
+  - `clio discard itm-x --reason noise --dry-run` → exit 0,
+    `{"dry_run":true,"irreversible":false,"operation":"discard","scope":"default","target":"itm-x","would":"set discarded_at/discard_reason (logged operations removal)"}`
+  - `clio discard <id> --confirm` → exit 0; `stats` → `items_total:1, items_active:0, items_discarded:1`
+  - `clio update a 1 --rule fact` → exit 2, `--rule must be discrete|continuous, got 'fact'`
+- Red-team review notes: in the run log; findings were the gate fail-closed behavior, the
+  `--dry-run` structural no-write path, the `discard` vs `erase_request` separation, secret
+  handling, and the intentional `correct` default. The `security-bug-finder` skill is not
+  installed in this session, so the review was manual and test-backed (see Known Limitations).
+- Coverage report: `make coverage` → `coverage-guard: 303 file(s) checked`, TOTAL lines 97.95%,
+  functions 98.92%, all files meet the per-file floor. Touched files: `cli_confirm.rs`
+  100%/100%, `cli_write_mutate.rs` 97.81%/100%, `cli_help.rs` 100%/100%, `cli_write.rs`
+  95.74%/100%, `main.rs` 96.84%/100%.
+- Known limitations: see §12.
 
 ---
 
@@ -301,17 +320,29 @@ After this phase is accepted:
 - A reusable confirm-gate helper exists for later destructive commands.
 
 ### Known Limitations
-- Interactive prompts are not added; confirmation is flag-based.
-- `discard` remains reversible-ish by design and is not compliance erasure.
+- Interactive prompts are not added; confirmation is flag-based. Off-TTY (and on-TTY) a
+  destructive command without `--confirm`/`--yes` fails closed with exit 2 rather than prompting.
+  No debt owner: this is the intended contract.
+- `discard --dry-run` is a CLI-side preview: it prints the target, bank scope, and irreversibility
+  note but does not resolve the target identity from the store (unlike the MCP `discard` dry-run,
+  which returns a `would_discard` identity). It writes nothing. If identity-resolving previews are
+  wanted, Phase 100376 can switch it to the tool's dry-run path.
+- `correct` runs the confirmed path by default (the CLI call is the operator action) because the
+  phase classifies it as a non-erasure mutation; an interactive/flag-based gate for `correct` was
+  not required. `--dry-run` still previews with zero writes.
+- The `security-bug-finder` skill is not installed in this environment; AC-100374-06 is satisfied
+  by a manual, test-backed review of the confirm gate (see run log) rather than a skill run.
+- `clio shared discard` keeps its pre-existing MCP `--confirm` preview behavior; this phase's
+  shared gate is applied to `clio discard` and is available for future destructive commands.
 
 ### Downstream Prerequisites
 - Phase 100376 reuses the confirm gate for `hygiene_clean` and `erase_request`.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
+- Implementer: OpenCode CLI (Go . Deepseek V4.1 Flash High), Developer r1
 - Verifier: [TBD]
 - Human Approver: not required (unless the confirm contract changes)
-- Date: [TBD]
+- Date: 2026-09-23

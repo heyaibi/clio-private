@@ -1,0 +1,114 @@
+{
+  "run": "r1",
+  "phase": "100374",
+  "subject": "Phase 100374: Full CLI Confirmed Memory Mutation Surface",
+  "verdict": "Good",
+  "verdict_justification": "Phase 100374 implements the confirmed memory mutations (`update`, `invalidate`, `discard`, `correct`) over the CLI along with a hardened, TTY-independent confirmation gate and zero-write `--dry-run` blast-radius previews. All exit codes (0/1/2) strictly follow the contract, files stay below the 450-line limit, and tests achieve >95% per-file coverage and 97.95% aggregate coverage with all 303 workspace files meeting the 90% floor. One minor defect was found: test comments in `main_write_tests.rs` explicitly reference the phase number, violating the roadmap isolation rule.",
+  "metadata": {
+    "generated": "2026-09-23",
+    "applies_to": "staged diff (phase 100374 r1)",
+    "source": "crates/clio-lib/src/{cli_confirm,cli_confirm_tests,cli_write_mutate,cli_write_mutate_tests,cli_help,cli_write,main,main_write_tests}.rs"
+  },
+  "standard": [
+    "Phase 100374 specification and Acceptance Criteria (AC-100374-01 through 06)",
+    "AGENTS.md hard constraints: file size <= 450 lines, per-file coverage >= 90% lines and functions",
+    "AGENTS.md and task rules: roadmap isolation (never reference roadmap files or phase numbers in code/comments)",
+    "gaps/full-cli.md §5, §7 step 3, §8: exit-code contract (0 ok, 1 operational, 2 usage/refusal) and non-interactive confirm gates",
+    "requirement.md §4.9.2 item 2 (identical tool semantics across bindings), FR-21 (discrete vs continuous update rules), FR-30 (exit codes)"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100374-01: Update/invalidate/correct/discard bound",
+      "status": "Fully satisfied",
+      "evidence": "All four verbs bound to in-process MCP tools; verified via cli_write_mutate_tests.rs (20 unit tests) and live execution against SQLite store."
+    },
+    {
+      "requirement": "AC-100374-02: Off-TTY destructive requires --confirm",
+      "status": "Fully satisfied",
+      "evidence": "`clio discard ID --reason R` off-TTY exits 2 with hint naming `--confirm (or --yes)`; verified in unit test `discard_off_tty_without_confirm_refuses_and_writes_nothing` and end-to-end test `discard_without_confirm_exits_two_end_to_end`."
+    },
+    {
+      "requirement": "AC-100374-03: --dry-run zero-write with blast radius",
+      "status": "Fully satisfied",
+      "evidence": "`--dry-run` emits WriteCall::Preview describing target, bank scope, and irreversibility note with zero writes; verified by `stats` item count assertions before/after."
+    },
+    {
+      "requirement": "AC-100374-04: Discard distinct from erase",
+      "status": "Fully satisfied",
+      "evidence": "`clio discard` sets `discarded_at` and `discard_reason` while preserving the item row (`items_total: 1, items_discarded: 1, items_active: 0`), never invoking `erase_request` or destroying DEKs."
+    },
+    {
+      "requirement": "AC-100374-05: No regression; coverage green",
+      "status": "Fully satisfied",
+      "evidence": "442 passed unit tests in clio; workspace `make coverage` passes checking 303 files (TOTAL lines 97.95%, functions 98.92%, 0 files below 90% floor)."
+    },
+    {
+      "requirement": "AC-100374-06: Red-team review completed",
+      "status": "Fully satisfied",
+      "evidence": "Manual, test-backed security review documented in developer log and re-verified during adversarial review (security-bug-finder skill unavailable in environment; documented in §12 Known Limitations)."
+    },
+    {
+      "requirement": "AGENTS.md: <= 450 lines per Rust source file",
+      "status": "Fully satisfied",
+      "evidence": "All 8 touched Rust source files stay <= 450 lines (cli_confirm.rs: 60, cli_confirm_tests.rs: 62, cli_help.rs: 446, cli_write.rs: 217, cli_write_mutate.rs: 320, cli_write_mutate_tests.rs: 395, main.rs: 312, main_write_tests.rs: 239)."
+    },
+    {
+      "requirement": "AGENTS.md: Roadmap isolation in code and comments",
+      "status": "Finding filed (F-01)",
+      "evidence": "crates/clio-lib/src/main_write_tests.rs:185,204 contain phase number references `T100374-05` and `T100374-07`."
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "Code comments in test file main_write_tests.rs reference the phase number, violating roadmap isolation",
+      "evidence": "crates/clio-lib/src/main_write_tests.rs:185 (\"// T100374-05 at the binary edge: a non-interactive `discard` with no\") and crates/clio-lib/src/main_write_tests.rs:204 (\"// T100374-07: `--dry-run` is a zero-write preview and never needs\")",
+      "requirement_ref": "AGENTS.md § Private / Public Boundary / Roadmap isolation; developer task § Hard rules (\"never reference private/clio-private/roadmap/, phase numbers, or roadmap files from code or comments\")",
+      "recommendation": "Remove or reword the comments in `crates/clio-lib/src/main_write_tests.rs` to describe the test intent without naming the phase number 100374."
+    }
+  ],
+  "dismissed": [
+    "Absence of --explain flag on `clio correct`: Dismissed because although the MCP schema for `correct` includes `explain` (due to being grouped under read_defs), `correct` is a mutating command whose CLI signature in gaps/full-cli.md §6 and Phase 100374 §5 Task 1 is specified as `clio correct ID VALUE --reason R`.",
+    "Cross-process LocalDevKms missing DEK on `clio correct` following `clio remember`: Dismissed because this is a documented pre-existing limitation of in-memory LocalDevKms across separate process invocations (identical to `clio recall` following `clio remember`); in-process tests prove correct functionality."
+  ],
+  "verification": [
+    {
+      "claim": "All touched files are <= 450 lines",
+      "classification": "Established",
+      "source_note": "Verified with `wc -l`: cli_help.rs 446, cli_write_mutate_tests.rs 395, main.rs 312, cli_write_mutate.rs 320, main_write_tests.rs 239, cli_write.rs 217, cli_confirm_tests.rs 62, cli_confirm.rs 60."
+    },
+    {
+      "claim": "Full workspace tests and coverage floors pass",
+      "classification": "Established",
+      "source_note": "Verified with `make coverage`: 303 files checked, 97.95% lines, 98.92% functions, 0 files below 90% floor. Touched files: cli_confirm.rs 100/100, cli_help.rs 100/100, cli_write.rs 95.74/100, cli_write_mutate.rs 97.81/100, main.rs 96.84/100."
+    },
+    {
+      "claim": "Exit codes adhere to contract (0 ok, 1 operational, 2 usage)",
+      "classification": "Established",
+      "source_note": "Verified by running binary commands: exit 2 on missing --confirm for discard, exit 2 on unknown rule for update, exit 2 on missing positionals, exit 0 on success and dry-run."
+    },
+    {
+      "claim": "Destructive actions require confirmation off-TTY",
+      "classification": "Established",
+      "source_note": "Verified: `clio discard itm-1 --reason noise` exits 2 naming `--confirm (or --yes)`."
+    },
+    {
+      "claim": "--dry-run performs zero writes and provides blast-radius preview",
+      "classification": "Established",
+      "source_note": "Verified: `clio discard ... --dry-run` exits 0, outputs blast radius JSON/text, and `clio stats` confirms items_discarded remains 0."
+    },
+    {
+      "claim": "Code formatting passes clean",
+      "classification": "Established",
+      "source_note": "Verified: `cargo fmt --all -- --check` exits 0 with zero diffs."
+    }
+  ],
+  "plan_1hr": [
+    "In `crates/clio-lib/src/main_write_tests.rs` (lines 185 and 204), remove or rephrase comments referencing `T100374-05` and `T100374-07` to eliminate phase number leaks."
+  ],
+  "plan_unlimited": [
+    "Consider adding identity resolution to `clio discard --dry-run` to look up item metadata from the store and display category/epistemic_kind in the preview, matching MCP `discard` tool's dry-run (currently documented debt for Phase 100376 in §12).",
+    "Consider refactoring `ops repair` and `ops reindex` confirmation handling to reuse `cli_confirm::require_confirm` for unified CLI confirmation logic across all commands."
+  ]
+}

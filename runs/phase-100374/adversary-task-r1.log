@@ -1,0 +1,24 @@
+[2026-09-23T21:22:00Z] START Adversary r1 review for phase 100374
+[2026-09-23T21:22:05Z] Initialized adversary review session
+[2026-09-23T21:22:08Z] Checked git status: 8 files staged in main repo, 0 unstaged; roadmap doc staged in private repo
+[2026-09-23T21:22:15Z] Read phase document private/clio-private/roadmap/phase-100374-full-cli-confirmed-memory-mutations.md
+[2026-09-23T21:22:21Z] Checked line counts of touched Rust files: all 8 files <= 450 lines (max cli_help.rs: 446 lines)
+[2026-09-23T21:24:20Z] Verified module headers in new files: truthful responsibility and ownership documentation
+[2026-09-23T21:25:27Z] Checked roadmap isolation: found phase number references in crates/clio-lib/src/main_write_tests.rs:185,204
+[2026-09-23T21:25:30Z] Logged finding F-01: crates/clio-lib/src/main_write_tests.rs:185,204 comments contain phase number T100374-05 and T100374-07
+[2026-09-23T21:25:52Z] Command `cargo fmt --all -- --check`: clean exit 0
+[2026-09-23T21:26:12Z] Command `cargo clippy -p clio --all-targets --locked`: clean exit 0, no warnings
+[2026-09-23T21:30:36Z] Command `cargo test -p clio --locked`: 442 unit tests passed, 0 failed
+[2026-09-23T21:31:24Z] Command `make coverage`: exit 0; 303 files checked, 97.95% lines / 98.92% functions, 0 files below 90% floor
+[2026-09-23T21:31:29Z] Verified per-file coverage on touched files: cli_confirm 100/100, cli_help 100/100, cli_write 95.74/100, cli_write_mutate 97.81/100, main 96.84/100
+[2026-09-23T21:33:38Z] Verified discard scenarios: off-TTY exit 2 naming --confirm, dry-run exit 0 zero writes, confirm exit 0 items_discarded=1
+[2026-09-23T21:33:59Z] Verified update and invalidate scenarios: update continuous EMA applied, update discrete invalidates, invalidate replacement chained
+[2026-09-23T21:34:10Z] Verified correct scenarios: dry-run exit 0 zero writes, confirmed correct preserves history in-process
+[2026-09-23T21:35:11Z] Verified text-mode outputs across all 4 mutation verbs and dry-run previews
+[2026-09-23T21:35:18Z] Verified continuous update on triple rejects with exit 1 wrong_update_rule
+[2026-09-23T21:35:50Z] Verified positional and flag error handling: unexpected extra arguments and missing arguments exit 2
+[2026-09-23T21:35:55Z] Verified unknown flags fail closed with exit 2
+[2026-09-23T21:38:36Z] Updated Attribution table in phase doc: Adversary r1 set to Antigravity CLI (Gemini 3.8 Flash) done
+[2026-09-23T21:39:21Z] Wrote findings.json and validated JSON syntax
+[2026-09-23T21:39:35Z] FINISH Adversary r1 review for phase 100374
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/findings.json b489379f

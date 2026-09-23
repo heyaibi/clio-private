@@ -1,0 +1,97 @@
+# Phase 100374 — Developer r1 run log
+
+## Start
+- Read task file, AGENTS.md, coverage.md, crates.md, phase file, gaps/full-cli.md §5-§9.
+- Online research (once): CLI exit-code/confirmation conventions (0/1/2, dry-run preview,
+  confirm flag, TTY detection). Converges with gaps/full-cli.md §5; nothing contradicts the
+  phase's confirm contract. Handed to workers (none spawned; work is intertwined in clio-lib).
+
+## Baseline coverage (pre-change)
+- Command: `cargo llvm-cov --workspace --locked --no-clean --json --output-path /tmp/cov-baseline.json`
+  with DATABASE_URL=postgres://clio:clio@127.0.0.1:34310/clio
+- Result: report saved, exit 0.
+- `python3 scripts/coverage_guard.py /tmp/cov-baseline.json`
+  -> 301 files checked; TOTAL lines 97.95% functions 98.91%; all files meet the per-file floor.
+- No file below 90%: baseline is green. Proceeding.
+
+## Research notes (handed to implementation)
+- CLI conventions (0 ok / 1 operational / 2 usage; `--dry-run` preview; destructive confirm
+  flag; TTY detection) match gaps/full-cli.md §5 and the existing `ops repair --confirm`
+  precedent. No dependency needed (phase-100320 forbids arg-parsing crates); reused the
+  hand-rolled `cli_args` parser.
+- MCP tool schemas: `update{target,new_value,update_rule}`, `invalidate{item_id,replacement_id}`,
+  `discard{item_id,reason,confirm}`, `correct{item_id,new_value,reason,confirm}`.
+  `discard`/`correct` default to a zero-write preview when `confirm` is absent; the CLI passes
+  `confirm: true` for `discard` only after its gate and for `correct` (non-destructive).
+
+## Work (no workers spawned — intertwined in one crate/repo, done by orchestrator)
+- Added `crates/clio-lib/src/cli_confirm.rs`: shared destructive-confirmation gate
+  (`require_confirm` + `confirmed`), TTY-independent, accepts `--confirm`/`--yes`, allows
+  `--dry-run`, else exit-2 usage error naming `--confirm`.
+- Added `crates/clio-lib/src/cli_write_mutate.rs`: `MutationWriteGroup` binding
+  `update|invalidate|discard|correct` to their MCP tools, with `--dry-run` no-write previews
+  and the discard blast-radius preview (target, scope, irreversibility note).
+- Registered the group in `cli_write.rs` (groups 6→7), dispatched the verbs in `main.rs`,
+  extended `cli_help.rs` bindings/usage and the human catalog.
+- Tests: `cli_confirm_tests.rs` (3), `cli_write_mutate_tests.rs` (20), plus e2e binary tests
+  in `main_write_tests.rs` (3) and help assertions.
+
+## Commands and results
+- `cargo fmt --all` -> clean.
+- `cargo clippy -p clio --all-targets --locked` -> no warnings.
+- `cargo test -p clio --locked --bin clio` -> 439 passed, 0 failed.
+- `cargo llvm-cov --package clio --locked --no-clean --json` (scoped pass 1) ->
+  cli_write_mutate.rs 89.47% lines (below floor); added 3 tests for positional errors and
+  invalidate text view.
+- Scoped pass 2 -> cli_write_mutate.rs 97.81% lines / 100% functions; cli_confirm 100/100,
+  cli_help 100/100, main.rs 96.84/100; no clio-lib file below floor.
+- Binary transcripts (temp sqlite db):
+  - `discard itm-x --reason noise` (no TTY) -> exit 2,
+    `hint: pass --confirm (or --yes) to run 'clio discard ...'; use --dry-run to preview first`.
+  - `discard itm-x --reason noise --dry-run` -> exit 0,
+    `{"dry_run":true,"irreversible":false,"operation":"discard","scope":"default","target":"itm-x",...}`.
+  - `update a 1 --rule fact` -> exit 2, `--rule must be discrete|continuous, got 'fact'`.
+  - `remember` then `discard <id> --confirm` -> exit 0, telemetry `reason_len:5` (reason never
+    logged); `stats` -> `items_total:1, items_active:0, items_discarded:1` (row kept: not erase).
+  - `remember` then `update <id> ignored --rule discrete` -> exit 0,
+    `{"rule":"discrete","closed_ids":["<id>"],"already_ended":false}`.
+  - `invalidate <id> --dry-run` -> exit 0, preview names target/scope/would.
+  - `correct <id> ... --reason` cross-process -> exit 1 `no DEK ...` (pre-existing LocalDevKms
+    cross-process limitation, same as `recall` after `remember`); in-process tests prove the
+    correction path writes an attributable correction.
+- `clio help` lists all four verbs with bound tools.
+
+## Final verification
+- `make check` -> exit 0 (fmt + clippy --all-features + workspace tests).
+- `make coverage` -> exit 0; `coverage-guard: 303 file(s) checked`; TOTAL lines 97.95%,
+  functions 98.92%; all files meet the per-file floor.
+  Touched files: cli_confirm.rs 100/100, cli_write_mutate.rs 97.81/100, cli_help.rs 100/100,
+  cli_write.rs 95.74/100, main.rs 96.84/100.
+- Line counts: cli_help.rs 446, cli_write_mutate.rs 320, main.rs 312, cli_write.rs 217,
+  cli_confirm.rs 60 — all ≤450.
+- No forbidden references (private paths / phase numbers / roadmap) in code or comments.
+
+## Phase file updated
+- Attribution Developer r1 = done.
+- §8 required-test checkboxes, §9 AC results, Definition of Done, Completion Evidence,
+  §12 Known Limitations, Final Status (PASS WITH DOCUMENTED LIMITATIONS), sign-off filled.
+
+## Red-team review of the confirm gate (security-bug-finder skill unavailable in this
+## session; performed manually and verified with tests)
+- Silent proceed off-TTY: impossible; `require_confirm` fails closed (exit 2) unless
+  `--confirm`/`--yes` or `--dry-run`. Test: `discard_off_tty_without_confirm_refuses_and_writes_nothing`.
+- Dry-run writes: `--dry-run` returns `WriteCall::Preview` and never calls the dispatcher;
+  verified by `stats` before/after. Test: `discard_dry_run_prints_blast_radius_and_writes_nothing`.
+- discard aliased to erase: `discard` binds only the `discard` tool; `erase_request` is not
+  reachable from this verb, and the row survives (`items_total:1`). Tests + transcript.
+- Secret leakage: errors flow through the shared redactor; the discard telemetry logs
+  `reason_len` only, never the reason text.
+- Unknown flags: the existing parser fails closed with a suggestion.
+- `correct` writes by default: intentional and in-scope (phase classifies update/invalidate/
+  correct as non-erasure mutations; the CLI call is the operator action). History is preserved.
+
+## Staging
+- Main repo staged with `git add -- . ':!private/clio-private/runs/'`.
+- Private repo staged with `git add -- roadmap/ runs/` from `private/clio-private`.
+
+DEVELOPER_DONE 99f86043
