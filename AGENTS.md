@@ -24,6 +24,15 @@ A test that exercises a helper inside one process is not the same as the reporte
 
 When a fix cannot restore data that was already lost (for example, a key that was never persisted), say that explicitly and immediately. Never present a fix as making the old case work when it only changes future behavior.
 
+## Stay on the Task (mandatory)
+
+Work only on the task you were given. Do not turn it into a bug-hunting session.
+
+- When you find an unrelated bug, **do not fix it**. Immediately create a GitHub issue that records the symptom, the exact file and line, how to reproduce it, the impact, and the proposed fix. Then carry on with the task at hand.
+- Do not expand scope to chase the bug, add tests for it, or refactor around it.
+- If the bug blocks the task, say so and ask before changing scope.
+- Keep the branch scoped to the task. A deferred bug belongs in its issue, not in this change. Revert in-progress edits for a bug you are deferring.
+
 ## Private / Public Boundary
 
 You run from the repo root, but this file lives in `private/clio-private/` — a separate private repo (`heyaibi/clio-private`) accessible to a few people only. The root repo (`heyaibi/clio`) is public. Everything under `private/` stays on this machine and in the private remote. Never let it leak into the public repo.
