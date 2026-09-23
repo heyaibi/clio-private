@@ -33,5 +33,9 @@ bash private/clio-private/harness/phase-driver.sh --dry-run
 bash private/clio-private/harness/phase-driver.sh --self-test
 
 
+cd ~/clio
+
+rm -f private/clio-private/runs/.driver/halted
+
 bash private/clio-private/harness/phase-driver.sh && tmux attach -t development
 ```
