@@ -1,8 +1,12 @@
-# Agent Memoir — 35 build slices + 9 remediation + 11 follow-up phases (55 total)
+# Agent Memoir — 35 build slices + 1 remediation insert + 9 remediation + 15 follow-up/conditional phases (60 total)
 
 Each numbered slice is one staffing unit of roughly **equal engineering effort** (~1×). Relative weights are marked on each heading (`1×` or `1.5×`); the max/min ratio is kept ≤ 1.5. Order is primary build dependency, not priority; independent slices (for example 100310 and 100320, and the extraction adapter 100340) share no dependency with their neighbours and are placed for narrative grouping. No links outside this folder.
 
 The **remediation phases 100360–100520** added 2026-09-22 use a different sizing basis: bottom-up ideal days for one senior Rust dev (0.5–9 days), not the ~1× slice unit, because they are gap-closure work of very uneven size rather than equal staffing units. The ≤1.5 ratio rule applies to the original slices only and does not bind the remediation table.
+
+The **conditional document phases 900611–900625** added 2026-09-24 also use bottom-up ideal days (3–4 days each, plus 2–4 days if document multi-host sync is claimed). They are planning artifacts only and remain blocked on the requirement §9 approval gate. Their estimates are provisional until the migration rehearsal and owner decision exist, and they are not staffing units or implementation approval.
+
+Phase numbers **900000 and above are parked**: `next_phase.py` excludes them from selection, audit, and verbose output, and `runner.py` rejects them instead of launching a run. This keeps the renamed document phases visible in the roadmap without letting the pipeline pick them up.
 
 ## Effort model
 
@@ -10,7 +14,7 @@ Target unit is about **one focused engineer-week** of implementation (design + c
 
 ## Plan status
 
-Status values: **Plan ready** (spec only) · **Complete — PASS WITH DOCUMENTED LIMITATIONS** (implementation accepted; see phase exit contract).
+Status values: **Plan ready** (spec only) · **Conditional — approval required** (planning only; implementation gates remain unsatisfied) · **Complete — PASS WITH DOCUMENTED LIMITATIONS** (implementation accepted; see phase exit contract).
 
 | Slice | Effort | Implementation plan | Status |
 |------:|--------|---------------------|--------|
@@ -226,14 +230,35 @@ Critical path: 100360 → 100380 → 100400 → 100440 → 100460 → 100480. To
 
 ## Native context and evidence-identity phases 100601–100606
 
-Added 2026-09-24 to support provider-neutral source context and migration readiness without a Hindsight adapter. Requirement v1.10 now defines the native `context` and generalized `evidence_ref` contract. Phase 100601 implements that contract in the core memory path; Phase 100606 propagates it through extraction, retrieval, portability, audit, sync, and erasure. These phases intentionally do not implement provider APIs, remote migration, or document-container behavior; external document identifiers may be carried opaquely with no parity claim, and `doc_id` container design is deferred to a later phase (see requirement §9).
+Added 2026-09-24 to support provider-neutral source context and migration readiness without a Hindsight adapter. Requirement v1.10 now defines the native `context` and generalized `evidence_ref` contract. Phase 100601 implements that contract in the core memory path; Phase 100606 propagates it through extraction, retrieval, portability, audit, sync, and erasure. These phases intentionally do not implement provider APIs, remote migration, or document-container behavior; external document identifiers may be carried opaquely with no parity claim, and `doc_id` container design remains a separate conditional track under requirement §9.
 
 | Phase | Scope | Effort | Implementation plan | Dependencies |
 |------:|-------|--------|---------------------|--------------|
 | 100601 | Native source context and evidence identity in the core memory contract | ~5–7 days | [phase-100601-native-source-context.md](phase-100601-native-source-context.md) | Core item/store, encryption, schema, and binding contracts |
 | 100606 | Context lifecycle, retrieval, portability, audit, sync, and erasure | ~4–6 days | [phase-100606-context-lifecycle-portability.md](phase-100606-context-lifecycle-portability.md) | Phase 100601; existing extraction/retrieval/portability/audit/sync/erase contracts |
 
-Dependency order: 100601 → 100606. No phase 100611 is planned at this time because the requested scope explicitly excludes a Hindsight adapter; a later provider-specific phase may be added only under a separate decision.
+Dependency order: 100601 → 100606. The conditional document track below depends on the accepted Phase 100601 identity boundary but does not turn `evidence_ref` into a document key.
+
+---
+
+## Conditional native document phases 900611–900625
+
+Added 2026-09-24 from `local_docs/research/hindsight-doc-id.md` as a **conditional planning track**, not approved implementation scope. No phase may start until requirement §9 is satisfied by migration-rehearsal evidence or an explicit owner amendment. The track selects Clio-native preservation: document replacement creates a new source revision and retires stale active projections without deleting prior revision or derived-record history. Provider-faithful destructive replacement remains excluded.
+
+Requirement §9 uses the phrase “bulk operations” without defining its scope. The Hindsight evidence establishes one-document cascade deletion, which Hindsight itself calls “delete in bulk,” and does not establish a multi-document delete request. Before this track can start, the owner must record the interpretation: one-document cascade deletion either satisfies §9 “bulk operations,” or a separate multi-document contract and phase are required. The current plans implement one-document lifecycle only and do not expose a multi-document API.
+
+| Phase | Scope | Effort | Implementation plan | Status / gate |
+|------:|-------|--------|---------------------|---------------|
+| 900611 | Native document contract, encrypted source/revision/chunk persistence, lineage, and dual-backend repository semantics | ~3–4 days | [phase-900611-native-document-contract-persistence.md](phase-900611-native-document-contract-persistence.md) | Conditional — §9 approval and contract decisions |
+| 900615 | Native document write/replace/append/reprocess lifecycle plus revision/chunk provenance and recall projection | ~3–4 days | [phase-900615-document-write-retrieval-lifecycle.md](phase-900615-document-write-retrieval-lifecycle.md) | Conditional — Phase 900611 and source-admission policy |
+| 900620 | Provisional MCP/CLI document management, source/chunk reads, conflict handling, and confirmed repository deletion | ~3–4 days | [phase-900620-provisional-document-management-tools.md](phase-900620-provisional-document-management-tools.md) | Conditional — normative tool names and CLI ownership approval |
+| 900625 | Document audit, export/import, repository-aware compliance erasure, and multi-host sync where claimed | ~3–4 days single-host; +2–4 days multi-host | [phase-900625-document-portability-erasure-conditional-sync.md](phase-900625-document-portability-erasure-conditional-sync.md) | Conditional — Phases 900611/900615 and integration policies |
+
+Dependency order: approval + Phase 100601 → 900611 → Phase 900615. Phase 900620 is strictly blocked on the normative catalog and command-ownership approval; no schema, parser, or binding work starts before that gate. Phase 900625 follows Phase 900615 and coordinates overlap with Phase 100606.
+
+All four document phases (900611, 900615, 900620, 900625) are parked at or above 900000, so the pipeline ignores the whole family. Phase 900615 still depends on 900611; un-park them together or supply the 900611 contract separately before any of them runs.
+
+The aggressive lower bound is **12 person-days**. The recommended planning range is **15–24 person-days** for single-host document scope, plus **2–4 days** when document multi-host sync is claimed. The range allows for schema surprises, integration work, roadmap review, and adversary/remediation cycles. The estimate excludes migration rehearsal, approval/review latency, unrelated baseline repair, provider-faithful destructive replacement (provisional 3–4 days), a Hindsight provider adapter (provisional 8–12 days), upload/ETL and attachment handling, and configurable source-retention-disabled behavior. Any later Hindsight adapter must ship provider fixture or contract tests before claiming parity.
 
 ---
 

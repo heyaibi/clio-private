@@ -22,6 +22,8 @@ Conventions (load-bearing, do not change silently):
   - Repo root is the process working directory. run_dir resolves against it.
   - Exit codes: 0 completed, 1 terminal non-complete (rejected/blocked),
     2 config_error (machine-readable JSON on stdout in all cases).
+  - Parked phase numbers (>= 900000) are roadmap-only; runner rejects them
+    and next_phase.py never selects them.
   - No runner timeouts, but agy enforces its own --print-timeout
     (default 5m) inside the harness; long reviews near that ceiling need
     an explicit harness-side decision, not a runner change.
@@ -60,6 +62,7 @@ import yaml
 # importable even when runner.py is imported rather than run as a script.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gitsync  # noqa: E402 - path set just above
+from phase_policy import PARKED_PHASE_FLOOR, is_runnable_phase  # noqa: E402
 
 TOKEN_RE = re.compile(r"\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}")
 HARNESS_RE = re.compile(r"[a-z0-9_-]+:[^\s:]+")
@@ -1849,6 +1852,8 @@ def self_test(run, live=False):
     import tempfile
     # Signal convention: last_line strips one leading ISO-8601 timestamp from
     # the final log line, then match_signal matches on the bare signal word.
+    check("phase policy: parked floor", not is_runnable_phase(PARKED_PHASE_FLOOR)
+          and is_runnable_phase(PARKED_PHASE_FLOOR - 1))
     check("signal parse: bare", match_signal(
         last_line("work done\nDEVELOPER_DONE"), ["DEVELOPER_DONE"]) == "DEVELOPER_DONE")
     check("signal parse: timestamped", match_signal(
@@ -2662,6 +2667,10 @@ def main():
             phase = int(inputs["phase_number"])
         except (ValueError, TypeError):
             raise Fail(f"input phase_number={inputs['phase_number']!r} is not an integer")
+        if not is_runnable_phase(phase):
+            raise Fail(
+                f"input phase_number={phase} is parked at or above "
+                f"{PARKED_PHASE_FLOOR}; the pipeline ignores parked phases")
         try:
             run._run_dir = (repo / pipe["run_dir"].format(phase=phase)).resolve()
         except (KeyError, ValueError, IndexError) as e:

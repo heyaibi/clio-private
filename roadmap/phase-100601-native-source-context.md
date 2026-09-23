@@ -541,7 +541,7 @@ After this phase is accepted:
 
 ### Downstream Prerequisites
 - Phase 100606 may rely on the approved context field, evidence-reference mapping, encryption behavior, and backward-compatible item contract.
-- Migration tooling may carry external document identifiers opaquely in `evidence_ref` with no container-parity claim; a dedicated later phase owns `doc_id` research and design.
+- Migration tooling may carry external document identifiers opaquely in `evidence_ref` with no container-parity claim; the approval-gated Phase 900611 family owns any later `doc_id` contract and persistence work.
 
 ### Final Status
 PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED

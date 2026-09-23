@@ -28,6 +28,8 @@ never silently re-run.
 Prints "<number>\t<repo-relative path>" for the lowest incomplete phase and
 exits 0; exits 1 when every phase is complete; exits 2 on a usage/state error.
 Appendix files (phase-*-appendix-*.md) are references, never runnable phases.
+Parked phases (number >= 900000) are roadmap-only and are ignored by selection,
+audit, and verbose output.
 """
 import argparse
 import json
@@ -35,6 +37,9 @@ import re
 import sys
 import tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from phase_policy import is_runnable_phase  # noqa: E402 - path set just above
 
 PHASE_RE = re.compile(r"^phase-(\d{4,6})-(?!appendix-).+\.md$")
 INDEX_ROW_RE = re.compile(r"^\|\s*(\d{4,6})\s*\|")
@@ -152,11 +157,15 @@ def index_complete(repo):
     for line in text.splitlines():
         row = INDEX_ROW_RE.match(line)
         if row and "Complete" in line:
-            done.add(int(row.group(1)))
+            number = int(row.group(1))
+            if is_runnable_phase(number):
+                done.add(number)
             continue
         head = INDEX_HEAD_RE.match(line)
         if head and "**Complete**" in line:
-            done.add(int(head.group(1)))
+            number = int(head.group(1))
+            if is_runnable_phase(number):
+                done.add(number)
     return done
 
 
@@ -186,7 +195,7 @@ def candidates(repo):
         return out
     for path in sorted(base.glob("phase-*.md")):
         match = PHASE_RE.match(path.name)
-        if match:
+        if match and is_runnable_phase(int(match.group(1))):
             out.append((int(match.group(1)), path))
     return sorted(out)
 
@@ -257,6 +266,16 @@ def self_test():
         (repo / "roadmap" / "phase-100020-beta.md").write_text(
             "- [x] Required approval is obtained.\n")
         assert select_next(repo) is None, select_next(repo)
+    with tempfile.TemporaryDirectory() as tmp:
+        # Parked phases stay visible in the roadmap but are never selected.
+        repo = Path(tmp)
+        (repo / "roadmap").mkdir()
+        (repo / "roadmap" / "phase-100010-alpha.md").write_text(
+            "- [x] Required approval is obtained.\n")
+        (repo / "roadmap" / "phase-900999-parked.md").write_text("x\n")
+        (repo / "roadmap" / "index.md").write_text("Plan ready\n")
+        assert select_next(repo) is None, select_next(repo)
+        assert [n for n, _ in candidates(repo)] == [100010], candidates(repo)
     with tempfile.TemporaryDirectory() as tmp:
         # Each machine signal on its own phase: ledger-only and log-only each
         # count; a ledger without finalize outranks a stale DONE log; BLOCKED
