@@ -355,7 +355,7 @@ _drive() {
   [ -z "${DRIVER_RUN_DIR:-}" ] || envs="$envs DRIVER_RUN_DIR='$DRIVER_RUN_DIR'"
   local launch="${envs:+$envs }bash '$REPO/$PRIV/harness/phase-driver.sh' --session '$number' '$rel'"
 
-  tmux new-session -d -s "$SESSION" -c "$REPO" "$launch" \
+  9>&- tmux new-session -d -s "$SESSION" -c "$REPO" "$launch" \
     || { notify "phase $number failed to launch in tmux"; return 1; }
   printf '%s\n' "$number" >"$CURRENT"
   tmux pipe-pane -t "$SESSION" -o "cat >> '$RUN_DIR/session-$number.log'" 2>/dev/null || true
