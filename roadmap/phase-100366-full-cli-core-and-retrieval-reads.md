@@ -4,7 +4,7 @@
 Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
-| Developer | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | blocked |
 | Adversary | r1 | [TBD] | [TBD] |
 | Remediator | r1 | [TBD] | [TBD] |
 | Remedy Approver | r1 | [TBD] | [TBD] |
