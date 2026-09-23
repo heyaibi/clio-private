@@ -1,0 +1,4 @@
+2026-09-23T08:51:49Z finalize-task-r1 start: reading roadmap attribution table and approval checkbox
+2026-09-23T08:52:19Z attribution check: rows for Developer r1 (blocked + done x2), Adversary r1 done, Remediator r1 done, Remedy Approver r1 approved present and well-formed; filled Finalize r1 row (OpenCode CLI (Together . GLM-5.3 Flash High) | done); added Definition of Done checkbox "- [x] Required approval is obtained (downstream pipeline step)." (line was absent from this phase file, added per convention of phases 100360/100362/100364)
+2026-09-23T08:54:18Z make check first attempt EXIT=2: doctest stage failed because rustdoc was not found (shell PATH lacks ~/.cargo/bin; /usr/local/bin symlinks only cargo and rustc). Environment issue, not a code failure.
+2026-09-23T08:54:18Z make check rerun with PATH=$HOME/.cargo/bin:$PATH: EXIT=0 (fmt, clippy, workspace tests, doctests all green)

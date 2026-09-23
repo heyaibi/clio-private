@@ -1,0 +1,19 @@
+2026-09-23T06:24:54Z developer r3 start: resumed attempt; tree clean, no baseline JSON, no prior log; starting from scratch
+2026-09-23T06:26:12Z discovery: gaps/full-cli.md referenced by phase file does not exist in private repo; phase-file spec (§5,§8) is self-contained, proceeding
+2026-09-23T06:26:12Z discovery: McpHandler::new+handle_message in-process seam confirmed (clio-mcp protocol.rs:53,72); McpState::open/open_with_effective runtime.rs:227,240; McpOpenOptions::default = sqlite::memory
+2026-09-23T06:26:12Z discovery: read tool arg shapes confirmed: get/get_snapshot/get_gist(item_id), inspect(filter{category,epistemic_kind,validity,time_start,time_end,include_discarded},limit,offset), stats(bank,actor), retrieve(query,domains,limit,as_of,time_axis,recall_scope,prefer_consolidated,expand_graph)
+2026-09-23T06:26:12Z discovery: parse_flags (main.rs:94) drops positionals; new hand-rolled parser needed; existing verbs keep parse_flags, decision recorded
+2026-09-23T06:26:12Z discovery: masking reuse sites: clio_ops::redact_credentials(finding.rs:177), clio_config::secret::{mask_secret,masked_clone}
+2026-09-23T06:26:12Z environment: cargo-llvm-cov and llvm-tools-preview were missing on this host; /tmp is noexec; installing cargo-llvm-cov with target dir under workspace target/ (in progress)
+2026-09-23T06:27:05Z cargo-llvm-cov 0.9.1 installed to ~/.cargo/bin (via rustup shim; llvm-tools-preview added; /tmp noexec workaround: target dir under workspace)
+2026-09-23T06:27:05Z baseline gate started: cargo llvm-cov --workspace --locked --no-clean --json --output-path /tmp/cov-baseline.json (DATABASE_URL=postgres://clio:clio@127.0.0.1:34310/clio, hermetic CLIO_DEPLOYMENT_CONFIG)
+2026-09-23T06:27:05Z plan: developer owns shared scaffold (cli_parse.rs, cli_out.rs, cli_help.rs + *_tests.rs, main.rs dispatch/help integration); one implement-worker spawned after scaffold for cli_read.rs + cli_read_tests.rs (recall/get/show/inspect/stats over McpHandler::handle_message)
+2026-09-23T06:28:35Z baseline gate attempt 1 FAILED: stale compose project 'agentmemoir' (POSTGRES_USER=agentmemoir) held port 34310 without role clio; t31_04_database_url_infers_postgres_backend failed
+2026-09-23T06:28:35Z recovery: stopped the 4 stale agentmemoir containers, ran make compose up linux (project clio, user/db clio); ops diagnose now ok=true schema_version=10
+2026-09-23T06:28:35Z baseline gate attempt 2 started (same env)
+2026-09-23T06:29:46Z baseline gate attempt 2 SUCCEEDED: /tmp/cov-baseline.json written (TOTAL lines 97.87% functions 98.87%)
+2026-09-23T06:29:46Z coverage_guard on baseline: 1 file(s) below 90.0% floor of 280 checked: crates/clio-mcp/src/http.rs lines 89.86% (286 lines, 29 uncovered) functions 96.15%
+2026-09-23T06:29:46Z flakiness check: scoped cargo llvm-cov --package clio-mcp --locked --no-clean --summary-only reproduces http.rs lines 89.86% functions 96.15% -> genuine pre-existing debt, not environment
+2026-09-23T06:29:46Z BLOCKER: pre-change baseline violates the per-file 90% floor; hard rule: stop and signal DEVELOPER_BLOCKED, do not fix old debt unprompted. Options recorded: (1, recommended) remediate http.rs coverage first then rerun baseline; (2) proceed and document inherited debt (violates the stop rule)
+2026-09-23T06:29:46Z no code was modified; working tree left clean; nothing staged
+DEVELOPER_BLOCKED: baseline per-file floor violated before any edits: crates/clio-mcp/src/http.rs lines 89.86% (<90%)

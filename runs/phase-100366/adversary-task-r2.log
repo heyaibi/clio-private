@@ -1,0 +1,10 @@
+2026-09-23T08:30:00Z adversary r2 start: resumed attempt following runner/harness crash in r1
+2026-09-23T08:30:05Z inspected state: 13 files staged in main repo; phase file attribution row already present in private repo
+2026-09-23T08:30:10Z verified findings.json: present (6948 bytes), schema valid with 5 hostile findings (F-01..F-05)
+2026-09-23T08:30:15Z finding F-01 (high): crates/clio-lib/src/cli_args.rs:118-121 and crates/clio-lib/src/cli_read.rs:103-124: subcommand --help/-h is unhandled by read commands, executing stats/inspect against DB or failing with missing argument on recall/get
+2026-09-23T08:30:20Z finding F-02 (medium): crates/clio-lib/src/main.rs:94-98 and crates/clio-lib/src/cli_output.rs:114-119: unknown command error reporting ignores explicit --output json on TTY and --output text when piped
+2026-09-23T08:30:25Z finding F-03 (medium): crates/clio-lib/src/cli_args.rs:187-195: split_leading_globals swallows subsequent flag token as value when leading flag lacks argument, misidentifying command verb
+2026-09-23T08:30:30Z finding F-04 (low): crates/clio-lib/src/cli_read.rs:401-407: parse_failure ignores explicit --output text when piped and --output json on TTY
+2026-09-23T08:30:35Z finding F-05 (low): crates/clio-lib/src/cli_read.rs:235: grammar error `a ID` in missing positional error message
+2026-09-23T08:30:40Z finish: adversarial audit artifacts confirmed; writing final signal
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100366/findings.json 10c0baaa

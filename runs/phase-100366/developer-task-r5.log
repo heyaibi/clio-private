@@ -1,0 +1,12 @@
+2026-09-23T07:31:36Z developer r5 start: resumed attempt; tree clean; r3 baseline JSON was stale (pre-remediation commit 17bde13 fixed clio-mcp http.rs); re-ran full gate
+2026-09-23T07:31:36Z baseline gate: PATH added ~/.cargo/bin (make coverage could not find cargo-llvm-cov); make coverage EXIT=0; guard all 280 files >=90% (TOTAL lines 97.89% funcs 98.87%); copied to /tmp/cov-baseline.json
+2026-09-23T07:31:55Z research (clig.dev, fetched): data on stdout, messaging/errors on stderr; exit 0 ok / non-zero failure; TTY detection for human vs machine output; NO_COLOR (and non-TTY) disables color; did-you-mean suggestions; order-independent flags. Phase takes clispec.dev piped-JSON default (deviation from clig.dev human-first), human error message on TTY; recorded in phase tradeoff.
+2026-09-23T07:31:55Z discovery: gaps/full-cli.md absent; phase file self-contained. In-process seam McpHandler::new+handle_message confirmed. parse_flags drops positionals -> new hand-rolled parser. Reserved verbs include status. Worker spawned (bg) for cli_read.rs + cli_read_tests.rs; parent owns cli_args/cli_error/cli_output/cli_help + main.rs/main_tests.rs.
+2026-09-23T08:00:21Z worker done (bg, session ses_f32d30fceffeGNwgzpTw14iobD): cli_read.rs + cli_read_tests.rs; 245 bin tests pass; scoped cli_read.rs 96.85% lines 97.56% funcs; flagged 3 clippy issues in parent-owned files
+2026-09-23T08:00:21Z integration review: fixed clippy (cfg(test) on CliError accessors, split_leading_globals &[String], NO_COLOR backticks); cli_read.rs was 492 lines after rustfmt -> extracted cli_read_render.rs (108); all files <=450
+2026-09-23T08:00:21Z verify: cargo clippy -p clio --all-targets -D warnings clean; cargo test -p clio 245 passed; scoped llvm-cov clio-lib per-file all >=90%
+2026-09-23T08:00:21Z verify: real binary (target/debug/clio) -- recall piped JSON/--output text; inspect shows truncated; stats; unknown command+flag suggestions exit 2; TTY text vs --output json; NO_COLOR strips ANSI; help --json tool names == schema_pack names and tool==name
+2026-09-23T08:00:21Z note: cross-process get returns store forbidden/no-DEK (LocalDevKms is process-local, pre-existing); get success proven by in-process integration tests
+2026-09-23T08:00:21Z make check EXIT=0 (47 test-result ok lines); phase file AC/DoD/Completion Evidence/Attribution/Final Status updated
+2026-09-23T08:00:21Z final gate: make coverage EXIT=0; 286 files all >=90% floor; TOTAL lines 97.93% funcs 98.90%
+DEVELOPER_DONE 71340b19

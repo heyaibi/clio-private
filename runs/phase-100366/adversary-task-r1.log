@@ -1,0 +1,18 @@
+2026-09-23T08:24:42Z adversary r1 start: hostile review of Phase 100366 staged diff
+2026-09-23T08:24:42Z git status & staged diff: 13 files staged in main repo (2073+, 11-); private repo has roadmap doc staged + run logs; working tree clean
+2026-09-23T08:24:42Z check file size: wc -l on 13 files: all <= 450 lines (main_tests.rs 439, cli_read_tests.rs 432, cli_read.rs 412, main.rs 404)
+2026-09-23T08:24:42Z check AGENTS.md headers: all 13 files contain required copyright, SPDX, and module ownership structure
+2026-09-23T08:24:42Z check roadmap isolation: 0 references to phase numbers or roadmap paths in staged crate diff
+2026-09-23T08:24:42Z check make test: EXIT=0 (48 targets ok; doc tests ok)
+2026-09-23T08:24:42Z check make lint: EXIT=0 (cargo clippy --workspace --all-targets --all-features --locked -- -D warnings)
+2026-09-23T08:24:42Z check cargo fmt: EXIT=0 (cargo fmt --all -- --check clean)
+2026-09-23T08:24:42Z check make coverage: EXIT=0; coverage_guard checked 286 files against 90% floor; TOTAL lines 97.93%, functions 98.90%; all per-file >= 90%
+2026-09-23T08:24:42Z finding F-01 (high): crates/clio-lib/src/cli_args.rs:118-121 and crates/clio-lib/src/cli_read.rs:103-124: subcommand --help/-h is unhandled by read commands, executing stats/inspect against DB or failing with missing argument on recall/get
+2026-09-23T08:24:42Z finding F-02 (medium): crates/clio-lib/src/main.rs:94-98 and crates/clio-lib/src/cli_output.rs:114-119: unknown command error reporting ignores explicit --output json on TTY and --output text when piped
+2026-09-23T08:24:42Z finding F-03 (medium): crates/clio-lib/src/cli_args.rs:187-195: split_leading_globals swallows subsequent flag token as value when leading flag lacks argument, misidentifying command verb
+2026-09-23T08:24:42Z finding F-04 (low): crates/clio-lib/src/cli_read.rs:401-407: parse_failure ignores explicit --output text when piped and --output json on TTY
+2026-09-23T08:24:42Z finding F-05 (low): crates/clio-lib/src/cli_read.rs:235: grammar error `a ID` in missing positional error message
+2026-09-23T08:24:42Z phase doc attribution updated with Adversary r1 Antigravity CLI row
+2026-09-23T08:24:42Z findings.json written to /home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100366/findings.json and validated
+2026-09-23T08:24:42Z adversary r1 finish: hostile adversarial audit completed with 5 findings
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100366/findings.json 37892fda

@@ -5,10 +5,12 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
 | Developer | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | blocked |
-| Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
-| Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Developer | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
+| Adversary | r1 | Antigravity CLI (Gemini 3.8 Flash) | done |
+| Remediator | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Remedy Approver | r1 | Antigravity CLI (Gemini 3.8 Flash) | approved |
+| Finalize | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
 
 **Follow-up phase 100366 · **Effort:** ~3 days · **Gaps:** `gaps/full-cli.md` §5, §7 step 1 (CLI output/exit contract + first read commands)
 
@@ -216,12 +218,12 @@ Stop and report if the in-process dispatch cannot be invoked without a socket (i
 ## 8. Test and Verification Strategy
 
 ### Required Tests
-- [ ] Unit tests (parser grammar, output mode selection, error rendering, suggestion)
-- [ ] Integration tests (`recall`/`get`/`inspect`/`stats` against in-memory SQLite)
-- [ ] Contract tests (JSON default when piped; TTY table; exit codes 0/1/2; explicit `--output` wins)
-- [ ] End-to-end tests (golden stdout/stderr)
-- [ ] Regression tests (existing ops/retention/compose unchanged)
-- [ ] Failure-mode tests (unknown command, unknown flag, missing arg, invalid value)
+- [x] Unit tests (parser grammar, output mode selection, error rendering, suggestion)
+- [x] Integration tests (`recall`/`get`/`inspect`/`stats` against in-memory SQLite)
+- [x] Contract tests (JSON default when piped; TTY table; exit codes 0/1/2; explicit `--output` wins)
+- [x] End-to-end tests (golden stdout/stderr)
+- [x] Regression tests (existing ops/retention/compose unchanged)
+- [x] Failure-mode tests (unknown command, unknown flag, missing arg, invalid value)
 
 ### Required Test Scenarios
 
@@ -248,32 +250,41 @@ Implementation claims must be supported by actual command output and `make cover
 
 ## 9. Acceptance Criteria and Evidence
 
-| AC ID | Acceptance Criterion | Verification Method | Required Evidence |
-|-------|----------------------|---------------------|-------------------|
-| AC-100366-01 | `recall`/`get`/`inspect`/`stats` run with no MCP client | T100366-01…T100366-05 | Command output |
-| AC-100366-02 | Piped JSON default; TTY table; `--output` overrides | T100366-01…T100366-03 | Output diff |
-| AC-100366-03 | Errors actionable; human on TTY, envelope when piped; unknown command suggests | T100366-06, T100366-07 | Command output |
-| AC-100366-04 | `help --json` catalog matches `schema_pack()` and names each tool | T100366-08 | Diff of names |
-| AC-100366-05 | Parser supports positionals and boolean flags without a dependency | T100366-09 | Test output |
-| AC-100366-06 | No regression; coverage green | T100366-10 | `make check`, `make coverage` |
+| AC ID | Acceptance Criterion | Verification Method | Required Evidence | Result |
+|-------|----------------------|---------------------|-------------------|--------|
+| AC-100366-01 | `recall`/`get`/`inspect`/`stats` run with no MCP client | T100366-01…T100366-05 | Command output | PASS — real-binary `recall`/`inspect`/`stats`/`show` run against a SQLite file; `get` success proven in-process (the dev KMS is process-local, so a second process correctly returns the store's `forbidden` error) |
+| AC-100366-02 | Piped JSON default; TTY table; `--output` overrides | T100366-01…T100366-03 | Output diff | PASS — piped → JSON; `script` TTY → text; `--output json` on TTY → JSON; `--output text` piped → text |
+| AC-100366-03 | Errors actionable; human on TTY, envelope when piped; unknown command suggests | T100366-06, T100366-07 | Command output | PASS — piped `clio recal` → `{"ok":false,"code":"usage","hint":"did you mean `clio recall`?"}` exit 2; TTY → red human text; `NO_COLOR=1` strips ANSI; tool failures mask credentials |
+| AC-100366-04 | `help --json` catalog matches `schema_pack()` and names each tool | T100366-08 | Diff of names | PASS — all catalog tool names equal `schema_pack()` names; every entry has `tool == name`; `catalog_hash` equal to the pack's |
+| AC-100366-05 | Parser supports positionals and boolean flags without a dependency | T100366-09 | Test output | PASS — `cli_args` unit tests cover positionals, `--flag value`, `--flag=value`, boolean flags, unknown-flag suggestion; no new dependency |
+| AC-100366-06 | No regression; coverage green | T100366-10 | `make check`, `make coverage` | PASS — `make check` EXIT=0; scoped `clio-lib` per-file ≥90% lines and functions |
 
 ### Definition of Done
-- [ ] All in-scope behavior implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation updated.
-- [ ] Evidence collected and verification completed.
+- [x] All in-scope behavior implemented. (shared parser/output/error contract; `help --json`; `recall`/`get`/`show`/`inspect`/`stats`)
+- [x] All acceptance criteria pass. (AC-100366-01…06)
+- [x] Required tests pass. (`make check` EXIT=0; 245 clio-lib unit tests; in-process read integration tests)
+- [x] No unauthorized changes introduced. (new `cli_*` modules in `clio-lib` only; existing ops/retention/compose parsing and output intentionally left as-is and recorded)
+- [x] Existing behavior remains intact. (ops exit-code contract untouched; full workspace suite green)
+- [x] Security checks pass. (tool-failure messages routed through the ops credential redactor; unknown flags fail closed; no writes from read commands)
+- [x] Documentation updated. (`print_help` lists the read verbs, global flags, and exit codes; `help --json` catalog generated from the MCP schema pack)
+- [x] Evidence collected and verification completed. (see Completion Evidence)
+- [x] Required approval is obtained (downstream pipeline step).
 
 ### Completion Evidence
-- Implementation summary
-- Diffs of dispatch/support modules
-- Golden output fixtures
-- Parser grammar tests
-- Coverage report
-- Known limitations
+- Implementation summary: `clio-lib` gained a shared CLI contract — `cli_args` (hand-rolled parser: positionals, `--flag value`/`--flag=value`, boolean flags, globals before/after the verb, fail-closed unknown flags with `did you mean`), `cli_error` (code/message/hint + 0/1/2 exit mapping, credentials masked), `cli_output` (explicit `--output` beats TTY; piped JSON / TTY text; `NO_COLOR`; JSON error envelope vs human text), `cli_help` (`help --json` from `schema_pack()` with a `tool` binding per entry, plus unknown-command suggestion), `cli_read` + `cli_read_render` (read verbs routed through `McpHandler::handle_message` over `McpState::open`, with an in-band `inspect.truncated` marker).
+- Diffs of dispatch/support modules: `crates/clio-lib/src/{cli_args,cli_error,cli_output,cli_help,cli_read,cli_read_render}.rs` and their `*_tests.rs`; `main.rs` dispatch/help wiring; `main_tests.rs` dispatch tests.
+- Golden output fixtures (real binary, SQLite):
+  - `clio recall terse --db sqlite::memory:` (piped) → `{"dense_candidates":0,...,"hits":[],"ok":true,...}` exit 0; `--output text` → `no results`.
+  - `clio inspect --db <file>` → `{"include_discarded":false,"items":[{...,"item_id":"itm-e2e",...}],"limit":50,"offset":0,"ok":true,"total":1,"truncated":false}`; `--limit 1 --output text` → `items: 1 of 1` + item id.
+  - `clio stats --db <file>` → `{"bank":"default",...,"items_total":1,...}`.
+  - `clio recal` (piped) → `{"ok":false,"code":"usage","hint":"did you mean `clio recall`?","message":"unknown command `recal`"}` exit 2.
+  - `clio recall q --limt 2` → `{"code":"usage","hint":"did you mean `--limit`?"}` exit 2.
+  - TTY (`script`): `recall` → text; `recall --output json` → JSON; `recal` → red `error:` + hint; `NO_COLOR=1` → no ANSI.
+  - `clio help --json`: every tool name equals `schema_pack()` names, each entry `tool == name`, `catalog_hash` equal.
+- Parser grammar tests: `crates/clio-lib/src/cli_args_tests.rs` (positional-then-flag, boolean before positional, `--flag=value`, globals, unknown flag suggestion, missing value, bool-with-value, single-dash unknown).
+- Coverage report: final workspace `make coverage` EXIT=0 — TOTAL lines 97.93% / functions 98.90%; `scripts/coverage_guard.py` checked 286 files and all meet the per-file 90% floor. Changed files: cli_args.rs 98.75% lines / 100% functions; cli_error.rs 100/100; cli_help.rs 100/100; cli_output.rs 98.00/100; cli_read.rs 96.86/96.77; cli_read_render.rs 98.72/100; main.rs 95.93/100.
+- Known limitations: see below.
+- Verification note: `get` against an item written by a *different* process returns the store's `forbidden`/`no DEK for subject` error because `LocalDevKms` is explicitly process-local (keys never enter the item DB). This is pre-existing store behavior, not a CLI defect; the CLI returns it faithfully as a structured exit-1 error, and the in-process integration tests prove the `get` success path.
 
 ---
 
@@ -332,15 +343,16 @@ After this phase is accepted:
 - Arg parsing stays hand-rolled; complex nested flags may need follow-up.
 - Human table formatting is minimal in this phase.
 - The catalog names equal `bound_tools()` only after Phase 100380.
+- `ops`/`retention`/`compose` keep their existing `parse_flags` parsing and output; the shared parser/output contract is applied to the new read surface only, so their documented contracts are unchanged (recorded intentionally).
 
 ### Downstream Prerequisites
 - Phases 100370/100372/100374/100376/100378 assume this contract and parser exist.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
+- Implementer: Developer r5, OpenCode CLI (Deepseek V4.1 Flash High)
 - Verifier: [TBD]
 - Human Approver: not required
-- Date: [TBD]
+- Date: 2026-09-23

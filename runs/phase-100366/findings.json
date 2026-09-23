@@ -1,0 +1,134 @@
+{
+  "run": "r1",
+  "phase": "100366",
+  "subject": "Phase 100366: Full CLI Core Plumbing and Retrieval Read Surface",
+  "verdict": "Adequate",
+  "verdict_justification": "The developer successfully delivered the shared argument parser (cli_args), output layer (cli_output), error contract (cli_error), MCP-derived help catalog (cli_help), and the flagship read commands recall, get/show, inspect, and stats routed in-process via McpHandler without drift. Test suite passes (make test exit 0), clippy is clean (make lint exit 0), and workspace coverage is 97.93% lines / 98.90% functions across 286 files with all changed files >=95%. However, five findings were identified: subcommand --help is completely unhandled by read commands, unknown command error reporting ignores explicit --output flags, split_leading_globals misparses consecutive value flags, parse_failure overrides explicit --output formatting, and a minor grammar error in get argument requirements.",
+  "metadata": {
+    "generated": "2026-09-23",
+    "applies_to": "Phase 100366 staged diff",
+    "source": "crates/clio-lib/src/{cli_args,cli_error,cli_help,cli_output,cli_read,cli_read_render,main}.rs"
+  },
+  "standard": [
+    "Phase 100366 specification (roadmap/phase-100366-full-cli-core-and-retrieval-reads.md)",
+    "requirement.md §4.9.2 (read bindings, tool schema catalog, exit codes)",
+    "AGENTS.md file size cap (<=450 lines) and per-file coverage floors (>=90%)",
+    "Workspace gates: make test, make lint, make coverage"
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Subcommand `--help` / `-h` is unhandled by the read surface, executing commands or erroring on missing positionals",
+      "evidence": "crates/clio-lib/src/cli_args.rs:118-121 parses `-h` and `--help` into `parsed.flags` under `help`, but `crates/clio-lib/src/cli_read.rs:103-124` never inspects `parsed.has(\"help\")`. Executing `target/debug/clio stats --help --db sqlite::memory:` executes `stats` and returns data payload instead of help text; executing `target/debug/clio recall --help` fails with exit 2 `{\"code\":\"usage\",\"hint\":\"usage: clio recall QUERY\",\"message\":\"`recall` requires a QUERY argument\",\"ok\":false}`.",
+      "requirement_ref": "Phase 100366 §1 Expected Outcome, §5 Task 1 & Task 2, AC-100366-01",
+      "recommendation": "In `cli_read::run_parsed` (or `run_verb`), check `if parsed.has(\"help\")`: render the subcommand usage text and exit with `ExitCode::SUCCESS`.",
+      "status": "resolved",
+      "resolution": "Resolved. Added `help_if_requested` in cli_read.rs, called from `run_verb` and `run_with_state` before `McpState::open`, so `clio <verb> --help`/`-h` renders `cli_help::verb_help(verb)` (usage line + bound tool name) to stdout and returns exit 0 without touching the store. Real output: `target/debug/clio recall --help` -> `usage: clio recall QUERY [--bank BANK] [--limit N] [--domains a,b] [--as-of TS] [--time-axis valid|transaction] [--output json|text]` blank line `recall calls the `retrieve` tool.` exit 0; `target/debug/clio stats --help --db sqlite::memory:` -> usage for stats, exit 0; `target/debug/clio get -h` -> usage for get, exit 0. An unknown verb's `--help` still exits 2 as an unknown command. Tests: cli_read_help_tests.rs (all five verbs, both spellings), main_read_tests.rs."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Unknown-command error reporting ignores explicit `--output json` on TTY and `--output text` when piped",
+      "evidence": "crates/clio-lib/src/main.rs:94-98 calls `cli_output::report_error(&error, cli_output::stdout_is_tty(), cli_output::no_color_requested())`, where `cli_output.rs:114-119` determines mode strictly by terminal attachment without inspecting `--output`. Live output: on a terminal, `clio recal --output json` outputs colored human text `error: unknown command `recal`` instead of `{ok:false, code, message, hint}`; when piped, `clio recal --output text 2>&1 | cat` outputs the JSON envelope instead of human text.",
+      "requirement_ref": "Phase 100366 §1, §2 In Scope, §5 Task 1, AC-100366-02, AC-100366-03",
+      "recommendation": "In `main.rs` unknown command handler (or in `cli_output::report_error`), inspect `trailing` or `collected` for `--output json` / `--output text` so an explicit `--output` overrides TTY detection.",
+      "status": "resolved",
+      "resolution": "Resolved. Added `cli_output::mode_from_raw(args, is_tty)` which scans raw tokens for the last `--output`/`--output=...` (a value-less `--output` before another flag is ignored); the main.rs unknown-command branch now resolves the mode from `trailing` and passes it to `report_error`. Real output: TTY via `script -qec 'target/debug/clio recal --output json' /dev/null` -> `{\"code\":\"usage\",\"hint\":\"did you mean `clio recall`?\",\"message\":\"unknown command `recal`\",\"ok\":false}` exit 2; piped `target/debug/clio recal --output text 2>&1 | cat` -> `error: unknown command `recal`` + `hint: did you mean `clio recall`?` exit 2. Defaults unchanged: TTY prints red human text, a pipe prints the JSON envelope. Tests: cli_output_tests.rs (mode_from_raw), main_read_tests.rs."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "`split_leading_globals` consumes subsequent flag token as value when a leading value flag lacks an argument",
+      "evidence": "crates/clio-lib/src/cli_args.rs:187-195 pushes `args.get(index)` as the flag value without checking `!value.starts_with(\"--\")`. Live output: `target/debug/clio --output --db sqlite::memory: recall q` consumes `--db` as the value of `--output` and treats `sqlite::memory:` as the command verb, exiting 2 with `error: unknown command `sqlite::memory:`` instead of reporting that `--output` requires a value.",
+      "requirement_ref": "Phase 100366 §5 Task 1, AC-100366-05",
+      "recommendation": "In `split_leading_globals`, verify that `!value.starts_with(\"--\")` before consuming `value` for a value-taking flag.",
+      "status": "resolved",
+      "resolution": "Resolved. `cli_args::split_leading_globals` now appends the following token as a value only when it does not start with `--`, so a value-less leading flag leaves the next flag for the parser. Real output: `target/debug/clio --output --db sqlite::memory: recall q` -> `{\"code\":\"usage\",\"hint\":\"try `--output VALUE`\",\"message\":\"flag `--output` requires a value\",\"ok\":false}` exit 2 (previously it consumed `--db` and reported `unknown command `sqlite::memory:``). Test: cli_args_tests.rs::split_leading_globals_does_not_consume_a_flag_as_a_value."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "`parse_failure` in `cli_read` ignores explicit `--output text` when piped and `--output json` on TTY",
+      "evidence": "crates/clio-lib/src/cli_read.rs:401-407 hardcodes `mode = if io.is_tty { OutputMode::Text } else { OutputMode::Json };`. Live output: `target/debug/clio recall q --output text --limt 2 2>&1 | cat` outputs JSON `{\"code\":\"usage\",\"hint\":\"did you mean `--limit`?\",\"message\":\"unknown flag `--limt`\",\"ok\":false}` despite explicit `--output text`.",
+      "requirement_ref": "Phase 100366 §1, §5 Task 1, AC-100366-02",
+      "recommendation": "In `parse_failure`, scan `args` for valid `--output json` / `--output text` (or `--output=...`) before defaulting to TTY mode.",
+      "status": "resolved",
+      "resolution": "Resolved. Removed the TTY-only `parse_failure`; `run_verb`/`run_with_state` now resolve a parse error's mode with `cli_output::mode_from_raw` over the raw args, so an explicit `--output` wins even though parsing failed. Real output: `target/debug/clio recall q --output text --limt 2 2>&1 | cat` -> `error: unknown flag `--limt`` + `hint: did you mean `--limit`?` exit 2; `--output json` on a TTY prints the envelope (asserted in cli_read_help_tests.rs::parse_error_honors_an_explicit_output_flag)."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Grammar defect in missing positional argument error message",
+      "evidence": "crates/clio-lib/src/cli_read.rs:235 formats error as `format!(\"`{verb}` requires a {label} argument\")`. When label is \"ID\", `target/debug/clio get` produces `message: \"`get` requires a ID argument\"` with incorrect indefinite article.",
+      "requirement_ref": "Phase 100366 §5 Task 2",
+      "recommendation": "Adjust phrasing to `format!(\"`{verb}` requires an {label} argument\")` or choose the article dynamically based on vowel start.",
+      "status": "resolved",
+      "resolution": "Resolved. `one_positional` now selects the indefinite article with a small `article(label)` helper. Real output: `target/debug/clio get` -> `{\"code\":\"usage\",\"hint\":\"usage: clio get ID\",\"message\":\"`get` requires an ID argument\",\"ok\":false}` exit 2; `target/debug/clio recall` -> `message: \"`recall` requires a QUERY argument\"`. Test: cli_read_help_tests.rs::missing_positional_uses_the_correct_article."
+    }
+  ],
+  "plan_1hr": [
+    "In crates/clio-lib/src/cli_read.rs, check if parsed.has(\"help\") in run_parsed. Render the subcommand usage text and return ExitCode::SUCCESS.",
+    "In crates/clio-lib/src/main.rs, check trailing tokens for `--output json` / `--output text` when reporting unknown command errors so explicit --output overrides TTY detection.",
+    "In crates/clio-lib/src/cli_args.rs:split_leading_globals, guard args.get(index) with `!value.starts_with(\"--\")` before consuming it as a value for a value-taking flag.",
+    "In crates/clio-lib/src/cli_read.rs:parse_failure, inspect args for explicit `--output` flags before falling back to TTY detection.",
+    "In crates/clio-lib/src/cli_read.rs:one_positional, update article formatting to \"an {label}\" where appropriate."
+  ],
+  "plan_unlimited": [
+    "Add dedicated unit and integration tests covering subcommand-level `--help` and `-h` across all read subcommands (`recall`, `get`, `show`, `inspect`, `stats`).",
+    "Centralize global flag pre-parsing across top-level dispatch so output mode, color, and database resolution behave identically across all CLI commands and error paths."
+  ],
+  "remediation": {
+    "round": 1,
+    "status": "all findings resolved",
+    "gate": "make check EXIT=0 (fmt + clippy -D warnings + workspace tests); make coverage EXIT=0 - coverage-guard: 286 files checked, TOTAL lines 97.93% / functions 98.90%, all reported files meet the 90% floor",
+    "changed_files": [
+      "crates/clio-lib/src/cli_args.rs (98.77% lines / 100% functions)",
+      "crates/clio-lib/src/cli_output.rs (100% / 100%)",
+      "crates/clio-lib/src/cli_help.rs (100% / 100%)",
+      "crates/clio-lib/src/cli_read.rs (96.73% / 96.88%)",
+      "crates/clio-lib/src/main.rs (95.91% / 100%)",
+      "new test modules: crates/clio-lib/src/cli_read_help_tests.rs, crates/clio-lib/src/main_read_tests.rs"
+    ],
+    "environment_note": "rustdoc and cargo-llvm-cov live in ~/.cargo/bin, which is not on this shell's PATH. Both make check and make coverage were run with PATH=$HOME/.cargo/bin:$PATH; without it cargo cannot locate rustdoc and doctests fail before any code runs. No code change was involved.",
+    "plan_1hr": [
+      {
+        "item": "check parsed.has(\"help\") in run_parsed",
+        "status": "done",
+        "note": "Done one step earlier - in run_verb/run_with_state before McpState::open, so help never opens the database."
+      },
+      {
+        "item": "main.rs unknown command: scan trailing for --output",
+        "status": "done",
+        "note": "Resolved via cli_output::mode_from_raw over trailing."
+      },
+      {
+        "item": "cli_args split_leading_globals guard",
+        "status": "done",
+        "note": "Guard added and unit-tested."
+      },
+      {
+        "item": "parse_failure inspect args for --output",
+        "status": "done",
+        "note": "parse_failure removed; mode_from_raw is used on the parse-error path."
+      },
+      {
+        "item": "one_positional article",
+        "status": "done",
+        "note": "article() helper added; 'an ID' / 'a QUERY'."
+      }
+    ],
+    "plan_unlimited": [
+      {
+        "item": "dedicated unit/integration tests for subcommand --help/-h across all read subcommands",
+        "status": "done",
+        "note": "cli_read_help_tests.rs covers recall/get/show/inspect/stats with both --help and -h, plus main_read_tests.rs through dispatch; verb_help unit-tested in cli_help_tests.rs."
+      },
+      {
+        "item": "centralize global flag pre-parsing across top-level dispatch",
+        "status": "partially done",
+        "note": "The raw-args explicit-output scan is centralized in cli_output::mode_from_raw and shared by the unknown-command path and the read parse-error path, so --output now behaves identically on both error surfaces. Full pre-parsing of all globals for every top-level command (ops/retention/compose/setup) is out of scope for these findings and would change those commands' documented parsing; deliberately not done to avoid a drive-by refactor."
+      }
+    ]
+  }
+}

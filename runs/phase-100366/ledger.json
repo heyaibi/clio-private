@@ -1,0 +1,56 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 99184dec",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 7,
+      "output_sha256": "f3d58448f72f214657cd02a93c1b7a4b01dd258a14669011ad42e756cc2a1554",
+      "artifacts": {},
+      "git_head": "17bde13c3de4a652168ab6b23bab9311282f10ad"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100366/findings.json 10c0baaa",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 2,
+      "output_sha256": "e1e151a4e9bc0ecb65d4483da69f683f75afc3fbf7dd3dc9fb4abf64efd76ef9",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 6948,
+          "sha256": "d6b4001a5c5de9309b9405aa8947fcf4c7d92412579b15a8f253402689666276"
+        }
+      },
+      "git_head": "17bde13c3de4a652168ab6b23bab9311282f10ad"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 9ee2916b",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "dba75b0d596613507e0ebc4c2019da89fe760f9faaf3002ec1f32c7090950e9f",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 6948,
+          "sha256": "d6b4001a5c5de9309b9405aa8947fcf4c7d92412579b15a8f253402689666276"
+        }
+      },
+      "git_head": "17bde13c3de4a652168ab6b23bab9311282f10ad"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 03bc9549",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "9f71385e97fc8707d0a2f51b5174f913f594d5209b8d313dad4d674ae1f29c20",
+      "artifacts": {},
+      "git_head": "17bde13c3de4a652168ab6b23bab9311282f10ad"
+    }
+  }
+}
