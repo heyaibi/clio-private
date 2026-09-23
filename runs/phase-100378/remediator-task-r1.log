@@ -1,0 +1,30 @@
+# Remediator run log — phase 100378 (r1)
+
+Task: fix findings from adversary report (findings.json), round 1.
+Working dir: /home/e1rcv4ogdmzught4sw9be5k2/clio
+
+## Entries
+
+[start] Thu Sep 24 00:47 IST 2026. Backup findings.original.json already exists (6938 bytes, same size as findings.json); not overwriting. Spawn nothing rule satisfied.
+[triage] 3 findings, all low, all in crates/clio-lib/src/ (in scope). No runs/-only findings to close. F-01 sync_cli.rs arg validation on single-host; F-02 ranking_cli.rs error message text; F-03 sync_cli_tests.rs 1s sleep. F-01 and F-03 share sync_cli.rs/test files -> coupled, so no worker fan-out; I fix all three serially myself.[repro] Reproduced all three findings BEFORE fixing (AGENTS.md reproduce-first):
+  F-01: ./target/debug/clio sync status unexpected_arg -> exit 0 with single-host explanation (should be 2); sync status --banks "" -> exit 0.
+  F-02: ./target/debug/clio ranking set --patch-file=/tmp/invalid.json -> "error: --patch must be a JSON object: ..." (misnames flag).
+  F-03: cargo test -p clio --bin clio render_dispatches_and_covers -> test finishes in 1.00s, all from the unconditional wait_for_ttl(1) sleep.
+[fix] F-01 crates/clio-lib/src/sync_cli.rs: moved the pure decode `build(&verb, &parsed, io.env)` ahead of the single-host short-circuit; no DB open, so behavior otherwise unchanged. New regression test `single_host_status_rejects_bad_args_like_multi_host` (sync_cli_tests.rs).
+[fix] F-02 crates/clio-lib/src/ranking_cli.rs::set_call: error text now names the flag that supplied the patch (`--patch` inline, `--patch-file` file). Existing test at ranking_cli_tests.rs:116 (inline --patch) still passes unchanged; added `--patch-file must be a JSON object` assertion to `ranking_set_reads_a_patch_file`.
+[fix] F-03 crates/clio-lib/src/sync_cli.rs: `wait_for_ttl` now takes `std::time::Duration` (zero check via `is_zero`); production passes `Duration::from_secs(ttl)`; tests use `Duration::from_millis(1)` / `Duration::ZERO`.
+[verify-after] Rebuilt binary, re-ran same reproductions:
+  sync status unexpected_arg -> exit 2 "unexpected extra argument `unexpected_arg`"
+  sync status --banks "" -> exit 2 "--banks must name at least one bank"
+  ranking set --patch-file=/tmp/invalid.json -> exit 2 "--patch-file must be a JSON object: expected value at line 1 column 17"
+  ranking set --patch 'not-json' -> exit 2 "--patch must be a JSON object" (unchanged inline message)
+  sync status and sync status --banks demo on single-host -> exit 0 with FR-31 explanation (behavior preserved)
+[cmd] cargo test -p clio --bin clio --locked -> 532 passed, 0 failed (was 531; +1 regression test), 2.10s (F-03 test now 0.00s vs 1.00s).
+[cmd] wc -l: sync_cli.rs 441, sync_cli_tests.rs 329, ranking_cli.rs 144, ranking_cli_tests.rs 185 — all <=450, headers untouched/valid.
+[cmd] make check -> exit 0 (fmt, clippy -D warnings, workspace tests, doctests). Only full check run this round.
+[cmd] make coverage -> exit 0; coverage-guard: 311 files checked, TOTAL lines 97.99% / functions 98.82%, all reported files meet per-file floor. Per-file re-read for touched production files: sync_cli.rs 99.39% lines / 93.55% functions; ranking_cli.rs 98.85% lines / 90.91% functions (test files are not in the reported set).
+[workers] None spawned: F-01 and F-03 share crates/clio-lib/src/sync_cli.rs and its test file, so the slices were coupled; per the task rules I fixed all three serially myself.
+[git] No commit/push/stash; no `git add` (index untouched). Unstaged scoped diff `git diff -- . ':!private/clio-private/runs/'` shows exactly the 4 Rust files.
+[report] findings.json updated: F-01/F-02/F-03 marked RESOLVED (r1) with quoted before/after output; plan_1hr items marked DONE; plan_unlimited left as future-phase considerations (not defects); remediation_note added; findings.json re-validated as JSON. Backup findings.original.json untouched.
+[phase-file] roadmap/phase-100378-full-cli-config-ranking-sync.md Attribution: Remediator r1 row set to done. No other rows touched.
+REMEDIATOR_DONE 7a59fb62

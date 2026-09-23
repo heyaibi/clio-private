@@ -4,11 +4,11 @@
 Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
-| Developer | r1 | [TBD] | [TBD] |
-| Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
-| Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Adversary | r1 | Antigravity CLI (Gemini 3.8 Flash) | done |
+| Remediator | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
+| Remedy Approver | r1 | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | approved |
+| Finalize | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
 
 **Follow-up phase 100378 · **Effort:** ~2 days · **Gaps:** `gaps/full-cli.md` §6 (config/ranking and sync have zero CLI surface today)
 
@@ -194,12 +194,12 @@ Stop and report if a config/ranking view cannot be masked, if the shared dispatc
 ## 8. Test and Verification Strategy
 
 ### Required Tests
-- [ ] Unit tests (scope handling, weight validation, mask)
-- [ ] Integration tests (config get/set/profiles/use; ranking get/set; sync status single-host)
-- [ ] Contract tests (semantics identical to MCP; exit codes)
-- [ ] End-to-end tests (golden output)
-- [ ] Regression tests (prior phases unchanged)
-- [ ] Security/failure-mode tests (masking; gate non-bypass; invalid weight/scope rejected)
+- [x] Unit tests (scope handling, weight validation, mask)
+- [x] Integration tests (config get/set/profiles/use; ranking get/set; sync status single-host)
+- [x] Contract tests (semantics identical to MCP; exit codes)
+- [x] End-to-end tests (golden output)
+- [x] Regression tests (prior phases unchanged)
+- [x] Security/failure-mode tests (masking; gate non-bypass; invalid weight/scope rejected)
 
 ### Required Test Scenarios
 
@@ -225,29 +225,34 @@ Implementation claims must be supported by actual command output and `make cover
 
 | AC ID | Acceptance Criterion | Verification Method | Required Evidence |
 |-------|----------------------|---------------------|-------------------|
-| AC-100378-01 | Config/ranking commands bound with identical semantics | T100378-01…T100378-04 | Command output |
-| AC-100378-02 | Every config/ranking view masked | T100378-01 | Output diff |
-| AC-100378-03 | Profile/ranking changes do not bypass gates | T100378-03 | Output |
-| AC-100378-04 | Sync exposed; single-host explained | T100378-05, T100378-06 | Command output |
-| AC-100378-05 | No regression; coverage green | T100378-07 | `make check`, `make coverage` |
+| AC-100378-01 | Config/ranking commands bound with identical semantics | T100378-01…T100378-04 | PASS. New `runtime_cli.rs` engine plus `config_cli.rs` / `ranking_cli.rs` bind `clio config get/set/profiles/use` and `clio ranking get/set` to `config_get`/`config_set`/`config_profiles`/`config_profile_apply`/`ranking_env_get`/`ranking_env_set` through the existing shared dispatch `clio_config::Runtime::call_tool` (no second implementation; `clio-config` remains the single source of truth). Live transcripts: `clio config get` (full + path), `clio config set … --scope deployment`, `clio config profiles`, `clio config use coding_local`, `clio ranking get`, `clio ranking set --patch '{…}' --dry-run` (weights renormalized to 0.25 each). Tests: 11 config + 9 ranking + 7 engine + 11 sync; `cargo test -p clio --bin clio` 520 passed. |
+| AC-100378-02 | Every config/ranking view masked | T100378-01 | PASS. Planted secret `sk-live-ABCDEFGHIJKLMNOP` set via `clio config set credentials.api_key … --scope deployment`; `clio config get credentials.api_key` prints `****MNOP` and the full `clio config get` view contains zero occurrences of the plaintext (`grep -c` = 0). Test `config_get_masks_a_planted_secret_in_path_and_full_views` asserts the plaintext is absent from both JSON and text output. `config_profiles` and `ranking get`/`set` carry no secret material. |
+| AC-100378-03 | Profile/ranking changes do not bypass gates | T100378-03 | PASS. `clio config use coding_local` returns the effective diff and the tool note "Profile apply changes tunable knobs only; it does not bypass §4.1–§4.2 gates." `clio config set ranking.theta_admit 0.5` is rejected `forbidden` (ranking knobs are not tunable via config_set); `ranking set` only patches the ranking env after validation/renormalization. Tests `config_set_rejects_forbidden_and_unknown_paths` and `config_use_applies_a_profile_and_reports_no_gate_bypass`. |
+| AC-100378-04 | Sync exposed; single-host explained | T100378-05, T100378-06 | PASS. `clio sync status` on a single-host deployment (effective `sync.omit` = true, the default) prints the FR-31 single-host explanation and exits 0 (transcript collected). With `sync.omit=false` the same command returns the masked MCP status report (`device_id`, per-bank cursors/pending/conflicts/dead letters) and exits 0. `clio sync push/pull` mirror the tool schema (`--remote`, `--mode`, `--banks`, `--token`, `--sync-key`) and require `--remote` (exit 2 without it); `clio sync serve` binds and holds the process for the resolved TTL. Tests: 11 sync + live transcripts. |
+| AC-100378-05 | No regression; coverage green | T100378-07 | PASS. `make check` exit 0 (fmt + clippy `-D warnings` workspace + `cargo test --workspace --locked` incl. doctests). `make coverage` final gate: 311 files checked, TOTAL lines 97.98% / functions 98.82%, per-file guard all ≥90%. New files: `runtime_cli.rs` 100%/100%, `config_cli.rs` 99.30%/93.75%, `ranking_cli.rs` 98.84%/90.91%, `sync_cli.rs` 99.39%/93.55%. |
 
 ### Definition of Done
-- [ ] All in-scope behavior implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation updated.
-- [ ] Evidence collected and verification completed.
+- [x] All in-scope behavior implemented.
+- [x] All acceptance criteria pass.
+- [x] Required tests pass.
+- [x] No unauthorized changes introduced.
+- [x] Existing behavior remains intact.
+- [x] Security checks pass.
+- [x] Documentation updated (help catalog, per-command usage lines, `clio help` catalog).
+- [x] Evidence collected and verification completed.
+- [x] Required approval is obtained (downstream pipeline step). — Remedy Approver r1 verdict APPROVE (all findings F-01…F-03 resolved; size, roadmap-isolation, and coverage constraints hold)
 
 ### Completion Evidence
-- Implementation summary
-- Module diffs
-- Masking evidence
-- Single-host sync transcript
-- Coverage report
-- Known limitations
+- **Implementation summary**: New modules in `crates/clio-lib/src`: `runtime_cli.rs` (shared engine that resolves a two-token runtime-backed group, parses flags, and bridges to `clio_config::Runtime::call_tool`), `config_cli.rs` (`config get|set|profiles|use` → the four `config_*` tools), `ranking_cli.rs` (`ranking get|set` → `ranking_env_get`/`ranking_env_set`), and `sync_cli.rs` (`sync status|push|pull|serve` → the four §4.9.5.D sync tools through the in-process MCP dispatcher). Config/ranking route through the existing shared dispatch in `clio-config` (Phase 100380 owns MCP publication); sync routes through the same in-process `tools/call` bridge the read/write engines use, so CLI and MCP semantics cannot drift. Shared wiring: dispatch arms in `main.rs`, group subcommands/bindings in `cli_help.rs`, usage lines in `cli_help_usage.rs`, and top-level help lines in `main.rs`.
+- **Module diffs**: four new production files + four new `*_tests.rs` files (all ≤450 lines; `sync_cli.rs` is the largest at 434). Edited shared files: `main.rs`, `cli_help.rs`, `cli_help_usage.rs`.
+- **Masking evidence**: `clio config set credentials.api_key 'sk-live-ABCDEFGHIJKLMNOP' --scope deployment` then `clio config get credentials.api_key` → `config credentials.api_key = ****MNOP`; full `clio config get` contains zero plaintext occurrences. Test `config_get_masks_a_planted_secret_in_path_and_full_views`.
+- **Single-host sync transcript**: `clio sync status` (default `sync.omit=true`) → "sync is omitted on this single-host deployment by design (the FR-31 single-host exception); the local store is authoritative …", exit 0. With `sync.omit=false` → `sync status (device …, remote (none), auth none, encryption false)` with per-bank cursors, exit 0.
+- **Coverage report**: pre-change baseline (before edits) `307 files, TOTAL lines 97.96% / functions 98.91%` (guard green). Final `make coverage` → `target/coverage/coverage.json` (`311 files, TOTAL lines 97.98% / functions 98.82%`, per-file guard all ≥90%).
+- **Known limitations**:
+  1. `config set --scope profile` requires an active profile, which a one-shot CLI process does not have; it fails closed with the tool's clear error, identical to the MCP path. `config use` activation is in-memory for the current process; only `--scope deployment` persists (to the deployment config file). The profile-scope precondition is a `clio-config` tool semantic and is intentionally unchanged.
+  2. `ranking set` without `--dry-run` patches only the current process's in-memory ranking env (the tool's "current profile/session" semantics), so a one-shot CLI cannot retain it; the text view states this and `--dry-run` is the useful CLI mode. Persisting ranking is a semantic change and remains out of scope.
+  3. `sync serve` runs in the foreground for the resolved TTL (default 1800s); it does not daemonize. `sync_ack_skip` (a documented non-normative extension beyond §4.9.5.D, owned by Phase 100380's extension note) has no CLI binding; this phase binds the four §4.9.5.D sync commands. Debt owner: no phase is assigned a CLI binding for the extension.
+  4. Single-host sync detection reads the effective `sync.omit` flag (default true), not a separate host-count probe.
 
 ---
 
@@ -300,15 +305,18 @@ After this phase is accepted:
 ### Known Limitations
 - Sync on a single-host deployment is a reported no-op by design.
 - Provider ingest remains out of scope.
+- `config set --scope profile` requires an active profile, which a one-shot CLI process does not have; it fails closed with the tool's error. `config use` activation is in-memory only; `--scope deployment` is the persistent scope.
+- `ranking set` without `--dry-run` affects only the current process (the tool's session semantics); `--dry-run` is the useful CLI mode.
+- `sync serve` runs in the foreground for the resolved TTL; `sync_ack_skip` (a non-normative extension) has no CLI binding.
 
 ### Downstream Prerequisites
 - None; this phase completes the CLI surface.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
-- Verifier: [TBD]
+- Implementer: Developer r1 (OpenCode CLI, Go . Deepseek V4.1 Flash High)
+- Verifier: Developer r1 — `make check` exit 0; `make coverage` final gate green (311 files, TOTAL lines 97.98% / functions 98.82%, per-file guard all ≥90%); live CLI transcripts collected for config/ranking/sync
 - Human Approver: not required
-- Date: [TBD]
+- Date: 2026-09-24

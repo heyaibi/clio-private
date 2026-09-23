@@ -1,0 +1,21 @@
+[2026-09-24T00:25:30Z] [start] Adversary review started for Phase 100378 (r1). Target: git diff --cached -- . ':!private/clio-private/runs/'.
+[2026-09-24T00:26:00Z] [cmd] git diff --cached --stat -> 11 files changed, 1975 insertions(+)
+[2026-09-24T00:26:10Z] [audit] wc -l on all 11 touched Rust files: all <=450 lines (max sync_cli.rs at 434 lines, main.rs at 354 lines).
+[2026-09-24T00:26:20Z] [audit] AGENTS.md headers checked on all new and modified files: valid and truthful ownership declared.
+[2026-09-24T00:26:30Z] [audit] Roadmap isolation check: no references to roadmap/, phase numbers, or crates.md in staged production code.
+[2026-09-24T00:31:10Z] [cmd] cargo check --workspace --all-targets --locked -> exit 0
+[2026-09-24T00:31:13Z] [cmd] cargo fmt --all -- --check -> exit 0 (clean)
+[2026-09-24T00:31:16Z] [cmd] cargo clippy --workspace --all-targets --locked -- -D warnings -> exit 0 (clean)
+[2026-09-24T00:31:22Z] [cmd] cargo test -p clio --bin clio --locked -> exit 0 (531 passed, 0 failed)
+[2026-09-24T00:33:05Z] [cmd] PATH="$HOME/.cargo/bin:$PATH" make check -> exit 0 (fmt clean, clippy -D warnings clean, workspace tests clean, doctests clean)
+[2026-09-24T00:39:05Z] [cmd] PATH="$HOME/.cargo/bin:$PATH" make coverage -> exit 0 (311 files, TOTAL lines 97.99% / functions 98.82%; all per-file >=90%)
+[2026-09-24T00:39:30Z] [verify] Live binary verification: clio config get/set/profiles/use, clio ranking get/set --dry-run, clio sync status/push/pull/serve.
+[2026-09-24T00:39:57Z] [verify] Secret masking verified: sk-live-SUPERSECRET1234 masked as ****1234 in both path and full config views; 0 plaintext occurrences.
+[2026-09-24T00:43:04Z] [verify] Single-host vs multi-host sync status verified: single-host prints FR-31 omission explanation (exit 0); multi-host reports cursors and device ID (exit 0).
+[2026-09-24T00:43:35Z] [finding] F-01 (low): crates/clio-lib/src/sync_cli.rs:108-114 `sync status` skips positional and flag validation on single-host deployments.
+[2026-09-24T00:44:33Z] [finding] F-02 (low): crates/clio-lib/src/ranking_cli.rs:103-105 `ranking set` error message references `--patch` when `--patch-file` contains invalid JSON.
+[2026-09-24T00:44:40Z] [finding] F-03 (low): crates/clio-lib/src/sync_cli_tests.rs:292 Unit test `render_dispatches_and_covers_transfer_and_serve_banks` incurs an unconditional 1-second sleep (`wait_for_ttl(1)`).
+[2026-09-24T00:46:10Z] [findings-json] Written to /home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100378/findings.json (3 findings, valid JSON).
+[2026-09-24T00:46:15Z] [attribution] Updated phase file Attribution table row for Adversary to done.
+[2026-09-24T00:47:00Z] [finish] Adversary review complete. Verdict: Good.
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100378/findings.json 93499b9e

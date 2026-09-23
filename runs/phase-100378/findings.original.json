@@ -1,0 +1,93 @@
+{
+  "run": "r1",
+  "phase": "100378",
+  "subject": "Phase 100378: Full CLI Configuration, Ranking, and Sync Surface",
+  "verdict": "Good",
+  "verdict_justification": "Phase 100378 cleanly implements the full CLI configuration, ranking, and sync surface (clio config get/set/profiles/use, clio ranking get/set, and clio sync status/push/pull/serve) through existing shared runtime and MCP dispatchers, preserving exact tool semantics and fail-closed security guarantees. Masking is verified across all config views, weight normalization and dry-run work as specified, single-host sync correctly explains the FR-31 omission, all files strictly adhere to <=450 lines and AGENTS.md headers, and all 311 reported files satisfy >=90% line and function coverage floors. Three minor findings were identified regarding single-host sync argument validation, patch-file error messaging, and an unnecessary 1-second sleep in unit tests.",
+  "metadata": {
+    "generated": "2026-09-24",
+    "applies_to": "staged diff (r1)",
+    "source": "crates/clio-lib/src/{runtime_cli,config_cli,ranking_cli,sync_cli,main,cli_help,cli_help_usage}.rs"
+  },
+  "standard": [
+    "Phase 100378 specification and Acceptance Criteria (AC-100378-01 through 05)",
+    "requirement.md FR-32: Effective configuration, profiles, and ranking environment; masked views; no gate bypass",
+    "requirement.md FR-31 / §4.9.5.D: Client/server sync protocol, single-host exception",
+    "requirement.md §4.9.2: Identical tool semantics across bindings",
+    "AGENTS.md: Source file size limit <=450 lines and truthful ownership headers",
+    "coverage.md: Aggregate and per-file >=90% function and line coverage floors"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100378-01: Config/ranking commands bound with identical semantics",
+      "status": "Fully satisfied",
+      "evidence": "clio config get/set/profiles/use and clio ranking get/set route through Runtime::call_tool in-process without code duplication; 520 clio unit tests and live command executions pass.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100378-02: Every config/ranking view masked",
+      "status": "Fully satisfied",
+      "evidence": "Planted credential sk-live-SUPERSECRET1234 masked as ****1234 in path and full config views; plaintext grep count is 0 in both JSON and human text modes.",
+      "severity": "Critical"
+    },
+    {
+      "requirement": "AC-100378-03: Profile/ranking changes do not bypass gates",
+      "status": "Fully satisfied",
+      "evidence": "config use coding_local notes gate non-bypass; config set ranking.theta_admit is rejected as forbidden; ranking set only affects tunable knobs.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100378-04: Sync exposed; single-host explained",
+      "status": "Fully satisfied",
+      "evidence": "clio sync status on default single-host deployment prints FR-31 omission explanation and exits 0; multi-host deployment (sync.omit=false) prints full device status report; sync push/pull require --remote (exit 2 without); sync serve binds and holds TTL.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AC-100378-05: No regression; coverage green",
+      "status": "Fully satisfied",
+      "evidence": "make check exit 0; make coverage reports 311 files meeting floor with TOTAL lines 97.99% and functions 98.82%; new files achieve 98-100% lines and 90-100% functions.",
+      "severity": "High"
+    },
+    {
+      "requirement": "AGENTS.md: <= 450 lines per Rust source file",
+      "status": "Fully satisfied",
+      "evidence": "wc -l confirms all 11 modified or created Rust files are <= 450 lines (max 434 in sync_cli.rs, 354 in main.rs).",
+      "severity": "High"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "`sync status` skips positional and flag validation on single-host deployments",
+      "evidence": "crates/clio-lib/src/sync_cli.rs:108-114 (`if sub == \"status\" && single_host { return emit_single_host(io, mode); }`). Live verification: `./target/debug/clio sync status unexpected_arg` exits 0 on single-host, but exits 2 with `unexpected extra argument` on multi-host (`sync.omit=false`). Likewise, `./target/debug/clio sync status --banks \"\"` exits 0 on single-host but exits 2 on multi-host.",
+      "requirement_ref": "Phase 100378 §5 Task 2, §8 T100378-05",
+      "recommendation": "In `crates/clio-lib/src/sync_cli.rs`, run `crate::runtime_cli::no_positionals(&parsed)?` and validate argument flags prior to short-circuiting for `single_host`, ensuring consistent exit-code 2 usage errors across deployment modes."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "`ranking set` error message references `--patch` when `--patch-file` contains invalid JSON",
+      "evidence": "crates/clio-lib/src/ranking_cli.rs:103-105 (`serde_json::from_str(&raw).map_err(|error| CliError::usage(format!(\"--patch must be a JSON object: {error}\")))?; if !patch.is_object() { return Err(CliError::usage(\"--patch must be a JSON object\")); }`). Live verification: `./target/debug/clio ranking set --patch-file=/tmp/invalid.json` outputs `error: --patch must be a JSON object`.",
+      "requirement_ref": "Phase 100378 §5 Task 1",
+      "recommendation": "In `crates/clio-lib/src/ranking_cli.rs`, dynamically mention `--patch-file` or use `\"--patch or --patch-file must provide a JSON object\"` in the error messages."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Unit test `render_dispatches_and_covers_transfer_and_serve_banks` incurs an unconditional 1-second sleep",
+      "evidence": "crates/clio-lib/src/sync_cli_tests.rs:292 (`wait_for_ttl(1);`), calling `crates/clio-lib/src/sync_cli.rs:320-324` (`std::thread::sleep(Duration::from_secs(ttl_secs));`).",
+      "requirement_ref": "Phase 100378 §8",
+      "recommendation": "Avoid real 1-second sleeps in unit test suites. Parameterize `wait_for_ttl` or test sleep duration with millisecond resolution / injectable sleep mock so unit test suites remain fast."
+    }
+  ],
+  "plan_1hr": [
+    "In `crates/clio-lib/src/sync_cli.rs`, validate `no_positionals(&parsed)` and `--banks` before returning the single-host omission explanation in `sync status`.",
+    "In `crates/clio-lib/src/ranking_cli.rs`, update the JSON parse and object check error messages to reference `--patch / --patch-file` appropriately.",
+    "In `crates/clio-lib/src/sync_cli_tests.rs`, remove the 1-second `wait_for_ttl(1)` call or mock sleep to avoid slowing down unit test runs."
+  ],
+  "plan_unlimited": [
+    "Consider adding a persistent scope or file-target mechanism for ranking environments if offline tuning without an active session is desired in future phases.",
+    "Consider adding a `--timeout` flag or daemonization mode for `sync serve` to support background supervisor workflows beyond foreground TTL waits."
+  ]
+}
