@@ -9,6 +9,21 @@
 - **Question unrealistic constraints.** If a requested constraint makes the stated requirements impossible or materially risks correctness, explain the conflict and ask for a decision. Otherwise, use reasonable engineering judgment rather than stopping unnecessarily.
 - **Verify your work.** Run appropriate checks and tests when possible. Clearly state what was and was not verified.
 
+## Reproduce Before You Fix (mandatory)
+
+A passing test is not proof that a reported bug is fixed. Reproduce the report first, then change code.
+
+1. **Read the report and restate the symptom.** Quote the exact command and the exact error from the issue or message.
+2. **Reproduce with the real entry point.** Build and run the actual binary or service, not only an in-process unit test. For this CLI: `make compile` (or `make install`) and run the reported commands.
+3. **Use realistic state.** If the report can occur against existing data, reproduce against an existing database too. A fix that only works on a fresh install is not a fix.
+4. **See the failure before editing.** Save the before output. Do not start refactoring or expanding scope before you have reproduced it.
+5. **Re-run the same reproduction after the change.** Show before and after from the same commands and the same kind of data. Do not substitute an easier scenario and call it done.
+6. **Say exactly what you ran and what you did not.** If you did not reproduce the report end to end, say so plainly and do not call the issue fixed.
+
+A test that exercises a helper inside one process is not the same as the reported cross-process or persisted-state path. Prove the reported path.
+
+When a fix cannot restore data that was already lost (for example, a key that was never persisted), say that explicitly and immediately. Never present a fix as making the old case work when it only changes future behavior.
+
 ## Private / Public Boundary
 
 You run from the repo root, but this file lives in `private/clio-private/` — a separate private repo (`heyaibi/clio-private`) accessible to a few people only. The root repo (`heyaibi/clio`) is public. Everything under `private/` stays on this machine and in the private remote. Never let it leak into the public repo.
@@ -188,3 +203,13 @@ Every Rust source file MUST use the following header structure:
 - If the phase touched Rust crates, complete the required `private/clio-private/baseline/coverage.md` procedure and verify both aggregate coverage and the per-file ≥90% function and line thresholds.
 - For `private/clio-private/baseline/requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
 - Clearly state what was verified and identify anything that could not be verified.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for heyaibi/clio. See `private/clio-private/issue-tracker/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` and `private/clio-private/docs/adr/`. See `private/clio-private/issue-tracker/domain.md`.
