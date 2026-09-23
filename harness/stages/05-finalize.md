@@ -73,3 +73,5 @@ needs no nonce). A chat
 summary alone never counts. The "timestamped
 entries" rule applies to every other log line. The pipeline parses that log
 line, and nothing after the signal is read.
+
+**This is mandatory.** A run that ends without that signal line halts the pipeline with `missing expected signal`. Never end your turn, stop early, or leave a background worker running before the signal is written. If you delegated to a worker, wait for it to finish, then write the signal as your final action.

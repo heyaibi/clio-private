@@ -92,3 +92,5 @@ from the Signal nonce section at the end of your task file>' >>
 `APPROVER_BLOCKED: ...` which needs none). A chat summary alone never counts. The "timestamped
 entries" rule applies to every other log line. The pipeline parses that log
 line. Verify that you have sucessfully written the signal in a new line and that it's not glued to the last line.
+
+**This is mandatory.** A run that ends without that signal line halts the pipeline with `missing expected signal`. Never end your turn, stop early, or leave a background worker running before the signal is written. If you delegated to a worker, wait for it to finish, then write the signal as your final action.

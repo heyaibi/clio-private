@@ -67,3 +67,5 @@ Summarize: what you fixed (including worker slices and how you verified them), r
 - `REMEDIATOR_BLOCKED: <one-line reason>`
 
 Write that same signal as the very last line of your run log ({{LOG_PATH}}), on its own line, with no timestamp prefix and nothing after it. Do it with a tool call as your final action: `printf '%s %s\n' 'REMEDIATOR_DONE' '<nonce from the Signal nonce section at the end of your task file>' >> {{LOG_PATH}}` (or your full `REMEDIATOR_BLOCKED: ...` line instead, which needs no nonce). A chat summary alone never counts.
+
+**This is mandatory.** A run that ends without that signal line halts the pipeline with `missing expected signal`. Never end your turn, stop early, or leave a background worker running before the signal is written. If you delegated to a worker, wait for it to finish, then write the signal as your final action.
