@@ -1,5 +1,6 @@
 {
   "workbench.sideBar.location": "right",
+  "git.autofetch": true,
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,
