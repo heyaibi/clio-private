@@ -92,6 +92,13 @@ messages, never the work.
   decision (launched / skipped / halted); the rest goes to `private/clio-private/runs/.driver/driver.log`.
 - **Run refused with "halted":** a prior run left `private/clio-private/runs/.driver/halted`; fix the
   cause and `rm` it.
+- **Run refused with a sync error (exit 2):** a checkout could not be brought in line with its
+  remote. The stderr JSON names the repo, the local and remote commits, the local-only and
+  remote-only commit subjects, the conflicted files, and a hint. The sync fast-forwards or
+  cleanly merges when it can; it stops only on a real conflict, a dirty index, or a detached
+  HEAD, and it never rebases, force-pushes, or discards local work. The private checkout is
+  normally dirty after a phase (the runner writes `ledger.json`/`run.json` after finalize's
+  commit); that alone does not block a start.
 
 ## Heartbeat (optional dead-man's switch)
 Set `HEARTBEAT_URL` (e.g. an ntfy.sh or healthchecks.io URL) and the driver pings it

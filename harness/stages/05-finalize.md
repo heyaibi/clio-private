@@ -30,6 +30,31 @@ to GitHub. Here's the message from Remedy Approver agent.
 
 {{REMEDY_APPROVER_AGENT_OUTPUT}}
 
+## Sync before publishing (mandatory)
+
+The phase began on a synced base, but a remote can move while you work. After
+you have committed both repos and immediately before you push, run this from
+the repo root:
+
+    python3 private/clio-private/harness/gitsync.py --root . --mode push
+
+It fetches `clio` and `private/clio-private`, fast-forwards or merges any new
+remote commits (never rebasing, force-pushing, resetting, or discarding
+work), and confirms each push will fast-forward. If it merges remote commits
+into your work, run `make check` again before pushing, since the base changed.
+
+- Exit 0: safe to push both repos.
+- Exit 1: a real conflict remains. Resolve it yourself: open the conflicted
+  files the JSON names, edit them to the correct combined result, `git add`
+  them, and complete the merge with `git commit --no-edit`. Then run the
+  sync check again. Never `git rebase`, `git reset --hard`, or push with
+  `--force`. If you cannot resolve it confidently, leave the merge state,
+  quote the printed evidence, and end with
+  `FINALIZE_BLOCKED: <one-line reason>`.
+
+If a push is still rejected after the check (a remote moved in the last
+instant), stop and signal `FINALIZE_BLOCKED`; never retry with `--force`.
+
 ## Close-out
 
 - Confirm every Attribution row the earlier stages recorded is present and
@@ -47,7 +72,8 @@ to GitHub. Here's the message from Remedy Approver agent.
 - Confirm `git status` in both repos shows only intended working-tree changes, including the staged `runs/` changes.
 - Write a clear commit message describing the change.
 - Create the commit.
-- Push the code to GitHub and confirm the push succeeds.
+- Run the sync check above; only if it exits 0, push both repos to GitHub
+  and confirm each push succeeds.
 
 ## Run log
 

@@ -8,5 +8,6 @@ runs/_old/
 runs/.harness-rotation-*.json
 runs/.driver/
 runs/.driver-cron.log
+runs/phase-*/sync-before-*.json
 *.tui.log
 *.profraw

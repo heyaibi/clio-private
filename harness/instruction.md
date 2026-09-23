@@ -13,6 +13,8 @@ python3 private/clio-private/harness/runner.py --pipeline private/clio-private/h
 
 Flow: developer → adversary → remediator ⇄ approver (3 rounds max) → finalize. Empty findings skip to finalize. Any `*_BLOCKED` ends the run. Each step rotates its two harnesses round-robin.
 
+Before a fresh start the runner brings both checkouts (`clio` and `private/clio-private`) in line with their remotes — fast-forwarding or cleanly merging — and refuses only on a real conflict, a dirty index, or a detached HEAD. Finalize syncs again and confirms each push will fast-forward before pushing. A blocked sync exits 2 and halts the line (see `runner.md`, Sync gate).
+
 ## Canary (after stage/worker edits)
 
 Run one phase, then prove birth-die compliance from the run logs: each worker spawned with disjoint FILES, no worker signal line (only the main's signal routes), workers left the index alone (`git diff --cached` shows main's staging only), and the main ran the full gate exactly twice (implement) or at most once plus one `make check` (remedy). If any check fails, fix the prompt, not the worker output.

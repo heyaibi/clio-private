@@ -68,6 +68,59 @@ Each run dir holds `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>
 
 `ledger.json` records per-step completion proofs (signal, harness, visits, output hash, artifact hashes, git HEAD). On resume every entry is re-proven: outputs and artifacts must hash identically (files a later step intentionally rewrites via a snapshot `from` are exempt), and later steps moving git HEAD fail the check. The resumed current step is exempt from the output pin since its saved output is the interrupted attempt.
 
+## Sync gate (fail-closed)
+
+Both checkouts must not run on a stale or diverged base. `harness/gitsync.py`
+owns this; the runner calls it and the finalize stage calls it directly.
+
+- **Before a fresh start** the runner syncs the public root and nested
+  `private/clio-private` (`gitsync.sync_all(repo, "start")`). It fetches each
+  repo from its own upstream, fast-forwards a strictly-behind branch with
+  `git merge --ff-only`, and merges a diverged branch with a plain merge
+  commit that keeps every local commit and accepts the remote changes.
+  Giving up is the last resort: only a real merge conflict, a staged change,
+  a detached HEAD, or a missing upstream stops the run with exit 2 (config
+  error) and the driver halts. It never rebases, force-pushes, resets,
+  stashes, or discards local work, and never runs `git pull` (the public repo
+  sets `pull.rebase = true`, which would rewrite history). Local commits
+  ahead of the remote do not block a start; the remote has nothing new.
+- **A fresh start then cleans up run state.** The runner commits and pushes
+  only the private repo's `runs/` leftovers (the runner writes `ledger.json`
+  and `run.json` after finalize's commit), so the phase begins from a clean
+  tree. Any dirty path outside `runs/` in either checkout stops the run for
+  operator review, so a half-finished human edit is never auto-published.
+- **Resume is deliberately not synced.** A resume must keep the history its
+  ledger already attests to (`git HEAD` per step), so a sync that moved HEAD
+  would invalidate the completion proofs.
+- **Before finalize** the finalize agent commits the phase's work first, then
+  runs `gitsync.py --root . --mode push` immediately before pushing. That
+  fetches both checkouts, fast-forwards or merges any remote commits that
+  arrived (never rebasing or forcing), and confirms the remote tip is an
+  ancestor of local HEAD so the push will fast-forward. A genuine conflict is
+  left in place (not aborted): the agent resolves the conflicted files,
+  `git add`s them, completes the merge, and re-checks. If it cannot resolve
+  them confidently, the run blocks before anything is pushed. Committing
+  first is what lets the merge run against a clean index.
+- **The private checkout is normally dirty after a phase**: the runner writes
+  `ledger.json` and `run.json` after finalize's commit. `start` mode treats
+  that as expected — when local HEAD already equals the remote it is a no-op,
+  and a fast-forward or merge preserves dirty artifacts it does not touch,
+  refusing only overlapping ones. It never requires a clean working tree,
+  only a clean index.
+- **Every sync attempt is recorded**: the runner writes `sync-before-start.json`
+  and `sync-before-start-clean.json` beside the run state (git-ignored
+  evidence), and a merge's own commit is durable in git history.
+- **Cross-checkout safety**: if the nested private repo shares the public
+  repo's remote URL, both are refused, so private content cannot cross into
+  the public checkout.
+
+Standalone check (stubbed remotes, no repo state touched); it also runs inside
+`runner.py --self-test`:
+
+```bash
+python3 private/clio-private/harness/gitsync.py --self-test
+```
+
 ## Verify
 
 `--dry-run`, `--self-test`, and `--fuzz` create nothing in the repo. `--self-test` checks harness binaries and model slugs statically (plus signal parsing, the opencode TUI command shape, harness display-name coverage, alias expansion, the idle reminder's schedule, signal safety, pty delivery, prompt-tail skipping, operator-typing suppression, and the swallowed-Enter retry, and rotation persistence with a stub harness in a temp dir). `--fuzz` asserts router properties over random graphs: terminal states are terminal, every routed edge matches the taken signal, exhaustion respects `max_rounds`, and consecutive events chain step-to-step.
@@ -78,4 +131,4 @@ Manual idle-reminder check (needs a terminal, not part of the automated gate): r
 
 Stage files stay lean orchestrators; execution detail lives in `harness/workers/*.md`, which the runner never loads. Rules: stages reference workers by exact relative path; every referenced file must exist; every worker defines its per-spawn slots under `## You own` and ends with `## Report back`; workers never signal, touch the index, run full gates, or spawn subworkers (depth cap is main -> worker). Static check (dry-run does not cover workers/): `python3 private/clio-private/harness/check-workers.py`. Run it after any stage/worker edit.
 
-Baseline 2026-09-21 (dry-run, phase 100060): developer 6649 B, adversary 12542 B, remediator 12023 B, approver 4390 B, finalize 3559 B. Re-capture after stage edits when claiming context savings.
+Baseline 2026-09-23 (dry-run, phase 100060): developer 7624 B, adversary 13970 B, remediator 13469 B, approver 4798 B, finalize 5399 B. Re-capture after stage edits when claiming context savings.

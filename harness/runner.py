@@ -56,6 +56,11 @@ except ImportError:
 
 import yaml
 
+# The fail-closed sync helper lives beside this file. Make its directory
+# importable even when runner.py is imported rather than run as a script.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import gitsync  # noqa: E402 - path set just above
+
 TOKEN_RE = re.compile(r"\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}")
 HARNESS_RE = re.compile(r"[a-z0-9_-]+:[^\s:]+")
 INT_INPUTS = {"phase_number", "max_remedy_rounds"}
@@ -1545,6 +1550,39 @@ def _poll_loop(proc, log_path, when, nonce, mirror_size):
         raise
 
 
+def _record_sync(run, name, res):
+    """Persist one sync result beside the run state and echo it to stderr."""
+    try:
+        (run._run_dir / f"{name}.json").write_text(json.dumps(res, indent=2))
+    except OSError:
+        pass
+    print(json.dumps(res, indent=2), file=sys.stderr)
+
+
+def preflight_sync(run, commit_run_state=False):
+    """Bring both checkouts in line with their remotes before a fresh start.
+
+    Fails closed: a base that cannot be brought in line raises Fail so the
+    run stops with a clear message instead of starting on it. Never discards
+    or rewrites local work (see gitsync).
+
+    commit_run_state commits and pushes the private repo's runs/ leftovers so
+    the phase begins clean, and halts on any dirty path outside runs/."""
+    res = gitsync.sync_all(run.repo, "start")
+    _record_sync(run, "sync-before-start", res)
+    if not res["ok"]:
+        raise Fail(f"sync blocked before start: {res['summary']}")
+    if commit_run_state:
+        clean = gitsync.commit_leftover_run_state(
+            run.repo,
+            f"pipeline: commit leftover run state before phase "
+            f"{int(run.inputs['phase_number'])}")
+        _record_sync(run, "sync-before-start-clean", clean)
+        if not clean["ok"]:
+            raise Fail(f"dirty working tree before start: {clean['summary']}")
+    return res
+
+
 def drive(run, pipe, invoke, resumed=None):
     """Execute the routing loop. invoke(harness, task_path, log_path,
     usage_path, when, nonce) returns (output_text, meta).
@@ -2351,6 +2389,10 @@ def self_test(run, live=False):
     check("mark-done: force overrides loop cap",
           res_f.get("advanced_to") == "s1", "advanced with force")
 
+    # Fail-closed sync: stubbed-remote checks live in gitsync.py so the same
+    # gate runs standalone (`gitsync.py --self-test`) and here.
+    checks += gitsync.self_test_checks()
+
     ok = all(c["ok"] for c in checks if c["ok"] is not None)
     print(json.dumps({"self_test": "pass" if ok else "fail", "checks": checks}, indent=2))
     sys.exit(0 if ok else 1)
@@ -2698,6 +2740,12 @@ def main():
                 print(json.dumps(result, indent=2))
                 sys.exit(0 if result["state"] in ("completed", "advanced")
                          else 1)
+            if resumed is None:
+                # Fresh start only: a resume keeps the history its ledger
+                # already attests to, so it is deliberately not synced. The
+                # fresh start also commits/pushes the private repo's runs/
+                # leftovers so the phase begins clean.
+                preflight_sync(run, commit_run_state=True)
             result = drive(run, pipe, run.invoke, resumed)
         except KeyboardInterrupt:
             # Operator Ctrl-C killed the step. resume.json was saved before
