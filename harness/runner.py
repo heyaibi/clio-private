@@ -80,6 +80,10 @@ SIGNAL_SCAN_LINES = 10
 # signal never sits silent (a missing signal alone must not hang the run
 # unnoticed). No timeout: the step still runs until it signals.
 IDLE_NUDGE_S = 300.0
+# TUI auto-submit: `opencode --prompt` pre-fills the input box but does not
+# send it, so the runner presses Enter once the prompt is on screen (matched
+# in the console mirror) or after this fallback delay, whichever comes first.
+SUBMIT_FALLBACK_S = 25.0
 # Per-invocation signal nonce: every harness invocation gets a fresh
 # random token appended to its task file. Non-*_BLOCKED* signal lines must
 # carry it as a separate token, so a mid-run echo of the bare signal word
@@ -197,9 +201,11 @@ def opencode_launch(model, effort, pointer, stage_name=OPENCODE_AGENT):
     --model/--agent flags, so the model and the stage's reasoning effort
     (variant) are injected through OPENCODE_CONFIG_CONTENT: the root `model`
     carries provider/model, and an effort adds a default primary agent whose
-    model selector is `provider/model#variant`. --auto auto-approves
+    model selector is `provider/model#variant`. --standalone gives the TUI its
+    own server so it reads that injected config; without it the TUI attaches
+    to the shared background service and ignores it. --auto auto-approves
     permissions (mandated by the stages). Returns (cmd, env)."""
-    cmd = ["opencode", "--auto", "--prompt", pointer]
+    cmd = ["opencode", "--standalone", "--auto", "--prompt", pointer]
     env = dict(os.environ)
     cfg = {}
     if model != "auto":
@@ -491,12 +497,14 @@ class Run:
         os.environ["PATH"] = f"{home}/.local/bin:{home}/.opencode/bin:{os.environ['PATH']}"
         pointer = TASK_POINTER.format(path=task_path)
         env = None
+        submit_marker = None
         full = f"{provider}/{model}" if provider else model
         if cli == "cursor":
             cmd = ["agent"] + (["--model", full] if full != "auto" else []) + [pointer]
         elif cli == "opencode":
             stage_name = self.stages[sid][0]["name"] if sid else OPENCODE_AGENT
             cmd, env = opencode_launch(full, effort, pointer, stage_name)
+            submit_marker = SUBMIT_MARKER
         elif cli == "agy":
             # -i takes the prompt as its value: it must come last or it
             # swallows the next token (e.g. --model) as prompt text.
@@ -518,7 +526,8 @@ class Run:
             raise Fail(f"no command mapping for cli {cli!r}")
         banner(cli, harness, task_path, log_path)
         text, rc, info = run_attached(cmd, log_path, when, nonce,
-                                      cwd=self.repo, env=env)
+                                      cwd=self.repo, env=env,
+                                      submit_marker=submit_marker)
         if rc != 0 and not log_done(text, when, nonce) \
                 and not info.get("mirror_signal"):
             raise Fail(f"{cmd[0]} exited {rc} (step failed; rerun to resume)")
@@ -936,6 +945,10 @@ TASK_POINTER = ("Your full task instructions are in this file: {path}\n"
                     "summarized in chat, still append that signal line to "
                     "the log file: chat text alone never counts.")
 
+# First line of TASK_POINTER, matched (whitespace-collapsed) in the TUI
+# console mirror to know the prompt is rendered and Enter will submit it.
+SUBMIT_MARKER = "Your full task instructions are in this file"
+
 
 BANNER_ART = r"""
   ____   _____  _____  ____
@@ -1019,6 +1032,12 @@ def _clean_mirror(data):
     return ANSI_RE.sub("", text)
 
 
+def _norm_ws(s):
+    """Collapse whitespace runs to single spaces for TUI text matching
+    (the input box wraps a long prompt across lines)."""
+    return " ".join(s.split())
+
+
 def _tail_text(path, limit=TUI_TAIL_BYTES):
     """Last `limit` bytes of a file, decoded lossily ("" when unreadable)."""
     try:
@@ -1047,7 +1066,7 @@ def _pty_set_size(master, stdin_fd):
 
 
 def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
-                      stdin_fd, out_fd=None):
+                      stdin_fd, out_fd=None, submit_marker=None):
     """Run cmd under a pty, forwarding stdin->pty and pty->stdout while
     capturing all console output to tui_path. The operator experience is
     unchanged; the runner additionally scans the capture with the same
@@ -1069,7 +1088,7 @@ def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
         out_fd = sys.stdout.fileno()
     try:
         return _pty_forward(proc, master, stdin_fd, out_fd, log_path,
-                            tui_path, when, nonce)
+                            tui_path, when, nonce, submit_marker)
     finally:
         try:
             os.close(master)
@@ -1078,7 +1097,7 @@ def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
 
 
 def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
-                 when, nonce):
+                 when, nonce, submit_marker=None):
     try:
         orig_attrs = termios.tcgetattr(stdin_fd)
     except termios.error:
@@ -1101,6 +1120,9 @@ def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
     last_key = (-1, -1)
     last_change = time.time()
     next_nudge = last_change + IDLE_NUDGE_S
+    submit_needle = _norm_ws(submit_marker) if submit_marker else None
+    submitted = submit_needle is None
+    submit_deadline = time.time() + SUBMIT_FALLBACK_S
     want = ("one of " + "/".join(when)) if when else "a *_DONE/*_APPROVED/*_REJECTED signal"
     if nonce is not None:
         want += f" carrying nonce {nonce}"
@@ -1144,6 +1166,15 @@ def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
                     cap += chunk
                     if len(cap) > TUI_TAIL_BYTES:
                         del cap[:len(cap) - TUI_TAIL_BYTES]
+            if not submitted:
+                hit = submit_needle and submit_needle in _norm_ws(
+                    _clean_mirror(cap))
+                if cap and (hit or time.time() >= submit_deadline):
+                    try:
+                        os.write(master, b"\r")
+                    except OSError:
+                        pass
+                    submitted = True
             try:
                 log_text = Path(log_path).read_text()
                 log_size = Path(log_path).stat().st_size
@@ -1244,7 +1275,8 @@ def _restore_term():
         pass
 
 
-def run_attached(cmd, log_path, when, nonce=None, cwd=None, env=None):
+def run_attached(cmd, log_path, when, nonce=None, cwd=None, env=None,
+                 submit_marker=None):
     """Run a harness attached in the foreground and wait for its signal.
 
     Under a terminal the child runs under a pty: the operator sees the
@@ -1266,7 +1298,8 @@ def run_attached(cmd, log_path, when, nonce=None, cwd=None, env=None):
         if _HAVE_PTY and sys.stdin.isatty() and sys.stdout.isatty():
             try:
                 return _run_attached_pty(cmd, log_path, tui_path, when, nonce,
-                                         cwd, env, sys.stdin.fileno())
+                                         cwd, env, sys.stdin.fileno(),
+                                         submit_marker)
             except Exception as e:  # noqa: BLE001 - foreground must survive
                 print(f"runner: pty mirror unavailable ({e}); plain spawn",
                       file=sys.stderr, flush=True)
@@ -1704,7 +1737,7 @@ def self_test(run, live=False):
                                    "PTR", "am_implement")
     cfg_h = json.loads(env_h["OPENCODE_CONFIG_CONTENT"])
     check("opencode tui cmd (effort)",
-          cmd_h == ["opencode", "--auto", "--prompt", "PTR"]
+          cmd_h == ["opencode", "--standalone", "--auto", "--prompt", "PTR"]
           and cfg_h["model"] == "togetherai/zai-org/GLM-5.3-Flash"
           and cfg_h["default_agent"] == "am_implement"
           and cfg_h["agents"]["am_implement"] == {
@@ -1712,14 +1745,18 @@ def self_test(run, live=False):
               "model": "togetherai/zai-org/GLM-5.3-Flash#high"})
     cmd_p, env_p = opencode_launch("togetherai/zai-org/GLM-5.3-Flash", None, "PTR")
     check("opencode tui cmd (no effort)",
-          cmd_p == ["opencode", "--auto", "--prompt", "PTR"]
+          cmd_p == ["opencode", "--standalone", "--auto", "--prompt", "PTR"]
           and json.loads(env_p["OPENCODE_CONFIG_CONTENT"]) == {
               "model": "togetherai/zai-org/GLM-5.3-Flash"})
     # model "auto" injects no config at all.
     cmd_a, env_a = opencode_launch("auto", "high", "PTR")
     check("opencode tui cmd (auto model)",
-          cmd_a == ["opencode", "--auto", "--prompt", "PTR"]
+          cmd_a == ["opencode", "--standalone", "--auto", "--prompt", "PTR"]
           and "OPENCODE_CONFIG_CONTENT" not in env_a)
+    # Auto-submit marker is whitespace-insensitive (the input box wraps).
+    check("submit marker: whitespace-insensitive match",
+          _norm_ws("Your full  task\n instructions are in this file")
+          == _norm_ws(SUBMIT_MARKER))
 
     # Alias resolution, pinned: short stage names expand to each
     # provider's own slug; unknown models pass through untouched.
