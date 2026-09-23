@@ -1,0 +1,102 @@
+{
+  "run": "r1",
+  "phase": "100376",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Hard 450-line cap violated: the modified cli_help.rs is 481 lines",
+      "evidence": "`git show :crates/clio-lib/src/cli_help.rs | wc -l` -> 481 (HEAD: 446; staged diff adds 35 lines); `wc -l crates/clio-lib/src/cli_help.rs` -> 481. The developer run log (private/clio-private/runs/phase-100376/developer-task-r1.log line 6) claims 'all Rust files <=450 lines', which is false for this file. All other created/modified Rust files are <=450 (largest new file: cli_write_portability_tests.rs, 444).",
+      "requirement_ref": "Developer task hard rules ('Every Rust file you create or modify stays at or below 450 total lines'); AGENTS.md 'Source File Size Constraint'; gaps/full-cli.md \u00a79 ('Estimate size before adding to a near-limit file; split first')",
+      "recommendation": "Split cli_help.rs (for example move VERB_USAGE or the binding table into a sibling cli_help_bindings.rs) so every created/modified Rust file is <=450 lines, then re-run make check and make coverage; correct the run-log and phase-file claims accordingly.",
+      "status": "resolved",
+      "resolution": "Split the usage table out of cli_help.rs into a new sibling crates/clio-lib/src/cli_help_usage.rs (VERB_USAGE + usage_for); cli_help.rs::verb_help now calls cli_help_usage::usage_for. Line counts after: cli_help.rs 262, cli_help_usage.rs 241 (both <=450); a wc -l scan over git diff --name-only + untracked shows no changed/new Rust file >450. Scoped tests: `cargo test -p clio --bin clio` -> 480 passed. Coverage (make coverage): cli_help.rs 100.00% lines/100.00% funcs, cli_help_usage.rs 100.00%/100.00%. make check green."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Canonical dry-run-then-confirm hygiene clean fails cross-process (UNIQUE batch id), yet AC-100376-01 records PASS",
+      "evidence": "Fresh temp DB, two processes: `./target/debug/clio hygiene clean --file c3.json --action discard --bank demo --db /tmp/opencode/adv-cli/clio3.db` -> exit 0, {\"dry_run\":true,\"would_discard\":1}; then `... --confirm --reason noise ...` -> exit 1, {\"code\":\"internal\",\"message\":\"hygiene log insert: UNIQUE constraint failed: hygiene_audit_logs.id\"}, while `stats` shows items_active 0 (the discard persisted). A confirm with no preceding dry-run succeeds (exit 0). Root cause: the clean batch id comes from a per-process counter that restarts every process (crates/clio-mcp/src/hygiene_tools.rs:92 `batch_id: &format!(\"hclean-{}\", state.next_item_id())`; crates/clio-mcp/src/runtime_context.rs:35-41). The dry-run path persists durable `dry_run:true` log rows (confirmed live via `clio hygiene log`), whose ids collide with the confirmed insert. Phase file line 231 (AC-100376-01) labels the flow PASS and does not state the confirm exit code; line 255 (limitation 2) discloses the abort but no owning phase is named.",
+      "requirement_ref": "phase-100376 \u00a78 T100376-03, \u00a79 AC-100376-01; \u00a712 Known Limitations; developer task 'Known limitations state ... which phase owns the debt'",
+      "recommendation": "Qualify AC-100376-01 with the observed exit 1 and name the owning phase/track for the id-generation defect; remediate by making the clean batch id collision-free (store-derived or invocation-unique) in the phase that owns hygiene/MCP runtime semantics, with a cross-process regression test (fresh process dry-run -> confirm).",
+      "status": "resolved",
+      "resolution": "Added McpState::next_clean_batch_id (crates/clio-mcp/src/runtime_context.rs) mixing process id + nanosecond clock + in-process counter; hygiene_tools.rs binds batch_id to it. Regression test hygiene_clean_dry_run_then_confirm_across_fresh_runtime_instances opens two fresh McpState instances over one file-backed SQLite DB (fresh state restarts the counter, like a fresh process): dry-run then confirm both return ok:true, applied:[\"xproc-1\"]. On the old id both states produce hclean-itm-mcp-0, so the dry-run row hlg-hclean-itm-mcp-0-0-xproc-1 collides and the confirm insert fails UNIQUE. Scoped: `cargo test -p clio-mcp hygiene` -> 12 passed; coverage hygiene_tools.rs 99.22%/100%, runtime_context.rs 100%/100%. make check + make coverage green."
+    },
+    {
+      "id": "F-03",
+      "severity": "medium",
+      "title": "The 'run standalone' expected outcome is not true for audit/export/import over durable data (in-process LocalDevKms)",
+      "evidence": "Live against a temp file DB whose item was written by an earlier CLI process: `./target/debug/clio hygiene audit --bank demo --db /tmp/opencode/adv-cli/clio.db` -> exit 1, {\"code\":\"forbidden\",\"message\":\"no DEK for subject `itm-cli-737432800-592671`\"}; `./target/debug/clio export --out bundle.json --actor harness --bank demo --db /tmp/opencode/adv-cli/clio.db` -> exit 1, same error; no bundle file written. Root cause is the fresh in-process `LocalDevKms` opened per CLI process (crates/clio-mcp/src/runtime.rs:244). The phase file discloses this as limitation 1 (lines 254 and 250) and earlier phases recorded the same pre-existing limitation; AC-100376-01/02 rows label PASS while their live-capable paths are clean/erase gates and in-process tests only.",
+      "requirement_ref": "phase-100376 \u00a71 Expected Outcome ('run standalone'), \u00a79 AC-100376-01/02; gaps/full-cli.md \u00a710 items 1-2; FR-29/FR-33",
+      "recommendation": "Keep the disclosure but add the cross-process caveat to the AC-100376-01/02 rows and surface it at the point of failure (help or error hint: content written by another process needs a durable KMS provider); assign the durable DEK provider to a named phase/track so the debt has an owner.",
+      "status": "resolved_by_documentation_and_hint",
+      "resolution": "A durable DEK/KMS provider is out of scope (this phase must not change the DEK/erase mechanism), so resolved by disclosure + failure-point surfacing. AC-100376-01/02 now carry the cross-process KMS caveat; limitation 1 names the owning track (DEK/KMS persistence track) and records that no roadmap phase is currently assigned (pre-existing unassigned debt, first recorded in the Phase 100370 CLI phase). The CLI now attaches an actionable hint at the failure point: cross_process_dek_hint in cli_error.rs keys on `no DEK for subject` and adds `the default key provider is process-local; content written by another process needs a durable KMS provider`; call_tool applies it. Test tool_failure_adds_the_cross_process_dek_hint; cli_error.rs coverage 100%/100%."
+    },
+    {
+      "id": "F-04",
+      "severity": "medium",
+      "title": "Confirmed clean reports a per-item failure as exit 0 and hides it from the text view",
+      "evidence": "Live: re-running `./target/debug/clio hygiene clean --file c2.json --action discard --confirm --reason noise --bank demo --db /tmp/opencode/adv-cli/clio2.db` on an already-discarded target -> exit 0 with {\"applied\":[],\"failed\":{\"error\":\"invalid_argument: item `itm-cli-...` is already discarded\", ...}}; `--output text` prints only 'hygiene clean: applied 0 item(s)' (no failed target, no error, no pending detail). Code: crates/clio-lib/src/cli_write_hygiene.rs:210-231 renders applied/pending but never `failed`; crates/clio-lib/src/cli_write_hygiene.rs:71-74 refuses nothing; crates/clio-lib/src/cli_write.rs:156-169 returns exit 0 for any ok payload. The developer's own batch-abort test (cli_write_hygiene_tests.rs:251-275) asserts exit 0 for a 1-applied/1-pending partial batch.",
+      "requirement_ref": "phase-100376 \u00a79 AC-100376-01 ('Candidates actioned'); gaps/full-cli.md \u00a75 items 2 and 5 (actionable typed errors, exit-code contract)",
+      "recommendation": "Render the failed target and its error plus the pending count in the text view, and either map a batch abort to exit 1 / a refusal or document partial-success exit 0 explicitly in the help; add a golden text-output test for the failure path.",
+      "status": "resolved",
+      "resolution": "render_clean now prints the failing target and its error plus the pending count (`hygiene clean: applied 1 item(s); failed itm-ghost (\u2026); aborted, 1 pending`), and the new WriteGroup::failure_exit seam makes a confirmed batch abort exit 1 while the JSON payload still carries applied/failed/pending. Golden tests: clean_reports_a_confirmed_batch_abort_in_text (exit 1, text) and clean_confirmed_batch_abort_exits_one_with_json_detail. Coverage cli_write_hygiene.rs 96.47%/95.24%. make check green."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "hygiene audit text view silently drops the scan-budget 'incomplete' signal",
+      "evidence": "crates/clio-lib/src/cli_read_hygiene.rs:129-131 renders only 'hygiene audit (bank X): scanned N active items, M candidates'; the tool marks banks larger than the scan budget via `incomplete` (crates/clio-hygiene/src/audit.rs:70-73) and the JSON payload carries it, but text users get no truncation notice. gaps/full-cli.md \u00a75 item 6 requires bounded output to never silently truncate hygiene_audit.",
+      "requirement_ref": "gaps/full-cli.md \u00a75 item 6; phase-100376 \u00a74 Discovery (hygiene_audit partial scan)",
+      "recommendation": "Append a '(partial scan: bank exceeds the scan budget)' marker to the audit text summary when `incomplete` is true, with a text-render test.",
+      "status": "resolved",
+      "resolution": "render_audit appends ` (partial scan: bank exceeds the scan budget)` when the tool payload's `incomplete` flag is true; a complete scan is unchanged. Test audit_text_marks_a_partial_scan covers true and false. Coverage cli_read_hygiene.rs 99.19%/100%."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Completion evidence contains inaccurate counts and percentages",
+      "evidence": "phase file line 252 says the baseline was '301 files, TOTAL 97.95% lines / 98.91% functions'; `python3 scripts/coverage_guard.py /tmp/cov-baseline.json` -> '303 file(s) checked ... TOTAL lines 97.95% functions 98.92%'. Line 249 says 'five new files plus test files ... four edited shared files' but the staged diff adds six new files (3 modules + 3 test files) and edits five shared files. developer-task-r1.log line 6 claims all Rust files <=450 lines (cli_help.rs is 481; see F-01).",
+      "requirement_ref": "developer task 'Fill ... with real results only'; AGENTS.md 'Be honest'",
+      "recommendation": "Correct the baseline file count/function percentage and the file counts in Completion Evidence, and drop or fix the <=450-line claim once cli_help.rs is split.",
+      "status": "resolved",
+      "resolution": "Phase file corrected with real numbers: baseline now `303 files, 97.95% lines / 98.92% functions` (python3 scripts/coverage_guard.py /tmp/cov-baseline.json -> `303 file(s) checked ... TOTAL lines 97.95% functions 98.92%`); module-diff counts corrected to 7 new files (3 modules + 3 *_tests.rs + cli_help_usage.rs) and 5 edited shared files in r1; the <=450-line claim now holds after the F-01 split; final gate numbers updated to `307 files, 97.96% / 98.91%`. The developer run-log line-6 <=450 claim predates the split and is superseded by this corrected record."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "hygiene clean rejects --dry-run although the CLI-wide UX contract promises it on every mutation",
+      "evidence": "`./target/debug/clio hygiene clean --dry-run --file /tmp/opencode/adv-cli/cands.json --db /tmp/opencode/adv-cli/clio.db` -> exit 2, unknown flag (the group spec at crates/clio-lib/src/cli_write_hygiene.rs:45-47 lists file/action/reason/note/confirm only). The unconfirmed call is the implicit dry-run and the help says so, but gaps/full-cli.md \u00a75 item 4 and \u00a710 item 3 promise `--dry-run` on every mutation.",
+      "requirement_ref": "gaps/full-cli.md \u00a75 item 4, \u00a710 item 3; phase-100376 \u00a75 Implementation Freedom (help wording)",
+      "recommendation": "Accept `--dry-run` on hygiene clean as an explicit alias that forces the unconfirmed dry-run path, or record the deviation in the phase file's Known Limitations.",
+      "status": "resolved",
+      "resolution": "HygieneWriteGroup::spec now accepts --dry-run; clean_call forces the unconfirmed zero-write path when --dry-run is present even with --confirm/--yes; the per-command usage line (cli_help_usage.rs) and clio help catalog (main.rs) updated. Test clean_dry_run_flag_forces_zero_writes_even_with_confirm -> exit 0, dry_run:true, would_discard:1, stats items_active unchanged; spec test asserts the flag."
+    }
+  ],
+  "plan_1hr": [
+    "Split crates/clio-lib/src/cli_help.rs into two files (bindings/usage tables vs catalog/help assembly) so every created/modified Rust file is <=450 lines; re-run make check and scoped cli coverage, then correct the phase-file/run-log <=450 claim (F-01, F-06).",
+    "Amend AC-100376-01 evidence to state the observed confirm exit 1 and the UNIQUE-batch-id root cause, and name the owning phase/track for the fix; add the in-row cross-process KMS caveat to AC-100376-01/02 (F-02, F-03).",
+    "Surface `failed` and `pending` in the confirmed-clean text view and decide exit semantics for a batch abort (exit 1 or refusal mapping); add a golden failure-path test (F-04)."
+  ],
+  "plan_unlimited": [
+    "Make hygiene clean batch ids collision-free (store-derived or invocation-unique) and add a cross-process regression test that runs dry-run then confirm against a durable DB (F-02).",
+    "Implement or assign a durable DEK/KMS provider (or a CLI-mode key file) with an owning phase so audit/export/import genuinely run standalone across one-shot processes; reflect the new capability in FR-29/FR-33 evidence (F-03).",
+    "Complete the bounded-output contract: accept --dry-run uniformly on hygiene clean and surface the scan-budget `incomplete` signal in text views; add golden CLI text tests for partial batches and partial scans (F-04, F-05, F-07).",
+    "Fix the completion-evidence bookkeeping (baseline counts/percentages, new/edited file counts) and add a repo check that flags modified files crossing the 450-line cap before staging (F-06)."
+  ],
+  "remediation_r1": {
+    "round": "r1",
+    "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+    "plan_1hr": [
+      "Done (F-01, F-06): split cli_help.rs -> cli_help_usage.rs so every created/modified Rust file is <=450 lines; re-ran make check and the full make coverage; corrected the phase-file/run-log <=450 and count claims.",
+      "Done (F-02, F-03): AC-100376-01 now states the previously observed confirm exit 1 and its UNIQUE-batch-id root cause and records the fix; AC-100376-01/02 carry the in-row cross-process KMS caveat and the debt track is named in limitation 1.",
+      "Done (F-04): the confirmed-clean text view now names the failing target and pending count; a batch abort exits 1 (WriteGroup::failure_exit) while the JSON payload keeps applied/failed/pending; golden failure-path tests added."
+    ],
+    "plan_unlimited": [
+      "Done (F-02): hygiene clean batch ids are invocation-unique (process id + nanosecond clock + counter) with a cross-process regression test (fresh runtime dry-run -> confirm over a durable file DB).",
+      "Assigned, not implemented (F-03): durable DEK/KMS provider is out of scope for this phase (must not change the DEK/erase mechanism); the phase file now names the DEK/KMS persistence track as owner and states no roadmap phase is currently assigned, and the CLI surfaces the limitation with an actionable hint at the failure point.",
+      "Done (F-04, F-05, F-07): --dry-run accepted uniformly on hygiene clean, the scan-budget incomplete signal is surfaced in the audit text view, and golden CLI text tests cover partial batches and partial scans.",
+      "Done (F-06): completion-evidence bookkeeping corrected (baseline counts/percentages, new/edited file counts). The suggested repo check that flags modified files crossing the 450-line cap was not added (out of scope for this phase); the cap is verified by scanning wc -l over the changed set."
+    ]
+  }
+}
