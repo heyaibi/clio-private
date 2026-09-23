@@ -1,0 +1,535 @@
+# Phase 100606: Context Lifecycle, Retrieval, and Portability
+
+### Attribution
+Rounds below record plan authorship; implementation sign-off is in §12.
+| Role | Round | Actual Agent | Status |
+|------|-------|--------------|--------|
+| Developer | r1 | OpenCode (Space Bunny Free) | proposed |
+| Adversary | r1 | [TBD] | [TBD] |
+| Remediator | r1 | [TBD] | [TBD] |
+| Remedy Approver | r1 | [TBD] | [TBD] |
+| Finalize | r1 | [TBD] | [TBD] |
+
+**Remediation/follow-up phase 100606** · **Effort:** ~4–6 days · **Status:** Plan ready · **Parent:** requirement.md v1.10 and Phase 100601 native context contract
+
+### Vocabulary (read first) — zero shared moniker
+
+| Term | Meaning in this phase | Must not be confused with |
+|------|------------------------|----------------------------|
+| **context propagation** | Carrying an already-validated source context through extraction, indexing, retrieval, portability, and audit | Creating a new category or injecting arbitrary text into a model |
+| **context-aware lexical match** | Optional retrieval use of bounded context text for matching | Treating a context match as factual proof |
+| **retrieval metadata** | Context returned alongside a hit for inspection or downstream policy | Unbudgeted automatic prompt injection |
+| **source-span grounding** | Verification of snapshot values against `source_text` | Verification against context |
+| **migration-ready bundle** | Portable data that preserves context and evidence references without a provider adapter | A Hindsight-specific export format |
+
+This phase makes context useful after it is stored. It does not create a Hindsight client or provider-specific migration path.
+
+---
+
+## 1. Objective
+
+### Goal
+Propagate native source context through extraction, indexing, retrieval, export/import, audit, sync, and erasure while preserving the core distinction between descriptive context, authoritative facts, evidence spans, and model-facing composition. The result must let a migration or ordinary caller preserve context and evidence identity without a provider adapter.
+
+### Expected Outcome
+- Raw ingest/extraction can receive bounded context as untrusted descriptive input without weakening span verification.
+- Retrieval results expose context and define a safe, bounded way to use it for matching without making it authoritative.
+- `compose_context` continues to enforce token budgets and does not automatically inject arbitrary context.
+- JSON portability, sync, audit, correction, and erase preserve or remove context according to the Phase 100601 contract.
+- CLI and MCP behavior remains identical and migration-oriented examples use only the native contract (no provider client, no container claims).
+
+### Product Rationale
+Storing context without carrying it through the rest of the lifecycle would create a misleading feature: a field would appear in one inspector but disappear during extraction, export, synchronization, or deletion. This phase makes context useful wherever the memory is transformed or inspected, while keeping it bounded and subordinate to the snapshot/gist contract.
+
+It also keeps migration provider-neutral. A migration tool or operator can retain the human-readable context and carry external source identifiers opaquely without requiring Clio to know which external system produced the record. Document-container parity is explicitly deferred (see requirement §9).
+
+### Parent Requirement
+Requirement v1.10 and Phase 100601's context/evidence contract; current P1, P3, P5, P6, P12; PR-1, PR-3, PR-4, PR-5, PR-8, PR-9, PR-10; FR-4, FR-5, FR-6, FR-15, FR-17, FR-20, FR-24, FR-29, FR-34, FR-35; NFR-2, NFR-3, NFR-5, NFR-6, NFR-7, NFR-9; §4.3–§4.5, §4.9.3, §4.9.5.B, §7.4.
+
+---
+
+## 2. Scope Boundaries
+
+### In Scope
+- Context propagation through the existing raw-ingest/extraction contract.
+- Safe treatment of context as untrusted input to local and hosted extractors.
+- Retrieval result metadata and the explicitly approved lexical matching policy.
+- Safe behavior of `compose_context` and context budget accounting.
+- JSON export/import round trips, manifests, checksums, and version compatibility.
+- Audit, correction, sync, and erasure propagation for context.
+- CLI/MCP parity tests, migration examples, and operator documentation.
+- A provider-neutral migration mapping guide showing how external source identifiers are carried opaquely in `evidence_ref` with no container-parity claim.
+
+### Explicitly Out of Scope
+- Hindsight API calls, provider credentials, provider polling, provider-side document upsert, or a Hindsight adapter.
+- Automatic live migration or dual-write.
+- A generic tags, labels, or context-based filtering API.
+- New context categories or admission factors.
+- Changing snapshot/gist authority, confidence semantics, or update rules.
+- Unbounded context injection into model prompts.
+- New storage engines or unrelated retrieval features.
+
+### Must Not Change
+- `compose_context` remains bounded by the existing token budget and persona/memory separation.
+- FR-4 span verification continues to use `source_text` as the haystack.
+- Context never overrides a structured snapshot or changes fact/belief classification.
+- Existing provider stubs remain unchanged; no provider code is added.
+- Existing export/import idempotency and manifest guarantees remain intact.
+- Existing sync, erase, and audit semantics remain authoritative.
+
+### Scope Expansion Rule
+If work outside this scope appears necessary:
+1. Stop.
+2. Document the reason.
+3. Request clarification or approval.
+4. Do not silently expand scope.
+
+---
+
+## 3. Preconditions and Dependencies
+
+### Preconditions
+- Phase 100601's contract is implemented or explicitly available as the downstream context/evidence contract.
+- Existing extraction, retrieval, CLI, portability, audit, sync, and erase owners have been identified.
+- The context maximum and redaction policy are documented.
+
+### Dependencies
+| Dependency | Required State | Validation |
+|------------|----------------|------------|
+| Native context field | Store/read contract accepts and returns bounded context | Phase 100601 acceptance |
+| Evidence reference | Stable external source IDs survive read/write/portability | Phase 100601 acceptance |
+| Extraction contract | Candidate has source text, snapshot, gist, and source reference | Existing extraction inspection/tests |
+| Span verification | Context is not accepted as a replacement for source text | Existing FR-4 tests |
+| Retrieval | Hybrid results can carry optional metadata without exceeding budgets | Existing retrieve/compose tests |
+| Portability | Manifest, checksums, versioned JSON, and idempotent import exist | Phase 100220 tests |
+| Audit/erase/sync | Context can be propagated or removed through existing records | Existing phase tests |
+
+---
+
+## 4. Existing-System Discovery
+
+The agent MUST inspect the existing system before deciding where or how to implement the changes.
+
+### Required Discovery
+- Locate raw ingest/extraction entry points and determine which path actually runs in the live runtime.
+- Confirm how `source_text`, `source_ref`, snapshots, gists, and retry feedback are passed to extractors.
+- Locate lexical/dense document construction and result serialization.
+- Confirm how `compose_context` selects and budgets persona versus memory content.
+- Locate export/import payload versions, manifests, checksums, and idempotency keys.
+- Locate sync payload serialization, audit projections, correction, and dirty-path erase propagation.
+- Inspect CLI/MCP schema generation and existing migration documentation.
+
+### Discovery Output
+Before implementation, the agent must report:
+
+- Relevant subsystems identified
+- Existing implementation approach
+- Relevant contracts/interfaces
+- Existing test coverage
+- Architectural constraints discovered
+- Assumptions confirmed
+- Assumptions contradicted
+- Questions requiring clarification
+
+### Current Repository Findings at Plan Time
+- The extraction interface carries source text and candidate output, but the live MCP store path does not currently run raw extraction.
+- `source_text` is only needed when a structured snapshot is present and is the correct span-verification haystack.
+- Retrieval already has a separate `compose_context` budget and persona channel; context must not bypass that contract.
+- JSON portability has a manifest and idempotent import foundation but must be checked for the new field.
+- Audit, sync, and erase have established paths; context must be added to those paths rather than creating parallel mechanisms.
+- The CLI binding for `remember` is already owned by the CLI write phase; this phase extends behavior and must not create a second command owner.
+
+### Assumptions Confirmed
+- Context can be carried as bounded metadata through existing item envelopes.
+- The retrieval result type can expose optional metadata without changing the authoritative item.
+- Existing manifest/version mechanisms can represent a new optional field compatibly.
+- Provider-neutral migration documentation can explain external source identifiers without a provider client.
+
+### Assumptions Requiring Approval
+- Whether context participates in lexical matching by default or only under an explicit retrieval option.
+- Whether `compose_context` may ever include context automatically; the recommended default is no.
+- Whether context is included in dense embedding input; the recommended default is no until separately benchmarked.
+
+### Repository Adaptation Rule
+The agent must determine concrete implementation locations from the actual repository. The plan does not prescribe file paths, class names, module names, or directory structures unless they are explicitly part of the externally required contract.
+
+---
+
+## 5. Implementation Specification
+
+### Task 1: Propagate Context Safely Through Ingest and Extraction
+
+#### Intent
+Allow source context to help a future extractor understand a memory's setting without allowing it to become evidence or an instruction channel.
+
+#### Required Capability or Behavior
+- Raw ingest accepts the same optional context contract as the core store.
+- Context is passed to extractors as bounded descriptive metadata.
+- The authoritative evidence haystack remains `source_text`.
+- Context is not concatenated into a prompt as an instruction and cannot override schema, system, or verifier rules.
+- Extracted snapshots, gists, source references, and context remain associated after successful admission.
+- A failed or rejected extraction follows the existing retry/refusal behavior.
+
+#### Architectural Responsibility
+The ingest/extraction boundary owns propagation and prompt safety; the span verifier remains the sole grounding authority.
+
+#### Required Changes
+1. Add context to the extraction request/candidate envelope where raw ingest is supported.
+2. Preserve context through extraction, verification, admission, and leaf publication.
+3. Add explicit prompt delimiters and untrusted-data treatment for context in hosted extraction.
+4. Ensure context is not used as a source span or included in snapshot verification.
+5. Add tests for missing, normal, oversized, and instruction-like context.
+
+#### Implementation Constraints
+- Do not send context to a hosted extractor unless the existing source-egress policy permits the same data class.
+- Do not let model output or context change the category, epistemic kind, or source type.
+- Do not change FR-4 retry/refusal behavior.
+- Do not require live extraction wiring if that wiring is owned by another phase; provide the contract and tests at the existing seam.
+
+#### Expected Result
+An extractor can receive context as bounded descriptive input, while only source text can satisfy span verification and the stored item retains the original context.
+
+### Task 2: Define Context-Aware Retrieval Without Breaking Budgets
+
+#### Intent
+Make context useful for finding related memories while keeping fact authority and model budgets unchanged.
+
+#### Required Capability or Behavior
+- Retrieval hits may return context as optional metadata.
+- The approved lexical policy may include context in lexical matching; dense snapshot/gist embeddings remain unchanged unless separately approved.
+- A context match never upgrades an item from belief to fact or bypasses category/admission history.
+- `compose_context` counts any explicitly included context under the same memory budget and never injects it by default.
+- Retrieval remains bank-scoped and subject to existing time, domain, and budget controls.
+
+#### Architectural Responsibility
+The retrieval/composition owner controls candidate text, result metadata, and budgets; the context field itself remains storage data.
+
+#### Required Changes
+1. Add context to retrieval result metadata and safe rendering.
+2. Implement or explicitly reject the proposed lexical matching policy with deterministic tests.
+3. Ensure dense/gist behavior is documented and covered by regression tests.
+4. Add budget tests showing context cannot expand `compose_context` beyond its budget.
+5. Add tests for context-only matches, fact/belief preservation, and bank isolation.
+
+#### Implementation Constraints
+- No unbounded context concatenation.
+- No new context filter syntax in this phase.
+- No change to the intent gate or persona channel rules.
+- No claim that a context match proves the underlying fact.
+
+#### Expected Result
+A caller can retrieve context when present, and any context used for matching or composition is bounded, visible, and separate from authoritative truth.
+
+### Task 3: Extend Portability, Audit, Correction, Sync, and Erasure
+
+#### Intent
+Ensure context survives the complete data lifecycle and does not create a hidden backup or orphan field.
+
+#### Required Capability or Behavior
+- Export includes context and the evidence reference according to the approved content mode.
+- Import validates and round-trips context, including old bundles where it is absent.
+- Manifest completeness/checksum calculations include the new field when present.
+- Audit and correction show context changes without logging unsafe raw values.
+- Sync carries context under the existing encrypted/conflict/idempotency rules.
+- Erasure removes or renders context unreadable through the existing subject/derived-structure path.
+- A context-only change does not silently rewrite unrelated item content.
+
+#### Architectural Responsibility
+Existing portability, audit, sync, and compliance owners add the field to their established projections and lifecycle rules.
+
+#### Required Changes
+1. Update versioned export/import schemas and compatibility logic.
+2. Update manifest counts/checksums and dry-run samples with safe redaction.
+3. Update audit/correction history for context changes.
+4. Update sync serialization and idempotency comparison.
+5. Update erase/dirty-path propagation and verify no derived copy remains readable.
+6. Add round-trip, old-version, redaction, and erasure tests.
+
+#### Implementation Constraints
+- Do not add a second export or sync format.
+- Do not expose context in plaintext logs or diagnostics.
+- Do not let import bypass admission or category gates.
+- Do not treat context as a new source of truth.
+
+#### Expected Result
+A context-bearing item survives export/import, sync, correction, audit, and erasure according to the same lifecycle guarantees as the rest of its content.
+
+### Task 4: CLI, Documentation, and Migration Mapping
+
+#### Intent
+Make the feature usable and migration-ready without adding a provider adapter.
+
+#### Required Capability or Behavior
+- Existing `remember` and `admit` CLI help documents `--context` and the evidence-reference semantics.
+- The MCP schema and CLI help describe identical constraints and defaults.
+- Operator documentation explains context versus category, evidence reference, source text, and compose context.
+- A provider-neutral migration example shows how external source identifiers are carried opaquely in `evidence_ref` and how `context` is retained, with no document-container claim.
+- No Hindsight network call or credential is required for the example.
+
+#### Architectural Responsibility
+CLI/help/docs owners expose the already-defined contract; migration documentation does not implement a provider adapter.
+
+#### Required Changes
+1. Add or update CLI usage text and examples.
+2. Add a migration mapping example using generic external records.
+3. Document that `evidence_ref` confers no document-container semantics and that `doc_id` is deferred to a later research phase (see requirement §9).
+4. Document retrieval, redaction, and context-size behavior.
+
+#### Implementation Constraints
+- Do not add a new top-level CLI command.
+- Do not add provider credentials or a remote migration flow.
+- Do not imply that evidence references are automatically idempotent unless the identity contract says so.
+
+#### Expected Result
+A user can manually or programmatically migrate records into Clio using the native context and evidence-reference contract without an adapter.
+
+### Task 5: Cross-Cutting Verification and Evidence
+
+#### Intent
+Demonstrate that context is safe and useful across the full system, not merely accepted by one parser.
+
+#### Required Capability or Behavior
+- Unit, integration, contract, end-to-end, regression, security, and failure-mode tests cover the approved lifecycle.
+- Tests prove context is not used for span verification or automatic injection.
+- Tests prove export/import, sync, audit, correction, and erase preserve lifecycle guarantees.
+- Tests prove MCP and CLI semantics match.
+
+#### Architectural Responsibility
+Each owning crate tests its boundary; the phase exit report collects the aggregate evidence.
+
+#### Required Changes
+1. Add focused tests at extraction, retrieval, portability, audit, sync, erase, and binding boundaries.
+2. Add a migration fixture with context, evidence reference, and no provider dependency.
+3. Run the workspace's required checks and coverage procedure.
+4. Record any unimplemented downstream policy as a documented limitation, not as a silent pass.
+
+#### Implementation Constraints
+- Do not claim retrieval quality improvement without comparative evidence.
+- Do not claim provider compatibility without a real contract test against a fixture or documented API shape.
+- Do not weaken existing tests to accommodate context.
+
+#### Expected Result
+The phase has executable evidence that context remains bounded, attributable, portable, erasable, and separate from truth and model composition.
+
+### Implementation Freedom
+The agent may choose internal module placement, retrieval representation, serializer layout, and test organization provided the public contract, security boundaries, and acceptance criteria remain intact.
+
+---
+
+## 6. Agent Execution Rules
+
+### Allowed Actions
+- Inspect and modify extraction, retrieval, CLI, portability, audit, sync, erase, schema, and documentation components.
+- Add context propagation and safe metadata handling.
+- Add provider-neutral migration examples and fixtures.
+- Perform local refactoring required to preserve existing ownership boundaries.
+
+### Forbidden Actions
+- Add a Hindsight adapter, Hindsight API client, provider polling, or remote migration job.
+- Add a new provider or dependency without approval.
+- Add a generic tag/filter system or new category.
+- Change fact/belief, source-span, admission, or compose-context semantics silently.
+- Unbounded prompt injection or plaintext logging.
+- Delete tests, weaken security, or claim success without evidence.
+
+### Agent Decision Boundary
+The agent may decide:
+- Whether context is included in lexical matching under the approved policy.
+- Internal metadata and serialization layout.
+- Documentation examples and test placement.
+
+The agent must request approval for:
+- Dense embedding changes.
+- Automatic context injection into `compose_context`.
+- New filtering or ranking semantics.
+- Provider-specific behavior.
+- A change to the context size or encryption policy.
+
+### Mandatory Stop Conditions
+Stop and report if:
+- Context cannot be kept separate from source text or truth.
+- Retrieval budgets cannot account for context safely.
+- Export/import or sync would lose or expose context.
+- Existing runtime extraction is not actually wired and the phase would require an unapproved rewrite.
+- A provider adapter appears necessary to satisfy the approved scope.
+
+---
+
+## 7. Security Constraints
+
+### Required Controls
+- Treat context as untrusted, potentially sensitive input.
+- Validate and bound context before extraction, indexing, storage, or egress.
+- Scrub or omit context from logs, dry-run samples, errors, and audit human output.
+- Preserve bank/subject authorization and existing provider stub behavior.
+- Keep model instructions and source text authoritative over context.
+
+### Sensitive Data Rules
+- Never log raw context by default.
+- Never treat context as a credential, authorization token, or executable instruction.
+- Never send context to a hosted model without the same explicit egress policy and scrubbing used for source text.
+- Never commit secrets or provider credentials.
+
+### Security Acceptance Conditions
+- Instruction-like context cannot change extraction schema or admission outcome.
+- Secret-like context is absent from plaintext diagnostics and exports unless the authorized content mode explicitly includes it.
+- Context is removed through the existing erasure path.
+- No provider network call occurs in this phase.
+
+---
+
+## 8. Test and Verification Strategy
+
+### Required Tests
+- [ ] Unit tests
+- [ ] Integration tests
+- [ ] Contract tests
+- [ ] End-to-end tests
+- [ ] Regression tests
+- [ ] Security tests
+- [ ] Failure-mode tests
+
+### Required Test Scenarios
+
+| Test ID | Scenario | Expected Result |
+|---------|----------|-----------------|
+| T100606-01 | Extract with normal context and source text | Snapshot verifies only against source text; context persists |
+| T100606-02 | Context contains instruction-like text | Treated as data; schema/admission cannot be overridden |
+| T100606-03 | Context is oversized or malformed | Rejected before extraction or persistence |
+| T100606-04 | Retrieve an item with context | Context appears as metadata; truth and bank scope remain correct |
+| T100606-05 | Compose a budgeted pack containing context candidate | Total budget is enforced; no unbounded injection |
+| T100606-06 | Export/import context-bearing item | Context and evidence reference round-trip; manifest remains complete |
+| T100606-07 | Import an old bundle without context | Accepted with absent context and no data loss |
+| T100606-08 | Correct/sync an item with context | Lifecycle change is attributable and idempotent |
+| T100606-09 | Erase a subject with context | Context is unreadable and derived copies are regenerated/removed |
+| T100606-10 | Context contains secret-like text | Logs, samples, and errors redact or omit it |
+| T100606-11 | CLI and MCP equivalent requests | Same stored context/evidence behavior |
+| T100606-12 | No provider/network configured | All local behavior remains available; no provider call occurs |
+
+### Negative Testing
+Verify that:
+- Context cannot bypass extraction or admission validation.
+- Context cannot expand retrieval or composition budgets.
+- Export/import and sync do not drop context silently.
+- Erasure does not leave a readable derived copy.
+- Existing no-context behavior remains intact.
+- A failed operation does not leave partially propagated context.
+
+### Verification Rule
+Implementation claims must be supported by actual test output, runtime evidence, schema inspection, or other concrete evidence.
+
+---
+
+## 9. Acceptance Criteria and Evidence
+
+| AC ID | Acceptance Criterion | Verification Method | Required Evidence |
+|-------|----------------------|---------------------|-------------------|
+| AC-100606-01 | Context propagates through extraction without becoming evidence or instructions | T100606-01, T100606-02, T100606-03 | Test output |
+| AC-100606-02 | Retrieval exposes context safely and preserves budgets | T100606-04, T100606-05 | Retrieval/compose test output |
+| AC-100606-03 | Portability and sync preserve context and evidence identity | T100606-06, T100606-07, T100606-08 | Round-trip and idempotency output |
+| AC-100606-04 | Audit, correction, and erasure honor context lifecycle | T100606-08, T100606-09 | Lifecycle/security output |
+| AC-100606-05 | Context is redacted from unsafe diagnostics and egress | T100606-10 | Security test output |
+| AC-100606-06 | CLI and MCP expose identical semantics | T100606-11 | Contract/parity output |
+| AC-100606-07 | No provider adapter or network dependency is introduced | T100606-12, code inspection | Discovery and test evidence |
+| AC-100606-08 | Migration documentation carries external source identifiers opaquely with no container-parity claim | Documentation review | Approved example |
+
+### Definition of Done
+- [ ] All in-scope behavior is implemented.
+- [ ] All acceptance criteria pass.
+- [ ] Required tests pass.
+- [ ] No unauthorized changes were introduced.
+- [ ] Existing behavior remains intact.
+- [ ] Security checks pass.
+- [ ] Documentation is updated where required.
+- [ ] Evidence is collected.
+- [ ] Verification is completed.
+- [ ] Required approval is obtained.
+
+### Completion Evidence
+- Context propagation and retrieval policy summary.
+- Portability/audit/sync/erase evidence.
+- CLI/MCP parity output.
+- Security and budget test output.
+- Provider-neutral migration example.
+- Known limitations and deferred dense/provider work.
+
+---
+
+## 10. Failure Handling and Recovery
+
+### Expected Failure Modes
+
+| Failure | Detection | Recovery |
+|---------|-----------|----------|
+| Context changes extraction output unexpectedly | Golden extraction comparison | Treat context as descriptive only; fix prompt/data boundary before proceeding |
+| Context causes budget overflow | Compose test | Exclude or truncate according to the approved budget policy; never inject unbounded text |
+| Export/import drops context | Round-trip test | Block acceptance; preserve old version compatibility while fixing serializer |
+| Sync omits context | Sync contract test | Fail the sync operation or use the documented compatibility path; do not silently clear it |
+| Context leaks in logs | Security test | Redact, remove output, investigate exposure, and rerun |
+| Erase leaves derived context | Erase test | Block acceptance and repair dirty-path propagation |
+| Existing extraction runtime is absent | Discovery | Limit work to the defined seam and document the live-wiring dependency; do not add an unapproved runtime rewrite |
+
+### Rollback Strategy
+Disable context-aware retrieval and new field exposure while retaining nullable stored values. Old bundles and items remain readable. Do not delete context-bearing data without an explicit erase/retention decision.
+
+### Partial Completion Policy
+If extraction, retrieval, portability, or erasure is incomplete, do not claim native support end to end. Record the completed boundary and the exact missing lifecycle behavior.
+
+---
+
+## 11. Traceability
+
+| Parent Requirement | Implementation Task | Verification | Acceptance Criterion |
+|--------------------|---------------------|--------------|-----------------------|
+| PR-1 / NFR-3 | Task 2 | T100606-04, T100606-05 | AC-100606-02 |
+| PR-4 / FR-4 / FR-5 | Task 1 | T100606-01, T100606-02 | AC-100606-01 |
+| PR-8 / FR-15 / NFR-6 | Task 3 | T100606-08, T100606-09 | AC-100606-03, AC-100606-04 |
+| FR-20 / NFR-7 | Task 4 | T100606-11 | AC-100606-06 |
+| §4.9.5.B / FR-29 | Task 3 and Task 4 | T100606-06, T100606-07 | AC-100606-03 |
+| §7.4 | Task 3 | T100606-09, T100606-10 | AC-100606-04, AC-100606-05 |
+| Provider-neutral migration goal | Task 4 | Documentation review | AC-100606-08 |
+| No-provider scope boundary | All tasks | T100606-12 | AC-100606-07 |
+
+Required chain:
+
+```text
+Requirement → Capability → Implementation → Test → Evidence
+```
+
+Every acceptance criterion must be traceable.
+
+---
+
+## 12. Phase Exit Contract
+
+### Outputs Produced
+- Safe context propagation through extraction, retrieval, portability, audit, sync, and erase.
+- Documented retrieval and composition policy for context.
+- Provider-neutral migration documentation using context and `evidence_ref`.
+- No Hindsight adapter, provider client, or remote migration flow.
+
+### Guarantees Provided to Downstream Phases
+After this phase is accepted:
+- Context is a first-class, bounded, protected part of the memory lifecycle.
+- `evidence_ref` is the canonical external source identity; document-container semantics are deferred (see requirement §9).
+- Retrieval and model composition remain bounded and truth-preserving.
+- A later migration tool or operator can map external records without changing the core contract.
+
+### Known Limitations
+- No direct Hindsight import or live migration.
+- Dense use of context is not enabled by default.
+- No generic context filter or tag system.
+- Provider-side document upsert semantics are not implemented.
+
+### Downstream Prerequisites
+- Any later migration tooling may rely on context and evidence-reference round trips.
+- Any future provider work must use the native contract; `doc_id` container design belongs to a dedicated later phase and must not be smuggled in as a string alias.
+
+### Final Status
+PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+
+### Verification Sign-Off
+- Implementer: [TBD]
+- Verifier: [TBD]
+- Human Approver: required for public retrieval/portability policy changes
+- Date: [TBD]

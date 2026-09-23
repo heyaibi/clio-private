@@ -2,10 +2,11 @@
 name: am_finalize
 description: Clio finalize stage - close-out duty after remedy approval
 role: developer
-harness: ['opencode:together/glm-5.3-flash@high', 'opencode:go/deepseek-v4.1-flash@high']
+harness: ['opencode:together/glm-5.3-flash@high', 'opencode:go/deepseek-v4.1-flash@high', 'opencode:go/space-bunny-free@max']
 harness_names:
   'opencode:together/glm-5.3-flash@high': "OpenCode CLI (Together . GLM-5.3 Flash High)"
   'opencode:go/deepseek-v4.1-flash@high': "OpenCode CLI (Go . Deepseek V4.1 Flash High)"
+  'opencode:go/space-bunny-free@max': "OpenCode CLI (Go . Space Bunny Free Max)"
 placeholders:
   REMEDY_APPROVER_AGENT_OUTPUT: Final approver verdict and message.
   LOG_PATH: Absolute path of this invocation's run log (beside the task file).
