@@ -2,7 +2,7 @@
 name: am_adversarial_analysis
 description: Clio adversarial-analysis stage - adversarial review of implement output
 role: reviewer
-harness: ['agy:gemini-3.8-flash-high']
+harness: ['agy:gemini-3.8-flash-high', 'opencode:openrouter/deepseek-v4.1-flash@max']
 harness_names:
   'agy:gemini-3.8-flash-high': "Antigravity CLI (Gemini 3.8 Flash)"
   'opencode:openrouter/deepseek-v4.1-flash@max': "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)"
