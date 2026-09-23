@@ -95,8 +95,8 @@ NONCE_FOOTER = (
     "is ignored. Nonces quoted from earlier prompts are stale: use only "
     "this one. `*_BLOCKED` lines need no nonce.\n")
 END_TOKENS = ("_DONE", "_APPROVED", "_REJECTED")
-# opencode's root TUI command lacks --variant (upstream #7354/#37925), so the
-# stage's reasoning effort is injected as a per-agent default variant instead.
+# OpenCode v2 only: stages run headless via `opencode run`. Reasoning effort
+# joins the model selector after `#` (provider/model#variant).
 OPENCODE_AGENT = "am_pipeline_stage"
 
 
@@ -186,22 +186,23 @@ def save_rotation(repo, key, harness_use):
 
 
 def opencode_launch(model, effort, pointer, stage_name=OPENCODE_AGENT):
-    """Build the opencode full-TUI launch command and environment.
+    """Build the opencode headless `run` command and environment.
 
-    Full TUI (not `run -i`) so the operator watches the real interface.
-    --auto auto-approves permissions (mandated by the stages). The root TUI
-    command has no --variant flag (upstream #7354/#37925), so a stage's
-    reasoning effort is injected as a per-agent default variant via
-    OPENCODE_CONFIG_CONTENT (spike-proven on 1.18.31). Returns (cmd, env)."""
-    cmd = ["opencode", "--auto"]
+    OpenCode v2 only: the v2 root TUI takes no model/agent/prompt flags,
+    so every stage runs headless via `opencode run`. --auto auto-approves
+    permissions (mandated by the stages). Reasoning effort joins the model
+    after `#` (v2 selector syntax: provider/model#variant). No --agent:
+    v2 hard-errors on unknown agent names ("Agent not found") instead of
+    falling back, and the stage names carry no system prompt (the task
+    file holds it), so every stage runs as the default agent. Output
+    streams to the tmux pane, which the driver pipe-panes into the
+    session log; the runner still closes the step once the final signal
+    lands in the run log. Returns (cmd, env)."""
+    cmd = ["opencode", "run", "--auto"]
     env = dict(os.environ)
     if model != "auto":
-        cmd += ["-m", model]
-    if effort:
-        env["OPENCODE_CONFIG_CONTENT"] = json.dumps(
-            {"agent": {stage_name: {"model": model, "variant": effort}}})
-        cmd += ["--agent", stage_name]
-    cmd += ["--prompt", pointer]
+        cmd += ["-m", f"{model}#{effort}" if effort else model]
+    cmd += [pointer]
     return cmd, env
 
 TOP_KEYS = {"version", "run_dir", "inputs", "start",
@@ -944,7 +945,7 @@ def banner(cli, harness, task_path, log_path):
     print(f"  STEP     {Path(task_path).stem}      HARNESS  {harness}")
     print(f"  TASK     {task_path}")
     print(f"  LOG      {log_path}")
-    print(f"  Watch it work. Approve tool prompts as they appear. "
+    print(f"  Watch it work in this pane (--auto approves permissions). "
           f"Ctrl-C kills the step;\n  rerunning the same command resumes it.")
     print(bar, flush=True)
 
@@ -1549,7 +1550,9 @@ def self_test(run, live=False):
                     check(f"{h} model listed", False, "agy models timed out")
             elif cli == "opencode" and provider:
                 try:
-                    out = subprocess.run(["opencode", "models", provider],
+                    # v2 only: `opencode models` takes no provider argument;
+                    # it lists every configured provider's catalog at once.
+                    out = subprocess.run(["opencode", "models"],
                                          capture_output=True, text=True,
                                          timeout=120).stdout
                     check(f"{h} model listed", model in out,
@@ -1686,27 +1689,26 @@ def self_test(run, live=False):
     check("poll stable: quiet no-signal stays zero",
           _poll_stable(False, False, 3) == 0)
 
-    # opencode full-TUI launch shape: no `run`, no --variant on the root
-    # command; effort goes through the injected per-agent variant instead.
-    # With an explicit stage_name, --agent and config use that name.
+    # opencode headless run shape (v2 only): `run` subcommand, --auto,
+    # -m provider/model with effort joined as #variant, message last,
+    # never --agent (v2 hard-errors on the stage names).
     cmd_h, env_h = opencode_launch("togetherai/zai-org/GLM-5.3-Flash", "high",
                                    "PTR", "am_implement")
-    check("opencode tui cmd (effort)",
-          cmd_h[:2] == ["opencode", "--auto"] and cmd_h[-2:] == ["--prompt", "PTR"]
-          and "run" not in cmd_h and "--variant" not in cmd_h
-          and cmd_h[cmd_h.index("--agent") + 1] == "am_implement"
-          and json.loads(env_h["OPENCODE_CONFIG_CONTENT"])
-          ["agent"]["am_implement"] == {"model": "togetherai/zai-org/GLM-5.3-Flash",
-                                        "variant": "high"})
+    check("opencode run cmd (effort)",
+          cmd_h[:3] == ["opencode", "run", "--auto"]
+          and cmd_h[cmd_h.index("-m") + 1] == "togetherai/zai-org/GLM-5.3-Flash#high"
+          and "--agent" not in cmd_h
+          and cmd_h[-1] == "PTR"
+          and "OPENCODE_CONFIG_CONTENT" not in env_h)
     cmd_p, env_p = opencode_launch("togetherai/zai-org/GLM-5.3-Flash", None, "PTR")
-    check("opencode tui cmd (no effort)",
-          "--agent" not in cmd_p and "-m" in cmd_p
+    check("opencode run cmd (no effort)",
+          cmd_p[cmd_p.index("-m") + 1] == "togetherai/zai-org/GLM-5.3-Flash"
+          and cmd_p[-1] == "PTR"
           and "OPENCODE_CONFIG_CONTENT" not in env_p)
-    # Without stage_name, falls back to OPENCODE_AGENT.
+    # stage_name is accepted but unused: no --agent is ever passed.
     cmd_f, env_f = opencode_launch("togetherai/zai-org/GLM-5.3-Flash", "high",
                                    "PTR")
-    check("opencode tui cmd (fallback agent name)",
-          cmd_f[cmd_f.index("--agent") + 1] == OPENCODE_AGENT)
+    check("opencode run cmd (no agent flag)", "--agent" not in cmd_f)
 
     # Alias resolution, pinned: short stage names expand to each
     # provider's own slug; unknown models pass through untouched.
