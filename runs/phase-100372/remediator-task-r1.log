@@ -1,0 +1,19 @@
+2026-09-23T20:40:00Z remediator-task-r1 start: read task file; backup findings.original.json already exists (skip copy)
+2026-09-23T20:40:00Z triage: F-01 (high) persona stable/observe panic on empty positionals -> cli_write_persona.rs:121,147; F-02 (high) cli_write_shared_tests.rs over 450 lines (measured 453, finding said 454) -> split
+2026-09-23T20:40:00Z audit (plan_unlimited #1): grepped all positionals[ indexing; only cli_write_persona.rs:121,147 unguarded; workspace/belief/graph guard with len() checks -> F-01 is the only panic site
+2026-09-23T20:40:00Z Postgres up on :34310; baseline JSON at /tmp/cov-baseline.json present; git worktree clean vs staged baseline
+2026-09-23T15:11:23Z workers spawned in parallel (2 disjoint slices): A=F-01 owns cli_write_persona.rs + cli_write_persona_tests.rs; B=F-02 owns cli_write_shared_tests.rs + new cli_write_validate_tests.rs + cli_write_shared.rs (mod decl)
+2026-09-23T15:11:23Z worker A (F-01) done: stable_call/observe_call now match [] | [_] -> usage_hint exit 2; added persona_write_zero_argument_invocations_exit_two_without_panicking; scoped 13 passed; clippy/check clean
+2026-09-23T15:11:23Z worker B (F-02) done: validate tests+seed helper moved to cli_write_validate_tests.rs (158 lines); shared_tests 453->319 lines; sibling mod validate_tests wired; 16 shared/validate tests pass; clippy/check clean
+2026-09-23T15:11:23Z integration review: diffs minimal and correct; all 5 touched files <=450 lines (303/383/251/319/158); headers truthful; tests moved byte-for-byte; no weakened assertions; roadmap isolation grep clean; index untouched (edits unstaged, new file untracked)
+2026-09-23T15:11:23Z union scoped verify: cargo test -p clio --locked --bin clio cli_write -> 116 passed; 0 failed
+2026-09-23T15:11:23Z make check PASS (exit 0): fmt + clippy -D warnings + workspace tests
+2026-09-23T15:11:23Z make coverage attempt 1 FAILED on unrelated flaky clio-ops reindex_space_tests::reindex_across_two_providers_and_widths (embed batch mismatch); passes 3/3 in isolation
+2026-09-23T15:11:23Z make coverage attempt 2 FAILED on unrelated flaky clio-write memtree::memtree_cov_tests::concurrent_writes_during_refresh_wave; passes 3/3 in isolation (same flake developer r1 logged)
+2026-09-23T15:11:23Z make coverage attempt 3 PASS (exit 0): coverage-guard 301 file(s) checked, TOTAL lines 97.95% functions 98.91%, all reported files meet the per-file floor; cli_write_persona.rs 98.11/100.00, cli_write_shared.rs 99.41/100.00
+2026-09-23T15:11:23Z real-binary e2e: ./target/debug/clio persona stable -> usage envelope exit 2 (was panic 101); persona observe -> usage exit 2; persona stable key -> usage exit 2
+2026-09-23T15:11:23Z findings.json updated: F-01 resolved (quoted binary+test+coverage evidence), F-02 resolved (split evidence), plan_1hr 5/5 DONE, plan_unlimited 3 items deferred/partially applied with reasons; JSON validated; findings.original.json sha256 210cff2d... unchanged (matches ledger)
+2026-09-23T15:11:23Z phase file attribution: Remediator r1 -> OpenCode CLI (Go . Deepseek V4.1 Flash High) done; developer row untouched
+2026-09-23T15:11:23Z git: no add/commit/push; main-repo edits unstaged, cli_write_validate_tests.rs untracked; private-repo roadmap+findings+runs edits unstaged
+2026-09-23T15:11:23Z finish: both findings resolved and verified; final make check PASS and make coverage PASS
+REMEDIATOR_DONE 62d1635e

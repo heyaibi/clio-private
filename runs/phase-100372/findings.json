@@ -1,0 +1,48 @@
+{
+  "run": "r1",
+  "phase": "100372",
+  "remediated_by": "OpenCode CLI (Go . Deepseek V4.1 Flash High), remediator r1",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "`clio persona stable` and `clio persona observe` panic on empty positionals instead of exiting with clean usage error",
+      "evidence": "crates/clio-lib/src/cli_write_persona.rs:121,147; running `clio persona stable` produces `thread 'main' (403342) panicked at crates/clio-lib/src/cli_write_persona.rs:121:36: index out of bounds: the len is 0 but the index is 2` (exit code 101); running `clio persona observe` produces `thread 'main' (403584) panicked at crates/clio-lib/src/cli_write_persona.rs:147:36: index out of bounds: the len is 0 but the index is 2` (exit code 101)",
+      "requirement_ref": "baseline/requirement.md §4.9.2 item 2, phase-100372 §1 Expected Outcome, §5 Task 1, cli_error.rs exit contract",
+      "recommendation": "In `stable_call` (line 103) and `observe_call` (line 130) in `crates/clio-lib/src/cli_write_persona.rs`, match empty positionals `[]` explicitly (or check `positionals.len() != 2`) and return `CliError::usage_hint(...)` with exit code 2. Do not let empty positionals fall through to the wildcard arm `_ => Err(unexpected_extra(&positionals[2]))` which panics on out-of-bounds indexing. Add tests for zero-argument invocations of both subcommands to `cli_write_persona_tests.rs`.",
+      "status": "resolved",
+      "resolution": "Fixed in crates/clio-lib/src/cli_write_persona.rs:117 (`stable_call`) and :143 (`observe_call`): the single-positional arm `[_only]` became `[] | [_]`, so zero positionals now return `CliError::usage_hint(...)` (exit code 2) instead of falling through to the wildcard arm `_ => Err(unexpected_extra(&positionals[2]))`, which indexed out of bounds. The 2-positional happy path and the 3+ `unexpected extra argument` path are unchanged. Added regression test `persona_write_zero_argument_invocations_exit_two_without_panicking` to crates/clio-lib/src/cli_write_persona_tests.rs. Evidence (real binary, previously panic/exit 101): `./target/debug/clio persona stable` -> `{\"code\":\"usage\",\"hint\":\"try 'clio persona stable KEY VALUE'\",\"message\":\"`persona stable` requires KEY and VALUE arguments\",\"ok\":false}` exit=2; `./target/debug/clio persona observe` -> `{\"code\":\"usage\",\"hint\":\"usage: clio persona observe KEY NUMBER\",\"message\":\"`persona observe` requires KEY and NUMBER arguments\",\"ok\":false}` exit=2. Scoped tests: `cargo test -p clio --locked --bin clio cli_write` -> `116 passed; 0 failed`. Per-file coverage: cli_write_persona.rs lines 98.11% / functions 100.00%."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "`crates/clio-lib/src/cli_write_shared_tests.rs` exceeds the 450-line file limit (454 lines)",
+      "evidence": "crates/clio-lib/src/cli_write_shared_tests.rs:454; line count is 454 lines (exceeds the hard 450-line limit); directly contradicts Developer Completion Evidence in roadmap/phase-100372-full-cli-safe-workspace-writes.md:244 claiming 'All ≤450 total lines'",
+      "requirement_ref": "AGENTS.md § Source File Size Constraint, developer-task-r1.md § Hard rules, roadmap/phase-100372 §9 Completion Evidence",
+      "recommendation": "Decompose `crates/clio-lib/src/cli_write_shared_tests.rs` into two smaller test modules (e.g. split into `cli_write_shared_tests.rs` and `cli_write_validate_tests.rs`), keeping both well below the 450-line limit.",
+      "status": "resolved",
+      "resolution": "Split crates/clio-lib/src/cli_write_shared_tests.rs into two test modules. Created crates/clio-lib/src/cli_write_validate_tests.rs (158 lines) holding the `seed_review_item` helper and the five `validate_*` tests; crates/clio-lib/src/cli_write_shared_tests.rs is now 319 lines. Wired the sibling in crates/clio-lib/src/cli_write_shared.rs with `#[cfg(test)] #[path = \"cli_write_validate_tests.rs\"] mod validate_tests;` so the new module is a submodule of the same module and `super::render_*` still resolves. No assertion changed; tests moved byte-for-byte; no coverage deleted. Note: the file measured 453 lines by `wc -l` (the finding said 454); it still exceeded the 450-line limit, so the finding stands. Evidence: `wc -l crates/clio-lib/src/cli_write_shared_tests.rs crates/clio-lib/src/cli_write_validate_tests.rs` -> 319 and 158 (both well under 450); `cargo test -p clio --locked --bin clio cli_write` -> `116 passed; 0 failed` including all 5 `cli_write_shared::validate_tests::*` and 11 `cli_write_shared::tests::*`."
+    }
+  ],
+  "plan_1hr": [
+    "DONE — `stable_call` now matches `[] | [_]` and returns `CliError::usage_hint(\"`{verb}` requires KEY and VALUE arguments\", ...)` with exit code 2 for 0 or 1 positionals (crates/clio-lib/src/cli_write_persona.rs:117).",
+    "DONE — `observe_call` now matches `[] | [_]` and returns `CliError::usage_hint(\"`{verb}` requires KEY and NUMBER arguments\", ...)` with exit code 2 for 0 or 1 positionals (crates/clio-lib/src/cli_write_persona.rs:143).",
+    "DONE — added `persona_write_zero_argument_invocations_exit_two_without_panicking` in crates/clio-lib/src/cli_write_persona_tests.rs, asserting both zero-argument invocations exit 2 with a usage message and never panic.",
+    "DONE — extracted the validate tests to crates/clio-lib/src/cli_write_validate_tests.rs (158 lines); crates/clio-lib/src/cli_write_shared_tests.rs is now 319 lines; both carry AGENTS.md headers and `*_tests.rs` names, comfortably under 450 lines.",
+    "DONE — gates re-run: `make check` PASS (exit 0); `make coverage` PASS (coverage-guard: 301 file(s) checked against 90.0% floors; TOTAL lines 97.95% functions 98.91%; all reported files meet the per-file floor). Two unrelated pre-existing flaky tests failed on separate attempts and each passed 3/3 in isolation (`clio-ops reindex_space_tests::reindex_across_two_providers_and_widths`, `clio-write memtree::memtree_cov_tests::concurrent_writes_during_refresh_wave`); the final gate run was clean and no clio-lib change was involved."
+  ],
+  "plan_unlimited": [
+    {
+      "item": "Audit argument validation across all CLI write and read modules to adopt a unified `positionals` validator helper (e.g., `require_positionals(parsed, verb, count, &[names])`) rather than ad-hoc slice pattern matching, preventing slice index out-of-bounds panics across the entire CLI surface.",
+      "disposition": "PARTIALLY APPLIED / rest deferred with reasons. Audit done: grepped every `positionals[` index in crates/clio-lib/src; the only unguarded site was cli_write_persona.rs:121,147 (now fixed). cli_write_workspace.rs:148 guards with `positionals.len() != 2`, cli_read_belief.rs:68 guards with `positionals.len() > TRIPLE_TERMS.len()`, and cli_write_graph.rs:90,146 guard with `positionals.len() != N` before indexing. A repo-wide unified validator refactor is deferred: (a) it is a cross-cutting API change across already-reviewed modules and would violate the no-drive-by-refactor rule for a remediation round; (b) cli_read.rs is already 434 lines, so adding the shared helper there risks the 450-line limit; the existing `one_positional` helper already covers the single-positional case and all remaining multi-positional sites are guarded. No failing behavior remains. Recommend proposing it as its own phase."
+    },
+    {
+      "item": "Add a pre-commit / CI automated lint check enforcing the AGENTS.md 450-line limit across all Rust files in the repository to prevent oversized files from reaching review.",
+      "disposition": "deferred with reasons. This is CI/tooling work, not a code fix: the phase's CI workflows are public and out of scope for a remediation round, and adding a new lint dependency or pre-commit hook is a process change that needs its own review. The immediate violation (F-02) is fixed. Recommend a dedicated tooling phase."
+    },
+    {
+      "item": "Add CLI fuzzing and smoke tests testing every registered CLI command and subcommand with 0, 1, 2, and excessive arguments to ensure all usage errors consistently fail closed with exit code 2 without panics.",
+      "disposition": "deferred with reasons. A full 0/1/2/excess argument matrix across every registered verb is a phase-sized test suite, not a remediation for the two reported defects, and it would collide with the 450-line per-file limit. The specific panic class was closed and a zero-argument regression test added for the affected verbs. Recommend a dedicated test-hardening phase."
+    }
+  ]
+}

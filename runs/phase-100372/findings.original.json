@@ -1,0 +1,34 @@
+{
+  "run": "r1",
+  "phase": "100372",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "`clio persona stable` and `clio persona observe` panic on empty positionals instead of exiting with clean usage error",
+      "evidence": "crates/clio-lib/src/cli_write_persona.rs:121,147; running `clio persona stable` produces `thread 'main' (403342) panicked at crates/clio-lib/src/cli_write_persona.rs:121:36: index out of bounds: the len is 0 but the index is 2` (exit code 101); running `clio persona observe` produces `thread 'main' (403584) panicked at crates/clio-lib/src/cli_write_persona.rs:147:36: index out of bounds: the len is 0 but the index is 2` (exit code 101)",
+      "requirement_ref": "baseline/requirement.md §4.9.2 item 2, phase-100372 §1 Expected Outcome, §5 Task 1, cli_error.rs exit contract",
+      "recommendation": "In `stable_call` (line 103) and `observe_call` (line 130) in `crates/clio-lib/src/cli_write_persona.rs`, match empty positionals `[]` explicitly (or check `positionals.len() != 2`) and return `CliError::usage_hint(...)` with exit code 2. Do not let empty positionals fall through to the wildcard arm `_ => Err(unexpected_extra(&positionals[2]))` which panics on out-of-bounds indexing. Add tests for zero-argument invocations of both subcommands to `cli_write_persona_tests.rs`."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "`crates/clio-lib/src/cli_write_shared_tests.rs` exceeds the 450-line file limit (454 lines)",
+      "evidence": "crates/clio-lib/src/cli_write_shared_tests.rs:454; line count is 454 lines (exceeds the hard 450-line limit); directly contradicts Developer Completion Evidence in roadmap/phase-100372-full-cli-safe-workspace-writes.md:244 claiming 'All ≤450 total lines'",
+      "requirement_ref": "AGENTS.md § Source File Size Constraint, developer-task-r1.md § Hard rules, roadmap/phase-100372 §9 Completion Evidence",
+      "recommendation": "Decompose `crates/clio-lib/src/cli_write_shared_tests.rs` into two smaller test modules (e.g. split into `cli_write_shared_tests.rs` and `cli_write_validate_tests.rs`), keeping both well below the 450-line limit."
+    }
+  ],
+  "plan_1hr": [
+    "In `crates/clio-lib/src/cli_write_persona.rs:103-122`, update `stable_call` pattern matching to handle `[]` or verify `positionals.len() != 2`, returning `CliError::usage_hint` with exit code 2 when 0 or 1 positional arguments are provided.",
+    "In `crates/clio-lib/src/cli_write_persona.rs:130-148`, update `observe_call` pattern matching to handle `[]` or verify `positionals.len() != 2`, returning `CliError::usage_hint` with exit code 2 when 0 or 1 positional arguments are provided.",
+    "Add unit tests in `crates/clio-lib/src/cli_write_persona_tests.rs` asserting that `persona stable` and `persona observe` with 0 arguments exit 2 with usage hints rather than panicking.",
+    "Split `crates/clio-lib/src/cli_write_shared_tests.rs` (454 lines) by extracting validate tests into a new test file (e.g. `crates/clio-lib/src/cli_write_validate_tests.rs`), ensuring both files remain comfortably under 450 lines with valid AGENTS.md headers.",
+    "Re-run `make check` and `make coverage` to verify tests pass, formatting and clippy are clean, and coverage remains >=90% per-file."
+  ],
+  "plan_unlimited": [
+    "Audit argument validation across all CLI write and read modules to adopt a unified `positionals` validator helper (e.g., `require_positionals(parsed, verb, count, &[names])`) rather than ad-hoc slice pattern matching, preventing slice index out-of-bounds panics across the entire CLI surface.",
+    "Add a pre-commit / CI automated lint check enforcing the AGENTS.md 450-line limit across all Rust files in the repository to prevent oversized files from reaching review.",
+    "Add CLI fuzzing and smoke tests testing every registered CLI command and subcommand with 0, 1, 2, and excessive arguments to ensure all usage errors consistently fail closed with exit code 2 without panics."
+  ]
+}

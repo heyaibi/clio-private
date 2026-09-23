@@ -1,0 +1,56 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE e38628d3",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "1878cc536187d9b9840fb563e2d507af4cf708fa2645da58e35d2a7ba740cf81",
+      "artifacts": {},
+      "git_head": "8cc09abe01ef3cac9b01d0fb1dbf6f83f3fb7913"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100372/findings.json d0b12762",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "d6672b73886178e15c097dc936510dda4028df0a344f453e5828a7f412d82d80",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 4031,
+          "sha256": "210cff2d313005f091df2bd617481e68ffd4222a3b31fd361cec34462e18d0d9"
+        }
+      },
+      "git_head": "8cc09abe01ef3cac9b01d0fb1dbf6f83f3fb7913"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 62d1635e",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "f0d5f432234dee6cb877ce522c67daffd803ef79a6330439d96a9b56a336d759",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 4031,
+          "sha256": "210cff2d313005f091df2bd617481e68ffd4222a3b31fd361cec34462e18d0d9"
+        }
+      },
+      "git_head": "8cc09abe01ef3cac9b01d0fb1dbf6f83f3fb7913"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 37783f2c",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "465e9a7a19a08e2257b4a4d5aec40d4ae99fe160f33073b3ade8c7103e70360a",
+      "artifacts": {},
+      "git_head": "8cc09abe01ef3cac9b01d0fb1dbf6f83f3fb7913"
+    }
+  }
+}
