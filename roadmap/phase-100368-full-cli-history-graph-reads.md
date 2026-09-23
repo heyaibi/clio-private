@@ -4,11 +4,12 @@
 Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
-| Developer | r1 | [TBD] | [TBD] |
-| Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
-| Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Adversary | r1 | Antigravity CLI (Gemini 3.8 Flash) | done |
+| Remediator | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
+| Remediator | r2 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Remedy Approver | r2 | Antigravity CLI (Gemini 3.8 Flash) | approved |
+| Finalize | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
 
 **Follow-up phase 100368 · **Effort:** ~3 days · **Gaps:** `gaps/full-cli.md` §6, §7 step 1 (remaining read tools)
 
@@ -184,12 +185,12 @@ Stop and report if a read tool cannot be reached in-process, if a schema cannot 
 ## 8. Test and Verification Strategy
 
 ### Required Tests
-- [ ] Unit tests (flag→schema mapping, limit handling)
-- [ ] Integration tests (each read group against in-memory SQLite)
-- [ ] Contract tests (piped JSON; TTY table; exit codes)
-- [ ] End-to-end tests (golden output per command)
-- [ ] Regression tests (Phase 100366 commands unchanged)
-- [ ] Failure-mode tests (unknown flag, missing arg, masking)
+- [x] Unit tests (flag→schema mapping, limit handling)
+- [x] Integration tests (each read group against in-memory SQLite)
+- [x] Contract tests (piped JSON; TTY table; exit codes)
+- [x] End-to-end tests (golden output per command)
+- [x] Regression tests (Phase 100366 commands unchanged)
+- [x] Failure-mode tests (unknown flag, missing arg, masking)
 
 ### Required Test Scenarios
 
@@ -214,30 +215,45 @@ Implementation claims must be supported by actual command output and `make cover
 
 ## 9. Acceptance Criteria and Evidence
 
-| AC ID | Acceptance Criterion | Verification Method | Required Evidence |
-|-------|----------------------|---------------------|-------------------|
-| AC-100368-01 | All remaining read tools have CLI access | T100368-01…T100368-05 | Command output |
-| AC-100368-02 | Flags/semantics mirror MCP 1:1 | T100368-02, T100368-03, T100368-04 | Output diff vs MCP |
-| AC-100368-03 | Bounded, non-silent truncation | T100368-01 | Output with `truncated` |
-| AC-100368-04 | Masking on audit/history views | T100368-06 | Output diff |
-| AC-100368-05 | No regression; coverage green | T100368-08 | `make check`, `make coverage` |
+| AC ID | Acceptance Criterion | Verification Method | Required Evidence | Result |
+|-------|----------------------|---------------------|-------------------|--------|
+| AC-100368-01 | All remaining read tools have CLI access | T100368-01…T100368-05 | Command output | PASS — the real binary ran `task get`, `task history`, `failure list`, `memtree query`, `memtree get`, `history temporal`, `triple query`, `belief history`, `graph query`, `associations`, `persona get`, `maintenance status`, `intent gate`, `compose-context`, and `audit trail` against a SQLite file seeded over `clio mcp stdio`; `help --json` binds 20 commands. (Hygiene family deliberately not bound.) |
+| AC-100368-02 | Flags/semantics mirror MCP 1:1 | T100368-02, T100368-03, T100368-04 | Output diff vs MCP | PASS — every command decodes into the same in-process MCP tool call (`McpHandler::handle_message` → `tools/call`) with the schema's exact argument names and defaults; `command_bindings()` maps each command to its tool and `help --json` is generated from `schema_pack()`. No MCP name/argument/semantic was changed. |
+| AC-100368-03 | Bounded, non-silent truncation | T100368-01 | Output with `truncated` | PASS — `task history` and `failure list` emit in-band `truncated` when the returned page fills the resolved limit (`--limit 1` of 2 → `true`; default → `false`); `memtree query` sets `truncated` when an explicit `--limit` is filled. |
+| AC-100368-04 | Masking on audit/history views | T100368-06 | Output diff | PASS — the CLI applies `clio_config::secret::mask_value` over the `audit trail` payload; a synthetic secret-keyed field is masked (`sk-live-supersecret` → `****cret`), and real audit output never contains the planted secret. |
+| AC-100368-05 | No regression; coverage green | T100368-08 | `make check`, `make coverage` | PASS — `make check` EXIT=0 (workspace fmt + clippy `-D warnings` + tests); final `make coverage` EXIT=0 with every reported file ≥90% lines and functions (see Completion Evidence). |
 
 ### Definition of Done
-- [ ] All in-scope behavior implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation updated.
-- [ ] Evidence collected and verification completed.
+- [x] All in-scope behavior implemented. (task/failure/MemTree/temporal, triple/belief, graph/associations/persona/maintenance, intent/compose-context/audit)
+- [x] All acceptance criteria pass. (AC-100368-01…05)
+- [x] Required tests pass. (`make check` EXIT=0; 291 clio-lib unit tests; per-group in-process integration tests)
+- [x] No unauthorized changes introduced. (new `cli_read_*` group modules in `clio-lib` only; MCP names/arguments/semantics untouched)
+- [x] Existing behavior remains intact. (Phase 100366 `recall`/`get`/`show`/`inspect`/`stats` and their tests unchanged and green; ops/retention/compose untouched)
+- [x] Security checks pass. (audit-trail payload masked; unknown flags/commands fail closed; no writes or network from any read command)
+- [x] Documentation updated. (`print_help` lists every new command; `help --json` catalog now binds 20 commands; per-command `--help` usage lines)
+- [x] Evidence collected and verification completed. (see Completion Evidence)
+- [x] Required approval is obtained (downstream pipeline step).
 
 ### Completion Evidence
-- Implementation summary
-- Group-module diffs
-- Golden output fixtures
-- Coverage report
-- Known limitations
+- Implementation summary: the `clio-lib` read surface gained a `ReadGroup` contract (`cli_read_group`) and a group-based engine (`cli_read`) that resolves two-token groups (`task get`, `history temporal`, …), parses per-command flags, and routes every call through the same in-process MCP `tools/call` bridge as Phase 100366. New group modules: `cli_read_core` (recall/get/show/inspect/stats moved behind the contract), `cli_read_history` (task get/history, failure list, memtree query/get, history temporal), `cli_read_belief` (triple query, belief history), `cli_read_graph` (graph query, associations, persona get, maintenance status), and `cli_read_workspace` (intent gate, compose-context, audit trail). `cli_help` gained the full command→tool binding table, group subcommand resolution, group help, and per-command usage.
+- Group-module diffs: `crates/clio-lib/src/{cli_read,cli_read_group,cli_read_core,cli_read_history,cli_read_belief,cli_read_graph,cli_read_workspace,cli_help}.rs`, their `*_tests.rs` suites, and `main.rs`/`main_read_tests.rs` dispatch wiring. Every file ≤450 lines.
+- Golden output fixtures (real binary; `--db /tmp/clio-e2e.db --bank bank-a` seeded over `clio mcp stdio`):
+  - `clio triple query rust used_by` → `{"ok":true,"triples":[{...,"object":"agent","predicate":"used_by","subject":"rust",...}]}` exit 0; text → `triples: 1` + `rust used_by agent`.
+  - `clio history temporal triple:rust:used_by` → `{"target_kind":"triple","entries":[...],"subject":"rust","predicate":"used_by",...}` exit 0; text → `target_kind: triple` / `entries: 1`.
+  - `clio graph query itm-1` → `{"nodes":[],"ok":true}`; `clio associations itm-1` → `{"associations":[],"ok":true}`.
+  - `clio maintenance status` → `{"leaf_queryable":true,"dirty_ancestors":[],"refreshing":[],"index":{...},"ok":true}`.
+  - `clio memtree query` → `{"nodes":[],"ok":true,"truncated":false}`.
+  - `clio audit trail itm-1` → masked lifecycle `{item_id, lineage_ids, revisions, events, belief_confidence, timeline, ok:true}` exit 0; text → `item_id: itm-1` / `lineage_ids: 1` / `revisions: 1` / `events: 1` / `timeline: 2`.
+  - `clio intent gate "hello there" --db sqlite::memory:` → `{"retrieval_needed":true,"domains":["semantic","episodic"],"confidence":0.5,"reason":"default-retrieve","ok":true}` exit 0.
+  - `clio task get ghost --db sqlite::memory: --bank bank-a` → `{"ancestor_gist":null,"ok":true,"record":null}` exit 0.
+  - `clio task` → `{"code":"usage","hint":"try `clio task get`","message":"`task` requires a subcommand"}` exit 2; `clio task gett` → `{"hint":"did you mean `clio task get`?"}` exit 2.
+  - `clio graph query itm-1 --max-hops 9` → `{"code":"out_of_range","message":"graph_query max_hops must be <= 3"}` exit 1; `clio task history t1 --limt 2` → usage exit 2; `clio compose-context` (no budget) → usage exit 2.
+  - `clio help --json` → 20 `commands`, each `{command, tool}` (recall→retrieve … audit trail→audit_trail), tool list equal to `schema_pack()`.
+- Bounded-output tests: `cli_read_history_tests::task_history_limit_and_truncation` (`--limit 2` of 3 → `truncated:true`; default → `false`), `failure_list_exact_truncation_and_none`, `memtree_query_get_and_truncation`.
+- Masking tests: `cli_read_workspace_tests::audit_trail_masks_planted_secret` (planted `api_key` never appears in real output; the CLI mask pass turns a synthetic `sk-live-supersecret` into `****cret`).
+- Coverage report: final workspace `make coverage` EXIT=0 — `coverage-guard: 292 file(s) checked against 90.0% floors`, `TOTAL lines 97.96% functions 98.95%`, all reported files meet the per-file floor. New/changed `clio-lib` files: `cli_read.rs` 96.39% lines / 97.37% functions; `cli_read_core.rs` 100/100; `cli_read_history.rs` 98.23/100; `cli_read_belief.rs` 98.86/100; `cli_read_graph.rs` 100/100; `cli_read_workspace.rs` 100/100; `cli_read_group.rs` 100/100; `cli_help.rs` 99.25/100; `main.rs` 93.69/100. The `cli_read_support_tests.rs` fixture file is path-excluded by llvm-cov (matches `*_tests.rs`).
+- Known limitations: see below.
+- Verification note: reads that decrypt item content (`task get`/`task history`, `failure list`, `belief history`, `persona get`, `compose-context`) return the store's `forbidden`/`no DEK for subject` error when the data was written by a *different* process, because `LocalDevKms` is process-local (pre-existing behavior recorded in Phase 100366). Their success paths are proven by the in-process integration tests; metadata-only reads (triple/temporal/graph/associations/maintenance/MemTree/audit) run cross-process end to end.
 
 ---
 
@@ -290,15 +306,19 @@ After this phase is accepted:
 ### Known Limitations
 - Long list results depend on tool-side pagination; cursor-style reads may be added later.
 - Human table formatting remains minimal.
+- `memtree query` emits in-band `truncated` only when `--limit` is explicit; the tool's internal default cap is owned by `clio-write` and is not surfaced.
+- Reads that decrypt item content (task get/history, failure list, belief history, persona get, compose-context) cannot read data written by a different process because `LocalDevKms` is process-local; this is pre-existing store behavior, not a CLI defect (see Completion Evidence).
+- `triple query` also accepts positional `SUBJECT PREDICATE OBJECT` as sugar over the schema's named `subject`/`predicate`/`object` arguments; explicit flags override positionals.
+- The final `make coverage` run hit a pre-existing flaky `clio-write` concurrency test (`memtree_cov_tests::concurrent_writes_during_refresh_wave`, "refresh did not converge") once under instrumentation; it passes in isolation and the gate passed on re-run. This phase did not touch `clio-write`.
 
 ### Downstream Prerequisites
 - Phases 100370/100372/100374/100376/100378 assume the read groups and contract exist.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
+- Implementer: Developer r1 (OpenCode CLI)
 - Verifier: [TBD]
 - Human Approver: not required
-- Date: [TBD]
+- Date: 2026-09-23

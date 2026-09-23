@@ -1,0 +1,42 @@
+{
+  "run": "r1",
+  "phase": "100368",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Omission of secret masking on history read command views",
+      "evidence": "crates/clio-lib/src/cli_read_history.rs:82-98",
+      "requirement_ref": "phase-100368 §7 (Security Constraints - Required Controls & Sensitive Data Rules), AC-100368-04, NFR-6",
+      "recommendation": "In `HistoryGroup::decorate` (`crates/clio-lib/src/cli_read_history.rs`), invoke `clio_config::secret::mask_value(\"\", payload)` so that any credential or secret material embedded within task records, definitions, failure lessons, or temporal records is masked in CLI output per §7."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Missing tool binding arrow for `graph query` in top-level `print_help()`",
+      "evidence": "crates/clio-lib/src/main.rs:401",
+      "requirement_ref": "gaps/full-cli.md §5 item 7, phase-100368 §5 Task 2",
+      "recommendation": "Update `crates/clio-lib/src/main.rs:401` in `print_help()` to append `-> graph_query`, matching the formatting of all other 19 CLI read command entries."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Developer execution round attribution row omitted from phase file Attribution table",
+      "evidence": "roadmap/phase-100368-full-cli-history-graph-reads.md:5-11",
+      "requirement_ref": "phase-100368 § Attribution",
+      "recommendation": "Update the Attribution table in § Attribution of the phase file to record the Developer execution agent row."
+    }
+  ],
+  "plan_1hr": [
+    "In `crates/clio-lib/src/cli_read_history.rs:82`, invoke `clio_config::secret::mask_value(\"\", payload)` inside `HistoryGroup::decorate` so all history payloads are sanitized against secret leakage.",
+    "In `crates/clio-lib/src/main.rs:401`, append `-> graph_query` to the `clio graph query` line in `print_help()`.",
+    "In `crates/clio-lib/src/cli_read_history_tests.rs`, add a test asserting that a planted secret in a task definition or failure lesson is masked by `task get` / `task history` / `failure list`.",
+    "In `roadmap/phase-100368-full-cli-history-graph-reads.md`, ensure the Attribution table accurately reflects all developer rounds.",
+    "Re-run `make check` and `make coverage` to confirm all tests pass and coverage remains >=90% per-file."
+  ],
+  "plan_unlimited": [
+    "Implement a centralized masking pass in `cli_read::run_parsed` so that any read command (current or future) automatically benefits from defense-in-depth secret masking without relying on each `ReadGroup` to remember calling `clio_config::secret::mask_value` in `decorate`.",
+    "Enhance the human text renderer for `persona get` (`render_persona`) to optionally render key names or preview entries instead of only returning counts (`stable: N, preferences: M`), improving UX for terminal users.",
+    "Ensure automated tests verify that every command listed in `command_bindings()` has an exact corresponding line in `print_help()` with the `-> <tool>` pattern, preventing formatting drift."
+  ]
+}

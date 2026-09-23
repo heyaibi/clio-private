@@ -1,0 +1,18 @@
+[2026-09-23T15:03:55+05:30] adversary r1 start. Staged git diff inspected; git status clean outside runs/.
+[2026-09-23T15:04:16+05:30] checked file line counts for all 18 staged Rust files: all <= 450 lines (max main.rs: 431, cli_read.rs: 420).
+[2026-09-23T15:08:44+05:30] checked file headers and module ownership statements on all 18 files: all match AGENTS.md format.
+[2026-09-23T15:08:47+05:30] checked roadmap isolation across staged files: zero references to roadmap, phase numbers, or baseline/crates.md.
+[2026-09-23T15:09:04+05:30] make lint: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> EXIT=0.
+[2026-09-23T15:09:12+05:30] cargo fmt --all -- --check -> EXIT=0 (clean).
+[2026-09-23T15:09:42+05:30] cargo test -p clio --bin clio -> 291 passed, 0 failed.
+[2026-09-23T15:10:30+05:30] make coverage attempt 1 -> hit pre-existing clio-write concurrency flake (memtree_cov_tests::concurrent_writes_during_refresh_wave).
+[2026-09-23T15:14:21+05:30] make coverage attempt 2 -> EXIT=0. coverage-guard: 292 file(s) checked against 90.0% floors; TOTAL lines 97.96% functions 98.95%; all files meet floor.
+[2026-09-23T15:15:12+05:30] make check -> EXIT=0 (fmt, clippy -D warnings, workspace tests).
+[2026-09-23T15:23:36+05:30] verified real binary CLI: intent gate (formatted and piped JSON), task history flag error (exit 2, stderr JSON), help --json (20 commands).
+[2026-09-23T15:25:32+05:30] finding F-01 (high): crates/clio-lib/src/cli_read_history.rs:82-98 - HistoryGroup::decorate omits clio_config::secret::mask_value over history payloads (task/failure/temporal).
+[2026-09-23T15:25:33+05:30] finding F-02 (low): crates/clio-lib/src/main.rs:401 - missing `-> graph_query` binding arrow in print_help().
+[2026-09-23T15:25:34+05:30] finding F-03 (low): roadmap/phase-100368-full-cli-history-graph-reads.md:5-11 - Developer execution round attribution row omitted from table.
+[2026-09-23T15:25:51+05:30] wrote findings.json to /home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100368/findings.json; validated against schema.
+[2026-09-23T15:29:34+05:30] updated phase file Attribution table row for Adversary r1 to Antigravity CLI (Gemini 3.8 Flash) done.
+[2026-09-23T15:30:00+05:30] adversary r1 finish. Generating final signal.
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100368/findings.json 649375f7

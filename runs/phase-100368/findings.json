@@ -1,0 +1,54 @@
+{
+  "run": "r1",
+  "phase": "100368",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Omission of secret masking on history read command views",
+      "evidence": "crates/clio-lib/src/cli_read_history.rs:82-98",
+      "requirement_ref": "phase-100368 \u00a77 (Security Constraints - Required Controls & Sensitive Data Rules), AC-100368-04, NFR-6",
+      "recommendation": "In `HistoryGroup::decorate` (`crates/clio-lib/src/cli_read_history.rs`), invoke `clio_config::secret::mask_value(\"\", payload)` so that any credential or secret material embedded within task records, definitions, failure lessons, or temporal records is masked in CLI output per \u00a77.",
+      "resolution": "RESOLVED (round 2; round-1 regression fixed). Round 1 masked every history payload with `clio_config::secret::mask_value`, which rewrites non-string leaves: `failure list` emitted the non-secret integer `FailureRecord.lesson_tokens` (clio-types/src/history.rs:233) as `\"[REDACTED]\"`, breaking the MCP-parity contract (AC-100368-02). Round 2 replaces that call with a new type-preserving helper `clio_config::secret::mask_string_secrets` (crates/clio-config/src/secret.rs), which masks only secret-keyed string leaves and leaves non-string leaves untouched, plus the existing `scrub_prose_secrets` prose pass over every string leaf. `HistoryGroup::decorate` (crates/clio-lib/src/cli_read_history.rs:84) now calls `mask_string_secrets(\"\", payload)` + `scrub_prose_secrets(payload)`; `WorkspaceGroup::decorate` (crates/clio-lib/src/cli_read_workspace.rs:71) uses the same helper for `audit trail` (same \u00a77 control, same regression class). Evidence: new test `cli_read_history_tests::failure_list_preserves_mcp_structured_fields` asserts the CLI `failures` array equals the raw `failures_for_task` tool result and that `lesson_tokens` stays numeric; new `secret_tests::mask_string_secrets_masks_strings_and_keeps_non_strings` and a workspace numeric assertion cover the helper; `history_views_mask_planted_secrets` still masks planted definition/lesson secrets. Out-of-tree probe on the exact failure payload: old `mask_value` -> `\"lesson_tokens\":\"[REDACTED]\"`; new pass -> `\"lesson_tokens\":3` with `lesson: password=****cret`. `make check` EXIT=0; `make coverage` EXIT=0, 292 files checked, TOTAL lines 97.96% functions 98.96%, all files >=90% (secret.rs 100/100, cli_read_history.rs 98.36/100, cli_read_workspace.rs 100/100). Boundary (unchanged, non-blocking): `scrub_inline_secrets` scrubs `key: secret` / `key=secret` prose but not JSON-quoted `\"key\": \"secret\"` text embedded inside a definition/lesson; the key-name mask applies only to structured string fields."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Missing tool binding arrow for `graph query` in top-level `print_help()`",
+      "evidence": "crates/clio-lib/src/main.rs:401",
+      "requirement_ref": "gaps/full-cli.md \u00a75 item 7, phase-100368 \u00a75 Task 2",
+      "recommendation": "Update `crates/clio-lib/src/main.rs:401` in `print_help()` to append `-> graph_query`, matching the formatting of all other 19 CLI read command entries.",
+      "resolution": "RESOLVED as recommended. The line now reads `clio graph query SEED_ID [--max-hops N] [--edge-type coactivation|explicit] -> graph_query`. Additionally, the top-level help text was extracted into `help_text()` and a new drift test (`main_read_tests::top_level_help_binds_every_read_command_tool`) asserts every `command_bindings()` entry appears in the help with its `-> <tool>` arrow (two-tool lines via ` / `), so this formatting drift cannot recur silently. Evidence: the new test passes; `cargo test -p clio --bin clio` \u2192 293 passed, 0 failed; `make check` EXIT=0; `make coverage` EXIT=0 with main.rs at 93.78% lines / 100.0% functions."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Developer execution round attribution row omitted from phase file Attribution table",
+      "evidence": "roadmap/phase-100368-full-cli-history-graph-reads.md:5-11",
+      "requirement_ref": "phase-100368 \u00a7 Attribution",
+      "recommendation": "Update the Attribution table in \u00a7 Attribution of the phase file to record the Developer execution agent row.",
+      "resolution": "REFUTED by evidence (finding not accepted; finding retained verbatim above). The cited evidence range itself contains the row the finding claims is omitted: roadmap/phase-100368-full-cli-history-graph-reads.md:7 reads `| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |`. That is exactly the row both developer task files mandate verbatim (developer-task-r1.md:60 and developer-task-r2.md:60: 'append `| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |`'). The row is present, staged in the private repo (git diff --cached shows `-| Developer | r1 | [TBD] | [TBD] |` \u2192 `+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |`), and status `done` is truthful (the resumed developer round completed and signed off \u00a79/\u00a712). No change made; the Remediator row was filled in per the remediation task's own Attribution instruction."
+    }
+  ],
+  "plan_1hr": [
+    "In `crates/clio-lib/src/cli_read_history.rs:82`, invoke secret masking inside `HistoryGroup::decorate` so all history payloads are sanitized against secret leakage. -> DONE, then corrected in round 2: the blanket `mask_value` call was replaced by `mask_string_secrets` (type-preserving) plus inline prose scrubbing, so secrets are masked without rewriting non-secret numeric fields (see F-01 resolution).",
+    "In `crates/clio-lib/src/main.rs:401`, append `-> graph_query` to the `clio graph query` line in `print_help()`. -> DONE (see F-02 resolution).",
+    "In `crates/clio-lib/src/cli_read_history_tests.rs`, add a test asserting that a planted secret in a task definition or failure lesson is masked by `task get` / `task history` / `failure list`. -> DONE: `history_views_mask_planted_secrets` plants `api_key: sk-live-supersecret` in a task definition and `password=hunter2secret` in a failure lesson and asserts neither leaks through any of the three commands in JSON output.",
+    "In `roadmap/phase-100368-full-cli-history-graph-reads.md`, ensure the Attribution table accurately reflects all developer rounds. -> NO CHANGE: the table already contains the mandated Developer r1 row with status done (see F-03 resolution); the Remediator r1 row was filled in per the remediation task's Attribution instruction.",
+    "Re-run `make check` and `make coverage` to confirm all tests pass and coverage remains >=90% per-file. -> DONE: `make check` EXIT=0; `make coverage` EXIT=0, coverage-guard: 292 file(s) checked against 90.0% floors, TOTAL lines 97.96% functions 98.96%, all reported files meet the per-file floor."
+  ],
+  "plan_unlimited": [
+    "Centralized masking pass in `cli_read::run_parsed` \u2014 DISAGREED by evidence, not implemented. The masking heuristics are substring-based over field names (`clio-config/src/secret.rs`: SECRET_MARKERS contains `auth`, `path_is_secret` uses `contains`), so a blanket pass over all 20 read views would redact legitimate fields \u2014 e.g. any `author` field matches the `auth` marker \u2014 corrupting `get`/`show`/`recall` output. Phase \u00a77 scopes masking to audit/history views, tool handlers already mask at their own boundary (`read_tools.rs:222` inspect, `runtime_index.rs:131`, hygiene/sync tools), and the per-view `decorate` mask matches the established `WorkspaceGroup` pattern. The scoped F-01 fix covers the required surface without that blast radius. ROUND 2: still DISAGREED, now with direct evidence. The `auth`/`token` substring heuristics do over-match domain payloads: the round-1 per-view blanket `mask_value` proved it by rewriting the non-secret integer `lesson_tokens` to a string. The round-2 fix therefore refined the per-view mask to `mask_string_secrets` (type-preserving) instead of centralizing a blanket pass, which would have spread the same false-positive class to all 20 read views.",
+    "`render_persona` UX enhancement (render key names/preview entries instead of counts) -> DISAGREED, not implemented. The view output is pinned by contract: `cli_read_graph_tests.rs:170-175` asserts the exact string `stable: 1\npreferences: 1\ndropped_keys: 1`, and the phase contract requires commands to 'return the same structured results as their MCP counterparts' (\u00a71 Expected Outcome). Changing the human view is a UX feature request with no owning requirement; implementing it would break the pinned view contract and AC evidence without authorization.",
+    "Automated tests verifying every `command_bindings()` entry has an exact corresponding line in `print_help()` with the `-> <tool>` pattern -> DONE (see F-02 resolution): `main_read_tests::top_level_help_binds_every_read_command_tool` iterates all 20 bindings against the extracted `help_text()`."
+  ],
+  "remediation_verification": {
+    "round": "r2",
+    "scoped_pass": "cargo fmt --all clean; cargo test -p clio-config --locked -> 148 passed, 0 failed; cargo test -p clio --bin clio --locked -> 294 passed, 0 failed (293 prior + 1 new parity test)",
+    "make_check": "EXIT=0 (workspace fmt + clippy -D warnings + tests). First run failed on the pre-existing clio-write flake `memtree_cov_tests::concurrent_writes_during_refresh_wave` (\"refresh did not converge\"); it passes 3/3 in isolation on an untouched crate, and the re-run was EXIT=0.",
+    "make_coverage": "EXIT=0; coverage-guard: 292 file(s) checked against 90.0% floors; TOTAL lines 97.96% functions 98.96%; all reported files meet the per-file floor. Touched files: secret.rs 100.0% lines / 100.0% funcs; cli_read_history.rs 98.36% lines / 100.0% funcs; cli_read_workspace.rs 100.0% lines / 100.0% funcs.",
+    "line_limits": "secret.rs 215, secret_tests.rs 78, cli_read_history.rs 322, cli_read_history_tests.rs 336, cli_read_workspace.rs 217, cli_read_workspace_tests.rs 235, main.rs 435, main_read_tests.rs 124 \u2014 all <=450.",
+    "regression_probe": "Out-of-tree probe (no repo files touched) on the exact `failures_for_task` payload: old `mask_value` -> `{\"lesson_tokens\":\"[REDACTED]\",...}`; new `mask_string_secrets` + prose scrub -> `{\"lesson_tokens\":3,\"lesson\":\"lesson: password=****cret\",...}`."
+  },
+  "remediation_round": "r2"
+}
