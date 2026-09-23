@@ -188,3 +188,13 @@ Every Rust source file MUST use the following header structure:
 - If the phase touched Rust crates, complete the required `private/clio-private/baseline/coverage.md` procedure and verify both aggregate coverage and the per-file ≥90% function and line thresholds.
 - For `private/clio-private/baseline/requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
 - Clearly state what was verified and identify anything that could not be verified.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for heyaibi/clio. See `private/clio-private/issue-tracker/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` and `private/clio-private/docs/adr/`. See `private/clio-private/issue-tracker/domain.md`.
