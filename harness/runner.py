@@ -1298,7 +1298,7 @@ def run_attached(cmd, log_path, when, nonce=None, cwd=None, env=None,
             try:
                 return _run_attached_pty(cmd, log_path, tui_path, when, nonce,
                                          cwd, env, sys.stdin.fileno(),
-                                         autosubmit)
+                                         None, autosubmit)
             except Exception as e:  # noqa: BLE001 - foreground must survive
                 print(f"runner: pty mirror unavailable ({e}); plain spawn",
                       file=sys.stderr, flush=True)
