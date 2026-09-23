@@ -3,7 +3,8 @@
     "developer",
     "adversary",
     "remediator",
-    "approver"
+    "approver",
+    "finalize"
   ],
   "steps": {
     "developer": {
@@ -51,6 +52,15 @@
       "output_sha256": "465e9a7a19a08e2257b4a4d5aec40d4ae99fe160f33073b3ade8c7103e70360a",
       "artifacts": {},
       "git_head": "8cc09abe01ef3cac9b01d0fb1dbf6f83f3fb7913"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE bd3a57c2",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "3d5a223eea4169435ede05da3fbbedbcdb256526d1a4837ca871f5964ea27d05",
+      "artifacts": {},
+      "git_head": "c14cd683663fb4d663d4bb0d15cd758a215800e8"
     }
   }
 }

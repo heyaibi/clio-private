@@ -4,3 +4,13 @@
 2026-09-23T20:58:00Z scope: main repo staged remediation files (cli_write_persona*, cli_write_shared*, new cli_write_validate_tests.rs) plus prior write-surface files; private repo staged roadmap + runs/ artifacts
 2026-09-23T21:05:00Z make check run 1: FAILED on unrelated flaky test clio-ops reindex_space_tests::reindex_across_two_providers_and_widths (mock embed server assumes one read; 'embed response count 1 does not match batch size 2'); all changes are in clio-lib, no clio-ops/clio-index diff; test passes 8/8 in isolation
 2026-09-23T21:06:00Z make check run 2: PASS exit 0 (fmt + clippy -D warnings + workspace tests + doc-tests all green)
+2026-09-23T21:10:00Z staged both repos: main `git add -A` (20 clio-lib files), private `git add -A` (roadmap + 14 runs/phase-100372 files); tui.log harness captures remain git-ignored
+2026-09-23T21:11:00Z main commit c14cd68 "feat(cli): add safe workspace and harness write surface" (20 files, +2839/-92)
+2026-09-23T21:12:00Z private commit b3fb2d1 "roadmap: close out phase 100372 (full CLI safe workspace writes)" (15 files, +1000/-34)
+2026-09-23T21:13:00Z gitsync --mode push: exit 0; main verified fast-forward (ahead 1); private merged 1 remote commit (3efcedb harness config) -> merge 270c9e9
+2026-09-23T21:14:00Z make check after merge: PASS exit 0
+2026-09-23T21:15:00Z pushed: main 8cc09ab..c14cd68 -> origin/master (exit 0); private 3efcedb..270c9e9 -> origin/master (exit 0); both branches clean and level with origin
+2026-09-23T21:15:00Z change file list (main c14cd68): crates/clio-lib/src/{cli_help.rs, cli_read.rs, cli_read_group_tests.rs, cli_read_help_tests.rs, cli_read_support_tests.rs, cli_read_tests.rs, cli_write.rs, cli_write_batch.rs, cli_write_batch_tests.rs, cli_write_core.rs, cli_write_group.rs, cli_write_persona.rs, cli_write_persona_tests.rs, cli_write_shared.rs, cli_write_shared_tests.rs, cli_write_support_tests.rs, cli_write_validate_tests.rs, cli_write_workspace.rs, cli_write_workspace_tests.rs, main.rs}
+2026-09-23T21:15:00Z change file list (private b3fb2d1): roadmap/phase-100372-full-cli-safe-workspace-writes.md, runs/phase-100372/{adversary,approver,developer,finalize,remediator}-task-r1.{log,md}, findings.json, findings.original.json, ledger.json, resume.json
+2026-09-23T21:15:00Z finish: all findings resolved and approved; attribution complete; approval checkbox set; make check green; both repos committed and pushed
+FINALIZE_DONE bd3a57c2
