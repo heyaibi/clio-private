@@ -8,7 +8,7 @@ A phase can start from a stale local checkout and finalize can push without chec
 
 ## Proposal
 
-Sync from the remote before starting a phase, and in finalization sync again before pushing, resolving any conflict first and pushing only when the tree is clean and intended. Improve or replace this proposal if your local and external validation finds a safer fix.
+Sync from the remote (both `clio` and `private/clio-private`) before starting a phase, and in finalization sync again before pushing, resolving any conflict first and pushing only when the tree is clean and intended. Improve or replace this proposal if your local and external validation finds a safer fix.
 
 ## Hypothesis (non-binding)
 
