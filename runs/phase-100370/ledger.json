@@ -1,0 +1,56 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 04ac7121",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 2,
+      "output_sha256": "208435724a9fa7b902d01182f3ba1f172c973e4616069ec2dd2bdb13b75fe31d",
+      "artifacts": {},
+      "git_head": "fb540a2f2db481d6233ce3817660808bb2678d36"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100370/findings.json 81a84958",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "d6c40e526bab4e5aeb7d78b6f0f251c05bb39475b7a9a88726d3cce94ff63b1d",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 3539,
+          "sha256": "0877fba45b35031d1c6b5617b7715ee068919d7cb44b3f2aeb75ce3f3cb049b6"
+        }
+      },
+      "git_head": "fb540a2f2db481d6233ce3817660808bb2678d36"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 391a08a0",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "133e8a53d6600568e98036c289bb0b773e0482b2a81480c3cec4170e27ae2d3e",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 3539,
+          "sha256": "0877fba45b35031d1c6b5617b7715ee068919d7cb44b3f2aeb75ce3f3cb049b6"
+        }
+      },
+      "git_head": "fb540a2f2db481d6233ce3817660808bb2678d36"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 5b65dc77",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "4e68ee77d6c3b76ded85f544b2e2e15a232c154e726a1e269d01ab9edb764305",
+      "artifacts": {},
+      "git_head": "fb540a2f2db481d6233ce3817660808bb2678d36"
+    }
+  }
+}

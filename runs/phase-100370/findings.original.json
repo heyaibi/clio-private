@@ -1,0 +1,33 @@
+{
+  "run": "r1",
+  "phase": "100370",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "`remember --dry-run` and `admit --file` text-mode views misrender results and violate preview contract",
+      "evidence": "crates/clio-lib/src/cli_write_core.rs:80-86,263-295; executing `clio remember \"test\" --category persona --dry-run --output text` outputs `stored ? (admission_score 0.7100000000000001)` falsely indicating mutation; executing `clio admit --file ops.json --output text` outputs a bare `preview` string omitting batch summary counts (`would_admit`, `would_reject`, `writes`)",
+      "requirement_ref": "phase-100370 §1 Expected Outcome (\"`clio remember --dry-run` and `clio admit ...` print score and factors without writing\"), §5 Task 1, §8 (T100370-02), AC-100370-02, gaps/full-cli.md §6",
+      "recommendation": "In `CoreWriteGroup::render` (`crates/clio-lib/src/cli_write_core.rs`), inspect the payload: if `payload.get(\"dry_run\") == Some(&Value::Bool(true))` or `verb == \"admit\"`, route to `render_preview(payload)` rather than `render_stored(payload)`. In `render_preview`, handle batch preview payloads (when `summary` or `count` is present, render `preview: {count} items (would_admit: {would_admit}, would_reject: {would_reject})`). Add unit tests in `cli_write_core_tests.rs` for both text-mode outputs."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Attribution table and verification sign-off mismatch actual assigned developer model",
+      "evidence": "roadmap/phase-100370-full-cli-safe-core-writes.md:7,345; lines attribute Developer r1 to `OpenCode CLI (Go . Deepseek V4.1 Flash High)` instead of the mandated `OpenCode CLI (Together . GLM-5.3 Flash High)` specified in developer-task-r1.md:60 and developer-task-r2.md:71",
+      "requirement_ref": "phase-100370 § Attribution, §12 Verification Sign-Off, developer-task-r2.md:71",
+      "recommendation": "Update lines 7 and 345 in `roadmap/phase-100370-full-cli-safe-core-writes.md` to attribute Developer r1 to `OpenCode CLI (Together . GLM-5.3 Flash High)` as mandated by the developer task instructions."
+    }
+  ],
+  "plan_1hr": [
+    "In `crates/clio-lib/src/cli_write_core.rs:81-86`, update `render` so that payloads with `dry_run: true` (such as `remember ... --dry-run`) route to `render_preview` instead of `render_stored`.",
+    "In `crates/clio-lib/src/cli_write_core.rs:272-295`, update `render_preview` to handle `admit_preview_batch` payloads containing `summary` (`would_admit` / `would_reject`), printing a human-readable batch summary rather than a bare `preview` string.",
+    "In `crates/clio-lib/src/cli_write_core_tests.rs`, add tests verifying text-mode output for `remember --dry-run` and `admit --file`.",
+    "In `roadmap/phase-100370-full-cli-safe-core-writes.md`, update lines 7 and 345 to attribute Developer r1 to `OpenCode CLI (Together . GLM-5.3 Flash High)`.",
+    "Re-run `make check` and `make coverage` to confirm all tests pass and coverage remains >=90% per-file."
+  ],
+  "plan_unlimited": [
+    "Harmonize dry-run preview contract across all write groups: pass execution context/mode to `WriteGroup::render` so groups have uniform, first-class access to whether an invocation is dry-run, avoiding heuristics on payload fields.",
+    "Introduce an automated golden snapshot test suite across all CLI verbs (both read and write surfaces) in both `--output json` and `--output text` modes to prevent UX drift and ensure consistent rendering."
+  ]
+}

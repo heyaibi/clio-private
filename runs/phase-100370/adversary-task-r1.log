@@ -1,0 +1,17 @@
+[2026-09-23T17:36:30+05:30] adversary r1 start. Staged git diff inspected; git status clean outside runs/.
+[2026-09-23T17:36:45+05:30] checked file line counts for all 15 staged Rust files: all <= 450 lines (max cli_read.rs: 430, main_tests.rs: 440, cli_write_graph_tests.rs: 413).
+[2026-09-23T17:36:50+05:30] checked file headers and module ownership statements on all 15 files: all match AGENTS.md format.
+[2026-09-23T17:36:55+05:30] checked roadmap isolation across staged files: zero references to roadmap, phase numbers, baseline, or crates.md.
+[2026-09-23T17:36:58+05:30] cargo fmt --all -- --check -> EXIT=0 (clean).
+[2026-09-23T17:37:05+05:30] make lint: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings -> EXIT=0.
+[2026-09-23T17:39:45+05:30] cargo test -p clio --bin clio -> 357 passed, 0 failed.
+[2026-09-23T17:40:02+05:30] make coverage attempt 1 -> failed on pre-existing clio-ops flake (reindex_space_tests::reindex_across_two_providers_and_widths); verified test passes in isolation.
+[2026-09-23T17:40:55+05:30] make coverage attempt 2 -> EXIT=0. coverage-guard: 297 file(s) checked against 90.0% floors; TOTAL lines 97.96% functions 98.94%; all reported files meet floor (cli_help.rs 99.36/100, cli_read.rs 96.15/97.37, cli_write.rs 95.45/100, cli_write_core.rs 96.35/95.83, cli_write_graph.rs 100/100, cli_write_group.rs 100/100, main.rs 96.74/100, mcp_cli.rs 92.03/100).
+[2026-09-23T17:41:57+05:30] make check -> EXIT=0 (fmt, clippy -D warnings, workspace tests).
+[2026-09-23T17:45:55+05:30] verified real binary CLI: remember, remember --dry-run, admit, admit --file, summarize, consolidate, triple add/query/end, belief observe, graph link, help --json, and per-command --help.
+[2026-09-23T17:46:00+05:30] finding F-01 (medium): crates/clio-lib/src/cli_write_core.rs:80-86,263-295 - remember --dry-run in text mode falsely outputs "stored ? (admission_score ...)" instead of score + factors, and admit --file in text mode outputs bare "preview" omitting batch summary.
+[2026-09-23T17:46:05+05:30] finding F-02 (low): roadmap/phase-100370-full-cli-safe-core-writes.md:7,345 - Attribution table and verification sign-off attribute Developer r1 to "OpenCode CLI (Go . Deepseek V4.1 Flash High)" instead of mandated "OpenCode CLI (Together . GLM-5.3 Flash High)".
+[2026-09-23T17:46:18+05:30] wrote findings.json to /home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100370/findings.json; validated against schema.
+[2026-09-23T17:46:25+05:30] updated phase file Attribution table row for Adversary r1 to Antigravity CLI (Gemini 3.8 Flash) done.
+[2026-09-23T17:46:35+05:30] adversary r1 finish. Generating final signal.
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100370/findings.json 81a84958

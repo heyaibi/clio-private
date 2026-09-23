@@ -4,11 +4,11 @@
 Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
-| Developer | r1 | [TBD] | [TBD] |
-| Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
-| Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Adversary | r1 | Antigravity CLI (Gemini 3.8 Flash) | done |
+| Remediator | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
+| Remedy Approver | r1 | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | approved |
+| Finalize | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
 
 **Follow-up phase 100370 · **Effort:** ~3 days · **Gaps:** `gaps/full-cli.md` §6, §7 step 2 (flagship write + gated core writes)
 
@@ -230,31 +230,56 @@ Implementation claims must be supported by actual command output and `make cover
 
 ## 9. Acceptance Criteria and Evidence
 
-| AC ID | Acceptance Criterion | Verification Method | Required Evidence |
-|-------|----------------------|---------------------|-------------------|
-| AC-100370-01 | `remember`→`recall` works with no MCP client | T100370-01 | Command output |
-| AC-100370-02 | `--dry-run` writes nothing, exits 0 | T100370-02 | Output + store check |
-| AC-100370-03 | Gating identical to MCP | T100370-03 | Refusal comparison |
-| AC-100370-04 | Triples/beliefs/graph/summarize bound | T100370-04…T100370-07 | Command output |
-| AC-100370-05 | No regression; coverage green | T100370-08 | `make check`, `make coverage` |
+| AC ID | Acceptance Criterion | Verification Method | Required Evidence | Result |
+|-------|----------------------|---------------------|-------------------|--------|
+| AC-100370-01 | `remember`→`recall` works with no MCP client | T100370-01 | Command output | PASS (with recorded store limitation) — in-process CLI round trip `remember`→`recall` returns the item (`cli_write_core::tests::remember_then_recall_round_trip_in_one_runtime`); real-binary `remember` writes one gated item and `inspect` reads it back. A second process's `recall`/`get` returns the store's `forbidden`/`no DEK for subject` error because `LocalDevKms` is process-local (pre-existing, recorded in Phases 100366/100368; not a CLI defect). |
+| AC-100370-02 | `--dry-run` writes nothing, exits 0 | T100370-02 | Output + store check | PASS — `remember --dry-run` prints `dry_run:true`, `pass`, `admission_score`, and `factors`, and publishes nothing (`remember_dry_run_writes_nothing_and_exits_zero`); `consolidate --dry-run` and `summarize --dry-run` emit validated previews without a dispatcher call (`dry_run_preview_writes_nothing_and_exits_zero`); a real-binary file-store `remember --dry-run` leaves 0 items. |
+| AC-100370-03 | Gating identical to MCP | T100370-03 | Refusal comparison | PASS — every write routes through the same in-process dispatcher (`cli_read::call_tool`); the CLI reports the exact MCP refusal message for the category gate (`remember_refusal_reports_the_mcp_reason_and_writes_nothing`), the continuous update-rule gate (`triple_add_rejects_continuous_update_rule_like_mcp`), the belief `source_type` rule (`triple_add_belief_without_source_type_is_refused`), and a missing graph endpoint (`graph_link_missing_endpoint_is_refused_like_mcp`). |
+| AC-100370-04 | Triples/beliefs/graph/summarize bound | T100370-04…T100370-07 | Command output | PASS WITH DOCUMENTED LIMITATION — `triple add`/`triple end`, `belief observe`, and `graph link` are bound and verified (`triple_add_then_query_returns_the_edge`, `triple_end_expires_and_retains_history`, `belief_observe_twice_appends_without_re_scoring`, `graph_link_then_query_returns_the_edge`). `summarize` is exposed (verb, flags, `--dry-run`, help) but its gist-regeneration handler is the Phase 100380 deliverable, so the live call faithfully reports the dispatcher's structured unknown-tool error; see Known Limitations. |
+| AC-100370-05 | No regression; coverage green | T100370-08 | `make check`, `make coverage` | PASS — `make check` exit 0; `make coverage` exit 0 with `coverage-guard: 297 file(s) checked against 90.0% floors`, `TOTAL lines 97.96% functions 98.94%`, `all reported files meet the per-file floor`. Changed files: `cli_write.rs` fn 100.00% / lines 95.45%, `cli_write_core.rs` fn 95.83% / lines 96.35%, `cli_write_graph.rs` fn 100.00% / lines 100.00%, `cli_write_group.rs` fn 100.00% / lines 100.00%, `mcp_cli.rs` fn 100.00% / lines 92.03%, `main.rs` fn 100.00% / lines 96.74%, `cli_help.rs` fn 100.00% / lines 99.36%, `cli_read.rs` fn 97.37% / lines 96.15%. |
 
 ### Definition of Done
-- [ ] All in-scope behavior implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation updated.
-- [ ] Evidence collected and verification completed.
+- [x] All in-scope behavior implemented.
+- [x] All acceptance criteria pass (AC-100370-04 passes with the documented `summarize` exposure limitation recorded under Known Limitations).
+- [x] Required tests pass.
+- [x] No unauthorized changes introduced.
+- [x] Existing behavior remains intact.
+- [x] Security checks pass.
+- [x] Documentation updated.
+- [x] Evidence collected and verification completed.
+- [x] Required approval is obtained (downstream pipeline step).
 
 ### Completion Evidence
-- Implementation summary
-- Write-module diffs
-- Round-trip command transcript
-- Snapshot-immutability evidence
-- Coverage report
-- Known limitations
+
+**Implementation summary.** `clio-lib` gains a write-command engine plus two disjoint group modules, all routing through the same in-process MCP dispatcher the MCP transport uses, so gating cannot drift:
+
+- `cli_write.rs` — the engine: verb resolution, flag parsing, `--help`, the `tools/call` bridge, exit-code mapping (0 ok, 1 refusal/operational, 2 usage), and one bounded index drain after a mutating success (a one-shot process has no background sweeper).
+- `cli_write_group.rs` — the `WriteGroup` contract, the `WriteCall::{Tool,Preview}` split (a preview carries no tool name, so it can never become a dispatcher call), and the shared `pass:false` → exit-1 refusal mapping.
+- `cli_write_core.rs` — `remember` (→ `store`), `admit` (→ `admit_preview`; `--file ops.json` → `admit_preview_batch`), `summarize`, and `consolidate`, each with `--dry-run`.
+- `cli_write_graph.rs` — `triple add`, `triple end`, `belief observe`, and `graph link` with mirrored flags and `--dry-run` previews.
+- `cli_read.rs` delegates group-resolved write verbs (`triple add`, …) to the write engine; `cli_help.rs` and `main.rs` publish the new verbs and their bound tool names in `clio help` and `clio help --json`.
+- `mcp_cli.rs` was extracted from `main.rs` (which dropped from 456 to 275 lines) to keep every file under the 450-line cap.
+
+**Write-module diffs.** New: `cli_write.rs` (208 lines), `cli_write_group.rs` (107), `cli_write_core.rs` (309), `cli_write_graph.rs` (349), `mcp_cli.rs` (227). Modified: `main.rs`, `cli_help.rs`, `cli_read.rs`, `main_tests.rs`. Test-only modules: `cli_write_tests.rs`, `cli_write_core_tests.rs`, `cli_write_graph_tests.rs`, `cli_write_graph_flag_tests.rs`, `cli_write_support_tests.rs`, `main_write_tests.rs`.
+
+**Round-trip command transcript (real binary, `--db` file store, `--output json`).**
+- `clio remember "prefers aisle seats" --category persona --bank demo` → exit 0, `{"ok":true,"pass":true,"admission_score":0.86,"id":"itm-cli-…","factors":{…}}`.
+- `clio remember "…" --category persona --bank demo --dry-run` → exit 0, `{"dry_run":true,"pass":true,"admission_score":…,"factors":{…}}`; a following `inspect` shows 0 items.
+- `clio admit "hello" --category persona --bank demo` → exit 0, preview with `pass`/`factors`, 0 writes.
+- `clio admit --file ops.json` → exit 0, `{"read_only":true,"count":2,"summary":{"would_admit":2,"would_reject":0},"writes":0}`.
+- `clio consolidate` → exit 0, `{"ok":true,"job_id":"job-1","status":"accepted"}`.
+- `clio triple add demo likes sqlite --bank demo` → exit 0, `{"decision":{"pass":true},"new_edge_id":"trp-…"}`; `triple query demo likes` returns the edge; `triple end demo likes --valid-until …` → `{"closed_ids":["trp-…"]}`.
+- `clio belief observe "Postgres handles writes" --confidence 0.7 --evidence ev-1 --source user_stated --bank demo` → exit 0, `{"outcome":"created","belief":{…}}`.
+- `clio graph link itm-a itm-b --relationship relates_to --bank demo` → exit 0, `{"edge_id":"…"}`.
+- `clio recall "aisle" --bank demo` in a *second* process → exit 1, `{"code":"forbidden","message":"no DEK for subject `itm-cli-…`"}` (pre-existing `LocalDevKms` process-local limitation).
+- `clio summarize --scope demo` → exit 1, `{"code":"-32602","message":"unknown tool `summarize`"}` (handler is Phase 100380; verb/help/`--dry-run` are exposed here).
+
+**Snapshot-immutability evidence.** Not verifiable in this phase: the `summarize` gist-regeneration handler is not bound yet (Phase 100380 owns it per §4 Discovery Output), so there is no live `summarize` write whose snapshot immutability could be asserted. The CLI's `summarize --dry-run` preview states "snapshots are never altered" and performs zero writes (`summarize_dry_run_previews_without_calling_the_dispatcher`). This is recorded as a known limitation, not as a passing immutability test.
+
+**Coverage report.** `make coverage` (final): `coverage-guard: 297 file(s) checked against 90.0% floors`; `TOTAL lines 97.96% functions 98.94%`; `all reported files meet the per-file floor`. Per-file rows for changed files are in AC-100370-05.
+
+**Known limitations.** See §12.
+
 
 ---
 
@@ -307,15 +332,18 @@ After this phase is accepted:
 ### Known Limitations
 - Category is required; no inference.
 - Background indexing remains asynchronous and off the response path.
+- `summarize`'s gist-regeneration handler is not implemented in this phase. What is missing: the MCP `summarize` handler and its snapshot-immutability test (T100370-07). Why: this phase exposes the CLI verb only — §4 Discovery Output assigns binding the `summarize` MCP handler to Phase 100380 ("Phase 100380 binds it; this phase only exposes it"), and binding it needs the versioned `tool_schema` publish approval that phase owns. Debt owner: Phase 100380. A live `clio summarize` returns the dispatcher's structured unknown-tool error; `clio summarize --dry-run` and the help surface work.
+- Cross-process reads of encrypted content (`recall`, `get`, and the `belief observe` append path) return the store's `forbidden`/`no DEK for subject` error because `LocalDevKms` is process-local (keys never enter the item DB). Why: pre-existing store behavior recorded in Phases 100366/100368; no phase currently owns a persistent KMS. Debt owner: unassigned (pre-existing). The CLI reports it faithfully and the success paths are proven in-process.
 
 ### Downstream Prerequisites
 - Phase 100372/100374/100376 build their write/confirm behavior on this contract.
+- Phase 100380 binds the `summarize` handler this phase exposes.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
+- Implementer: OpenCode CLI (Go . Deepseek V4.1 Flash High)
 - Verifier: [TBD]
 - Human Approver: not required
-- Date: [TBD]
+- Date: 2026-09-23
