@@ -3,3 +3,10 @@
 2026-09-23T12:30:51Z attribution check: Developer r1, Adversary r1, Remediator r1, Remedy Approver r1 rows present and well-formed; Finalize r1 row is [TBD] - will fill
 2026-09-23T12:31:04Z roadmap phase-100370: Finalize r1 attribution row filled (OpenCode CLI (Together . GLM-5.3 Flash High) / done); added checked 'Required approval is obtained (downstream pipeline step).' to Definition of Done (line was absent from this phase file, matching template/prior-phase pattern)
 2026-09-23T12:31:49Z make check: exit 0 (fmt, clippy -D warnings, full workspace test run all green)
+2026-09-23T12:31:59Z staged: main repo 15 files (all crates/clio-lib/src cli_write*/mcp_cli + touched help/read/main); private repo 22 files (roadmap phase-100370 edits + runs/phase-100368 ledger updates + runs/phase-100370 records incl. findings, logs, ledger); status shows no unintended paths
+2026-09-23T12:33:00Z commits: main repo fe3c6bf (15 files, +2871/-202), private repo 085efb7 (22 files, +1359/-173)
+2026-09-23T12:33:00Z pushes: main repo pushed fb540a2..fe3c6bf to github.com/heyaibi/clio (OK); private repo pushed ef61176..085efb7 to github.com/heyaibi/clio-private (OK); both branches in sync with origin
+2026-09-23T12:33:00Z change file list (main repo): crates/clio-lib/src/{cli_write,cli_write_core,cli_write_core_tests,cli_write_graph,cli_write_graph_flag_tests,cli_write_graph_tests,cli_write_group,cli_write_support_tests,cli_write_tests,main_write_tests,mcp_cli}.rs new; {cli_help,cli_read,main,main_tests}.rs modified
+2026-09-23T12:33:00Z change file list (private repo): roadmap/phase-100370 (attribution + approval checkbox); runs/phase-100368 ledger updates; runs/phase-100370 findings/approval/run records; this log
+2026-09-23T12:33:00Z finalize-task-r1 finish: attribution rows verified and completed, approval checkbox set, make check exit 0, both repos committed and pushed
+FINALIZE_DONE 61f03a0e
