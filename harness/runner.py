@@ -81,9 +81,12 @@ SIGNAL_SCAN_LINES = 10
 # unnoticed). No timeout: the step still runs until it signals.
 IDLE_NUDGE_S = 300.0
 # TUI auto-submit: `opencode --prompt` pre-fills the input box but does not
-# send it, so the runner presses Enter once the prompt is on screen (matched
-# in the console mirror) or after this fallback delay, whichever comes first.
-SUBMIT_FALLBACK_S = 25.0
+# send it, so the runner presses Enter repeatedly until the stage starts
+# (detected by the run log growing). A single press is unreliable: the TUI is
+# still loading for the first several seconds and swallows it.
+SUBMIT_FIRST_S = 10.0
+SUBMIT_RETRY_S = 5.0
+SUBMIT_MAX_S = 120.0
 # Per-invocation signal nonce: every harness invocation gets a fresh
 # random token appended to its task file. Non-*_BLOCKED* signal lines must
 # carry it as a separate token, so a mid-run echo of the bare signal word
@@ -497,14 +500,14 @@ class Run:
         os.environ["PATH"] = f"{home}/.local/bin:{home}/.opencode/bin:{os.environ['PATH']}"
         pointer = TASK_POINTER.format(path=task_path)
         env = None
-        submit_marker = None
+        autosubmit = False
         full = f"{provider}/{model}" if provider else model
         if cli == "cursor":
             cmd = ["agent"] + (["--model", full] if full != "auto" else []) + [pointer]
         elif cli == "opencode":
             stage_name = self.stages[sid][0]["name"] if sid else OPENCODE_AGENT
             cmd, env = opencode_launch(full, effort, pointer, stage_name)
-            submit_marker = SUBMIT_MARKER
+            autosubmit = True
         elif cli == "agy":
             # -i takes the prompt as its value: it must come last or it
             # swallows the next token (e.g. --model) as prompt text.
@@ -527,7 +530,7 @@ class Run:
         banner(cli, harness, task_path, log_path)
         text, rc, info = run_attached(cmd, log_path, when, nonce,
                                       cwd=self.repo, env=env,
-                                      submit_marker=submit_marker)
+                                      autosubmit=autosubmit)
         if rc != 0 and not log_done(text, when, nonce) \
                 and not info.get("mirror_signal"):
             raise Fail(f"{cmd[0]} exited {rc} (step failed; rerun to resume)")
@@ -945,10 +948,6 @@ TASK_POINTER = ("Your full task instructions are in this file: {path}\n"
                     "summarized in chat, still append that signal line to "
                     "the log file: chat text alone never counts.")
 
-# First line of TASK_POINTER, matched (whitespace-collapsed) in the TUI
-# console mirror to know the prompt is rendered and Enter will submit it.
-SUBMIT_MARKER = "Your full task instructions are in this file"
-
 
 BANNER_ART = r"""
   ____   _____  _____  ____
@@ -1032,12 +1031,6 @@ def _clean_mirror(data):
     return ANSI_RE.sub("", text)
 
 
-def _norm_ws(s):
-    """Collapse whitespace runs to single spaces for TUI text matching
-    (the input box wraps a long prompt across lines)."""
-    return " ".join(s.split())
-
-
 def _tail_text(path, limit=TUI_TAIL_BYTES):
     """Last `limit` bytes of a file, decoded lossily ("" when unreadable)."""
     try:
@@ -1066,7 +1059,7 @@ def _pty_set_size(master, stdin_fd):
 
 
 def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
-                      stdin_fd, out_fd=None, submit_marker=None):
+                      stdin_fd, out_fd=None, autosubmit=False):
     """Run cmd under a pty, forwarding stdin->pty and pty->stdout while
     capturing all console output to tui_path. The operator experience is
     unchanged; the runner additionally scans the capture with the same
@@ -1088,7 +1081,7 @@ def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
         out_fd = sys.stdout.fileno()
     try:
         return _pty_forward(proc, master, stdin_fd, out_fd, log_path,
-                            tui_path, when, nonce, submit_marker)
+                            tui_path, when, nonce, autosubmit)
     finally:
         try:
             os.close(master)
@@ -1097,7 +1090,7 @@ def _run_attached_pty(cmd, log_path, tui_path, when, nonce, cwd, env,
 
 
 def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
-                 when, nonce, submit_marker=None):
+                 when, nonce, autosubmit=False):
     try:
         orig_attrs = termios.tcgetattr(stdin_fd)
     except termios.error:
@@ -1120,9 +1113,12 @@ def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
     last_key = (-1, -1)
     last_change = time.time()
     next_nudge = last_change + IDLE_NUDGE_S
-    submit_needle = _norm_ws(submit_marker) if submit_marker else None
-    submitted = submit_needle is None
-    submit_deadline = time.time() + SUBMIT_FALLBACK_S
+    submit_next = (time.time() + SUBMIT_FIRST_S) if autosubmit else None
+    submit_stop = time.time() + SUBMIT_MAX_S
+    try:
+        submit_base = Path(log_path).stat().st_size
+    except OSError:
+        submit_base = -1
     want = ("one of " + "/".join(when)) if when else "a *_DONE/*_APPROVED/*_REJECTED signal"
     if nonce is not None:
         want += f" carrying nonce {nonce}"
@@ -1166,20 +1162,23 @@ def _pty_forward(proc, master, stdin_fd, out_fd, log_path, tui_path,
                     cap += chunk
                     if len(cap) > TUI_TAIL_BYTES:
                         del cap[:len(cap) - TUI_TAIL_BYTES]
-            if not submitted:
-                hit = submit_needle and submit_needle in _norm_ws(
-                    _clean_mirror(cap))
-                if cap and (hit or time.time() >= submit_deadline):
-                    try:
-                        os.write(master, b"\r")
-                    except OSError:
-                        pass
-                    submitted = True
             try:
                 log_text = Path(log_path).read_text()
                 log_size = Path(log_path).stat().st_size
             except OSError:
                 log_text, log_size = "", -1
+            if submit_next is not None:
+                if log_size > submit_base and log_size > 0:
+                    submit_next = None      # stage started; stop pressing Enter
+                elif time.time() >= submit_next:
+                    if time.time() >= submit_stop:
+                        submit_next = None
+                    else:
+                        try:
+                            os.write(master, b"\r")
+                        except OSError:
+                            pass
+                        submit_next = time.time() + SUBMIT_RETRY_S
             try:
                 tui_size = tui_path.stat().st_size
             except OSError:
@@ -1276,7 +1275,7 @@ def _restore_term():
 
 
 def run_attached(cmd, log_path, when, nonce=None, cwd=None, env=None,
-                 submit_marker=None):
+                 autosubmit=False):
     """Run a harness attached in the foreground and wait for its signal.
 
     Under a terminal the child runs under a pty: the operator sees the
@@ -1299,7 +1298,7 @@ def run_attached(cmd, log_path, when, nonce=None, cwd=None, env=None,
             try:
                 return _run_attached_pty(cmd, log_path, tui_path, when, nonce,
                                          cwd, env, sys.stdin.fileno(),
-                                         submit_marker)
+                                         autosubmit)
             except Exception as e:  # noqa: BLE001 - foreground must survive
                 print(f"runner: pty mirror unavailable ({e}); plain spawn",
                       file=sys.stderr, flush=True)
@@ -1753,10 +1752,6 @@ def self_test(run, live=False):
     check("opencode tui cmd (auto model)",
           cmd_a == ["opencode", "--standalone", "--auto", "--prompt", "PTR"]
           and "OPENCODE_CONFIG_CONTENT" not in env_a)
-    # Auto-submit marker is whitespace-insensitive (the input box wraps).
-    check("submit marker: whitespace-insensitive match",
-          _norm_ws("Your full  task\n instructions are in this file")
-          == _norm_ws(SUBMIT_MARKER))
 
     # Alias resolution, pinned: short stage names expand to each
     # provider's own slug; unknown models pass through untouched.
