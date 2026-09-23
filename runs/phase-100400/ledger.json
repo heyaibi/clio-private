@@ -1,0 +1,56 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE c4c31b4f",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "fcb835449f79fb3a0700b6a0860eb825d5b729ff5e4f339643d396036b2dbb16",
+      "artifacts": {},
+      "git_head": "94d3d634a346a44dfe74a2d1ecd9310ac6dd93f5"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/findings.json 08963fbe",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "13d972925d31f5ea3f19748881b9e3a26d009fa153a74062ebf4b6fab2ab4063",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 2365,
+          "sha256": "bbdf44b3f073f81205023fb5f22d541cc1f556fa9071d5958979591cb9678497"
+        }
+      },
+      "git_head": "94d3d634a346a44dfe74a2d1ecd9310ac6dd93f5"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 8fabb39f",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "615203311604bb18b88d359be067f9390b923bcea37aa997a27dfcc140bece5c",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 2365,
+          "sha256": "bbdf44b3f073f81205023fb5f22d541cc1f556fa9071d5958979591cb9678497"
+        }
+      },
+      "git_head": "94d3d634a346a44dfe74a2d1ecd9310ac6dd93f5"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 6daac5af",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "2f044b0cbb5716618023f796ec21ecc316e36d1f9fd15b272a12933bb1ca30b4",
+      "artifacts": {},
+      "git_head": "94d3d634a346a44dfe74a2d1ecd9310ac6dd93f5"
+    }
+  }
+}

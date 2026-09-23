@@ -1,0 +1,20 @@
+2026-09-24T03:23:38+05:30 Started adversarial review for Phase 100400 r1.
+2026-09-24T03:23:49+05:30 git status: 7 staged files in public repo, working tree clean.
+2026-09-24T03:23:49+05:30 git -C private/clio-private status: roadmap/phase-100400-live-path-hardening.md staged, runs/ untracked/modified.
+2026-09-24T03:26:34+05:30 make check passed: exit code 0 (fmt, clippy, workspace tests, doctests clean).
+2026-09-24T03:27:18+05:30 Hermetic workspace test (DATABASE_URL unset) passed: exit code 0, all suites green.
+2026-09-24T03:28:01+05:30 make coverage passed: 317 files checked, TOTAL lines 97.97% functions 98.89%, all files meet the 90.0% floor.
+2026-09-24T03:30:53.576960+05:30 Scoped compliance test passed: 5 tests in clio-compliance stats_tests.
+2026-09-24T03:30:53.576960+05:30 Repeated stats flake test passed: 50/50 runs of discard_counts_and_other_bank_isolation.
+2026-09-24T03:30:53.576960+05:30 Scoped stdio tests passed: 4/4 tests in clio-mcp stdio_tests (including stdio_store_retrieve_end_to_end).
+2026-09-24T03:30:53.576960+05:30 Scoped Postgres drain and backlog tests passed: 2/2 in index_drain_hardening_tests.
+2026-09-24T03:30:53.576960+05:30 Scoped runtime-index log-content tests passed: 2/2 in runtime_index_hardening_tests.
+2026-09-24T03:30:53.576960+05:30 Scoped clio-mcp library test passed: 240 passed, 0 failed with Postgres configured.
+2026-09-24T03:30:53.576960+05:30 make lint passed: clippy clean with -D warnings.
+2026-09-24T03:30:53.576960+05:30 make fmt passed: repository formatting clean.
+2026-09-24T03:30:53.576960+05:30 Coverage re-read confirmed: index_drain 100%/100%, runtime_index 93.94%/100%, stdio 100%/100%, stats.rs 100%/100%.
+2026-09-24T03:30:53.576960+05:30 Finding F-01 recorded with evidence crates/clio-ops/src/reindex_space_tests.rs:90,143-149 (MockEmbed single-read buffer flake).
+2026-09-24T03:30:53.576960+05:30 Finding F-02 recorded with evidence crates/clio-mcp/src/stdio_tests.rs:29-82 (in-memory BufRead interceptor).
+2026-09-24T03:30:53.576960+05:30 Updated phase attribution in roadmap/phase-100400-live-path-hardening.md for Adversary r1.
+2026-09-24T03:30:53.576960+05:30 findings.json written and verified as valid JSON.
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/findings.json 08963fbe

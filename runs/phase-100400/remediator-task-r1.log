@@ -1,0 +1,16 @@
+2026-09-24T03:30:00+05:30 Remediator r1 started; read task file, findings.json, and backup.
+2026-09-24T03:30:00+05:30 Backup findings.original.json already exists; no copy needed, so spawning is permitted.
+2026-09-24T03:30:00+05:30 Triage: F-01 (low) clio-ops MockEmbed single-read; F-02 (low) stdio test-only interceptor; plan_1hr = F-01; plan_unlimited = subprocess stdio test + conditional MCP raw-ingest schema.
+2026-09-24T03:30:00+05:30 Public worktree shows the 7 developer-staged files; nested private repo shows staged roadmap + runs artifacts. No unstaged remediation changes yet.
+2026-09-24T03:38:48+05:30 F-01 reproduced: 38/600 parallel runs of reindex_across_two_providers_and_widths failed with OutOfRange "embed response count 1 does not match batch size 2" (single-read mock).
+2026-09-24T03:38:48+05:30 F-01 fixed in crates/clio-ops/src/reindex_space_tests.rs: read_http_request loops until header terminator + Content-Length body; 0/600 parallel runs failed after; file 241 lines.
+2026-09-24T03:38:48+05:30 F-02 addressed: new subprocess integration test crates/clio-lib/tests/stdio_subprocess_test.rs drives the real clio mcp stdio binary over OS pipes (store -> background sweeper drain -> retrieve); 20/20 passes with DATABASE_URL set; file 213 lines.
+2026-09-24T03:38:48+05:30 plan_unlimited #2 resolved: no external non-native caller demonstrates a need, so no MCP raw-ingest schema draft; recorded the revisit condition in crates/clio-mcp/README.md.
+2026-09-24T03:38:48+05:30 Scoped clippy clean for clio and clio-ops (--all-targets --all-features -D warnings); cargo fmt applied with no reformat.
+2026-09-24T03:43:10+05:30 Final make check on the frozen tree: EXIT=0; 48 suites "test result: ok", 0 failed, 2023 tests passed (2022 baseline + 1 new subprocess test); new mcp_stdio_subprocess_store_drains_and_retrieves and reindex_across_two_providers_and_widths both ok.
+2026-09-24T03:43:10+05:30 Final coverage gate: coverage-guard 317 files, TOTAL lines 97.97% functions 98.89%, all reported files meet the per-file floor. Only path-excluded test files changed, so reported-file coverage is unchanged.
+2026-09-24T03:43:10+05:30 Updated findings.json: F-01 resolved, F-02 resolved, plan_1hr resolved, plan_unlimited #1 resolved (subprocess test), plan_unlimited #2 resolved-not-applicable (condition unmet, README revisit note). JSON validated with python3 json.load.
+2026-09-24T03:43:10+05:30 Phase file Attribution: Remediator r1 row set to "OpenCode CLI (Go . Deepseek V4.1 Flash High) | done"; other rows untouched.
+2026-09-24T03:43:10+05:30 Roadmap isolation check: no 100400/roadmap/private references in touched public files; both touched Rust files 241 and 220 lines (<=450); no stray profraw from this run.
+2026-09-24T03:43:10+05:30 Git: no add/commit/stash/index changes; remediation left unstaged (README/reindex_space_tests.rs modified, stdio_subprocess_test.rs untracked). Approver reviews git diff + git status.
+REMEDIATOR_DONE 8fabb39f

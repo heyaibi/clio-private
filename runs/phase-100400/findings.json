@@ -1,0 +1,54 @@
+{
+  "run": "r1",
+  "phase": "100400",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "Intermittent TCP partial-read test flake in clio-ops MockEmbed test double",
+      "evidence": "crates/clio-ops/src/reindex_space_tests.rs:90,143-149: let n = stream.read(&mut buf).unwrap_or(0); let request = String::from_utf8_lossy(&buf[..n]); parses request_input_count on a single TCP read without waiting for HTTP headers or Content-Length body completion, falling back to 1 on two-item batches (AmError { code: OutOfRange, message: \"embed response count 1 does not match batch size 2\" }).",
+      "requirement_ref": "coverage.md §1 (green cargo test / gate reliability)",
+      "recommendation": "Buffer incoming TCP stream bytes until \\r\\n\\r\\n and the declared Content-Length body bytes are fully received before parsing the JSON body in MockEmbed.",
+      "status": "resolved",
+      "resolution": "Fixed in crates/clio-ops/src/reindex_space_tests.rs. Added `read_http_request`, which loops on the socket until it has the `\\r\\n\\r\\n` header terminator plus the declared `Content-Length` body (helper `content_length`), then MockEmbed counts the batch from the complete request. Reproduced before the fix: 38/600 parallel runs of `reindex_space_tests::reindex_across_two_providers_and_widths` failed with `reindex succeeds: AmError { code: OutOfRange, message: \"embed response count 1 does not match batch size 2\" }` (panic at reindex_space_tests.rs:181). After the fix: 0/600 parallel runs failed. `make check` exited 0; `make coverage` reported 317 files, TOTAL lines 97.97% / functions 98.89%, all per-file floors met. File is 241 lines."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Stdio store-retrieve test relies on test-only in-memory BufRead interceptor rather than background sweeper or subprocess",
+      "evidence": "crates/clio-mcp/src/stdio_tests.rs:29-82: DrainBeforeRetrieve implements BufRead to trigger state.drain_index() between store and retrieve frames to avoid sweeper timing dependencies, rather than testing the real background sweeper or subprocess execution (am mcp stdio).",
+      "requirement_ref": "roadmap/phase-100400-live-path-hardening.md §5 Task 3",
+      "recommendation": "Complement the in-memory stdio::serve unit test with an integration-level subprocess test invoking am mcp stdio to test the full runtime binary and background sweeper thread across real OS pipes.",
+      "status": "resolved",
+      "resolution": "Added crates/clio-lib/tests/stdio_subprocess_test.rs. It launches the compiled `clio mcp stdio` binary over OS pipes, sends a grounded `store` frame, polls `maintenance_status` over the same pipes until the real background sweeper reports `pending_jobs=0` and `lexical_rows=1`, then sends `retrieve` and asserts the stored id is returned. Closing stdin must yield a clean exit. Evidence: `cargo test --locked -p clio --test stdio_subprocess_test` -> 1 passed; 20/20 repeated runs with `DATABASE_URL` set -> 0 failures; `make check` exit 0. Location note: the test lives in `crates/clio-lib/tests/` rather than `crates/clio-mcp/tests/` because the `clio` binary and `CARGO_BIN_EXE_clio` belong to the `clio` package, and adding `clio` as a dev-dependency of `clio-mcp` would create a dependency cycle (`clio` already depends on `clio-mcp`). The existing in-memory stdio test is retained for deterministic framing/stdout-purity coverage."
+    }
+  ],
+  "plan_1hr": [
+    "Harden crates/clio-ops/src/reindex_space_tests.rs::MockEmbed to loop-read until the full HTTP request body is assembled before parsing request_input_count, eliminating the intermittent test flake during parallel workspace test runs."
+  ],
+  "plan_unlimited": [
+    "Implement a true subprocess test (am mcp stdio) in crates/clio-mcp/tests/ to exercise the full binary entry point and background sweeper lifecycle over an OS pipe, complementing the in-process stdio::serve unit test.",
+    "Consider adding an MCP schema draft for raw conversation ingestion if external non-native callers demonstrate a need for unchunked turn extraction over MCP."
+  ],
+  "remediation": {
+    "round": 1,
+    "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+    "summary": "Both findings resolved. F-01's partial-read flake is closed with a before/after parallel reproduction (38/600 failing before, 0/600 after). F-02 is addressed with a real subprocess test of `clio mcp stdio` that exercises the background sweeper over OS pipes; the in-memory test is kept. `make check` exited 0 and the single final `make coverage` gate passed (317 files, TOTAL lines 97.97% / functions 98.89%, all per-file floors met).",
+    "plan_1hr": [
+      {
+        "status": "resolved",
+        "evidence": "Same fix and before/after evidence as F-01 (crates/clio-ops/src/reindex_space_tests.rs; 38/600 failures before, 0/600 after)."
+      }
+    ],
+    "plan_unlimited": [
+      {
+        "status": "resolved",
+        "evidence": "Implemented by the F-02 subprocess test in crates/clio-lib/tests/stdio_subprocess_test.rs (the `clio-mcp/tests/` path is not reachable without a dependency cycle; see F-02 resolution). 20/20 repeated runs passed."
+      },
+      {
+        "status": "resolved_not_applicable",
+        "evidence": "The condition (external non-native callers demonstrating a need for unchunked turn extraction over MCP) does not hold: native callers use `clio_write::ingest_raw` and MCP callers use the existing `store` binding. No schema draft was added, and no acceptance criterion depends on one. The revisit condition is now explicit in crates/clio-mcp/README.md (Raw-ingest binding decision)."
+      }
+    ]
+  }
+}
