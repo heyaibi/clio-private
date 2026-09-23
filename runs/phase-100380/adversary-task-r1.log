@@ -1,0 +1,28 @@
+[2026-09-24T02:00:00Z] START adversary r1 phase-100380: staged diff review, independent verification, omission audit
+[2026-09-24T02:01:00Z] Review scope: root staged diff 17 files (all crates/clio-mcp, +1427/-245) + nested private repo (baseline/crates.md, phase file). git status: all root changes staged, nothing unstaged/untracked outside ignored paths.
+[2026-09-24T02:02:00Z] Read every staged file + surrounding code: read_tools/write_tools dispatch order, protocol tools/call, runtime.rs->runtime_open.rs move, clio-config Runtime/validate/profile_ops, clio-store update/inspect, clio-write raw_ingest/extract.
+[2026-09-24T02:03:00Z] requirement.md check: §4.9.4 core catalog all bound; §4.9.5.E arg shapes match the six schemas; masking lives in clio-config (effective_masked/masked_clone, config_set secret echo, profile diff masked).
+[2026-09-24T02:04:00Z] Baseline /tmp/cov-baseline.json re-read: 313 files, lines 97.98% / functions 98.88%, zero files below 90% (no DEVELOPER_BLOCKED condition). /tmp/cov-ws.json mtime before final edits -> treated as diagnostic only.
+[2026-09-24T02:05:00Z] Postgres port 34310 open; cargo-llvm-cov present at ~/.cargo/bin (not on default PATH).
+[2026-09-24T02:06:00Z] cargo fmt --all -- --check -> exit 0 (clean).
+[2026-09-24T02:07:00Z] cargo test -p clio-mcp --lib (DATABASE_URL + hermetic CLIO_DEPLOYMENT_CONFIG) -> 230 passed, 0 failed (matches developer claim).
+[2026-09-24T02:09:00Z] make test -> exit 0; summed test-result lines: 2011 passed, 0 failed (matches developer claim).
+[2026-09-24T02:10:00Z] make lint (clippy --workspace --all-targets --all-features --locked -D warnings) -> exit 0.
+[2026-09-24T02:13:00Z] Targeted new tests (config_tools::, summarize_tools::, nfr7_tests::, schema_tests::) -> 25 passed, 0 failed.
+[2026-09-24T02:15:00Z] make coverage -> exit 0; coverage_guard: 317 files checked, TOTAL lines 97.97% functions 98.89%, all files >=90%. New/modified rows: config_tools 93.48/100, summarize_tools 91.37/100, runtime_open 98.12/100, schema_config_defs 100/100, runtime 100/100 (matches developer claim exactly).
+[2026-09-24T02:16:00Z] wc -l on all created/modified Rust files: max runtime_open 275, summarize_tools_tests 252, config_tools_tests 247, runtime.rs 254 -> all <=450.
+[2026-09-24T02:17:00Z] Omission audit: Tasks 1-4 required changes all present (summarize dispatch+read binding+carve-out removal; six schemas+dispatch+bound lists+masking test; crates.md paragraph; NFR-7 test). Out-of-scope list respected; no Cargo.toml/dependency changes; requirement.md untouched.
+[2026-09-24T02:18:00Z] Deeper checks: summarize_bank pagination (PAGE=200, stable created_at,id order), snapshot immutability via get_snapshot, bank isolation via resolve_ctx+inspect; DRY_RUN_TOOLS+=ranking_env_set correct; nfr7 minimal-args derivation handles enums/$ref/typed defaults.
+[F-01 medium] Missing phase §8 'End-to-end tests (full MCP request/response for each new tool)': no tools/call coverage for the seven new names in protocol_tests/http_tests/stdio_tests; DoD enumeration drops e2e (phase file:300).
+[F-02 medium] ranking_env_set/config_profile_apply never reach retrieval/admission (runtime_open.rs:120, read_retrieve.rs:58, write_tools.rs:149, store_write.rs:55) and nothing persists (config/mod.rs:152, validate.rs:69-77); limitation at phase file:333 says 're-resolves on restart' (actually reset to defaults) and names no owning phase.
+[F-03 low] DoD line phase file:306 marks 'Required approval obtained' [x] while approval is only requested (line 336) and pending (line 405).
+[F-04 low] configured_extractor success path (build_extractor_from) untested; only injected seam (summarize_tools_tests.rs:58) and fail-closed (summarize_tools_tests.rs:128) run; AC-01 evidence overstates 'configured extractor path'.
+[F-05 low] summarize_tools.rs:126-128 silently skips archived rows without a skipped[] reason while item scope errors (94-99); item scope can update discarded items that bank scope excludes (inspect_query.rs:104-106).
+[F-06 low] config_set schema omits the omitted-scope default 'session' (schema_config_defs.rs:44-56 vs config_tools.rs:89-93); §4.9.2 item 6 requires stated defaults.
+[F-07 low] New test files lack the AGENTS.md header structure (config_tools_tests.rs:1-5, summarize_tools_tests.rs:1-6, nfr7_tests.rs:1-6).
+[F-08 low] New comments embed phase-numbered T100380-xx IDs (summarize_tools_tests.rs:73,107,123; config_tools_tests.rs:35,117,142,179) and 'required by the phase' (nfr7_tests.rs:16); dev log:109 claims no phase-number leakage (pre-existing T<phase> convention exists repo-wide).
+[F-09 low] summarize(dry_run=true) mutates: read-bound short-circuit in write_tools.rs:68-71 bypasses dry_run_unsupported; summarize not in DRY_RUN_TOOLS; §4.9.4.G lists dry_run for all core tools.
+[2026-09-24T02:20:00Z] findings.json written and JSON-validated: 9 findings (2 medium, 7 low); evidence file:line in each.
+[2026-09-24T02:21:00Z] Phase file Attribution: Adversary r1 row set to done (only phase-file edit; not restaged per instructions).
+[2026-09-24T02:22:00Z] FINISH adversary r1: implementation verified green (fmt/lint/test/coverage); 9 findings filed; no critical/blocking defects.
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100380/findings.json faf0d3c6

@@ -1,0 +1,90 @@
+{
+  "run": "r1",
+  "phase": "100380",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Required end-to-end MCP request/response tests for the seven new tools are missing",
+      "evidence": "phase-100380 (roadmap/phase-100380-binding-closure.md) §8 'Required Tests' lists 'End-to-end tests (a full MCP request/response for each new tool)'; `grep -rn 'summarize|config_get|config_set|config_profiles|config_profile_apply|ranking_env' crates/clio-mcp/src/protocol_tests.rs crates/clio-mcp/src/http_tests.rs crates/clio-mcp/src/stdio_tests.rs` returns no matches; the new tests only call the in-process dispatcher/seam: config_tools_tests.rs:20 (`crate::write_tools::dispatch`), nfr7_tests.rs:99 (`write_tools::dispatch`), summarize_tools_tests.rs:58 (`summarize_with_extractor`). No test sends `tools/call` through `McpHandler`/stdio/HTTP for summarize, config_*, or ranking_env_*. The DoD bullet 'Required tests pass (unit, integration over MCP, contract, regression, security/masking, failure-mode; ...)' (phase file line 300) silently drops the end-to-end category.",
+      "requirement_ref": "phase-100380 §8 Required Tests; §4.9.2 MCP binding",
+      "recommendation": "Add a transport-level `tools/call` test per new tool (or one loop over the seven names) asserting the MCP envelope (`isError`/`structuredContent`), and either include e2e in the DoD enumeration or record a deliberate exception."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "ranking_env_set/config_profile_apply have no operational effect in the running MCP process, are not persisted, and the recorded limitation misstates this as 're-resolves on restart' without naming a debt owner",
+      "evidence": "runtime_open.rs:120 builds the retriever/hub env from `RankingEnv::system_defaults()`; the read/write paths use that frozen `state.env` (read_retrieve.rs:58 intent gate; write_tools.rs:149 and store_write.rs:55 admission). profile_ops.rs:122-141 patches only `Runtime.ranking`; clio-config config/mod.rs:152 initializes `Runtime.ranking` to `system_defaults()`, `finish_boot` loads no ranking from overlays, and validate.rs:69-77 forbids `config_set` on `ranking.*`, so nothing persists. phase-100380 lines 333 and 405 call it 'the restart-scoped ranking snapshot ... re-resolves on restart', but a restart resets to defaults; the limitation also fails the task rule that a known limitation states 'which phase owns the debt'.",
+      "requirement_ref": "FR-32; §4.9.5.E; developer task 'Known limitations state (a) what is missing, (b) why, (c) which phase owns the debt'",
+      "recommendation": "Correct the limitation text (the patch is process-local and discarded at restart, and does not affect in-process retrieval/admission), name the owning follow-up phase, and either wire propagation into state.env/retriever or document process-lifetime semantics in the tool descriptions."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "DoD checkbox 'Required approval obtained' is marked complete while the tool_schema approval is only requested/pending",
+      "evidence": "roadmap/phase-100380-binding-closure.md:306 `- [x] Required approval obtained (tool_schema publish approval)`; the only artifact is the 'Approval requested' subsection at line 336 and Final Status line 405 '( ... the pending `tool_schema` publish approval decision)'; phase section 6/§9 say the decision is owned by the Remedy Approver step.",
+      "requirement_ref": "phase-100380 §6 Agent Decision Boundary; §9 Definition of Done",
+      "recommendation": "Mark the approval DoD entry as pending (or split it into 'request recorded [x]' and 'approval obtained [ ]') so the pipeline sees the open decision."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "The configured extractor success path is never exercised; only the fail-closed branch and the injected seam are tested",
+      "evidence": "summarize_tools.rs:52-67 (`configured_extractor` -> `build_extractor_from(&effective, bearer, HttpTransport::default())`) is only reached in its failure branch: T100380-03 calls `write_tools::dispatch(&s, \"summarize\", {\"scope\":\"bank\"})` with no provider (summarize_tools_tests.rs:126-138); all success tests inject a stub via `summarize_with_extractor` (summarize_tools_tests.rs:56-62). No test drives the real provider wiring, although phase §8's Verification Rule says 'Implementation claims must be supported by actual test output, not inspection alone'.",
+      "requirement_ref": "phase-100380 §8 Verification Rule; AC-100380-01 evidence text",
+      "recommendation": "Add a test that sets `extract.url` to a local stub endpoint (or an injectable transport) and asserts the configured path produces a persisted gist; otherwise record the provider wiring as inspection-only."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Bank-scope summarize silently drops archived items from the report, and item scope does not exclude discarded items while bank scope does",
+      "evidence": "summarize_tools.rs:126-128 skips `row.archived` with no `skipped[]` entry, while item scope returns NotFound for archived (summarize_tools.rs:94-99); the bank filter inherits `include_discarded=false` (inspect_query.rs:104-106), while item scope reads via `get_memory_item` (sqlite_memory.rs:38-41), which does not check `discarded_at`. The report is documented as 'items summarized, skipped, and why' (phase §5 Task 1).",
+      "requirement_ref": "phase-100380 §5 Task 1",
+      "recommendation": "Record archived/discarded items under `skipped` with reasons (or document the exclusion in the schema description) so the report is complete and both scopes behave consistently."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "config_set published schema does not state the omitted-scope default",
+      "evidence": "schema_config_defs.rs:44-56 declares `scope` as an optional enum with no `default` and no default text; config_tools.rs:89-93 (and clio-config dispatch) silently default an omitted scope to `session`.",
+      "requirement_ref": "§4.9.2 item 6 ('Optional parameters marked `?` MAY be omitted; defaults MUST be those stated here or in the published schema')",
+      "recommendation": "Add `\"default\": \"session\"` (or say 'defaults to session') to the config_set scope property."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "New test source files do not use the AGENTS.md-mandated file header",
+      "evidence": "config_tools_tests.rs:1-5, summarize_tools_tests.rs:1-6, and nfr7_tests.rs:1-6 carry only Copyright/SPDX plus a one-line `//!` summary; the mandated '# Responsibility / ## Owns / ## Does not own / ## Boundary' structure is absent, while AGENTS.md says 'Every Rust source file MUST use the following header structure' and the developer task repeats 'New/modified Rust files use the exact AGENTS.md header'.",
+      "requirement_ref": "AGENTS.md File Header",
+      "recommendation": "Add the mandated header to the three new files, or amend AGENTS.md to exempt test-only modules (several pre-existing *_tests.rs use the short form)."
+    },
+    {
+      "id": "F-08",
+      "severity": "low",
+      "title": "New code comments reference the private phase number/phase concept; the developer log claims no such leakage",
+      "evidence": "New files embed phase-numbered test IDs and a phase reference: summarize_tools_tests.rs:73,107,123-126 (T100380-xx), config_tools_tests.rs:35,117,142,179 (T100380-xx), nfr7_tests.rs:16 ('required by the phase'). The developer task's roadmap-isolation rule says never reference roadmap phases or phase numbers from code or comments; developer-task-r1.log line 109 states 'No roadmap/phase-number leakage in clio-mcp sources'.",
+      "requirement_ref": "developer task 'Roadmap isolation'",
+      "recommendation": "Use phase-agnostic test names (or explicitly adopt the repo-wide T<phase-id> convention and fix the log claim). Pre-existing files (e.g. crates/clio-hygiene/src/audit_tests.rs:7) show the same T-ID pattern."
+    },
+    {
+      "id": "F-09",
+      "severity": "low",
+      "title": "summarize mutates but silently ignores dry_run=true because it is read-bound, bypassing the dry-run fail-closed guard",
+      "evidence": "write_tools.rs:68-71 returns read-bound names before the `dry_run_unsupported` guard; summarize is in `bound_read_tools` (lib.rs:160) and not in `DRY_RUN_TOOLS` (write_tools.rs:40-49); summarize_tools.rs:192-197 writes the gist unconditionally. §4.9.4.G lists `dry_run` as a common parameter for all core tools ('Validate and report without durable mutation when the tool mutates').",
+      "requirement_ref": "§4.9.4.G common parameters",
+      "recommendation": "Either implement a no-write dry_run for summarize or reject dry_run=true explicitly (as other mutators do) instead of performing the durable write."
+    }
+  ],
+  "plan_1hr": [
+    "F-01: add a transport-level tools/call test (protocol or stdio) for summarize/config_*/ranking_env_* and fix the DoD test enumeration.",
+    "F-02: rewrite the ranking limitation to say the patch is process-local and dropped at restart, name the owning follow-up phase, and update the 'restart-scoped' wording in Final Status.",
+    "F-03: mark the approval DoD item pending (split request vs decision).",
+    "F-05/F-06: report archived/discarded skips with reasons; add the config_set scope default to the schema."
+  ],
+  "plan_unlimited": [
+    "F-02: wire ranking/config patches into the running retriever/admission path (or an explicit rebuild) and test that rankings actually change in-process behavior.",
+    "F-04: exercise the configured extraction path end-to-end against a local stub sidecar.",
+    "F-09: give summarize a real dry_run or a fail-closed rejection; audit other read-bound mutating tools for the same bypass.",
+    "F-07/F-08: normalize test-file headers and settle the phase-number isolation convention repo-wide."
+  ]
+}

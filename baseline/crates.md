@@ -147,6 +147,13 @@ clio/                               # workspace root
     │                                #   Depends on: clio-store, clio-config, clio-types
     │                                #   Modules: apply.rs, client.rs, clock.rs,
     │                                #            crypto.rs, http.rs, protocol.rs, server.rs
+    │                                #
+    │                                #   Extension note: `sync_ack_skip` is a non-normative
+    │                                #   extension beyond the sync protocol in requirement
+    │                                #   §4.9.5.D — an operator dead-letter ack helper with
+    │                                #   zero behavioral risk: it acknowledges one
+    │                                #   permanently rejected mutation in the DLQ without
+    │                                #   changing apply, conflict, or cursor semantics.
     │
     └── clio-lib/                      # Top-level facade + binary entrypoints
         └── src/                     #   Re-exports from sub-crates,
