@@ -1,0 +1,109 @@
+{
+  "run_id": "phase-100374",
+  "phase": "100374",
+  "state": "completed",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "signal": "DEVELOPER_DONE 99f86043"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/findings.json b489379f"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "REMEDIATOR_DONE 5efa57de"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "signal": "REMEDY_APPROVED 0e08c7d8"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "FINALIZE_DONE 47d111ed"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/developer-task-r1.md",
+      "prompt_sha256": "17627ecf6e9948d613fc48cea7e8f49ed4db95ab2996a130468a3a77e3780a70",
+      "duration_s": 672.366,
+      "visits": 1,
+      "signal": "DEVELOPER_DONE 99f86043",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/developer-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/adversary-task-r1.md",
+      "prompt_sha256": "54ed4f655a6e61442be16af4bec213b1c527e39cd0c07dd38baf46273746b84e",
+      "duration_s": 1148.534,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/findings.json b489379f",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/adversary-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/remediator-task-r1.md",
+      "prompt_sha256": "91dcfd3fd66c5090def65de5eeed126740e122395b479f4f206a67e7b2e93447",
+      "duration_s": 254.925,
+      "visits": 1,
+      "signal": "REMEDIATOR_DONE 5efa57de",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/remediator-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/approver-task-r1.md",
+      "prompt_sha256": "9c3a40704ed4cb3cf0c6a484ae3e26a52dfb238801127ed417f910b8eda420aa",
+      "duration_s": 270.23,
+      "visits": 1,
+      "signal": "REMEDY_APPROVED 0e08c7d8",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/approver-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/finalize-task-r1.md",
+      "prompt_sha256": "e3ae4e806493313960fc3f1f16d19f20afb43ee23a33d61ee644a1751c666c5a",
+      "duration_s": 117.805,
+      "visits": 1,
+      "signal": "FINALIZE_DONE 47d111ed",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100374/finalize-task-r1.tui.log",
+      "attach": "pty",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ]
+}
