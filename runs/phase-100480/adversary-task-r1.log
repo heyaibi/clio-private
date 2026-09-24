@@ -1,0 +1,18 @@
+2026-09-24T23:49:00+05:30 start adversary r1 phase-100480
+2026-09-24T23:49:05+05:30 git status --short -> working tree clean in root repo; phase file staged in private repo
+2026-09-24T23:49:32+05:30 python3 private/clio-private/harness/github_issues.py list-open -> exit 0, 5 open issues triaged, 0 candidates for addressed_issues
+2026-09-24T23:50:11+05:30 python3 -m unittest discover -s benchmarks/tests -t . -> exit 0, 116 tests pass in 6.2s
+2026-09-24T23:50:15+05:30 python3 benchmarks/run.py --list-stubs -> exit 0, 3 documented stubs listed (BEAM, MemoryAgentBench, AMA-Bench)
+2026-09-24T23:50:31+05:30 python3 benchmarks/run.py --suite beam -> exit 2, documented stub refused with informative message
+2026-09-24T23:50:40+05:30 python3 benchmarks/run.py --suite both --adapter memory --judge stub --generator stub --max-probes 8 -> exit 0, 16 probes scored, token_f1 0.0747
+2026-09-24T23:51:34+05:30 make check -> exit 0, 149 tests pass, clippy and fmt clean
+2026-09-24T23:52:25+05:30 make coverage -> exit 0, 319 files, lines 97.97% functions 98.90%, all per-file floors pass
+2026-09-24T23:54:24+05:30 cargo run -q -- remember "Alice went to Paris" -> exit 0, JSON format verified against ClioAdapter parser
+2026-09-24T23:54:29+05:30 cargo run -q -- health --output json -> exit 0, {"ok": true} verified
+2026-09-24T23:55:52+05:30 incidental bug reported: issue #15 (crates/clio-lib/src/cli_args.rs:115-128 rejects '--' delimiter and treats hyphenated positionals as flags)
+2026-09-24T23:55:55+05:30 recorded issue #15 to reported-bugs.json
+2026-09-24T23:56:16+05:30 verified 450-line constraint across Rust source files; 0 violations in phase (0 Rust files created/modified)
+2026-09-24T23:57:06+05:30 written private/clio-private/runs/phase-100480/findings.json (0 findings, 0 addressed_issues)
+2026-09-24T23:57:10+05:30 generated private/clio-private/runs/phase-100480/report.html and copied style.css
+2026-09-24T23:57:57+05:30 updated attribution in roadmap/phase-100480-benchmark-runner-build.md
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/findings.json 790d08e8

@@ -1,0 +1,1 @@
+CLI argument parser rejects end-of-options delimiter '--' and treats hyphen-prefixed positional arguments as unknown flags

@@ -1,0 +1,117 @@
+{
+  "run": "phase-100480",
+  "phase": "100480",
+  "subject": "Phase 100480: Benchmark Runner Build (LongMemEval-style and LoCoMo-style)",
+  "verdict": "Excellent",
+  "verdict_justification": "The benchmark runner harness (am-bench) satisfies all requirements from Phase 100480 and benchmark.md §5 without product regression. Both suite adapters (LoCoMo and LongMemEval) preserve categories and abstention semantics, two-pass LLM judging applies geometric-mean positional bias mitigation at temperature 0.0, the three remaining suites are cleanly documented as stubs, and canary baselines were produced reproducibly against pinned snapshots.",
+  "metadata": {
+    "generated": "2026-09-24",
+    "applies_to": "3a638ed",
+    "source": "benchmarks/, phase-100480-benchmark-runner-build.md"
+  },
+  "standard": [
+    "AC-100480-01: Both suite adapters work with correct stream and question parsing",
+    "AC-100480-02: One-command reproducible scoring against pinned snapshots",
+    "AC-100480-03: Calibrated two-tier LLM-as-a-judge with swap-position geometric-mean bias mitigation",
+    "AC-100480-04: First baselines recorded with pinned datasets and judge settings",
+    "AC-100480-05: Three remaining suites remain documented stubs (BEAM, MemoryAgentBench, AMA-Bench)",
+    "AC-100480-06: No product regression; full workspace check and coverage gates pass",
+    "AGENTS.md & benchmark strategy constraints: zero dependencies beyond stdlib, no committed datasets/secrets, roadmap isolation"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100480-01: Both suite adapters work",
+      "status": "Fully satisfied",
+      "evidence": "am_bench/datasets/locomo.py and am_bench/datasets/longmemeval.py parse pinned snapshots preserving categories, timestamps, and abstention semantics. 116 tests pass in benchmarks/tests/.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100480-02: One-command reproducible scoring",
+      "status": "Fully satisfied",
+      "evidence": "python3 benchmarks/run.py runs end to end with pinned snapshots, producing structured JSON and Markdown scorecards.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100480-03: Judge integrated with bias mitigation",
+      "status": "Fully satisfied",
+      "evidence": "am_bench/judges/llm_judge.py implements two-pass swap position scoring with geometric mean at temperature 0.0 and JSON schema validation.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100480-04: First baselines recorded with pins",
+      "status": "Fully satisfied",
+      "evidence": "benchmarks/reports/baseline-locomo.json (acc 0.2265, F1 0.2127) and baseline-longmemeval.json (acc 0.0000, F1 0.1526) recorded with exact pins and judge settings.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100480-05: Three suites remain stubs",
+      "status": "Fully satisfied",
+      "evidence": "BEAM, MemoryAgentBench, and AMA-Bench documented in am_bench/stubs.py; CLI fails with code 2 and informative message.",
+      "severity": "Low"
+    },
+    {
+      "requirement": "AC-100480-06: No product regression",
+      "status": "Fully satisfied",
+      "evidence": "make check passes (149 tests, clippy and fmt clean); make coverage passes (319 files, 97.97% lines / 98.90% functions, 0 per-file offenders).",
+      "severity": "Low"
+    }
+  ],
+  "findings": [],
+  "issues": [],
+  "addressed_issues": [],
+  "dismissed": [
+    "Clio CLI argument parser treats hyphen-prefixed positional arguments as unknown flags: verified that while this is an incidental CLI issue in product code (reported as GitHub issue #15), it does not invalidate the benchmark runner harness or phase deliverables."
+  ],
+  "verification": [
+    {
+      "claim": "All 116 benchmark unit and integration tests pass",
+      "classification": "Established",
+      "source_note": "python3 -m unittest discover -s benchmarks/tests -t . executed with exit 0 in 6.2s"
+    },
+    {
+      "claim": "Workspace tests and lints pass with zero product regression",
+      "classification": "Established",
+      "source_note": "make check executed with exit 0: 149 passed, clippy and fmt clean"
+    },
+    {
+      "claim": "Workspace coverage meets all aggregate and per-file thresholds",
+      "classification": "Established",
+      "source_note": "make coverage executed with exit 0: 319 files checked, 97.97% lines / 98.90% functions, zero per-file offenders below 90%"
+    },
+    {
+      "claim": "Benchmark runner executes hermetically in one command",
+      "classification": "Established",
+      "source_note": "python3 benchmarks/run.py --suite both --adapter memory --judge stub --generator stub --max-probes 8 executed with exit 0"
+    },
+    {
+      "claim": "Documented stubs fail clearly without fabricating scores",
+      "classification": "Established",
+      "source_note": "python3 benchmarks/run.py --suite beam exited 2 with message 'BEAM (Agent Memory Benchmark) is a documented stub and is not implemented'"
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Hosted Tier 2 judge (gpt-4o) live latency and API cost",
+      "why_unknown": "Hosted OpenAI API key not configured in local environment; tested using stub client and JSON schema verification",
+      "what_would_resolve_it": "Running am-bench with valid AM_BENCH_API_KEY or OPENAI_API_KEY",
+      "materiality": "Low"
+    }
+  ],
+  "strengths": [
+    "Standard library only implementation in Python with zero third-party runtime package dependencies",
+    "Rigorous positional-bias mitigation via candidate-reference swap and geometric-mean score fusion",
+    "Session-isolated deterministic partitioning (60/20/20 train/canary/blind and 5-fold cross-validation)",
+    "Comprehensive hermetic test suite (116 tests) covering adapters, fetch verification, runner, parser, and judge",
+    "Clean isolation: zero modifications to core product crates or roadmap leaks"
+  ],
+  "regrets": [],
+  "process_changes": [
+    "Maintain the pattern of hermetic in-memory test doubles alongside CLI subprocess adapters for fast deterministic verification"
+  ],
+  "plan_1hr": [
+    "Address incidental issue #15 in clio-lib argument parser to support standard '--' end-of-options delimiter"
+  ],
+  "plan_unlimited": [
+    "Extend the unified MemoryBenchmarkAdapter interface to rival systems (Mem0, Hindsight, Honcho, Mnemosyne) and later suites (BEAM, MemoryAgentBench, AMA-Bench)"
+  ]
+}

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100480: Benchmark Runner Build (LongMemEval-style and LoCoMo-style)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100480: Benchmark Runner Build (LongMemEval-style and LoCoMo-style)</h1>
+    <div class="vline">
+      <span class="badge b-green"><i data-lucide="sparkles" class="ic"></i>Excellent</span>
+      <span class="mono">1 dismissed</span>
+    </div>
+    <p class="sum">The benchmark runner harness (am-bench) satisfies all requirements from Phase 100480 and benchmark.md §5 without product regression. Both suite adapters (LoCoMo and LongMemEval) preserve categories and abstention semantics, two-pass LLM judging applies geometric-mean positional bias mitigation at temperature 0.0, the three remaining suites are cleanly documented as stubs, and canary baselines were produced reproducibly against pinned snapshots.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-24</span>
+      <span><b>Applies to</b>3a638ed</span>
+      <span><b>Source</b>benchmarks/, phase-100480-benchmark-runner-build.md</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>AC-100480-01: Both suite adapters work with correct stream and question parsing</li>
+        <li>AC-100480-02: One-command reproducible scoring against pinned snapshots</li>
+        <li>AC-100480-03: Calibrated two-tier LLM-as-a-judge with swap-position geometric-mean bias mitigation</li>
+        <li>AC-100480-04: First baselines recorded with pinned datasets and judge settings</li>
+        <li>AC-100480-05: Three remaining suites remain documented stubs (BEAM, MemoryAgentBench, AMA-Bench)</li>
+        <li>AC-100480-06: No product regression; full workspace check and coverage gates pass</li>
+        <li>AGENTS.md &amp; benchmark strategy constraints: zero dependencies beyond stdlib, no committed datasets/secrets, roadmap isolation</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">6 of 6 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100480-01: Both suite adapters work</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">am_bench/datasets/locomo.py and am_bench/datasets/longmemeval.py parse pinned snapshots preserving categories, timestamps, and abstention semantics. 116 tests pass in benchmarks/tests/.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100480-02: One-command reproducible scoring</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">python3 benchmarks/run.py runs end to end with pinned snapshots, producing structured JSON and Markdown scorecards.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100480-03: Judge integrated with bias mitigation</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">am_bench/judges/llm_judge.py implements two-pass swap position scoring with geometric mean at temperature 0.0 and JSON schema validation.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100480-04: First baselines recorded with pins</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">benchmarks/reports/baseline-locomo.json (acc 0.2265, F1 0.2127) and baseline-longmemeval.json (acc 0.0000, F1 0.1526) recorded with exact pins and judge settings.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100480-05: Three suites remain stubs</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">BEAM, MemoryAgentBench, and AMA-Bench documented in am_bench/stubs.py; CLI fails with code 2 and informative message.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100480-06: No product regression</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">make check passes (149 tests, clippy and fmt clean); make coverage passes (319 files, 97.97% lines / 98.90% functions, 0 per-file offenders).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Clio CLI argument parser treats hyphen-prefixed positional arguments as unknown flags: verified that while this is an incidental CLI issue in product code (reported as GitHub issue #15), it does not invalidate the benchmark runner harness or phase deliverables.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>All 116 benchmark unit and integration tests pass — python3 -m unittest discover -s benchmarks/tests -t . executed with exit 0 in 6.2s</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace tests and lints pass with zero product regression — make check executed with exit 0: 149 passed, clippy and fmt clean</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace coverage meets all aggregate and per-file thresholds — make coverage executed with exit 0: 319 files checked, 97.97% lines / 98.90% functions, zero per-file offenders below 90%</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Benchmark runner executes hermetically in one command — python3 benchmarks/run.py --suite both --adapter memory --judge stub --generator stub --max-probes 8 executed with exit 0</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Documented stubs fail clearly without fabricating scores — python3 benchmarks/run.py --suite beam exited 2 with message &#39;BEAM (Agent Memory Benchmark) is a documented stub and is not implemented&#39;</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Hosted Tier 2 judge (gpt-4o) live latency and API cost</p>
+          <p class="d">Hosted OpenAI API key not configured in local environment; tested using stub client and JSON schema verification · Running am-bench with valid AM_BENCH_API_KEY or OPENAI_API_KEY · Low</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Standard library only implementation in Python with zero third-party runtime package dependencies</li>
+        <li>Rigorous positional-bias mitigation via candidate-reference swap and geometric-mean score fusion</li>
+        <li>Session-isolated deterministic partitioning (60/20/20 train/canary/blind and 5-fold cross-validation)</li>
+        <li>Comprehensive hermetic test suite (116 tests) covering adapters, fetch verification, runner, parser, and judge</li>
+        <li>Clean isolation: zero modifications to core product crates or roadmap leaks</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>None noted</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>Maintain the pattern of hermetic in-memory test doubles alongside CLI subprocess adapters for fast deterministic verification</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Address incidental issue #15 in clio-lib argument parser to support standard &#39;--&#39; end-of-options delimiter</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Extend the unified MemoryBenchmarkAdapter interface to rival systems (Mem0, Hindsight, Honcho, Mnemosyne) and later suites (BEAM, MemoryAgentBench, AMA-Bench)</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

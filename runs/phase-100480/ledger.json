@@ -1,0 +1,47 @@
+{
+  "order": [
+    "developer",
+    "adversary"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 2eebfc75",
+      "harness": "agy:gemini-3.8-flash-high",
+      "authoritative": true,
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "visits": 2,
+      "output_sha256": "f0edd51412b6aea0308e3d24d6e093b8b6ca3404e6ff6ba1392e58635b85d4d1",
+      "artifacts": {},
+      "git_head": "3a638ed93486cdb4b4e4a42d1833e0bae113083c",
+      "superseded_task_files": [
+        "developer-task-r1.md"
+      ],
+      "task_file": "developer-task-r2.md",
+      "task_sha256": "80afdb149aaefec9dbef36f7a4f5faf07b0249f9e5921eb88ee042ac7cf04d00",
+      "stage_sha256": "25a9eee0bf7bdc3665fe3d53e3759bc2424b1f5c4aa70d9b7829540a7c845fb3",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/findings.json 790d08e8",
+      "harness": "agy:gemini-3.8-flash-high",
+      "authoritative": true,
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "visits": 1,
+      "output_sha256": "e1ad32917df4be1afc97fa8d17424f0c3ce97ae100833b31dbaf15cb5521ad1e",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 6412,
+          "sha256": "75e58758aa234480198b920abf6c9f0797110b2c352a7e05689a03be80939bad"
+        }
+      },
+      "git_head": "3a638ed93486cdb4b4e4a42d1833e0bae113083c",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "95b3a8448fee7036b5f0bd7af27112d2a0206f1cbc139a07cb7f112d182e53a1",
+      "stage_sha256": "da4716215519df42bf167185485e0e5b03331e519a78413691806b31febbc9e1",
+      "via": "skip",
+      "routed_to": "finalize"
+    }
+  }
+}
