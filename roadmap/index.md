@@ -1,4 +1,4 @@
-# Agent Memoir — 35 build slices + 1 remediation insert + 9 remediation + 15 follow-up/conditional phases (60 total)
+# Agent Memoir — 35 build slices + 1 remediation insert + 9 remediation + 15 follow-up/conditional + 1 operator-finding phase (61 total)
 
 Each numbered slice is one staffing unit of roughly **equal engineering effort** (~1×). Relative weights are marked on each heading (`1×` or `1.5×`); the max/min ratio is kept ≤ 1.5. Order is primary build dependency, not priority; independent slices (for example 100310 and 100320, and the extraction adapter 100340) share no dependency with their neighbours and are placed for narrative grouping. No links outside this folder.
 
@@ -225,6 +225,16 @@ Added 2026-09-22 from the gap register in `gap/requirement-gaps.md` (build plan,
 | 100520 | Scale ceilings, TLS pooling, deployment docs | ~4–5 days | [phase-100520-scale-ceilings-docs.md](phase-100520-scale-ceilings-docs.md) | G-13, G-14, G-15, G-16 |
 
 Critical path: 100360 → 100380 → 100400 → 100440 → 100460 → 100480. Total 33–47 ideal days plus review latency (see `gap/requirement-gaps.md` §4). The `batch` widening stays in the backlog as an enhancement.
+
+---
+
+## Operator-finding phase 100401 (issue #3)
+
+Added 2026-09-24 from GitHub issue #3 (`heyaibi/clio`, a bug report). After the reranker was attached to the live path (Phase 100350), it silently never ran: the TEI adapter sends `{"query","documents","top_k"}` and parses `results[]`/`scores[]`, while TEI `/rerank` expects `{"query","texts"}` and returns a bare array, so every recall fell back to fused order and mislabeled the failure as an embed error. This phase corrects the TEI contract, scopes the shared transport error label so rerank/extraction failures are not reported as embed failures, and locks the recall-path fixes (skip unreadable candidate; show hit content) with regression coverage. It uses the remaining odd range (>100400, <100420) per the remediation block rule and sits between the accepted live-path phase 100400 and the historical/temporal phase 100420. The issue's two design observations (surfacing rerank relevance instead of the fused RRF score, and collapsing duplicate content) are deferred to a later phase because the first would change the frozen `Reranker` trait.
+
+| Phase | Scope | Effort | Implementation plan | Source |
+|------:|-------|--------|---------------------|--------|
+| 100401 | TEI rerank wire-contract correction, shared transport error scoping, recall-path regression closure | ~1–2 days | [phase-100401-rerank-contract-retrieval-diagnostics.md](phase-100401-rerank-contract-retrieval-diagnostics.md) | GitHub issue #3 |
 
 ---
 
