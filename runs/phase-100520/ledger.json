@@ -1,0 +1,86 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 21f62332",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 2,
+      "output_sha256": "db343c031c490e4fff0124f4ab94bee1a1361abe56b2fa8af60efc42ee5b9814",
+      "artifacts": {},
+      "git_head": "fa256796346a360e5ad3c55a3181784dbf3d3b47",
+      "superseded_task_files": [
+        "developer-task-r1.md"
+      ],
+      "task_file": "developer-task-r2.md",
+      "task_sha256": "ea53c3a437315d600e55290893bf604e2714c2205a417cf03baa6d1ab5c7d48f",
+      "stage_sha256": "e7922dfb5828ee581ed26707260171e3faf56670e7dd6539f05e74236b0b6ad2",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/findings.json a8473527",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "020dfaca369f776ba72b8561726cefb747bb967444ae5d2f0a74a681be44cb25",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 9638,
+          "sha256": "5a07d8d529a08a71f3f3100ba1cde31113e6f92bb92f0d5f164d0d4a0a73431e"
+        }
+      },
+      "git_head": "fa256796346a360e5ad3c55a3181784dbf3d3b47",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "0ba6d7f40bbe35d3eb16ac6432ff4fe45476882d48c8584c757b72fb6e3ba72d",
+      "stage_sha256": "fe6d74e4235f9728ec1dee23233a63adb223bbd1772925058e113d77c2fc6b72",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 59025d95",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "76ebacab6b1545f7d2cdab492d330d5ac24ec39f5cddb1811261d53ae362d9ae",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 9638,
+          "sha256": "5a07d8d529a08a71f3f3100ba1cde31113e6f92bb92f0d5f164d0d4a0a73431e"
+        }
+      },
+      "git_head": "fa256796346a360e5ad3c55a3181784dbf3d3b47",
+      "superseded_task_files": [],
+      "task_file": "remediator-task-r1.md",
+      "task_sha256": "5f5dda76a70ad7814f54c1eb17c0b91d321363aa0b48f444a17d11add5f79656",
+      "stage_sha256": "ec5444b8b1975fd9b74805a82b959f44dae0ef10deba1c57e6e77a1bfb1938e3",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 40cb8767",
+      "harness": "cmd:deepseek/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "Command Code (DeepSeek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "ba33a268c1df47b45d92d7d22c61abc087d4c520ecd27cb508f4c48c47c6255e",
+      "artifacts": {},
+      "git_head": "fa256796346a360e5ad3c55a3181784dbf3d3b47",
+      "superseded_task_files": [],
+      "task_file": "approver-task-r1.md",
+      "task_sha256": "6818d1e67392ba14f840103e7a457166ae8572761104c9b9ed7e9d50288c67dc",
+      "stage_sha256": "45f1735c6857978ea1f9fa097773d998b383cf82e44967cb1841e6d04a52e69f",
+      "via": "edge",
+      "routed_to": "finalize"
+    }
+  }
+}

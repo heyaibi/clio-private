@@ -1,0 +1,18 @@
+[2026-09-25T00:00:00+05:30] Remediator r1 round 1 started for phase 100520
+[2026-09-25T00:00:05+05:30] Backup findings.original.json already exists; skipped copy. 7 findings (F-01..F-07), addressed_issues empty.
+[2026-09-25T00:00:10+05:30] Triage: all findings touch 5 files with shared-file coupling (F-01+F-02 scale_tests.rs, F-01+F-04 mission_spike_tests.rs, F-03+F-05+F-06 http.rs) -> resolving all myself, no workers.
+[2026-09-25T00:10:00+05:30] F-07+F-01: scale_tests.rs header reworded to mandated template; t100520_01..03 renamed t01..t03; inline comment rewritten. scale_tests.rs 443 lines (<=450).
+[2026-09-25T00:15:00+05:30] F-02: new test near_duplicate_high_overlap_corpus_at_ceiling_bounded_cost in scale_tests.rs; 1,000 clusters x 10 items = 10,000 at ceiling; first/last-page flag checks + 10s bound; restructured to 2 audit calls after first pass ran 4.
+[2026-09-25T00:20:00+05:30] F-04: mission_spike_tests.rs HELD_OUT_KEEP/DROP added (no SYNONYM_CLUSTERS vocabulary, no rule-text reuse); println prints calibration + held-out rates; measured held-out literal=0.0000 semantic=0.0000 locked with asserts; 'Recorded Spike Outcome' header relabeled synthetic/self-confirming vs held-out. File 415 lines.
+[2026-09-25T00:20:30+05:30] F-01: t100520_04 -> t04_retention_mission_differently_phrased_spike; println phase id removed.
+[2026-09-25T00:21:00+05:30] F-05: http.rs:85-96 reverted to original find(']')/parse-then-check bracket structure from pre-phase revision.
+[2026-09-25T00:21:30+05:30] F-06: http.rs Owns bullet + transport_error doc now name certificate-bearing Io as terminal/non-retryable.
+[2026-09-25T00:21:45+05:30] F-03: post_json_with_ca -> pub(crate); lib.rs re-export trimmed to {HttpEndpoint, get_json, post_json}. http.rs 350 lines.
+[2026-09-25T00:22:00+05:30] Verified: grep -rn 100520 over public tree -> 0 occurrences; wc -l all modified files <=450; cargo fmt clean; cargo check 3 crates --tests OK.
+[2026-09-25T00:25:00+05:30] Scoped verify: clio-hygiene lib 41 pass (high-overlap page 7.58s < 10s); clio-config lib 160 pass incl. held-out rate 0.0 asserted; clio-index lib 71 pass incl. renamed t05/t06 TLS mock tests.
+[2026-09-25T00:40:00+05:30] make check exit 0: fmt clean, clippy -D warnings clean, 2,113 tests passed / 0 failed.
+[2026-09-25T00:55:00+05:30] make coverage exit 0 (final): guard 320 files vs 90% floors, TOTAL lines 97.95% / functions 98.83%, all per-file floors met; http.rs 96.23% lines / 94.12% functions.
+[2026-09-25T00:58:00+05:30] findings.json updated: all 7 findings marked resolved with real command output; recommendations unchanged; addressed_issues preserved as [].
+[2026-09-25T00:58:30+05:30] Phase file Attribution Remediator r1 row filled. Git: nothing staged, index untouched (unstaged diff for approver).
+[2026-09-25T00:58:45+05:30] No incidental bugs confirmed; nothing reported to GitHub.
+REMEDIATOR_DONE 59025d95

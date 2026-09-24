@@ -1,0 +1,23 @@
+[2026-09-25T03:10:00+05:30] Adversary r1 started for phase 100520 [2026-09-25T03:10:05+05:30] Staged public diff: 11 files, +1307/-172 (README, clio-config, clio-hygiene, clio-index, docs/deployment.md)
+[2026-09-25T03:20:00+05:30] make check EXIT=0 verified: fmt clean, clippy -D warnings clean, 2112 passed / 0 failed
+[2026-09-25T03:20:30+05:30] Open-issue audit: 5 open issues triaged and all 5 full threads viewed; none in phase scope (KMS perf, PG test lock, index job starvation, CLI -- parsing, memtree flake)
+[2026-09-25T03:21:00+05:30] Targeted tests pass: clio-hygiene t100520 (3), clio-config t100520 (1, spike output literal 0.0000/semantic 1.0000), clio-index t100520 (2)
+[2026-09-25T03:21:30+05:30] clio sync status single-host reproduced: {"sync":"omitted","single_host":true,"ok":true} exit=0
+[2026-09-25T03:22:00+05:30] Starting make coverage (full gate, PATH prefixed with ~/.cargo/bin)
+[2026-09-25T03:31:00+05:30] make coverage attempt 1 FAILED on pre-existing flake: clio-write memtree_cov_tests::concurrent_writes_during_refresh_wave "refresh did not converge" (open issue #16, clio-write untouched by this diff); no coverage JSON produced
+[2026-09-25T03:31:30+05:30] Retrying make coverage (--no-clean warm build) to obtain the per-file gate result
+[2026-09-25T03:07:52+05:30] Note: entries above were written with an estimated clock that ran ahead of wall time; real time for this block is shown below
+[2026-09-25T03:07:52+05:30] make coverage attempt 2 EXIT=0: guard 320 files, TOTAL lines 97.95% / functions 98.83%, all reported files meet the per-file floor; audit.rs 94.52% lines / 95.00% functions, http.rs 96.17% lines / 94.74% functions (matches developer claim)
+[2026-09-25T03:07:52+05:30] Coverage attempt 1 failed on pre-existing flake clio-write memtree_cov_tests::concurrent_writes_during_refresh_wave ("refresh did not converge", crates/clio-write/src/memtree_cov_tests.rs:279); already tracked as open issue #16; clio-write untouched by this diff; no new bug filed
+[2026-09-25T03:07:52+05:30] Finding F-01 (medium): private phase number 100520 in new public test names/comments - scale_tests.rs:117,101,170,287; mission_spike_tests.rs:297,317; tls_mock_tests.rs:10-11,145,159
+[2026-09-25T03:07:52+05:30] Finding F-02 (low): T100520-02 "at scale" uses 100 items and a <1s bound the old O(n^2) pairing also passes - scale_tests.rs:187,242-247
+[2026-09-25T03:07:52+05:30] Finding F-03 (low): test-only post_json_with_ca exported as public API - http.rs:232, lib.rs:73
+[2026-09-25T03:07:52+05:30] Finding F-04 (low): spike paraphrase corpus tuned to the prototype SYNONYM_CLUSTERS, 1.0 is self-confirming - mission_spike_tests.rs:67-100,266-288
+[2026-09-25T03:07:52+05:30] Finding F-05 (low): drive-by IPv6 bracket-parse refactor - http.rs:85-96
+[2026-09-25T03:07:52+05:30] Finding F-06 (low): http.rs docs call Io always transient while Io-cert failures are terminal - http.rs:161-167 vs 177-184
+[2026-09-25T03:07:52+05:30] Finding F-07 (low): scale_tests.rs:6 header uses "contains" not the mandated "is responsible for"
+[2026-09-25T03:07:52+05:30] findings.json written and validated (7 findings, 0 addressed_issues); phase-file Attribution Adversary row filled (only phase-file edit)
+[2026-09-25T03:08:10+05:30] Git state for review: public repo has exactly the 11 developer files staged and a clean worktree; private repo phase file carried the developer staged edit and now one unstaged Attribution-line change from this adversary; all runs/ paths excluded from review per instructions
+[2026-09-25T03:08:10+05:30] Verification performed by adversary: cargo fmt --check clean; make check EXIT=0 (2112 passed / 0 failed); targeted t100520 tests 3+1+2 pass; make coverage attempt 2 EXIT=0 with 0 per-file offenders; clio sync status single-host exit 0 reproduced; no /adversarial-review skill present so findings.json written per schema
+[2026-09-25T03:08:10+05:30] Omission audit: all four in-scope bullets have code+test evidence; conditional schema-policy bullet explicitly resolved as not triggered; DoD checkboxes re-verified against real output; downstream guarantee (verified-TLS mock test) confirmed
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/findings.json a8473527

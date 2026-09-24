@@ -1,0 +1,20 @@
+[2026-09-25T02:44:00+05:30] Developer r2 (resumed attempt) started for phase 100520
+[2026-09-25T02:44:10+05:30] Baseline coverage re-read from r1 run: /tmp/cov-baseline.json, 320 files checked, 97.95% lines / 98.83% functions, 0 files below 90%
+[2026-09-25T02:44:30+05:30] Inspected prior state: 6 tracked files touched + 4 new files from r1 worker slices (hygiene audit+scale_tests, config mission_spike_tests, index http+tls_mock_tests, README+docs/deployment.md)
+[2026-09-25T02:45:00+05:30] cargo check -p clio-hygiene -p clio-config -p clio-index --tests: OK
+[2026-09-25T02:45:30+05:30] Slice tests: clio-hygiene 40 pass, clio-config 160 pass, clio-index 71 pass; T100520-01..06 pass
+[2026-09-25T02:46:00+05:30] Integration fixes: audit.rs docs record ceiling cost + SQLite fts5 / PostgreSQL pg_trgm upgrade options; spike test prints measured rates; certificate-Io classifier unit test added
+[2026-09-25T02:47:00+05:30] http.rs was 474 lines (>450 cap) after the added test; moved inline unit_tests to crates/clio-index/src/http/unit_tests.rs (http.rs 338 lines, unit_tests.rs 162 lines)
+[2026-09-25T02:48:00+05:30] First make check failed clippy -D warnings: audit.rs too_many_lines + float casts; fixed with near_duplicate_flags() extraction and usize div_ceil arithmetic
+[2026-09-25T02:49:30+05:30] Verified deployment-doc claim end to end: HOME=<tmp> target/debug/clio sync status => {"sync":"omitted","single_host":true,"ok":true}, exit=0
+[2026-09-25T02:50:51+05:30] make check EXIT=0: fmt clean, clippy clean, 2,112 workspace tests passed / 0 failed
+[2026-09-25T02:52:35+05:30] make coverage EXIT=0 (final run 1): guard 320 files, TOTAL lines 97.94% / functions 98.83%, 0 per-file offenders; audit.rs 94.52% lines / 95.00% functions, http.rs 96.17% lines / 94.74% functions
+[2026-09-25T02:53:30+05:30] Strengthened T100520-01 to seed and audit 5,001 items (above the old 5,000 ceiling); standalone run passes in 3.15s
+[2026-09-25T02:54:29+05:30] make check (re-run after test change) EXIT=0, 2,112 tests passed
+[2026-09-25T02:55:21+05:30] make coverage EXIT=0 (re-run for the changed revision): guard 320 files, TOTAL lines 97.95% / functions 98.83%, 0 per-file offenders; audit.rs 94.52% lines / 95.00% functions, http.rs 96.17% lines / 94.74% functions
+[2026-09-25T02:55:30+05:30] Note: make coverage needs PATH=$HOME/.cargo/bin prefix for the Makefile's cargo-llvm-cov guard check (environment only, no source change)
+[2026-09-25T02:56:00+05:30] http.rs IPv6 refactor round-trip: briefly reverted the worker's behavior-equivalent bracket-parse refactor, then restored it so the file matches the revision that passed make check and make coverage; cargo fmt --check clean, clio-index 71 lib tests pass
+[2026-09-25T02:56:30+05:30] Phase file updated: §8 required-test boxes checked with evidence, §9 AC evidence filled with real outputs, DoD checked with approval note, Completion Evidence + known limitations recorded, Attribution Developer row filled, §12 Final Status PASS WITH DOCUMENTED LIMITATIONS and Implementer sign-off
+[2026-09-25T02:57:00+05:30] No incidental bugs confirmed outside the task scope; nothing reported to GitHub
+[2026-09-25T02:58:00+05:30] Staged public repo (11 files: README, clio-config/hygiene/index sources + 4 new test/docs files, docs/deployment.md) and private repo (roadmap/phase-100520 file + runs/phase-100520 artifacts; also pre-existing runs/phase-100500 state in the pathspec)
+DEVELOPER_DONE 21f62332

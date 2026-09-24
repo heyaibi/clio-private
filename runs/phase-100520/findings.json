@@ -1,0 +1,115 @@
+{
+  "run": "phase-100520",
+  "phase": "100520",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Roadmap isolation: private phase number 100520 embedded in new public test names and module comments",
+      "evidence": "crates/clio-hygiene/src/scale_tests.rs:117 (fn t100520_01_hygiene_audit_above_old_ceiling_and_overflow_incomplete), :101 (comment \"T100520-02 covers\"), :170 (fn t100520_02_near_duplicate_lookup_at_scale_matches_brute_force), :287 (fn t100520_03_staleness_with_last_relevance); crates/clio-config/src/mission_spike_tests.rs:297 (fn t100520_04_retention_mission_differently_phrased_spike), :317 (println \"T100520-04 spike: ...\"); crates/clio-index/src/tls_mock_tests.rs:10-11 (//! - T100520-05 / T100520-06 doc bullets), :145 (fn t100520_05_verified_tls_valid_cert_succeeds), :159 (fn t100520_06_verified_tls_invalid_cert_fails_closed). A scan of the public tree for '100520' finds no other occurrences; these 11 references are all introduced by this staged diff.",
+      "requirement_ref": "Developer Hard Rules: \"Roadmap isolation: never reference private/clio-private/roadmap/, phase numbers, or roadmap files from code or comments.\" Same class as the resolved phase-100500 adversary finding F-01, which was remediated by renaming t100500_* to t01_* and removing T100500-NN from doc comments (0 T100500 references remain in the public tree).",
+      "recommendation": "Rename the new test functions to ordinal names (t01_*, t02_*, ...) in scale_tests.rs, mission_spike_tests.rs, and tls_mock_tests.rs, and remove the T100520-NN identifiers from the module doc bullets, the inline comment, and the println line. Older pre-existing T100xxx identifiers elsewhere in the tree are separate debt and are not part of this finding.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Renamed to t01_/t02_/t03_ in crates/clio-hygiene/src/scale_tests.rs, t04_ in crates/clio-config/src/mission_spike_tests.rs, t05_/t06_ in crates/clio-index/src/tls_mock_tests.rs; rewrote the module doc bullets, the inline comment, and the println without phase identifiers.",
+        "evidence": "`grep -rn \"100520\" --include=*.rs --include=*.md --include=*.toml .` over the public tree (excluding private/) returns no matches; renamed tests pass: `cargo test -p clio-index --lib tls_mock` -> \"tls_mock_tests::t06_verified_tls_invalid_cert_fails_closed ... ok, 2 passed\"; clio-hygiene/clio-config lib suites pass."
+      }
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "T100520-02 claims near-duplicate lookup \"at scale\" but only exercises 100 items; the bounded-cost assertion cannot distinguish the new index from the old O(n^2) pairing",
+      "evidence": "crates/clio-hygiene/src/scale_tests.rs:187 (\"for i in 0..100\"), :242-247 (assert!(duration < Duration::from_secs(1), ...)). The old all-pairs implementation performs 100x100 sketch comparisons on this corpus, which also finishes far under 1s, so the test proves brute-force parity (valuable) but not the scalable lookup or its cost bound. No test seeds a near-identical or high-overlap corpus anywhere near the new 10,000-item ceiling.",
+      "requirement_ref": "Phase 100520 \u00a78 Required Test Scenarios T100520-02: \"Near-duplicate lookup at scale | Correct pairs; bounded cost\"; AC-100520-01 required evidence claims \"matches the inverted-index pairing against brute force on 100 items\".",
+      "recommendation": "Add a case with many near-identical/high-overlap gists (the worst case for the inverted index) and assert a deterministic work bound or a generous measured bound, or state in the phase evidence that cost is demonstrated only at 100 items.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Added `near_duplicate_high_overlap_corpus_at_ceiling_bounded_cost` in crates/clio-hygiene/src/scale_tests.rs: 1,000 clusters x 10 near-identical items = 10,000 items at the raised ceiling (within-cluster Jaccard 0.95, cross-cluster 0.0). Ground truth is by construction (only the 9 low-utility members per cluster are dominated at similarity >= 0.8); the test asserts scanned/total == 10,000, complete without `incomplete`, first page all near_duplicate-flagged, last page (offset 9,800) all clean dominators, and each audit page under a 10s bound.",
+        "evidence": "`cargo test -p clio-hygiene --lib near_duplicate_high_overlap -- --nocapture` -> \"high-overlap 10k near-duplicate audit: slowest page 7.579189648s (bound < 10s)\" and \"test result: ok. 1 passed\". All-pairs pairing would need ~10^8 sketch comparisons (minutes); the measured audit cost is one ordering."
+      }
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Test-only custom-CA hook is exported as public API",
+      "evidence": "crates/clio-index/src/http.rs:232 (pub fn post_json_with_ca), crates/clio-index/src/lib.rs:73 (pub use http::{HttpEndpoint, get_json, post_json, post_json_with_ca}). The only callers are crates/clio-index/src/tls_mock_tests.rs:145,159 and the internal post_json delegation at http.rs:266; no production code passes a CA.",
+      "requirement_ref": "Phase 100520 \u00a75 Task 3 (verified-TLS mock test); developer hard rule \"Implement only what the task asks\".",
+      "recommendation": "Make post_json_with_ca pub(crate) (the tls_mock_tests module is crate-internal) or gate it with #[cfg(test)], and drop the lib.rs re-export so the production API surface is unchanged.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Changed `pub fn post_json_with_ca` to `pub(crate) fn` in crates/clio-index/src/http.rs and removed it from the lib.rs re-export (`pub use http::{HttpEndpoint, get_json, post_json};`).",
+        "evidence": "`cargo test -p clio-index --lib` -> 71 passed, 0 failed; `make check` clippy -D warnings clean; crate-internal callers (post_json delegation, tls_mock_tests) unchanged."
+      }
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Semantic-spike paraphrase corpus is tuned to the prototype's own synonym table, so the measured 1.0 hit rate is self-confirming",
+      "evidence": "crates/clio-config/src/mission_spike_tests.rs:67-100 (SYNONYM_CLUSTERS: prefer/favor, decision/resolution/chose, constraint/boundary, root/underlying, cause/defect, verified/validated, config/parameters, workflow/automation, rule/policy, alert/urgent/warning, tests/test/suite, passed/succeeded, ...) and :266-288 (PARAPHRASED_KEEP/PARAPHRASED_DROP). Each paraphrased example's distinguishing words are members of those exact clusters (e.g. \"favors\", \"Resolution ... chose\", \"boundary\", \"Underlying defect\", \"Validated\", \"parameters\", \"automation policy\", \"urgent warning\"), so semantic hit rate 1.0000 is a property of the corpus construction, not evidence that the prototype generalizes to unseen phrasing.",
+      "requirement_ref": "Phase 100520 \u00a75 Task 2 (\"Run the spike on representative differently-phrased examples\"); \u00a76 Forbidden Actions (\"Claim a semantic improvement without a measured spike\").",
+      "recommendation": "Either add held-out paraphrases whose wording is not represented in SYNONYM_CLUSTERS and report that rate alongside, or label the current corpus explicitly as a synthetic/self-confirming calibration suite in the recorded outcome and decision.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Added HELD_OUT_KEEP/HELD_OUT_DROP corpora in crates/clio-config/src/mission_spike_tests.rs phrased with vocabulary absent from SYNONYM_CLUSTERS and reusing no rule text; the test now prints calibration and held-out rates and asserts the measured held-out rates (0.0). The 'Recorded Spike Outcome' header now labels the paraphrased corpus as synthetic/self-confirming and records both corpora. The deferral decision is kept and is now supported by the honest held-out measurement.",
+        "evidence": "`cargo test -p clio-config --lib t04_retention -- --nocapture` -> \"semantic spike: exact literal=1.0000 semantic=1.0000; paraphrased literal=0.0000 semantic=1.0000; held-out literal=0.0000 semantic=0.0000\"; test result: ok. 1 passed."
+      }
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "Drive-by refactor of unrelated IPv6 bracket parsing in http.rs",
+      "evidence": "crates/clio-index/src/http.rs:85-96: the previous find(']')/parse-then-check structure was rewritten as map/filter combinators although the TLS work does not require it. The developer run log records a revert-then-restore of this refactor (\"briefly reverted the worker's behavior-equivalent bracket-parse refactor, then restored it so the file matches the revision that passed make check and make coverage\"). Behavior is equivalent and the existing bracket tests pass, but the change is outside the task.",
+      "requirement_ref": "Developer Hard Rules: \"Implement only what the task asks. No drive-by refactors.\"",
+      "recommendation": "Restore the original minimal parse structure so the http.rs diff contains only the CA/agent and error-classification changes the phase requires.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Reverted crates/clio-index/src/http.rs bracket parsing to the original find(']')/parse-then-check structure from the pre-phase revision.",
+        "evidence": "Pre-existing bracket unit tests pass: `cargo test -p clio-index --lib` -> 71 passed, 0 failed (includes the bracketed-IPv6 http tests); `make check` exit 0."
+      }
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "http.rs contract docs now understate terminal transport errors: Io-wrapped certificate failures are non-retryable but the doc says Io is always transient",
+      "evidence": "crates/clio-index/src/http.rs:161-167 (fn doc: \"Transient transport failures (Timeout, Io, ConnectionFailed, HostNotFound) always contain `sidecar unreachable`... Terminal client errors (`Tls`, `BadUri`, `Protocol`) get neither...\") versus :177-184, where ureq::Error::Io with \"certificate\" in the text returns transient=false and \"tls failure: ...\". The module-level \"Owns\" bullet at :26-28 lists only Tls/BadUri/Protocol as terminal. The new unit test at crates/clio-index/src/http/unit_tests.rs:85-94 confirms the Io-certificate path is non-retryable.",
+      "requirement_ref": "AGENTS.md file-header rule (\"responsibility and ownership statements MUST accurately describe the actual module\"); phase 100520 \u00a75 Task 3.",
+      "recommendation": "Update both doc comments to name certificate-bearing Io errors as a terminal (non-retryable) case alongside Tls/BadUri/Protocol.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Updated the http.rs module 'Owns' bullet and the transport_error doc to name certificate-bearing `Io` errors as terminal (non-retryable) alongside `Tls`/`BadUri`/`Protocol`.",
+        "evidence": "crates/clio-index/src/http.rs module header now reads \"terminal failures (`Tls`, `BadUri`, `Protocol`, and certificate-bearing `Io`) do not\"; transport_error doc names the ureq `Io` certificate wrapping; behavior unchanged and covered by the existing Io-certificate unit test in crates/clio-index/src/http/unit_tests.rs."
+      }
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "scale_tests.rs header does not use the mandated \"This module is responsible for\" wording",
+      "evidence": "crates/clio-hygiene/src/scale_tests.rs:6: \"//! This module contains scale and boundary tests for the `hygiene_audit` scan\". It is the only file under crates/ with that phrasing; every other test module uses \"This module is responsible for\".",
+      "requirement_ref": "AGENTS.md File Header template (\"This module is responsible for <ONE clear responsibility>\"); developer hard rule \"New/modified Rust files use the exact AGENTS.md header\".",
+      "recommendation": "Reword line 6 to \"This module is responsible for scale and boundary tests of the `hygiene_audit` scan ...\" and keep the remaining header sections as they are.",
+      "resolution": {
+        "status": "resolved",
+        "how": "Reworded the scale_tests.rs header to the mandated \"This module is responsible for ...\" template (and extended the Owns list for the new ceiling test).",
+        "evidence": "crates/clio-hygiene/src/scale_tests.rs lines 6-7 now begin \"This module is responsible for scale and boundary tests of the `hygiene_audit` scan\"; `make check` fmt clean."
+      }
+    }
+  ],
+  "addressed_issues": [],
+  "remediation_summary": {
+    "make_check": "exit 0: cargo fmt clean, clippy -D warnings clean, 2,113 workspace tests passed / 0 failed",
+    "make_coverage": "exit 0: coverage-guard 320 file(s) checked against 90.0% floors, TOTAL lines 97.95% functions 98.83%, all reported files meet the per-file floor; modified http.rs 96.23% lines / 94.12% functions",
+    "plan_1hr": "F-01, F-03, F-05, F-06, F-07 resolved as planned",
+    "plan_unlimited": "F-02 resolved with a 10,000-item high-overlap corpus at the ceiling plus a measured cost bound; F-04 resolved with a held-out corpus (measured 0.0 hit rate) recorded alongside the calibration rates"
+  },
+  "plan_1hr": [
+    "F-01: Rename t100520_01..03 to t01..t03 in crates/clio-hygiene/src/scale_tests.rs, t100520_04 in crates/clio-config/src/mission_spike_tests.rs, t100520_05/06 in crates/clio-index/src/tls_mock_tests.rs; remove T100520-NN from the doc bullets, the inline comment, and the spike println. Re-run the three targeted test filters to confirm the renamed tests still pass.",
+    "F-03: Change post_json_with_ca to pub(crate) in crates/clio-index/src/http.rs and drop it from the crates/clio-index/src/lib.rs re-export; re-run clio-index tests.",
+    "F-05: Revert crates/clio-index/src/http.rs:85-96 to the original find(']')/parse-then-check bracket parsing; re-run the bracket unit tests.",
+    "F-06: Add the Io-certificate terminal case to the http.rs module and transport_error docs.",
+    "F-07: Reword the crates/clio-hygiene/src/scale_tests.rs:6 header line to the mandated template."
+  ],
+  "plan_unlimited": [
+    "F-02: Extend the near-duplicate scale test with a high-overlap corpus at or above the new 10,000-item ceiling and a deterministic cost/work-bound assertion, so the index's scaling claim is actually demonstrated.",
+    "F-04: Add held-out paraphrased keep/drop examples that do not reuse SYNONYM_CLUSTERS vocabulary and record both the tuned and held-out semantic hit rates in the spike outcome; keep the deferral decision if the held-out rate is still not compelling."
+  ]
+}
