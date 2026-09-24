@@ -2,9 +2,10 @@
 name: am_finalize
 description: Clio finalize stage - close-out duty after remedy approval
 role: developer
-harness: ['opencode:together/glm-5.3-flash@high']
+harness: ['opencode:together/glm-5.3-flash@high', 'cmd:deepseek/deepseek-v4-flash@max']
 harness_names:
   'opencode:together/glm-5.3-flash@high': "OpenCode CLI (Together . GLM-5.3 Flash High)"
+  'cmd:deepseek/deepseek-v4-flash@max': "Command Code (DeepSeek V4 Flash (latest) Max)"
 placeholders:
   REMEDY_APPROVER_AGENT_OUTPUT: Final approver verdict and message.
   ISSUE_AUDIT_PATH: Absolute path of findings.json containing approved issue candidates.

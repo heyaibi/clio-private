@@ -140,10 +140,10 @@ IDLE_REMIND_PLAN = {
     "enabled": True,
 }
 # Harnesses whose stages run with permissions auto-approved (opencode --auto,
-# agy --dangerously-skip-permissions). The reminder targets only these: a
-# harness that may be waiting at a confirmation dialog is never typed into.
-# cursor and hermes are excluded because they can prompt the operator.
-REMINDER_CLIS = {"opencode", "agy"}
+# agy --dangerously-skip-permissions, cmd --yolo). The reminder targets only
+# these: a harness that may be waiting at a confirmation dialog is never typed
+# into. cursor and hermes are excluded because they can prompt the operator.
+REMINDER_CLIS = {"opencode", "agy", "cmd"}
 # TUI auto-submit: `opencode --prompt` pre-fills the input box but does not
 # send it, so the runner presses Enter repeatedly until the stage starts
 # (detected by the run log growing). A single press is unreliable: the TUI is
@@ -311,7 +311,7 @@ STEP_KEYS = {"stage", "record_as", "bindings", "when", "end",
 SOURCE_KEYS = {"output", "task", "join", "prev_output"}
 STAGE_KEYS = {"name", "harness", "harness_names", "placeholders",
               "description", "role"}
-KNOWN_CLIS = {"cursor", "agy", "hermes", "opencode"}
+KNOWN_CLIS = {"cursor", "agy", "hermes", "opencode", "cmd"}
 
 # Provider aliases, resolved per CLI before invoking. `go` under the
 # opencode CLI always means the installed `opencode-go` provider, and
@@ -343,6 +343,154 @@ def resolve_model(cli, provider, model):
     if cli == "opencode":
         return OPENCODE_MODEL_ALIASES.get((provider, model), model)
     return model
+
+
+# Command Code (`cmd`) runs in its interactive form, with the task pointer as
+# the positional initial message. Headless `-p` ends when the turn ends, which
+# would drop the signal whenever an agent pauses (the same reason opencode uses
+# its full TUI). --trust skips the project trust prompt, --yolo auto-approves
+# permissions (the stages mandate unattended tool use, and the idle reminder is
+# only safe to type when no approval dialog can appear), and --skip-onboarding
+# is for automated runs. Stage entries carry native catalog model ids only:
+# opencode's provider and model aliases never apply here, and a BYOK custom
+# provider id must not appear in a stage file.
+CMD_BINARY = "cmd"
+CMD_PROBE_TIMEOUT_S = 120
+# `cmd -p` with local-only forced resolves one (model, effort) pair exactly as
+# a real invocation does and then refuses the transport, so the check sends
+# nothing, starts no session, and costs nothing. A resolved pair prints the
+# refusal; a rejected pair prints its rejection instead (see cmd_probe_problem).
+CMD_LOCAL_ONLY_REFUSAL = "local-only mode"
+CMD_PROBE_REJECTIONS = ("unknown model", "has no adjustable reasoning effort",
+                        'unknown effort "')
+# Model rows in `cmd --list-models`: an id column padded to the description.
+# Section headings ("Open Source") have a single space, so they do not match.
+CMD_ROW_RE = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._:/+-]*)\s{2,}\S")
+# Self-test probe targets: the CLI's default model (always listed and carries
+# efforts), an id no catalog serves, an effort level the CLI never accepts,
+# and a listed model with no adjustable effort at all.
+CMD_PROBE_MODEL = "deepseek/deepseek-v4-flash"
+CMD_UNKNOWN_MODEL = "bogus/not-a-real-model"
+CMD_UNKNOWN_EFFORT = "ultra"
+CMD_NO_EFFORT_MODEL = "poolside/laguna-s-2.1-free"
+
+
+def cmd_launch(model, effort, pointer):
+    """Build the interactive Command Code launch command.
+
+    The pointer is the positional initial message, so it must come last."""
+    cmd = [CMD_BINARY, "--trust", "--yolo", "--skip-onboarding", "-m", model]
+    if effort:
+        cmd += ["--effort", effort]
+    cmd.append(pointer)
+    return cmd
+
+
+def _first_text_line(text, limit=200):
+    for line in (text or "").splitlines():
+        if line.strip():
+            return line.strip()[:limit]
+    return ""
+
+
+_CMD_PROBE_CACHE = {}
+
+
+def cmd_probe_problem(model, effort):
+    """Return the Command Code CLI's own rejection of one (model, effort) pair.
+
+    Returns the CLI's rejection line, or None when the pair resolves or the
+    probe is inconclusive. An inconclusive probe cannot let a bad pair through:
+    the CLI refuses an unknown model and an unsupported effort itself, before
+    any inference, so nothing is spent and no session starts either way.
+    Cached per pair: a remedy loop re-invokes the same step, and the pair
+    cannot change mid-run.
+    """
+    key = (model, effort)
+    if key not in _CMD_PROBE_CACHE:
+        _CMD_PROBE_CACHE[key] = _cmd_probe(model, effort)
+    return _CMD_PROBE_CACHE[key]
+
+
+def _cmd_probe(model, effort):
+    probe = [CMD_BINARY, "-p", "--no-session", "-m", model]
+    if effort:
+        probe += ["--effort", effort]
+    probe.append("Reply with exactly: SELFTEST_OK")
+    env = dict(os.environ, CMD_LOCAL_ONLY="1")
+    try:
+        result = subprocess.run(probe, capture_output=True, text=True,
+                                timeout=CMD_PROBE_TIMEOUT_S, env=env)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    out = f"{result.stdout}\n{result.stderr}"
+    low = out.lower()
+    if CMD_LOCAL_ONLY_REFUSAL in low:
+        return None
+    for marker in CMD_PROBE_REJECTIONS:
+        if marker in low:
+            return _first_text_line(out)
+    return None
+
+
+def cmd_catalog_ids(text):
+    """Model ids from one `cmd --list-models` listing, lowercased.
+
+    Model rows pad the id column; headings switch sections. The listing
+    lowercases ids while the catalog spells some of them mixed-case
+    (`zai-org/GLM-5.3`); the CLI accepts either spelling, so ids are compared
+    case-insensitively. Decision models are listed under a "(headless only)"
+    heading and are excluded: an interactive stage entry naming one would be
+    refused at launch, so it must not validate here.
+    """
+    ids, headless_only = set(), False
+    for line in (text or "").splitlines():
+        if "·" in line:              # header: "Available models · N models"
+            continue
+        match = CMD_ROW_RE.match(line)
+        if match:
+            model_id = match.group(1)
+            if not model_id.endswith(":") and not headless_only:
+                ids.add(model_id.lower())
+            continue
+        stripped = line.strip()
+        if stripped:
+            headless_only = "headless only" in stripped.lower()
+    return ids
+
+
+def cmd_catalog_models():
+    """Return the ids `cmd --list-models` advertises.
+
+    None when the catalog command itself is unavailable, which self-test
+    reports as skipped rather than failed.
+    """
+    try:
+        result = subprocess.run([CMD_BINARY, "--list-models"],
+                                capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    return cmd_catalog_ids(result.stdout)
+
+
+def cmd_catalog_check(model, effort):
+    """Static, spend-free catalog check for one `cmd` model (and effort).
+
+    Returns (ok, detail): True when the model is listed and the effort
+    resolves, False when the CLI rejects either, None when the catalog command
+    itself is unavailable (reported as skipped, not failed)."""
+    models = cmd_catalog_models()
+    if not models:
+        return None, "cmd model catalog unavailable"
+    problem = cmd_probe_problem(model, effort)
+    if problem:
+        return False, problem
+    if model.lower() not in models:
+        return False, f"{model} not in cmd --list-models"
+    return True, "slug in cmd --list-models" + (
+        " + effort resolves" if effort else "")
 
 
 class Fail(Exception):
@@ -812,6 +960,16 @@ class Run:
             # swallows the next token (e.g. --model) as prompt text.
             cmd = (["agy", "--dangerously-skip-permissions", "--model", full]
                    + (["--effort", effort] if effort else []) + ["-i", pointer])
+        elif cli == "cmd":
+            # Reject a bad model or effort here, before the session starts:
+            # the CLI reports both for free, so the run stops as a config
+            # error with the CLI's own reason instead of a missing run log.
+            problem = cmd_probe_problem(full, effort)
+            if problem:
+                raise Fail(f"cmd rejected model {full!r}"
+                           + (f" with effort {effort!r}" if effort else "")
+                           + f": {problem}")
+            cmd = cmd_launch(full, effort, pointer)
         elif cli == "hermes":
             # --usage-file is a top-level flag: it goes before the chat subcommand.
             cmd = ["hermes"]
@@ -2848,8 +3006,8 @@ def self_test(run, live=False):
             cli, provider, model, effort = parse_harness(h)
             provider = resolve_provider(cli, provider)
             model = resolve_model(cli, provider, model)
-            binary = {"cursor": "agent", "agy": "agy",
-                      "hermes": "hermes", "opencode": "opencode"}[cli]
+            binary = {"cursor": "agent", "agy": "agy", "hermes": "hermes",
+                      "opencode": "opencode", "cmd": CMD_BINARY}[cli]
             path = shutil.which(binary)
             check(f"{h} binary", path is not None, path or "not on PATH")
             if path is None:
@@ -2884,6 +3042,9 @@ def self_test(run, live=False):
                               "slug in opencode models" if model in out else "slug missing")
                 except subprocess.TimeoutExpired:
                     check(f"{h} model listed", False, "opencode models timed out")
+            elif cli == "cmd":
+                cmd_ok, cmd_detail = cmd_catalog_check(full, effort)
+                check(f"{h} model listed", cmd_ok, cmd_detail)
             elif cli == "hermes":
                 check(f"{h} model listed", None, "not statically verifiable; needs live probe")
             if live:
@@ -2896,6 +3057,14 @@ def self_test(run, live=False):
                 elif cli == "agy":
                     cmd = ["agy", "--model", full,
                            "-p", "Reply with exactly: SELFTEST_OK"]
+                elif cli == "cmd":
+                    # Headless probe (never the interactive form): --yolo so
+                    # the probe can act if the model chooses to, one-word reply.
+                    cmd = ([CMD_BINARY, "-p", "--yolo", "--skip-onboarding",
+                            "--no-session"]
+                           + (["-m", full] if full != "auto" else [])
+                           + (["--effort", effort] if effort else [])
+                           + ["Reply with exactly: SELFTEST_OK"])
                 elif cli == "hermes":
                     cmd = ["hermes", "-z", "Reply with exactly: SELFTEST_OK"]
                     if provider:
@@ -3269,6 +3438,69 @@ def self_test(run, live=False):
               "opencode", "go"), "deepseek-v4.1-flash") == "deepseek-v4.1-flash")
     check("alias: unknown model passes through",
           resolve_model("opencode", "togetherai", "other-model") == "other-model")
+
+    # Command Code (cmd): the id, the binary, and the native catalog resolve,
+    # and both an unknown model and an unsupported effort are rejected without
+    # inference. These run whether or not a stage declares cmd, so the mapping
+    # stays pinned before the first cmd stage lands.
+    check("cmd: harness id parses without a provider",
+          parse_harness("cmd:deepseek/deepseek-v4-flash@high")
+          == ("cmd", "deepseek", "deepseek-v4-flash", "high")
+          and parse_harness("cmd:gpt-5.5") == ("cmd", None, "gpt-5.5", None))
+    check("cmd: opencode provider and model aliases never apply",
+          resolve_provider("cmd", "go") == "go"
+          and resolve_provider("cmd", "together") == "together"
+          and resolve_model("cmd", "togetherai", "glm-5.3-flash") == "glm-5.3-flash"
+          and resolve_model("cmd", "openrouter", "deepseek-v4.1-flash")
+          == "deepseek-v4.1-flash",
+          "aliases stay scoped to cli == 'opencode'")
+    check("cmd: launch is the interactive form with auto-approved permissions",
+          cmd_launch("deepseek/deepseek-v4-flash", "high", "PTR")
+          == ["cmd", "--trust", "--yolo", "--skip-onboarding",
+              "-m", "deepseek/deepseek-v4-flash", "--effort", "high", "PTR"]
+          and cmd_launch("gpt-5.5", None, "PTR")
+          == ["cmd", "--trust", "--yolo", "--skip-onboarding",
+              "-m", "gpt-5.5", "PTR"],
+          "no -p: the session must stay open for the runner to close")
+    check("cmd: reminder eligible only because permissions auto-approve",
+          "cmd" in REMINDER_CLIS and "--yolo" in cmd_launch("m", None, "PTR")
+          and "cursor" not in REMINDER_CLIS and "hermes" not in REMINDER_CLIS,
+          "reminder never reaches a prompting harness")
+    check("cmd catalog: parser reads model rows only",
+          cmd_catalog_ids(
+              "Available models  ·  2 models\n\nOpen Source\n\n"
+              "deepseek/deepseek-v4-flash   fast hybrid-attention reasoning\n"
+              "Moonshotai/Kimi-K3   long-horizon coding\n\n"
+              "Pass the full id, or just the short name after the last \"/\":\n"
+              "cmd --model kimi-k3\n\n"
+              "Docs:  https://commandcode.ai/docs/reference/cli/models\n\n"
+              "Decision models (headless only)\n"
+              "typesafe/jev  typed questions in, probabilities out\n")
+          == {"deepseek/deepseek-v4-flash", "moonshotai/kimi-k3"},
+          "rows lowercased; headings, footer, and headless-only ids excluded")
+    cmd_path = shutil.which(CMD_BINARY)
+    check("cmd binary", cmd_path is not None, cmd_path or "not on PATH")
+    if cmd_path is not None:
+        cmd_ids = cmd_catalog_models()
+        check("cmd catalog: model list readable",
+              bool(cmd_ids), f"{len(cmd_ids)} ids" if cmd_ids
+              else "cmd --list-models unavailable")
+        if cmd_ids:
+            listed = CMD_PROBE_MODEL.lower() in cmd_ids
+            check("cmd catalog: known model listed", listed,
+                  f"{CMD_PROBE_MODEL} " + ("listed" if listed else "missing"))
+            unknown = cmd_probe_problem(CMD_UNKNOWN_MODEL, None)
+            check("cmd rejection: unknown model", bool(unknown),
+                  unknown or "no rejection reported")
+            level = cmd_probe_problem(CMD_PROBE_MODEL, CMD_UNKNOWN_EFFORT)
+            check("cmd rejection: unknown effort level", bool(level),
+                  level or "no rejection reported")
+            model_effort = cmd_probe_problem(CMD_NO_EFFORT_MODEL, "max")
+            check("cmd rejection: effort the model does not support",
+                  bool(model_effort), model_effort or "no rejection reported")
+            resolved = cmd_probe_problem(CMD_PROBE_MODEL, "high")
+            check("cmd resolution: supported pair resolves without spend",
+                  resolved is None, resolved or "resolved with no transport")
 
     # Harness-token guarantee: every stage-declared harness id is mapped,
     # and {{harness}} resolves to exactly one real name per invocation.

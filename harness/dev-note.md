@@ -44,7 +44,7 @@ already exists, so the redirect works on a fresh clone:
 Requires: `tmux`, `python3`, `curl` (for the optional heartbeat), and the
 Hermes profile `not-james-gosling` with Discord configured. `flock` is used
 when present; otherwise the driver uses an atomic portable lock directory.
-The harnesses also need their own auth (opencode, agy, and git push for
+The harnesses also need their own auth (opencode, agy, cmd, and git push for
 finalize). The push credential must be available to `git credential fill`;
 `harness/github_issues.py` keeps it in memory and the pipeline never prints it.
 
@@ -129,7 +129,7 @@ process so we stop retrying. A dead profile or dead Discord only costs you the
 messages, never the work.
 
 ## Troubleshooting
-- **A step sits idle with no signal:** the runner prints the exact `printf ... >> <log>` recovery line to stderr and, for `opencode`/`agy` under a terminal, types a short signal-safe reminder into the harness's own input. Check `<run_dir>/reminders.log` for what was sent, and `runner: attach mode: pty (console capture on)` in `session-<N>.log` to confirm the pty path was used. The reminder never writes the signal; if the work is verified done, use `--mark-done STEP SIGNAL`.
+- **A step sits idle with no signal:** the runner prints the exact `printf ... >> <log>` recovery line to stderr and, for `opencode`/`agy`/`cmd` under a terminal, types a short signal-safe reminder into the harness's own input. Check `<run_dir>/reminders.log` for what was sent, and `runner: attach mode: pty (console capture on)` in `session-<N>.log` to confirm the pty path was used. The reminder never writes the signal; if the work is verified done, use `--mark-done STEP SIGNAL`.
 - **A run dies within seconds:** read `private/clio-private/runs/.driver/session-<N>.log` (the pane
   capture — the traceback lands there). The driver auto-selects a `python3` that has
   PyYAML (runner.py needs it); `--check` shows which one.
@@ -174,6 +174,7 @@ python3 private/clio-private/harness/next_phase.py             # which phase is 
 python3 private/clio-private/harness/next_phase.py --server --machine-id server-01 --read-only  # inspect the shared board
 python3 private/clio-private/harness/phase_reservations.py --self-test  # two-client Git race/fencing check
 python3 private/clio-private/harness/github_issues.py --self-test  # hermetic credential/privacy checks; no network
+python3 private/clio-private/harness/check-cmd-harness.py  # hermetic stubbed-cmd harness check; no spend
 bash private/clio-private/harness/phase-driver.sh --check      # tools, profile, config readiness
 bash private/clio-private/harness/phase-driver.sh --dry-run    # what the driver would do; touches nothing
 bash private/clio-private/harness/phase-driver.sh --self-test  # hermetic guard/halt/stop/orphan/notify test
