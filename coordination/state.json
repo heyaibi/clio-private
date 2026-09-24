@@ -6,21 +6,20 @@
         "public": "3a638ed93486cdb4b4e4a42d1833e0bae113083c"
       },
       "claimed_at": "2026-09-24T18:01:45.537Z",
+      "completion_receipt": {
+        "path": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/publication.json",
+        "private_commit": "039012d796db2bd3fede3b33d07cd705d9071788",
+        "public_commit": "3a638ed93486cdb4b4e4a42d1833e0bae113083c",
+        "published_at": "2026-09-24T18:47:41.561Z"
+      },
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-24T18:47:22.263Z",
+      "heartbeat_at": "2026-09-24T18:47:49.517Z",
       "machine_id": "macbook",
       "reservation_id": "rsv-819a49beb4a57acc588232ef",
       "run_id": "phase-100480",
-      "status": "running"
+      "status": "completed"
     }
-  },
-  "publication": {
-    "acquired_at": "2026-09-24T18:47:27.236Z",
-    "generation": 1,
-    "machine_id": "macbook",
-    "phase": "100480",
-    "reservation_id": "rsv-819a49beb4a57acc588232ef"
   },
   "version": 1
 }
