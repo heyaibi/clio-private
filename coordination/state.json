@@ -1,4 +1,19 @@
 {
-  "version": 1,
-  "phases": {}
+  "phases": {
+    "100480": {
+      "base_revisions": {
+        "private": "7a69cd65b7426712614e491403aca9310a734475",
+        "public": "3a638ed93486cdb4b4e4a42d1833e0bae113083c"
+      },
+      "claimed_at": "2026-09-24T18:01:45.537Z",
+      "expires_at": null,
+      "generation": 1,
+      "heartbeat_at": "2026-09-24T18:01:45.537Z",
+      "machine_id": "macbook",
+      "reservation_id": "rsv-819a49beb4a57acc588232ef",
+      "run_id": "phase-100480",
+      "status": "running"
+    }
+  },
+  "version": 1
 }
