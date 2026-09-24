@@ -1,0 +1,109 @@
+{
+  "run_id": "phase-100400",
+  "phase": "100400",
+  "state": "completed",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "signal": "DEVELOPER_DONE c4c31b4f"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/findings.json 08963fbe"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "signal": "REMEDIATOR_DONE 8fabb39f"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "signal": "REMEDY_APPROVED 6daac5af"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "signal": "FINALIZE_DONE 57e40771"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/developer-task-r1.md",
+      "prompt_sha256": "87c39f94d86493f6d0a28306b5182777076d149e5cc87fe3cbbb3424bc78a9e7",
+      "duration_s": 1985.587,
+      "visits": 1,
+      "signal": "DEVELOPER_DONE c4c31b4f",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/developer-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/adversary-task-r1.md",
+      "prompt_sha256": "9c1dd7616f14172aca292a57d131d640d043df98f6a684fece8b93492ceaeea1",
+      "duration_s": 510.15,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/findings.json 08963fbe",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/adversary-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/remediator-task-r1.md",
+      "prompt_sha256": "2bc38ec6f967d97293f788de16ec13950ed442ff599fc15cdea5de5fad91af63",
+      "duration_s": 722.574,
+      "visits": 1,
+      "signal": "REMEDIATOR_DONE 8fabb39f",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/remediator-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/approver-task-r1.md",
+      "prompt_sha256": "a9ebadc1060ae0c195eb58025d5612af8d754bbb99b8366adf5127f9fef4f39f",
+      "duration_s": 486.583,
+      "visits": 1,
+      "signal": "REMEDY_APPROVED 6daac5af",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/approver-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/finalize-task-r1.md",
+      "prompt_sha256": "aa7ee981707485032b1e6964c43056489a2e2b2be7140baa7658d85ab4c94e66",
+      "duration_s": 440.902,
+      "visits": 1,
+      "signal": "FINALIZE_DONE 57e40771",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100400/finalize-task-r1.tui.log",
+      "attach": "pty",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ]
+}

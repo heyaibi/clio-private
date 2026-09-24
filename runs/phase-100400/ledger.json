@@ -3,7 +3,8 @@
     "developer",
     "adversary",
     "remediator",
-    "approver"
+    "approver",
+    "finalize"
   ],
   "steps": {
     "developer": {
@@ -51,6 +52,15 @@
       "output_sha256": "2f044b0cbb5716618023f796ec21ecc316e36d1f9fd15b272a12933bb1ca30b4",
       "artifacts": {},
       "git_head": "94d3d634a346a44dfe74a2d1ecd9310ac6dd93f5"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 57e40771",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "38544af8504978658953e418531c41e3f90cafb4d2373da37866e89fe58a990e",
+      "artifacts": {},
+      "git_head": "e8c8a55eb647b63f14ce0a820a08ed2080c1863d"
     }
   }
 }
