@@ -1,0 +1,42 @@
+{
+  "run": "r1",
+  "phase": "100460",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "LongMemEval calibration sample omitted `single-session-preference` question type and mislabeled the suite as having five question types",
+      "evidence": "`private/clio-private/baseline/benchmark.md:168` lists 6 curated question types in LongMemEval oracle split ('temporal-reasoning 133, multi-session 133, knowledge-update 78, single-session-user 70, single-session-assistant 56, preference 30', totaling 500 questions). However, `private/clio-private/baseline/benchmark.md:320` states 'LongMemEval-oracle across all five question types (12 items)'. In `private/clio-private/runs/phase-100460/judge-calibration-results.json`, `per_item` contains only 5 types ('single-session-user', 'multi-session', 'single-session-assistant', 'temporal-reasoning', 'knowledge-update'); `single-session-preference` is omitted entirely and not listed under Known Limitations in `roadmap/phase-100460-benchmark-spike.md:247`.",
+      "requirement_ref": "Phase 100460 Task 2 / AC-100460-02; benchmark.md §3.6, §5.3.1",
+      "recommendation": "Update `baseline/benchmark.md` §5.3.1 to note that LongMemEval comprises 6 question types and that the 30-item sample covered 5 of them; add the `single-session-preference` omission to Known Limitations in `roadmap/phase-100460-benchmark-spike.md` §9 as deferred to Phase 100480 alongside LoCoMo category 5.",
+      "status": "resolved",
+      "resolution": "Corrected `private/clio-private/baseline/benchmark.md`: §3.6 (line 168) now names the sixth type `single-session-preference` and states there are six question types; §5.3.1 (line 320) now says the 12 LongMemEval-oracle items covered 'five of its six question types' and names the omitted `single-session-preference`; the §5.3.1 'Known calibration limitations' list gained a bullet assigning `single-session-preference` to the Phase 100480 calibration set. `private/clio-private/roadmap/phase-100460-benchmark-spike.md` §9 (Completion Evidence known limitations, line 247) and §12 (Known Limitations, line 298) now record the omission. Verified against the raw calibration JSON: `per_item` LongMemEval-oracle categories are temporal-reasoning 3, knowledge-update 3, multi-session 3, single-session-user 2, single-session-assistant 1 (12 total) with `single-session-preference` absent, matching the corrected text."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "`benchmark.md` §10.1 asserts neither dataset license requires approval, conflicting with the phase document's pending human review requirement for LoCoMo's CC BY-NC 4.0 license",
+      "evidence": "`private/clio-private/baseline/benchmark.md:920` states 'Neither requires restricted licensing arrangements or approval', whereas `private/clio-private/roadmap/phase-100460-benchmark-spike.md:173` states 'The agent must request approval for any licensing arrangement that restricts redistribution', `:240` marks DoD as '(**Pending human review**: LoCoMo is CC BY-NC 4.0...)', and `:309` records 'Human Approver: pending — LoCoMo's CC BY-NC 4.0 restricts use to non-commercial; use here is internal evaluation with no redistribution, and the approver should confirm that reading'.",
+      "requirement_ref": "Phase 100460 §6 Agent Decision Boundary, §9 Definition of Done, §12 Verification Sign-Off",
+      "recommendation": "Update `baseline/benchmark.md` §10.1 to clarify that while the licenses are compatible with internal evaluation, LoCoMo's CC BY-NC 4.0 license restricts redistribution and commercial use, requiring the human approver confirmation recorded in the phase file.",
+      "status": "resolved",
+      "resolution": "Rewrote the license evidence line in `private/clio-private/baseline/benchmark.md` §10.1 (line 921): it no longer claims 'Neither requires restricted licensing arrangements or approval'. It now states LoCoMo's CC BY-NC 4.0 restricts redistribution and commercial use, that the intended internal evaluation use (no redistribution, no commercial use) is compatible, and that it still requires the human approver confirmation recorded in the phase sign-off; LongMemEval's MIT terms permit redistribution with attribution. This matches `private/clio-private/roadmap/phase-100460-benchmark-spike.md` §9 DoD ('Pending human review') and §12 Verification Sign-Off ('Human Approver: pending'). No other `benchmark.md` section claims approval is unnecessary."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "DONE — F-01: `benchmark.md` §5.3.1 now says LongMemEval has six question types and the 12-item sample covered five; the `single-session-preference` omission is recorded as Phase 100480 work in both `benchmark.md` §5.3.1 and the phase file §9/§12.",
+    "DONE — the `single-session-preference` omission is recorded in the phase file §9 (Completion Evidence known limitations) and §12 (Known Limitations) alongside LoCoMo category 5, both assigned to Phase 100480.",
+    "DONE — F-02: `benchmark.md` §10.1 now aligns with the phase file: LoCoMo CC BY-NC 4.0 restricts redistribution/non-commercial use and requires the recorded human approver sign-off."
+  ],
+  "plan_unlimited": [
+    "RECORDED for Phase 100480 — both `benchmark.md` §5.3.1 and the phase file now name `single-session-preference` and LoCoMo category 5 as additions to the Phase 100480 calibration set; the calibration itself is out of scope for this planning-only spike.",
+    "DEFERRED — end-to-end Tier-2 `gpt-4o-2024-08-06` validation still cannot run: no hosted judge credentials exist in this environment. It remains recorded as a known limitation in `benchmark.md` §5.3.1/§10.2 and the phase file; provisioning owns the follow-up."
+  ],
+  "remediated_by": "OpenCode CLI (Go . Deepseek V4.1 Flash High), remediator r1",
+  "remediation": {
+    "make_check": "passed: `make check` exit 0 (fmt, clippy --workspace --all-targets --all-features --locked -- -D warnings, full workspace tests; 0 failed)",
+    "coverage": "not required: no Rust source changed; the fix is documentation-only, so the coverage gate is unaffected",
+    "addressed_issues": "none; addressed_issues remains empty"
+  }
+}

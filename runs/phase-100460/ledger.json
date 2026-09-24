@@ -1,0 +1,56 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 682b8aa3",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "ce8771336f12150ab74e76c39dbc124e0613d3f16638b989ba5799efe0c854d2",
+      "artifacts": {},
+      "git_head": "23702586375678cefe77d0f1ccc647a5f796cb31"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100460/findings.json 51a001b7",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "9e84daf47e6c99f884033ea599247628b1ebef5f97d3257aca5060da7457a3d6",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 3644,
+          "sha256": "0266797bedc566d5ce82abfd5776f6ee9a45c632f5c449294188383131e0f7d3"
+        }
+      },
+      "git_head": "23702586375678cefe77d0f1ccc647a5f796cb31"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE d8884f58",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "726132ca26af8ece601763f6f6423cd0d414f70eae247d32b476abfb95c1ed53",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 3644,
+          "sha256": "0266797bedc566d5ce82abfd5776f6ee9a45c632f5c449294188383131e0f7d3"
+        }
+      },
+      "git_head": "23702586375678cefe77d0f1ccc647a5f796cb31"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 6d1307ba",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "414c4f273dcd3d13641642f14afcd5479d09166450fb719dc6fb3c2a05af652d",
+      "artifacts": {},
+      "git_head": "23702586375678cefe77d0f1ccc647a5f796cb31"
+    }
+  }
+}

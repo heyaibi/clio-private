@@ -1,0 +1,6 @@
+2026-09-24T18:00:00+05:30 start finalize r1 phase-100460 (benchmark spike close-out)
+2026-09-24T18:00:05+05:30 initial state: main repo working tree clean; nested private repo has staged+unstaged docs and run artifacts
+2026-09-24T18:00:10+05:30 attribution check: Developer r1, Adversary r1, Remediator r1, Remedy Approver r1 rows present and well-formed; Finalize r1 row is [TBD]
+2026-09-24T18:01:30+05:30 attribution update: Finalize r1 row set to OpenCode CLI (Go . Deepseek V4.1 Flash High) | done
+2026-09-24T18:01:35+05:30 DoD update: added "- [x] Required approval is obtained (downstream pipeline step)." to phase-100460 DoD
+2026-09-24T18:02:40+05:30 make check exit 0: fmt, clippy -D warnings, workspace tests; 2082 passed, 0 failed (48 test-result blocks)

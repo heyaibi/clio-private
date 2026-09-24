@@ -1,0 +1,1492 @@
+{
+  "judge_model": "Qwen2.5-1.5B-Instruct (Q4_K_M, llama.cpp server, temperature 0.0)",
+  "sample_items": 30,
+  "locomo_conversations_available": 10,
+  "longmemeval_oracle_questions_available": 500,
+  "seed": 100460,
+  "threshold": 0.7,
+  "discrimination_pass1": {
+    "correct_candidates_marked_correct": "30/30",
+    "wrong_candidates_marked_wrong": "30/30",
+    "agreement": 1.0
+  },
+  "consistency": {
+    "calls_compared": 60,
+    "verdict_mismatches": 0
+  },
+  "latency_ms": {
+    "mean": 8469.2,
+    "p95": 10985.2
+  },
+  "tokens": {
+    "prompt_total": 25984,
+    "completion_total": 9147,
+    "note": "local run: usd cost 0.00"
+  },
+  "token_f1_reference": {
+    "mean_f1_gold_vs_correct_candidate": 1.0,
+    "mean_f1_gold_vs_wrong_candidate": 0.0383
+  },
+  "swap_position_check": [
+    {
+      "pair": 0,
+      "order": 1,
+      "verdict": "A",
+      "expects_correct_pick": true
+    },
+    {
+      "pair": 0,
+      "order": 2,
+      "verdict": "B",
+      "expects_correct_pick": true
+    },
+    {
+      "pair": 1,
+      "order": 1,
+      "verdict": "A",
+      "expects_correct_pick": true
+    },
+    {
+      "pair": 1,
+      "order": 2,
+      "verdict": "B",
+      "expects_correct_pick": true
+    },
+    {
+      "pair": 2,
+      "order": 1,
+      "verdict": "A",
+      "expects_correct_pick": true
+    },
+    {
+      "pair": 2,
+      "order": 2,
+      "verdict": "B",
+      "expects_correct_pick": true
+    },
+    {
+      "pair": 3,
+      "order": 1,
+      "verdict": "B",
+      "expects_correct_pick": false
+    },
+    {
+      "pair": 3,
+      "order": 2,
+      "verdict": "B",
+      "expects_correct_pick": true
+    }
+  ],
+  "per_item": [
+    {
+      "suite": "locomo",
+      "sample_id": "conv-50",
+      "category": 1,
+      "question": "Which places or events has Calvin visited in Tokyo?",
+      "gold": "music festival, car museum, Shibuya crossing, Shinjuku",
+      "candidate_correct": "music festival, car museum, Shibuya crossing, Shinjuku",
+      "candidate_wrong": "Performing and connecting with the crowd",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9982.9
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8077.3
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8120.7
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7824.5
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-43",
+      "category": 1,
+      "question": "What schools did John play basketball in and how many years was he with his team during high school?",
+      "gold": "Middle school, high school, and college and he was with his high school team for 4 years.",
+      "candidate_correct": "Middle school, high school, and college and he was with his high school team for 4 years.",
+      "candidate_wrong": "September 2023",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 11574.8
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8281.0
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10806.0
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8298.9
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-44",
+      "category": 1,
+      "question": "What are the classes that Audrey took for her dogs to?",
+      "gold": "Positive reinforcement training class for bonding, dog training course, agility class",
+      "candidate_correct": "Positive reinforcement training class for bonding, dog training course, agility class",
+      "candidate_wrong": "by biking",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7300.6
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7360.3
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6452.2
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7562.2
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-49",
+      "category": 1,
+      "question": "What is a stress reliever for Sam?",
+      "gold": "Unhealthy snacks, sweets, yoga, places with beautiful views",
+      "candidate_correct": "Unhealthy snacks, sweets, yoga, places with beautiful views",
+      "candidate_wrong": "consuming soda and candy",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7721.5
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 9138.7
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7211.7
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 9058.8
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-43",
+      "category": 1,
+      "question": "What outdoor activities does John enjoy?",
+      "gold": "Hiking, surfing",
+      "candidate_correct": "Hiking, surfing",
+      "candidate_wrong": "Amazing",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7828.2
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6700.9
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7882.0
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6874.5
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-50",
+      "category": 1,
+      "question": "What are Dave's dreams?",
+      "gold": "open a car maintenance shop, work on classic cars, build a custom car from scratch",
+      "candidate_correct": "open a car maintenance shop, work on classic cars, build a custom car from scratch",
+      "candidate_wrong": "How he made his car look like a beast",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8048.1
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 11104.7
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7051.1
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 11149.1
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-49",
+      "category": 2,
+      "question": "When did Evan go skiing in Banff?",
+      "gold": "July 2023",
+      "candidate_correct": "July 2023",
+      "candidate_wrong": "He relied on it for his active lifestyle and road trips",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9764.7
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8164.6
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10985.2
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8269.1
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-43",
+      "category": 2,
+      "question": "Which country was Tim visiting in the second week of November?",
+      "gold": "UK",
+      "candidate_correct": "UK",
+      "candidate_wrong": "Prepping the feast and talking about what they're thankful for",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7267.1
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 6613.2
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6699.5
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 6547.4
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-42",
+      "category": 2,
+      "question": "When was Joanna's second movie script shown on the big screens?",
+      "gold": "The Sunday before 25October, 2022.",
+      "candidate_correct": "The Sunday before 25October, 2022.",
+      "candidate_wrong": "Coconut milk ice cream",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7252.0
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7063.4
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6053.3
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7016.4
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-30",
+      "category": 2,
+      "question": "When did Jon receive mentorship to promote his venture?",
+      "gold": "15 June, 2023",
+      "candidate_correct": "15 June, 2023",
+      "candidate_wrong": "The perfect spot for her store",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10302.7
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8210.2
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9737.0
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8165.7
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-26",
+      "category": 2,
+      "question": "When did Caroline join a mentorship program?",
+      "gold": "The weekend before 17 July 2023",
+      "candidate_correct": "The weekend before 17 July 2023",
+      "candidate_wrong": "July 2023",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10413.4
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7635.9
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9372.7
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7535.8
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-50",
+      "category": 2,
+      "question": "When did Dave buy a vintage camera?",
+      "gold": "November 2023",
+      "candidate_correct": "November 2023",
+      "candidate_wrong": "exploring and growing his brand",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9264.7
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8572.8
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8612.7
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8213.1
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-42",
+      "category": 3,
+      "question": "What nickname does Nate use for Joanna?",
+      "gold": "Jo",
+      "candidate_correct": "Jo",
+      "candidate_wrong": "make it for her family",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7486.8
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7311.6
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6775.2
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 6951.4
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-41",
+      "category": 3,
+      "question": "Would John be open to moving to another country?",
+      "gold": "No, he has goals specifically in the U.S. like joining the military and running for office.",
+      "candidate_correct": "No, he has goals specifically in the U.S. like joining the military and running for office.",
+      "candidate_wrong": "a medal for volunteering",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8061.8
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7705.7
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7188.7
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7897.3
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-48",
+      "category": 3,
+      "question": "What card game is Deborah talking about?",
+      "gold": "Exploding Kittens",
+      "candidate_correct": "Exploding Kittens",
+      "candidate_wrong": "yes",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7807.9
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7798.8
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6987.0
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7749.8
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-43",
+      "category": 3,
+      "question": "What is a prominent charity organization that John might want to work with and why?",
+      "gold": "Good Sports, because they work with Nike, Gatorade, and Under Armour and they aim toprovide youth sports opportunities for kids ages 3-18 in high-need communities.",
+      "candidate_correct": "Good Sports, because they work with Nike, Gatorade, and Under Armour and they aim toprovide youth sports opportunities for kids ages 3-18 in high-need communities.",
+      "candidate_wrong": "visited a travel agency",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 15261.2
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8381.7
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 14100.7
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8399.2
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-41",
+      "category": 4,
+      "question": "Why did Maria sit with the little girl at the shelter event in February 2023?",
+      "gold": "The girl seemed sad and had no other family",
+      "candidate_correct": "The girl seemed sad and had no other family",
+      "candidate_wrong": "joined a gym",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8198.5
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9590.1
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7038.1
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9598.3
+        }
+      ]
+    },
+    {
+      "suite": "locomo",
+      "sample_id": "conv-42",
+      "category": 4,
+      "question": "What is Nate's favorite genre of movies?",
+      "gold": "Fantasy and sci-fi",
+      "candidate_correct": "Fantasy and sci-fi",
+      "candidate_wrong": "The week before 14August, 2022.",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7300.2
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7600.0
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7147.3
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 7552.3
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "gpt4_4fc4f797",
+      "category": "temporal-reasoning",
+      "question": "How many days passed between the day I received feedback about my car's suspension and the day I tested my new suspension setup?",
+      "gold": "38 days. 39 days (including the last day) is also acceptable.",
+      "candidate_correct": "38 days. 39 days (including the last day) is also acceptable.",
+      "candidate_wrong": "I first completed the Spring Sprint Triathlon, then took part in the Midsummer 5K Run, and finally participated in the company's annual charity soccer tournament.",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9298.1
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10669.4
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7819.9
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10511.0
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "993da5e2",
+      "category": "temporal-reasoning",
+      "question": "How long had I been using the new area rug when I rearranged my living room furniture?",
+      "gold": "One week. Answers ranging from 7 days to 10 days are also acceptable.",
+      "candidate_correct": "One week. Answers ranging from 7 days to 10 days are also acceptable.",
+      "candidate_wrong": "29 days. 30 days (including the last day) is also acceptable.",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9397.2
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8400.4
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10571.7
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8427.9
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "gpt4_e061b84f",
+      "category": "temporal-reasoning",
+      "question": "What is the order of the three sports events I participated in during the past month, from earliest to latest?",
+      "gold": "I first completed the Spring Sprint Triathlon, then took part in the Midsummer 5K Run, and finally participated in the company's annual charity soccer tournament.",
+      "candidate_correct": "I first completed the Spring Sprint Triathlon, then took part in the Midsummer 5K Run, and finally participated in the company's annual charity soccer tournament.",
+      "candidate_wrong": "15",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10027.7
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6970.7
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8400.6
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6998.7
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "cf22b7bf",
+      "category": "knowledge-update",
+      "question": "How much weight have I lost since I started going to the gym consistently?",
+      "gold": "10 pounds",
+      "candidate_correct": "10 pounds",
+      "candidate_wrong": "Premier Silver",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8998.7
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8608.5
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8079.0
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8593.8
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "0ddfec37_abs",
+      "category": "knowledge-update",
+      "question": "How many autographed football have I added to my collection in the first three months of collection?",
+      "gold": "The information provided is not enough. You mentioned collecting autographed baseball but not football.",
+      "candidate_correct": "The information provided is not enough. You mentioned collecting autographed baseball but not football.",
+      "candidate_wrong": "$400,000",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9916.1
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9400.7
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9599.5
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9299.8
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "9bbe84a2",
+      "category": "knowledge-update",
+      "question": "What was my previous goal for my Apex Legends level before I updated my goal?",
+      "gold": "level 100",
+      "candidate_correct": "level 100",
+      "candidate_wrong": "The information provided is not enough. You mentioned starting the role as Senior Software Engineer but not Software Engineer Manager.",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8299.0
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7899.6
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7726.4
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7873.8
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "87f22b4a",
+      "category": "multi-session",
+      "question": "How much have I made from selling eggs this month?",
+      "gold": "$120",
+      "candidate_correct": "$120",
+      "candidate_wrong": "$5",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9002.0
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6895.7
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8199.1
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6778.1
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "gpt4_5501fe77",
+      "category": "multi-session",
+      "question": "Which social media platform did I gain the most followers on over the past month?",
+      "gold": "TikTok",
+      "candidate_correct": "TikTok",
+      "candidate_wrong": "The information provided is not enough. You mentioned traveling for 10 days in Hawaii but did not mention abything about the trip to Seattle.",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10820.8
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6899.8
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9173.7
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7025.9
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "4adc0475",
+      "category": "multi-session",
+      "question": "What is the total number of goals and assists I have in the recreational indoor soccer league?",
+      "gold": "5",
+      "candidate_correct": "5",
+      "candidate_wrong": "3",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7798.7
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7199.1
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7586.9
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 6965.5
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "21436231",
+      "category": "single-session-user",
+      "question": "How many largemouth bass did I catch on my fishing trip to Lake Michigan?",
+      "gold": "12",
+      "candidate_correct": "12",
+      "candidate_wrong": "February 14th",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8693.3
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8438.3
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 7915.4
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 8698.4
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "726462e0",
+      "category": "single-session-user",
+      "question": "What was the discount I got on my first purchase from the new clothing brand?",
+      "gold": "10%",
+      "candidate_correct": "10%",
+      "candidate_wrong": "4 hours",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 10686.9
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8384.6
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9883.1
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 8217.5
+        }
+      ]
+    },
+    {
+      "suite": "longmemeval_oracle",
+      "sample_id": "d596882b",
+      "category": "single-session-assistant",
+      "question": "I'm planning another trip to New York City and I was wondering if you could remind me of that vegan eatery you recommended last time, the one with multiple locations throughout the city?",
+      "gold": "By Chloe",
+      "candidate_correct": "By Chloe",
+      "candidate_wrong": "2-3 eggs",
+      "runs": [
+        {
+          "pass": 1,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 11978.6
+        },
+        {
+          "pass": 1,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 9545.5
+        },
+        {
+          "pass": 2,
+          "cand": "correct",
+          "expect_correct": true,
+          "accuracy_score": 1.0,
+          "temporal_correctness": true,
+          "hallucination_penalty": 0.0,
+          "latency_ms": 9170.5
+        },
+        {
+          "pass": 2,
+          "cand": "wrong",
+          "expect_correct": false,
+          "accuracy_score": 0.0,
+          "temporal_correctness": false,
+          "hallucination_penalty": 1.0,
+          "latency_ms": 9527.9
+        }
+      ]
+    }
+  ]
+}

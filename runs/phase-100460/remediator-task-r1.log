@@ -1,0 +1,17 @@
+2026-09-24T18:0:00+0530 start remediator r1 phase-100460 (benchmark spike, docs-only)
+2026-09-24T18:0:00+0530 backup check: findings.original.json already exists (3644 bytes); not overwriting
+2026-09-24T18:0:00+0530 triage: F-01 (low) and F-02 (low), both docs-only in baseline/benchmark.md (+ phase file for F-01). No Rust changes; no addressed_issues candidates to re-fetch
+2026-09-24T18:0:00+0530 verified F-01 against raw calibration JSON: LongMemEval-oracle per_item types = temporal-reasoning 3, knowledge-update 3, multi-session 3, single-session-user 2, single-session-assistant 1 (12 total); single-session-preference absent. benchmark.md:320 "all five question types" is wrong (suite has 6); benchmark.md:168 lists 6
+2026-09-24T18:0:00+0530 verified F-02: benchmark.md:920 claims neither license needs approval, while phase file :240/:309 mark human review pending for LoCoMo CC BY-NC 4.0
+2026-09-24T18:0:00+0530 decision: no workers (findings touch the same file, coupled, small); fixing serially myself
+2026-09-24T18:05:00+0530 fix F-01: benchmark.md:168 renamed "preference 30" -> "single-session-preference 30 ... six question types"; benchmark.md:320 corrected "all five question types" -> "five of its six question types" with explicit omission note; added a Known-calibration-limitations bullet at benchmark.md:326; phase file:247 and :298 record the single-session-preference omission, deferred to Phase 100480
+2026-09-24T18:05:00+0530 fix F-02: benchmark.md:921 rewritten to state LoCoMo CC BY-NC 4.0 restricts redistribution/commercial use and requires the recorded human approver confirmation; removed the "neither requires approval" claim
+2026-09-24T18:05:00+0530 attribution: phase file Remediator row set to OpenCode CLI (Go . Deepseek V4.1 Flash High) done
+2026-09-24T18:05:00+0530 running single verification: make check (fmt lint test)
+2026-09-24T18:12:00+0530 final verification: make check exit 0 (fmt, clippy --workspace --all-targets --all-features --locked -- -D warnings, full workspace tests; 0 failed). Log at /tmp/opencode/remediator-make-check.log
+2026-09-24T18:12:00+0530 coverage: not run/not required — no Rust source changed; docs-only remediation leaves the coverage gate unaffected
+2026-09-24T18:12:00+0530 findings report updated: F-01 and F-02 marked resolved with resolution evidence; original finding text preserved byte-for-byte; addressed_issues retained empty (no candidates were named or reported in this run); remediated_by and remediation fields added
+2026-09-24T18:12:00+0530 incidental bugs: none confirmed beyond the two assigned findings; nothing filed
+2026-09-24T18:12:00+0530 git: changes left UNSTAGED (baseline/benchmark.md, roadmap/phase-100460-benchmark-spike.md, runs/phase-100460/findings.json); index untouched; no commit/push
+2026-09-24T18:12:00+0530 finish: REMEDIATOR_DONE — both low-severity docs findings fixed and verified; no blockers
+REMEDIATOR_DONE d8884f58

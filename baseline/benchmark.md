@@ -136,6 +136,37 @@ Understanding how established players design their systems and structure their b
 - **Agent Baselines:** Directly compares memory modules against full-context LLMs and tool-using coding agents (e.g., Claude Code, Codex).
 - **Primary Metrics:** Open-ended answer accuracy, judge agreement score, and context compression ratio.
 
+### 3.6 Dataset Snapshot Pins and Licensing (locked for the two first suites)
+
+These pins are locked; Phase 100480 must not re-decide them without a recorded reason. Datasets are downloaded at benchmark time and never committed to this repository. The §5.4 anti-overfitting partition (60% train / 20% canary / 20% blind test, split at the conversation-session level) applies to both suites; the partition is implemented in Phase 100480, and the pins below are the raw snapshots it will split.
+
+#### LoCoMo-style suite (Snap Research)
+
+| Field | Value |
+|---|---|
+| Identity | LoCoMo — *Evaluating Very Long-Term Conversational Memory of LLM Agents*, Maharana et al., ACL 2024 ([arXiv:2402.17753](https://arxiv.org/abs/2402.17753)) |
+| Source | https://github.com/snap-research/locomo |
+| Snapshot pin | Repo commit `3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376` (2024-08-13); data file `data/locomo10.json`, git blob `d95b872480b413d935821fdc3c84f8a8f5f29e73` |
+| Pin verification | `git hash-object` on the fetched file at the pinned commit returned the exact blob hash above |
+| Size | 10 conversations, 1,986 annotated QA items; `data/locomo10.json` = 2,805,274 bytes |
+| Download method | `https://raw.githubusercontent.com/snap-research/locomo/3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376/data/locomo10.json` |
+| License | CC BY-NC 4.0 (`LICENSE.txt` in the pinned commit: *Attribution-NonCommercial 4.0 International*) |
+| Use/distribution notes | Attribution required; **no redistribution** — the repo must fetch the file from the official source and must not vendor `locomo10.json`. Non-commercial-only terms are compatible with internal evaluation use. Multimodal fields are URL/caption metadata only (images are not released upstream) and are out of scope for the text-memory runner. |
+| QA category notes | Categories: 1 single-hop (282 items), 2 temporal (321), 3 multi-hop (96), 4 open-domain (841), 5 adversarial (446, uses the separate `adversarial_answer` field). Category-5 abstention handling is a documented Phase 100480 task; the sample calibration covered categories 1–4. |
+
+#### LongMemEval-style suite (Wu et al.)
+
+| Field | Value |
+|---|---|
+| Identity | LongMemEval — *LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory*, Wu et al. ([arXiv:2410.10813](https://arxiv.org/abs/2410.10813)) |
+| Source | https://github.com/xiaowu0162/LongMemEval |
+| Snapshot pin | Repo commit `9e0b455f4ef0e2ab8f2e582289761153549043fc`; data release `huggingface.co/datasets/xiaowu0162/longmemeval-cleaned` |
+| Pin hashes | `longmemeval_oracle.json` sha256 `821a2034d219ab45846873dd14c14f12cfe7776e73527a483f9dac095d38620c` (15,388,478 bytes); `longmemeval_s_cleaned.json` sha256 `d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442` (277,383,467 bytes); `longmemeval_m_cleaned.json` sha256 `9d79e5524794a2e6900a3aa9cb7d9152c5a3e8319c9a87c25494ba1eacee495f` (2,737,100,077 bytes) |
+| Pin verification | The oracle split was fetched and its sha256 matches the HuggingFace LFS oid byte-for-byte. The S and M splits were resolved through the HF API (size + sha256 recorded above); full-file download is deferred to Phase 100480. |
+| Download method | `https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/<file>` (per the upstream README) |
+| License | MIT (repo `LICENSE`, Copyright (c) 2024 Di Wu; upstream paper states the data release uses MIT). Redistribution permitted with attribution; the repo still fetches rather than vendors the data. |
+| Scale notes | 500 curated questions (temporal-reasoning 133, multi-session 133, knowledge-update 78, single-session-user 70, single-session-assistant 56, single-session-preference 30 in the oracle split counts — six question types). S ≈ 115k tokens of history per question; M ≈ 500 sessions (~1.5M tokens) per question. The oracle split (evidence sessions only) is the Phase 100480 adapter target; S is the stretch target; M is out of the first-build scope (host budget, see §10). |
+
 ---
 
 ## 4. Clio Architectural Mapping
@@ -276,6 +307,25 @@ To avoid scoring drift across experiments:
    - `hallucination_penalty` (0.0 to 1.0): Were extra ungrounded facts invented?
    - `explanation` (str): Concise chain-of-thought justification.
 3. **Double Blind Grading:** The judge receives the question, gold answer, and candidate answer with system names masked.
+
+### 5.3.1 Judge Decision (locked, spike-calibrated)
+
+**Selected: calibrated LLM-as-a-judge**, two-tier, replacing token F1 as the primary metric. Token F1 remains as a deterministic cross-check and fallback, not the primary score.
+
+| Tier | Judge | Role | Measured properties (spike calibration) |
+|---|---|---|---|
+| Tier 1 — inner optimization loop | **Local `Qwen2.5-1.5B-Instruct` (Q4_K_M)** via llama.cpp, `temperature = 0.0`, structured JSON output per §5.3 | Fast, free scoring inside tuning trials | Discrimination agreement 60/60 calls (30/30 correct-answer probes ≥ 0.7, 30/30 wrong-answer probes < 0.7; LoCoMo 18/18 items, LongMemEval-oracle 12/12); consistency 0/60 verdict mismatches across two identical passes; latency mean 8.5 s / p95 11.0 s per call on the 4-core spike host; cost $0.00 |
+| Tier 2 — canary gate & official leaderboard | **`gpt-4o-2024-08-06`** at `temperature = 0.0` (§5.3 protocol unchanged) | Release scoring and scorecards | Not runnable in the spike environment (no hosted judge credentials); cost estimated at ~$2.50/1M input + ~$10/1M output → ~$15 or less per full official sweep of ~2,500 probes (see §10 assumptions) |
+
+Calibration sample design (seed 100460, scripts run ad hoc, not committed): 30 items — LoCoMo categories 1/2/3/4 (18 items across the pinned conversations) and LongMemEval-oracle across five of its six question types (12 items; `single-session-preference` not sampled — see the calibration limitations below). Each item was judged twice: candidate = gold answer verbatim (expected correct) and candidate = the gold answer of a different question from the same conversation / question type (expected wrong). Judges produced the §5.3 schema (`accuracy_score`, `temporal_correctness`, `hallucination_penalty`, `explanation`) under a JSON schema constraint. A swap-position spot check (4 comparative pairs × both orders, §5.8) picked the better response in 7/8 cases, confirming that swap-position scoring must stay in Phase 100480 rather than being dropped for the small local judge.
+
+**Why not token F1 as primary:** on the same sample F1 discriminates verbatim pairs (mean 1.00 vs 0.04), but it requires the candidate to share surface wording; it systematically penalizes valid paraphrases and abstention phrasings, which are core to temporal-reasoning and conflict-resolution probes. The LLM judge handles semantic equivalence; its measured weakness (positional instability at 1.5B scale) is mitigated by §5.8's two-pass geometric-mean protocol.
+
+**Known calibration limitations (carried into Phase 100480):**
+- The sample used verbatim gold vs wrong-answer pairs; it does not yet measure the paraphrase case where the judge outperforms F1. Phase 100480 adds paraphrased and stale-fact candidate arms to the calibration set before official scoring.
+- LongMemEval's `single-session-preference` type was not in the sample: the 12 LongMemEval items covered five of the six question types (temporal-reasoning, multi-session, knowledge-update, single-session-user, single-session-assistant). Phase 100480 adds `single-session-preference` items alongside the LoCoMo category-5 abstention arm.
+- LoCoMo category 5 (adversarial, separate `adversarial_answer` field) was not in the sample; abstention scoring is part of the Phase 100480 judge integration.
+- Tier-2 hosted judging is untested end to end pending credentials via the standard secret mechanism; if provisioning fails, Tier 2 falls back to the local judge and official scores are flagged as provisional.
 
 ---
 
@@ -859,4 +909,31 @@ This directory centralizes all official datasets, research papers, repositories,
 - **A-MAC (Adaptive Memory Admission Control):** [arXiv:2603.04549](https://arxiv.org/abs/2603.04549) — Foundational five-factor memory admission policy.
 - **AdaMem (Adaptive User-Centric Memory):** [arXiv:2603.16496](https://arxiv.org/abs/2603.16496) — Multi-agent working, episodic, and persona memory coordination.
 - **All-Mem (Agentic Lifelong Memory via Topology Evolution):** [arXiv:2603.19595](https://arxiv.org/abs/2603.19595) — Dynamic memory topology and offline consolidation.
+
+---
+
+## 10. Phase 100480 Go/No-Go and Locked Build Estimate
+
+### 10.1 Decision: **GO**
+
+Evidence:
+- Both first-suite datasets are pinned and byte-verified (§3.6): LoCoMo at a pinned commit with a verified git blob hash; LongMemEval with a verified sha256 for the oracle split and API-resolved hashes for S/M.
+- Licenses are compatible with the intended use: LoCoMo CC BY-NC 4.0 and LongMemEval MIT. LoCoMo's CC BY-NC 4.0 restricts redistribution and commercial use; the intended use is internal evaluation with no redistribution and no commercial use, which is compatible but still requires the human approver confirmation recorded in the phase sign-off. LongMemEval's MIT terms permit redistribution with attribution. No restricted licensing arrangement (for example redistribution of the data) is entered into.
+- The judge calibrates within budget: Tier-1 local judge measured at $0.00 with 60/60 discrimination agreement and 0/60 consistency mismatches on a 30-item sample (§5.3.1).
+- No mandatory stop condition triggered: no dataset is unreachable or license-blocked, a judge was calibrated within budget, and the estimate below is bounded.
+
+No-go triggers for Phase 100480 (record here, do not silently proceed): a pinned snapshot stops resolving byte-for-byte, a license change forbids the intended use, or the Tier-1 judge agreement drops below 80% on the expanded calibration set without an in-budget replacement.
+
+### 10.2 Locked Build Estimate
+
+**Estimate: 60 hours core (range 48–66 hours), ≈ 7–8 working days.** This supersedes the §6.1 full-plan hours for the Phase 100480 subset (steps 1, 2, 3, 4, 6 = 54 h) plus a 6 h integration margin for stub docs, docs, and reproducibility checks.
+
+Scope covered by the estimate: harness scaffolding + shared types (8 h), judge engine with swap-position scoring and the two-tier client (10 h), Clio adapter via the product's public surface (12 h), LoCoMo pipeline + baseline runner (10 h), LongMemEval-oracle integration + competency probes (14 h), partitioning + stubs + docs (6 h). Rival adapters (§6.1 steps 5, 8, 10, 11) and CI wiring (step 12) are excluded.
+
+Assumptions:
+1. **Judge cost:** Tier 1 is local at $0.00. Tier 2 (`gpt-4o-2024-08-06`) costs ≈ $2.50/1M input + $10/1M output; a full official sweep (~2,500 probes × ~2 calls × ~700 tokens) ≈ 3.5M input + 0.5M output ≈ **under $15** per sweep, inside the §5.5 hard caps ($15/trial, $50/CI run) when sweep frequency is respected.
+2. **Throughput:** Tier-1 scoring is batched across llama.cpp parallel slots (~2–3 s per verdict wall time on the 4-core host); a full LongMemEval-oracle sweep (500 questions) completes in under ~4 h.
+3. **Datasets:** pins per §3.6; one-time full downloads of the S (277 MB) and M (2.7 GB) splits need ~3 GB disk; only the oracle split is the first-build adapter target, S is stretch, M is out of scope.
+4. **Credentials:** hosted Tier-2 judge credentials are provisionable via the standard secret mechanism. If they are not, Tier 2 falls back to the local judge and official scores are flagged as provisional; this fallback is a scope decision that requires operator sign-off, not a silent substitution.
+5. **No product changes:** retrieval, extraction, and admission behavior are untouched; §5.4 partitions are implemented in the harness only.
 
