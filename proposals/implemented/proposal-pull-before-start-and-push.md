@@ -1,6 +1,6 @@
 # Proposal: pull before start and before final push
 
-Status: draft. Date: 2026-09-23. Scope: pipeline startup and finalization only. No other stage changes.
+Status: implemented (2026-09-24). Date: 2026-09-23. Scope: pipeline startup and finalization only. No other stage changes.
 
 ## Problem
 
@@ -48,7 +48,22 @@ Search first. Do not invent git automation.
 - Add a manual check on both checkouts: start stale, finalize diverged, and confirm no work is lost and no private path leaks.
 - State what was verified locally and externally, and list anything that could not be verified.
 
-## Open questions
+## Implementation record
 
-- Which sync strategy fits the fail-closed pipeline for each checkout?
-- What conflict evidence must the halt message carry so the operator can resolve it quickly?
+Implemented and verified on 2026-09-24.
+
+- A fresh phase synchronizes the public checkout and the nested private checkout before starting.
+- Finalization synchronizes again immediately before publishing and refuses to publish when the safe fast-forward check fails.
+- Sync uses fetch plus fast-forward or a clean merge; it never rebases, force-pushes, resets, stashes, or discards local work.
+- A genuine conflict is surfaced for resolution and stops publication.
+- The public and private checkouts must use separate remotes; a shared remote URL is refused.
+- `python3 private/clio-private/harness/gitsync.py --self-test` passed, including stale, diverged, conflicting, run-state cleanup, and public/private boundary cases.
+
+The live server push path and real credential path were not exercised during this documentation update.
+
+## Implementation choices
+
+- Start synchronization is fail-closed and happens only for a fresh run.
+- Resume deliberately does not synchronize because the existing ledger pins the history it attests to.
+- Final publication uses the push-mode check after the phase commits its work.
+- A conflict remains visible for operator resolution; it is never hidden by a forced update.
