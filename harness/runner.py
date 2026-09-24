@@ -386,6 +386,59 @@ def cmd_launch(model, effort, pointer):
     return cmd
 
 
+# Availability for the skip is binary presence only: the CLI word a harness
+# id names, mapped to the executable `shutil.which` must find. Model-catalog
+# and effort checks stay where they are today (self-test and the cmd
+# invoke-time probe); a catalog command that is itself unavailable never
+# marks a harness unavailable here.
+HARNESS_BINARIES = {"cursor": "agent", "agy": "agy", "hermes": "hermes",
+                    "opencode": "opencode", "cmd": CMD_BINARY}
+
+
+def binary_for(harness):
+    """The CLI executable a harness id invokes ('cursor' is `agent`)."""
+    cli = harness.split(":", 1)[0]
+    return HARNESS_BINARIES.get(cli, cli)
+
+
+def is_harness_available(harness, lookup=shutil.which):
+    """True when the harness's CLI binary is on PATH.
+
+    `lookup` is injectable so the selection logic can be pinned without a
+    real PATH. Availability deliberately ignores the model and effort: the
+    CLI reports a bad pair itself (the cmd invoke-time probe fails closed),
+    and that stays a hard config error rather than a silent skip.
+    """
+    return bool(lookup(binary_for(harness)))
+
+
+def select_harness(harnesses, count, lookup=shutil.which):
+    """Pick the first available harness from the rotation offset, wrapping.
+
+    Returns the index of the first entry whose binary is on PATH, or None
+    when every entry is missing one. Order is preserved from the offset; the
+    caller consumes the slot past the skips so the next run does not retry a
+    known-missing head.
+    """
+    n = len(harnesses)
+    for step in range(n):
+        idx = (count + step) % n
+        if is_harness_available(harnesses[idx], lookup):
+            return idx
+    return None
+
+
+def ensure_harness_path():
+    """Add the harness install dirs to PATH (idempotent).
+
+    Applied before the availability check and before every invocation so the
+    skip sees the same PATH the harness would run under.
+    """
+    home = str(Path.home())
+    prefix = f"{home}/.local/bin:{home}/.opencode/bin"
+    os.environ["PATH"] = f"{prefix}:{os.environ['PATH']}"
+
+
 def _first_text_line(text, limit=200):
     for line in (text or "").splitlines():
         if line.strip():
@@ -495,6 +548,18 @@ def cmd_catalog_check(model, effort):
 
 class Fail(Exception):
     pass
+
+
+class HarnessUnavailable(Fail):
+    """No harness for a step has its CLI binary on PATH (fail-closed halt)."""
+
+    def __init__(self, step, harnesses):
+        self.step = step
+        self.harnesses = harnesses
+        listing = ", ".join(f"{h} ({binary_for(h)})" for h in harnesses)
+        super().__init__(
+            f"step {step}: no harness is available (all listed CLIs are "
+            f"missing from PATH): {listing}")
 
 
 def load_stage(path):
@@ -916,26 +981,61 @@ class Run:
                 raise Fail(f"ledger.json migration for {sid!r} cannot persist ({exc})") from exc
         return migrated
 
+    def harnesses(self, sid):
+        """The stage's declared harness list, normalized to a list."""
+        meta, _ = self.stages[sid]
+        hs = meta["harness"]
+        return hs if isinstance(hs, list) else [hs]
+
     def planned_harness(self, sid):
         """Return the first rotation slot for previews without completion data."""
-        meta, _ = self.stages[sid]
-        hs = meta["harness"] if isinstance(meta["harness"], list) else [meta["harness"]]
-        return hs[0]
+        return self.harnesses(sid)[0]
 
     def harness_for(self, sid):
-        """Peek the next harness without consuming a rotation slot.
+        """Peek the next rotation slot without consuming it.
 
-        A slot is consumed only after a signal and all completion gates pass;
+        Used for attribution of an already-finished step (--mark-done), so it
+        reads the recorded offset rather than the live availability of the
+        CLI; drive() picks the live harness through select_harness. A slot is
+        consumed only after a signal and all completion gates pass;
         interrupted, blocked, and otherwise failed attempts therefore retry
         the same harness. The visits counter still increments so each attempt
         gets a distinct forensic task/log file.
         """
-        meta, _ = self.stages[sid]
-        hs = meta["harness"] if isinstance(meta["harness"], list) else [meta["harness"]]
+        hs = self.harnesses(sid)
         return hs[self.harness_use.get(sid, 0) % len(hs)]
 
+    def select_harness(self, sid):
+        """Choose the harness for this invocation, skipping unavailable ones.
+
+        Walks the stage list from the current rotation offset, wrapping
+        around, and returns (harness, skipped, used_index, next_count):
+
+        - harness: the first entry whose CLI binary is on PATH.
+        - skipped: the entries walked over before it, in order, as
+          (harness_id, missing_binary) pairs. Empty when the head is up.
+        - used_index: the index of the chosen entry. The caller records it
+          in the pre-invocation resume state so a failed attempt's retry and
+          an operator --mark-done both reproduce the exact harness.
+        - next_count: the rotation counter the *accepted* invocation persists
+          past the skips, so a later run does not retry a known-missing head.
+
+        When every entry is missing its binary this raises HarnessUnavailable
+        naming the step and the whole list; no harness is invoked.
+        """
+        hs = self.harnesses(sid)
+        n = len(hs)
+        count = self.harness_use.get(sid, 0)
+        idx = select_harness(hs, count)
+        if idx is None:
+            raise HarnessUnavailable(sid, hs)
+        walked = (idx - count) % n
+        skipped = [(hs[(count + off) % n], binary_for(hs[(count + off) % n]))
+                   for off in range(walked)]
+        return hs[idx], skipped, idx, count + walked + 1
+
     def invoke(self, harness, task_path, log_path, usage_path=None, when=None,
-               nonce=None, sid=None):
+               nonce=None, sid=None, skipped=None):
         """Run the harness attached in the foreground: inherited stdio, the
         operator watches and approves prompts, the runner closes the session
         ~15 s after the final signal lands in the run log.
@@ -943,8 +1043,7 @@ class Run:
         cli, provider, model, effort = parse_harness(harness)
         provider = resolve_provider(cli, provider)
         model = resolve_model(cli, provider, model)
-        home = str(Path.home())
-        os.environ["PATH"] = f"{home}/.local/bin:{home}/.opencode/bin:{os.environ['PATH']}"
+        ensure_harness_path()
         pointer = TASK_POINTER.format(path=task_path)
         env = None
         autosubmit = False
@@ -984,7 +1083,7 @@ class Run:
                 cmd += ["--reasoning", effort]
         else:
             raise Fail(f"no command mapping for cli {cli!r}")
-        banner(cli, harness, task_path, log_path)
+        banner(cli, harness, task_path, log_path, skipped=skipped)
         reminder = dict(IDLE_REMIND_PLAN, enabled=cli in REMINDER_CLIS)
         text, rc, info = run_attached(cmd, log_path, when, nonce,
                                       cwd=self.repo, env=env,
@@ -2033,11 +2132,19 @@ BANNER_ART = r"""
 """
 
 
-def banner(cli, harness, task_path, log_path):
-    """Announce the start of a new foreground harness step."""
+def banner(cli, harness, task_path, log_path, skipped=None):
+    """Announce the start of a new foreground harness step.
+
+    `skipped` is the (harness_id, missing_binary) list walked over before the
+    chosen harness, printed so an operator sees which entries were missing and
+    why the model under HARNESS is not the head of the stage list.
+    """
     bar = "=" * 76
     print(f"\n{bar}{BANNER_ART}{bar}")
     print(f"  STEP     {Path(task_path).stem}      HARNESS  {harness}")
+    if skipped:
+        print("  SKIPPED  " + ", ".join(
+            f"{h} ({binary} not on PATH)" for h, binary in skipped))
     print(f"  TASK     {task_path}")
     print(f"  LOG      {log_path}")
     print(f"  Watch it work in this pane (--auto approves permissions). "
@@ -2754,6 +2861,17 @@ def drive(run, pipe, invoke, resumed=None):
         if heartbeat is not None:
             heartbeat.check()
         s = run.steps[current]
+        # Availability before any file write or invocation: skip a harness
+        # whose CLI binary is missing and use the next one in the stage list
+        # (wrapping from the rotation offset). A halt here has touched no
+        # task, log, snapshot, ledger, or resume file. The used index is
+        # recorded in the pre-invocation resume state (persisted by save
+        # below) so a retry and an operator --mark-done both reproduce the
+        # exact harness; only the accepted invocation advances the counter
+        # past the skips (next_count), so a failed attempt re-skips and a
+        # later run does not retry a known-missing head.
+        harness, skipped, used_index, next_count = run.select_harness(current)
+        run.harness_use[current] = used_index
         run.visits[current] = run.visits.get(current, 0) + 1
         t0 = time.time()
         if "snapshot" in s:
@@ -2762,7 +2880,6 @@ def drive(run, pipe, invoke, resumed=None):
             if not dst.exists() and src.exists():
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
-        harness = run.harness_for(current)
         agent = display_name(harness)
         prompt = run.render_task(current, harness_name=agent)
         # Fresh nonce per invocation, appended to the invoked file: only a
@@ -2791,7 +2908,7 @@ def drive(run, pipe, invoke, resumed=None):
                       if harness.split(":", 1)[0] == "hermes" else None)
         when_keys = list(s["when"]) if "when" in s else None
         output, meta = invoke(harness, invoke_path, log_path, usage_path, when_keys,
-                              nonce, sid=current)
+                              nonce, sid=current, skipped=skipped)
         heartbeat = getattr(run, "reservation_heartbeat", None)
         if heartbeat is not None:
             heartbeat.check()
@@ -2820,6 +2937,9 @@ def drive(run, pipe, invoke, resumed=None):
                  "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
                  "duration_s": round(time.time() - t0, 3),
                  "visits": run.visits[current], "signal": sig}
+        if skipped:
+            event["skipped"] = [{"harness": h, "missing_binary": b}
+                                for h, b in skipped]
         if resume_file:
             event["resume_file"] = resume_file
         event.update({k: v for k, v in meta.items() if v is not None})
@@ -2843,7 +2963,7 @@ def drive(run, pipe, invoke, resumed=None):
                                "agent": agent, "signal": sig})
             events.append(event)
             harness_use_after = dict(run.harness_use)
-            harness_use_after[current] = harness_use_after.get(current, 0) + 1
+            harness_use_after[current] = next_count
             resume_after = {"current": current, "outputs": dict(run.outputs),
                             "visits": dict(run.visits),
                             "harness_use": dict(harness_use_after),
@@ -2884,7 +3004,7 @@ def drive(run, pipe, invoke, resumed=None):
                 events.append(event)
                 nxt = s["skip_when_empty"]
                 harness_use_after = dict(run.harness_use)
-                harness_use_after[current] = harness_use_after.get(current, 0) + 1
+                harness_use_after[current] = next_count
                 resume_after = {"current": nxt, "outputs": dict(run.outputs),
                                 "visits": dict(run.visits),
                                 "harness_use": dict(harness_use_after),
@@ -2916,7 +3036,7 @@ def drive(run, pipe, invoke, resumed=None):
         event["routed_to"] = target
         events.append(event)
         harness_use_after = dict(run.harness_use)
-        harness_use_after[current] = harness_use_after.get(current, 0) + 1
+        harness_use_after[current] = next_count
         if target in pipe["ends"]:
             event["via"] = "edge-end"
             # Mutating the appended dict keeps transcript/events consistent;
@@ -2988,8 +3108,7 @@ def drive(run, pipe, invoke, resumed=None):
 
 def self_test(run, live=False):
     """Static harness checks (no inference spend) plus optional live probes."""
-    home = str(Path.home())
-    os.environ["PATH"] = f"{home}/.local/bin:{home}/.opencode/bin:{os.environ['PATH']}"
+    ensure_harness_path()
     seen, checks = set(), []
 
     def check(name, ok, detail=""):
@@ -3525,6 +3644,155 @@ def self_test(run, live=False):
     check("harness token: unknown id falls back raw",
           display_name("mystery_cli:whatever") == "mystery_cli:whatever",
           "fallback returns raw id")
+
+    # Harness availability skip, pinned without touching the host PATH:
+    # selection walks from the rotation offset and wraps; a missing head
+    # uses the next installed entry; none available returns None (the caller
+    # halts). The CLI-to-binary map is part of the contract.
+    fake = lambda name: name == "opencode"          # noqa: E731 - test predicate
+    check("harness availability: cli maps to its binary",
+          binary_for("cursor:m") == "agent" and binary_for("agy:m") == "agy"
+          and binary_for("opencode:go/m@high") == "opencode"
+          and binary_for("cmd:m") == CMD_BINARY,
+          "cursor -> agent, cmd -> cmd")
+    check("harness selection: available head is used",
+          select_harness(["opencode:go/a@high", "agy:b"], 0, fake) == 0,
+          "no skip when the head is up")
+    check("harness selection: missing head uses the next entry",
+          select_harness(["agy:a", "opencode:go/b@high", "cmd:c"], 0, fake) == 1,
+          "walk 0 (agy) -> 1 (opencode)")
+    check("harness selection: wraps past a missing tail",
+          select_harness(["opencode:go/b@high", "agy:a"], 1, fake) == 0,
+          "offset 1 (agy) wraps to 0 (opencode)")
+    check("harness selection: none available returns None",
+          select_harness(["agy:a", "cmd:c"], 0, fake) is None,
+          "caller halts fail-closed")
+
+    # Stub binaries on a fake PATH in a temp dir (hermetic: HOME points at
+    # the temp root so the runner's own PATH prepend cannot reach a real
+    # CLI). A missing entry uses the next installed one; when every entry is
+    # missing the selector returns None; the method reports the skips and the
+    # counter that passes them.
+    avail_root = Path(tempfile.mkdtemp(prefix="harness-avail-"))
+    avail_bin = avail_root / "bin"
+    avail_bin.mkdir()
+    for name in ("opencode", "cmd"):
+        stub = avail_bin / name
+        stub.write_text("#!/bin/sh\nexit 0\n")
+        stub.chmod(0o755)
+    (avail_root / "sel.md").write_text(
+        "---\nname: sel\nharness: ['agy:a', 'opencode:go/b@high', 'cmd:c']\n"
+        "harness_names:\n  'agy:a': 'A'\n  'opencode:go/b@high': 'B'\n"
+        "  'cmd:c': 'C'\nplaceholders:\n  X: x\n---\nDo {{X}}.")
+    sel_pipe = {"version": 1, "run_dir": "run",
+                "inputs": {"phase_number": 2, "phase_file": "p",
+                           "max_remedy_rounds": 3},
+                "start": "sel", "ends": ["completed"],
+                "steps": {"sel": {"stage": "sel.md", "record_as": "S",
+                                  "bindings": {"X": "x"}, "end": "completed"}}}
+    validate(sel_pipe, avail_root)
+    sel_run = Run(sel_pipe, avail_root, avail_root, dict(sel_pipe["inputs"]))
+    saved_home, saved_path = os.environ.get("HOME"), os.environ.get("PATH")
+    os.environ["HOME"] = str(avail_root)
+    os.environ["PATH"] = f"{avail_bin}:/usr/bin:/bin"
+    try:
+        check("harness availability: stub on PATH is found",
+              is_harness_available("opencode:go/m@high")
+              and is_harness_available("cmd:m"), "stub binaries visible")
+        check("harness availability: absent CLI is not found",
+              not is_harness_available("agy:m")
+              and not is_harness_available("hermes:m"),
+              "no real CLI reachable under the fake HOME/PATH")
+        picked = sel_run.select_harness("sel")
+        check("harness availability: stub-PATH skip uses the next",
+              picked[0] == "opencode:go/b@high" and picked[2] == 1,
+              "missing agy skipped for the opencode stub")
+        check("harness availability: skip reports the missing binary",
+              picked[1] == [("agy:a", "agy")],
+              f"skipped {picked[1]!r}")
+        check("harness availability: accepted run passes the skips",
+              picked[3] == 2, "next counter is offset+skips+1")
+        check("harness availability: all-missing halts fail-closed",
+              select_harness(["agy:a", "hermes:b"], 0) is None,
+              "no usable harness -> None")
+
+        # End to end through drive(): the missing head is skipped, the
+        # installed stub runs, the skip is recorded, and the accepted run
+        # consumes past it. A stub invoke keeps this hermetic (no binary is
+        # executed; only the availability check reads PATH).
+        def drive_pipe(name, harnesses):
+            (avail_root / f"{name}.md").write_text(
+                f"---\nname: {name}\nharness: {harnesses!r}\n"
+                "harness_names:\n"
+                + "".join(f"  {h!r}: {h!r}\n" for h in harnesses)
+                + "placeholders:\n  X: x\n---\nDo {{X}}.")
+            return {"version": 1, "run_dir": "run",
+                    "inputs": {"phase_number": 3, "phase_file": "p",
+                               "max_remedy_rounds": 3},
+                    "start": "d", "ends": ["completed"],
+                    "steps": {"d": {"stage": f"{name}.md", "record_as": "D",
+                                    "bindings": {"X": "x"},
+                                    "end": "completed"}}}
+
+        skip_pipe = drive_pipe("skip", ["agy:missing@high", "opencode:go/ok@high"])
+        validate(skip_pipe, avail_root)
+        skip_run = Run(skip_pipe, avail_root, avail_root, dict(skip_pipe["inputs"]))
+        skip_run.rotation_key = "rk-avail"
+        skip_run._run_dir = avail_root / "run"
+        skip_run._run_dir.mkdir(exist_ok=True)
+        ran = []
+
+        def skip_stub(harness, task_path, log_path, usage_path=None, when=None,
+                      nonce=None, **kw):
+            ran.append(harness)
+            sig = "BYE_DONE" + (f" {nonce}" if nonce else "")
+            Path(log_path).write_text(sig)
+            return sig, {}
+        skip_res = drive(skip_run, skip_pipe, skip_stub)
+        check("harness availability: drive skips the missing head",
+              ran == ["opencode:go/ok@high"] and skip_res["state"] == "completed",
+              f"invoked {ran}")
+        check("harness availability: event records the skip",
+              skip_res["events"][0].get("skipped")
+              == [{"harness": "agy:missing@high", "missing_binary": "agy"}],
+              f"skipped={skip_res['events'][0].get('skipped')}")
+        check("harness availability: skip writes no task or log file",
+              sorted(p.name for p in skip_run._run_dir.iterdir())
+              == ["d-task-r1.log", "d-task-r1.md", "ledger.json", "resume.json"],
+              "one attempt file per step: "
+              f"{sorted(p.name for p in skip_run._run_dir.iterdir())}")
+        check("harness availability: accepted run consumes past the skip",
+              json.loads(rotation_file(avail_root, "rk-avail").read_text())
+              == {"d": 2}, "offset 0 + one skip + the accept = 2")
+
+        halt_pipe = drive_pipe("halt", ["agy:missing@high", "hermes:missing2"])
+        validate(halt_pipe, avail_root)
+        halt_run = Run(halt_pipe, avail_root, avail_root, dict(halt_pipe["inputs"]))
+        halt_run.rotation_key = "rk-halt"
+        halt_run._run_dir = avail_root / "halt"
+        halt_run._run_dir.mkdir()
+        invoked = []
+
+        def halt_stub(*a, **k):
+            invoked.append(a)
+            return "", {}
+        halted = None
+        try:
+            drive(halt_run, halt_pipe, halt_stub)
+        except HarnessUnavailable as exc:
+            halted = exc
+        check("harness availability: all-missing halts before invoking",
+              halted is not None and halted.step == "d"
+              and not invoked and set(halted.harnesses)
+              == {"agy:missing@high", "hermes:missing2"},
+              str(halted))
+        check("harness availability: halt writes no state",
+              not list(halt_run._run_dir.iterdir())
+              and not rotation_file(avail_root, "rk-halt").exists(),
+              "no task, log, ledger, resume, or rotation file")
+    finally:
+        os.environ["HOME"] = saved_home
+        os.environ["PATH"] = saved_path
 
     # Rotation persistence, pinned: consecutive drives alternate, resume
     # max-merges the file over resume.json, corrupt state restarts at zero,
@@ -4436,6 +4704,22 @@ def autoexit_test():
     sys.exit(0 if ok else 1)
 
 
+def config_error_payload(error):
+    """Machine-readable exit-2 payload for a config error.
+
+    A HarnessUnavailable halt additionally names the step and every harness
+    tried with the missing binary, so an operator can install one and resume
+    (resume.json is untouched and retries the same step).
+    """
+    payload = {"state": "config_error", "error": str(error)}
+    if isinstance(error, HarnessUnavailable):
+        payload["step"] = error.step
+        payload["harnesses"] = [
+            {"harness": h, "missing_binary": binary_for(h)}
+            for h in error.harnesses]
+    return payload
+
+
 def main():
     ap = argparse.ArgumentParser(description="Run a stage pipeline.")
     ap.add_argument("--pipeline", default=None)
@@ -4556,16 +4840,24 @@ def main():
 
         if args.dry_run:
             # A preview shows the first planned slot; live execution reads
-            # completed harness data from the ledger.
+            # completed harness data from the ledger and skips any harness
+            # whose CLI is missing, so the preview names the first available
+            # slot and lists the skips.
             run.require_authoritative = False
+            ensure_harness_path()
             for sid in run.steps:
-                meta, _ = run.stages[sid]
-                hs = meta["harness"] if isinstance(meta["harness"], list) else [meta["harness"]]
-                # Preview shows the planned r1 name (first rotation slot),
-                # matching what the first live invocation receives.
-                prompt = run.render_task(sid, harness_name=display_name(hs[0]))
+                hs = run.harnesses(sid)
+                missing = [h for h in hs if not is_harness_available(h)]
+                available = [h for h in hs if is_harness_available(h)]
+                first = available[0] if available else hs[0]
+                prompt = run.render_task(sid, harness_name=display_name(first))
                 print(f"===== step {sid} =====")
                 print(f"harness: {hs}")
+                if missing:
+                    print("skipped (CLI binary not on PATH): "
+                          + ", ".join(f"{h} ({binary_for(h)})" for h in missing))
+                    print(f"first available: {first}" if available
+                          else "no harness available: the run would halt here")
                 print(f"prompt: {len(prompt.encode())} bytes -> "
                       f"{run._run_dir}/{sid}-task-r1.md")
                 if args.show_prompts:
@@ -4706,7 +4998,7 @@ def main():
             except CoordinationError as reservation_error:
                 print(f"runner: could not mark reservation blocked: "
                       f"{reservation_error}", file=sys.stderr)
-        print(json.dumps({"state": "config_error", "error": str(e)}, indent=2))
+        print(json.dumps(config_error_payload(e), indent=2))
         sys.exit(2)
 
 
