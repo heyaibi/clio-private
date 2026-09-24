@@ -46,13 +46,19 @@
         "public": "fa256796346a360e5ad3c55a3181784dbf3d3b47"
       },
       "claimed_at": "2026-09-24T20:40:03.886Z",
+      "completion_receipt": {
+        "path": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/publication.json",
+        "private_commit": "e71e4d30f94d5774e12e0641ca96065013e48d43",
+        "public_commit": "af617969e18ac90092647152f42af5827955e4eb",
+        "published_at": "2026-09-24T22:13:03.492Z"
+      },
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-24T22:09:32.618Z",
+      "heartbeat_at": "2026-09-24T22:13:07.999Z",
       "machine_id": "devserver",
       "reservation_id": "rsv-afd1fd3ffa51be72710bd210",
       "run_id": "phase-100520",
-      "status": "running"
+      "status": "completed"
     }
   },
   "version": 1
