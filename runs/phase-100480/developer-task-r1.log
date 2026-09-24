@@ -1,0 +1,32 @@
+2026-09-24T18:25:00+0530 start developer r1 phase-100480 (benchmark runner build: two suite adapters, one-command runner, judge integration, three stubs)
+2026-09-24T18:25:00+0530 read task file, AGENTS.md, coverage.md, crates.md, benchmark.md, phase-100480 file, phase-100460 close-out
+2026-09-24T18:31:00+0530 pre-change baseline gate started: cargo llvm-cov --workspace --locked --no-clean --json -> /tmp/cov-baseline.json (DATABASE_URL=postgres://clio:clio@127.0.0.1:34310/clio)
+2026-09-24T18:52:00+0530 baseline gate done exit 0; scripts/coverage_guard.py: 318 files, TOTAL lines 97.96% functions 98.87%, all per-file floors pass -> no DEVELOPER_BLOCKED
+2026-09-24T18:53:00+0530 research (single online pass): LoCoMo locomo10.json structure confirmed (10 conversations; conversation.session_N lists of {speaker,dia_id,text}; qa items {question,answer,evidence,category}; cat 5 uses adversarial_answer); LongMemEval oracle confirmed (500 items; question_type, haystack_sessions of {role,content,has_answer}, answer_session_ids)
+2026-09-24T18:54:00+0530 pins re-verified byte-for-byte: locomo10.json git blob d95b872480b413d935821fdc3c84f8a8f5f29e73 (2805274 bytes); longmemeval_oracle.json sha256 821a2034d219ab45846873dd14c14f12cfe7776e73527a483f9dac095d38620c (15388478 bytes)
+2026-09-24T18:55:00+0530 environment: no pip/tiktoken/pytest; network reachable; local Qwen2.5-1.5B-Instruct GGUF already cached at /tmp/opencode/qwen2.5-1.5b-instruct-q4_k_m.gguf; product clio binary builds and `remember`/`recall` work on sqlite without extract sidecar
+2026-09-24T18:56:00+0530 design locked: harness language Python 3 stdlib (phase 100480 Implementation Freedom); package benchmarks/am_bench + benchmarks/run.py + benchmarks/tests; product crates untouched (no coverage impact)
+2026-09-24T19:05:00+0530 shared scaffolding written by me: benchmarks/ package (types, adapter, partition, tokenizer, scoring, fetch, llm, doubles, stubs, pins.json, runner, run.py, README, package inits)
+2026-09-24T19:05:00+0530 worker A (general) slice datasets: created datasets/locomo.py, datasets/longmemeval.py + tests/test_locomo.py, tests/test_longmemeval.py; report: 31 tests pass
+2026-09-24T19:05:00+0530 worker B (general) slice judge: created judges/llm_judge.py, answerer.py + tests/test_llm_judge.py, tests/test_answerer.py; report: 16 tests pass
+2026-09-24T19:05:00+0530 worker C (general) slice clio adapter: created adapters/clio.py + tests/test_clio_adapter.py; report: 10 tests pass
+2026-09-24T19:20:00+0530 integration: reviewed all worker diffs; wrote runner.py, run.py, doubles.py, README.md, tests/test_{partition,scoring,tokenizer,fetch,stubs,runner,contract}.py
+2026-09-24T19:20:00+0530 fixes after review: clio adapter default actor benchmark->harness (product rejects `benchmark`); catch OSError/FileNotFoundError in clio _run and ClioAdapterError in runner main (clear failure, no traceback)
+2026-09-24T19:20:00+0530 tests: python3 -m unittest discover -s benchmarks/tests -t . -> 111 tests OK
+2026-09-24T19:21:00+0530 local judge server started: llama.cpp docker (Qwen2.5-1.5B-Instruct Q4_K_M) on 127.0.0.1:8899, temp 0; smoke judge call ~7s, structured JSON ok
+2026-09-24T19:22:00+0530 scoped real run: python3 benchmarks/run.py --suite locomo --partition canary --max-probes 2 --adapter clio --judge local --generator local -> exit 0, 2 probes scored, JSON+MD written (path validated end to end)
+2026-09-24T19:23:00+0530 baseline run started: --suite both --partition canary --max-probes 10 --token-budget 1024 --adapter clio --judge local --generator local -> benchmarks/reports/baseline.json + baseline.md
+2026-09-24T19:30:00+0530 first real baseline attempt aborted (no report): clio `remember` exits 1 when admission rejects a turn; adapter treated it as a harness error
+2026-09-24T19:31:00+0530 fix: ClioAdapter._run(allow_failure) returns the JSON payload on non-zero exit when present; ingest records ok=False + error instead of aborting (admission rejection is a normal product outcome); added test_ingest_records_admission_rejection_without_raising
+2026-09-24T19:32:00+0530 hardening: HttpChatClient timeout 180s->600s; LlmJudge max_tokens param; runner --generator-max-tokens/--judge-max-tokens; ingestion stats (turns_ingested/turns_rejected) in report + markdown; --verbose progress
+2026-09-24T19:33:00+0530 tests after fixes: 113 tests OK
+2026-09-24T19:36:00+0530 local judge server restarted; calibrated ~18.5s per judge call at ~500-token context on the 4-core host
+2026-09-24T19:37:00+0530 baseline run restarted (tuned): --suite both --partition canary --max-probes 8 --token-budget 512 --generator-max-tokens 96 --judge-max-tokens 160 -> benchmarks/reports/baseline.json + baseline.md
+2026-09-24T21:00:00+0530 second/third baseline attempts aborted: (a) admission-reject result JSON is printed to STDERR (not stdout) with exit 1; (b) clio recall timed out at 120s under load
+2026-09-24T21:02:00+0530 fixes: clio _run scans stderr too for the result object when allow_failure; ClioAdapter default timeout 120s->600s; runner records per-turn ingest failures and per-probe retrieval failures as failed (no fabricated score) while judge/generator failures still abort; added --max-instances
+2026-09-24T21:03:00+0530 real reproduction: adapter ingest of the same low-novelty turn twice -> first ok=True, second ok=False error="score 0.480 < theta 0.550" (no exception)
+2026-09-24T21:05:00+0530 tests: 116 tests OK
+2026-09-24T21:06:00+0530 baseline restarted as two bounded runs: locomo (canary, max-instances 1, max-probes 5) then longmemeval (canary, max-instances 6, max-probes 6)
+2026-09-24T22:07:00+0530 baseline locomo run exit 0: canary, max-instances 1, max-probes 5, 509 turns ingested, 0 rejected; overall accuracy 0.2265, token_f1 0.2127; per-category single-hop 0.50, multi-hop 0.6325, temporal 0.00, open-domain 0.00, adversarial-abstention 0.00 -> benchmarks/reports/baseline-locomo.{json,md}
+2026-09-24T22:07:00+0530 baseline longmemeval run exit 0: canary, max-instances 6, max-probes 6, 96 turns ingested, 1 rejected by admission; overall accuracy 0.0000, token_f1 0.1526; per-category single-hop 0.00 (4), temporal-reasoning 0.00, knowledge-update 0.00 -> benchmarks/reports/baseline-longmemeval.{json,md}
+2026-09-24T22:08:00+0530 longmemeval reproducibility repeat started (identical command, output /tmp/opencode/repeat-longmemeval.json)

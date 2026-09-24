@@ -1,0 +1,17 @@
+{
+  "current": "developer",
+  "outputs": {},
+  "visits": {
+    "developer": 1
+  },
+  "harness_use": {
+    "developer": 16,
+    "adversary": 13,
+    "remediator": 13,
+    "approver": 13,
+    "finalize": 14
+  },
+  "prev_step": null,
+  "transcript": [],
+  "events": []
+}
