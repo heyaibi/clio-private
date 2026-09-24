@@ -1,4 +1,4 @@
-# Agent Memoir — 35 build slices + 1 remediation insert + 9 remediation + 15 follow-up/conditional + 1 operator-finding phase (61 total)
+# Agent Memoir — 35 build slices + 1 remediation insert + 9 remediation + 15 follow-up/conditional + 1 operator-finding + 10 recall-fidelity phases (71 total)
 
 Each numbered slice is one staffing unit of roughly **equal engineering effort** (~1×). Relative weights are marked on each heading (`1×` or `1.5×`); the max/min ratio is kept ≤ 1.5. Order is primary build dependency, not priority; independent slices (for example 100310 and 100320, and the extraction adapter 100340) share no dependency with their neighbours and are placed for narrative grouping. No links outside this folder.
 
@@ -235,6 +235,48 @@ Added 2026-09-24 from GitHub issue #3 (`heyaibi/clio`, a bug report). After the 
 | Phase | Scope | Effort | Implementation plan | Source |
 |------:|-------|--------|---------------------|--------|
 | 100421 | TEI rerank wire-contract correction, shared transport error scoping, recall-path regression closure | ~1–2 days | [phase-100421-rerank-contract-retrieval-diagnostics.md](phase-100421-rerank-contract-retrieval-diagnostics.md) | GitHub issue #3 |
+
+---
+
+## Recall result-fidelity phases 100620–100800
+
+Added 2026-09-25 from `gaps/recall-result-fidelity-gap-analysis.md` (a capability-area gap analysis, not a single ticket). Clio's retrieval pipeline computes per-stage signals (dense cosine distance, lexical score, rerank relevance) and then discards most of them, so a caller sees one opaque `score`; there is also no per-hit entity surface, no CLI score breakdown, and no `-o` alias. This block surfaces those signals and closes the adjacent read-surface gaps found while mapping the area.
+
+The phases put `scores` and `entities` on `ScoredHit`, **not** on the frozen `RetrieveHit`, and keep the existing top-level `score` as `final`. That placement keeps the fact/belief contract alone and avoids colliding with the in-flight context work in Phases 100601/100606. If a later decision moves these fields onto `RetrieveHit`, Phases 100620 and 100680 must sequence after 100601 instead of running in parallel.
+
+Phases 100780 and 100800 are **extensions**: include them only if scope is meant to cover the reference system's full surface. Numbering is provisional until reserved through the harness.
+
+All CLI-touching phases here (100620, 100660, 100680, 100700, 100720, 100740) build on the completed Phase 100366 (CLI core plumbing and retrieval reads, including `clio recall`) and Phase 100368 (history/graph reads); command ownership stays with 100366 per [command-ownership.md](command-ownership.md). Phase 100640 deliberately amends Phase 100300's frozen `Reranker` trait entry for the return shape only (the full-permutation and fail-open contracts remain); that amendment requires owner approval and must be recorded in the phase's completion evidence. Phase 100800 requires an explicit caller-supplied temporal anchor; requirement v1.11 (§9 retrieval temporal-anchor determinism, added to the v1.10 baseline) records that relative-date retrieval MUST NOT use an implicit server clock.
+
+| Phase | Scope | Effort | Implementation plan | Dependencies |
+|------:|-------|--------|---------------------|--------------|
+| 100620 | Retrieval stage scores (dense + lexical) and the `scores` object | ~4–5 days | [phase-100620-retrieval-stage-scores.md](phase-100620-retrieval-stage-scores.md) | Existing retrieval/fusion; coordinate with 100601 only if placement changes |
+| 100640 | Rerank relevance capture and per-provider normalization | ~3–4 days | [phase-100640-rerank-relevance-normalization.md](phase-100640-rerank-relevance-normalization.md) | Phase 100620; Phase 100421 TEI contract |
+| 100660 | CLI scores breakdown in the recall text view | ~1–1.5 days | [phase-100660-cli-scores-breakdown.md](phase-100660-cli-scores-breakdown.md) | Phases 100620, 100640 |
+| 100680 | Entity names on recall hits (`entities[]`) | ~2–3 days | [phase-100680-entity-names-recall-hits.md](phase-100680-entity-names-recall-hits.md) | Phase 100620 |
+| 100700 | Entity-overlap match reason (display-only) | ~2–3 days | [phase-100700-entity-overlap-match-reason.md](phase-100700-entity-overlap-match-reason.md) | Phases 100680, 100660 |
+| 100720 | CLI `-o` alias and output-mode help | ~1–2 days | [phase-100720-cli-output-alias-help.md](phase-100720-cli-output-alias-help.md) | Independent |
+| 100740 | Read-surface de-drift: derive the `explain` trace from the hit | ~1–1.5 days | [phase-100740-explain-trace-projection.md](phase-100740-explain-trace-projection.md) | Phase 100620 |
+| 100760 | Snapshot leaf verification: reconcile docs and code | ~1–2 days | [phase-100760-snapshot-leaf-verification.md](phase-100760-snapshot-leaf-verification.md) | Independent |
+| 100780 | Score floors and entity inclusion controls (extension) | ~3–4 days | [phase-100780-score-floors-entity-controls.md](phase-100780-score-floors-entity-controls.md) | Phases 100620, 100640, 100680 |
+| 100800 | Temporal (relative-date) retrieval arm (extension) | ~5–8 days | [phase-100800-temporal-retrieval-arm.md](phase-100800-temporal-retrieval-arm.md) | Phase 100620 |
+
+Dependency order:
+
+```text
+100620 ──┬── 100640 ──┬── 100660 ──┐
+         │            │            ├── 100700
+         │            └── 100740   │
+         ├── 100680 ───────────────┘
+         ├── 100780 (also needs 100640, 100680)
+         └── 100800
+
+100720  (independent)
+100760  (independent)
+Existing 100601 / 100606 cover the `context`/`source_ref` gap; no new phase.
+```
+
+Two decisions gate phase start: rerank normalization (gates 100640) and entity placement plus display-only-vs-rank (gates 100680/100700). The rerank premise was corrected at review: TEI applies sigmoid by default (`raw_scores=false`), so the TEI-vs-Cohere gap is calibration, not raw logits. The `context`/`evidence_ref` gap the analysis found is already covered by Phases 100601/100606 and adds no phase here. Totals: core 100620–100760 are ~15–22.5 ideal days (plan ~18–24 with integration, cross-binding updates, and review); 100780 adds ~3–4 days and 100800 adds ~5–8 days. Estimates are bottom-up ideal days for one senior Rust dev and fold in each phase's own tests and coverage.
 
 ---
 
