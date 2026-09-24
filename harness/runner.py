@@ -2523,13 +2523,13 @@ def self_test(run, live=False):
             map_ok = False
     check("harness token: display map covers stage harness ids", map_ok,
           "all mapped" if map_ok else "unmapped harness id present")
-    t = (run.render_task("remediator",
-                         harness_name=display_name(
-                             "opencode:togetherai/zai-org/GLM-5.3-Flash@high"))
-         if "remediator" in run.steps else "")
+    remediator_display = (display_name(run.planned_harness("remediator"))
+                          if "remediator" in run.steps else "")
+    t = (run.render_task("remediator", harness_name=remediator_display)
+         if remediator_display else "")
     check("harness token: resolves single harness",
           "remediator" not in run.steps or (
-              "OpenCode CLI (Together . GLM-5.3 Flash High)" in t
+              remediator_display in t
               and "{{harness}}" not in t
               and ") / OpenCode" not in t),
           "remediator prompt carries one real harness")

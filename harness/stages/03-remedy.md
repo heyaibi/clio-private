@@ -2,11 +2,9 @@
 name: am_remedy
 description: Clio remedy stage - resolves adversarial findings without regressions
 role: developer
-harness: ['opencode:go/deepseek-v4.1-flash@high', 'opencode:together/glm-5.3-flash@high', 'opencode:go/space-bunny-free@max']
+harness: ['opencode:together/glm-5.3-flash@high']
 harness_names:
-  'opencode:go/deepseek-v4.1-flash@high': "OpenCode CLI (Go . Deepseek V4.1 Flash High)"
   'opencode:together/glm-5.3-flash@high': "OpenCode CLI (Together . GLM-5.3 Flash High)"
-  'opencode:go/space-bunny-free@max': "OpenCode CLI (Go . Space Bunny Free Max)"
 placeholders:
   FINDINGS_PATH: Absolute path of findings.json.
   BACKUP_PATH: Absolute path for the findings.original.json backup.
