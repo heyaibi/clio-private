@@ -3,7 +3,8 @@
     "developer",
     "adversary",
     "remediator",
-    "approver"
+    "approver",
+    "finalize"
   ],
   "steps": {
     "developer": {
@@ -49,6 +50,15 @@
       "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
       "visits": 1,
       "output_sha256": "e956b67142122832ca9b5f2db93a67fef790a981cc1ab93c764301ac0b84785b",
+      "artifacts": {},
+      "git_head": "23702586375678cefe77d0f1ccc647a5f796cb31"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 617a8811",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 2,
+      "output_sha256": "5bcea0873211c23a1ab24bdfb6e67b95e3c8a8e8c29d2e06a075fa0a69de30b4",
       "artifacts": {},
       "git_head": "23702586375678cefe77d0f1ccc647a5f796cb31"
     }
