@@ -1,4 +1,4 @@
-# Phase 100401: TEI Rerank Wire-Contract Correction and Retrieval Diagnostics (issue #3)
+# Phase 100421: TEI Rerank Wire-Contract Correction and Retrieval Diagnostics (issue #3)
 
 ### Attribution
 Rounds below record plan authorship; implementation sign-off is in §12.
@@ -10,7 +10,7 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Remedy Approver | r1 | [TBD] | [TBD] |
 | Finalize | r1 | [TBD] | [TBD] |
 
-**Operator-finding phase 100401 · Effort: ~1–2 days · Source: GitHub issue #3 (`heyaibi/clio`) · Slot: remaining odd range of the remediation block (>100400, <100420)**
+**Operator-finding phase 100421 · Effort: ~1–2 days · Source: GitHub issue #3 (`heyaibi/clio`) · Slot: after the in-progress Phase 100420**
 
 ## 1. Objective
 
@@ -268,18 +268,18 @@ Stop and report if: the TEI sidecar cannot be reached for reproduction; the bare
 ### Required Test Scenarios
 | Test ID | Scenario | Expected Result |
 |---------|----------|-----------------|
-| T100401-01 | Capture the TEI request from `HttpReranker` | Body contains `"query"` and `"texts"`; no `"documents"`; no `"top_k"` |
-| T100401-02 | TEI bare-array response `[{"index":1,...},{"index":0,...}]` | Order `[1,0,...]`; full permutation |
-| T100401-03 | TEI bare array omits a document | Omitted document appended in original order |
-| T100401-04 | TEI bare array with duplicate/out-of-range index | Fail-closed error; orchestrator keeps fused order |
-| T100401-05 | Existing `results[]` and `scores[]` bodies | Parsed exactly as before (compat regression) |
-| T100401-06 | Rerank HTTP failure (for example 422) | Error text contains no `embed`; may name rerank/neutral endpoint |
-| T100401-07 | Hosted-extraction transport failure | Error text contains no `embed` |
-| T100401-08 | 429/5xx and connect/timeout; TLS/BadUri/Protocol | Retryable unchanged; non-retryable unchanged |
-| T100401-09 | Recall with one unreadable candidate | Readable hits returned; one skip warning; no abort |
-| T100401-10 | Text-mode recall | Hit content appears in output |
-| T100401-11 | No provider configured; unknown provider | No reranker / fail-closed config error; behavior unchanged |
-| T100401-12 | Full workspace suite + coverage + clippy + fmt | Green; aggregate and per-file coverage ≥90% |
+| T100421-01 | Capture the TEI request from `HttpReranker` | Body contains `"query"` and `"texts"`; no `"documents"`; no `"top_k"` |
+| T100421-02 | TEI bare-array response `[{"index":1,...},{"index":0,...}]` | Order `[1,0,...]`; full permutation |
+| T100421-03 | TEI bare array omits a document | Omitted document appended in original order |
+| T100421-04 | TEI bare array with duplicate/out-of-range index | Fail-closed error; orchestrator keeps fused order |
+| T100421-05 | Existing `results[]` and `scores[]` bodies | Parsed exactly as before (compat regression) |
+| T100421-06 | Rerank HTTP failure (for example 422) | Error text contains no `embed`; may name rerank/neutral endpoint |
+| T100421-07 | Hosted-extraction transport failure | Error text contains no `embed` |
+| T100421-08 | 429/5xx and connect/timeout; TLS/BadUri/Protocol | Retryable unchanged; non-retryable unchanged |
+| T100421-09 | Recall with one unreadable candidate | Readable hits returned; one skip warning; no abort |
+| T100421-10 | Text-mode recall | Hit content appears in output |
+| T100421-11 | No provider configured; unknown provider | No reranker / fail-closed config error; behavior unchanged |
+| T100421-12 | Full workspace suite + coverage + clippy + fmt | Green; aggregate and per-file coverage ≥90% |
 
 ### Negative Testing
 Verify that invalid TEI bodies fail closed and keep the fused order, duplicate/out-of-range indices never produce an invalid permutation, dead sidecars keep fused order, unreadable candidates are skipped without leaking content, and existing TEI/Cohere/embed behavior is intact.
@@ -293,12 +293,12 @@ Implementation claims must be supported by actual test output, inspection result
 
 | AC ID | Acceptance Criterion | Verification Method | Required Evidence |
 |-------|----------------------|---------------------|-------------------|
-| AC-100401-01 | TEI request/response contract corrected; a configured sidecar reranks live retrieval | T100401-01…04; real CLI repro | Captured request body, bare-array parse test, before/after `clio recall` output showing rerank applied |
-| AC-100401-02 | `results[]`/`scores[]` parsing and full-permutation guarantee preserved | T100401-05 | Existing tests green unchanged |
-| AC-100401-03 | Rerank and extraction errors are not labeled embed | T100401-06, T100401-07 | Test output / error-text assertions |
-| AC-100401-04 | Retry classification and 401/403 body suppression unchanged | T100401-08 | Test output |
-| AC-100401-05 | Recall resilience and content fixes present and regression-tested | T100401-09, T100401-10 | New/updated test output; fix locations recorded |
-| AC-100401-06 | No regression; size/coverage gates pass | T100401-11, T100401-12 | Workspace suite green; `make coverage` per-file ≥90%; files ≤450 lines; `clippy -D warnings`; `fmt --check` |
+| AC-100421-01 | TEI request/response contract corrected; a configured sidecar reranks live retrieval | T100421-01…04; real CLI repro | Captured request body, bare-array parse test, before/after `clio recall` output showing rerank applied |
+| AC-100421-02 | `results[]`/`scores[]` parsing and full-permutation guarantee preserved | T100421-05 | Existing tests green unchanged |
+| AC-100421-03 | Rerank and extraction errors are not labeled embed | T100421-06, T100421-07 | Test output / error-text assertions |
+| AC-100421-04 | Retry classification and 401/403 body suppression unchanged | T100421-08 | Test output |
+| AC-100421-05 | Recall resilience and content fixes present and regression-tested | T100421-09, T100421-10 | New/updated test output; fix locations recorded |
+| AC-100421-06 | No regression; size/coverage gates pass | T100421-11, T100421-12 | Workspace suite green; `make coverage` per-file ≥90%; files ≤450 lines; `clippy -D warnings`; `fmt --check` |
 
 ### Definition of Done
 - [ ] All in-scope behavior is implemented.
@@ -346,14 +346,14 @@ If only the contract fix or only the label fix lands, do not claim completion. R
 
 | Parent Requirement | Implementation Task | Verification | Acceptance Criterion |
 |--------------------|---------------------|--------------|-----------------------|
-| requirement §4.5 step 3 (rerank stage) | Task 1 | T100401-01…04 | AC-100401-01 |
-| FR-32 / §4.9.5.E (provider selection) | Task 1 | T100401-01, T100401-11 | AC-100401-01 |
-| Issue #3 finding 2 (mislabeled transport errors) | Task 2 | T100401-06…08 | AC-100401-03, AC-100401-04 |
-| Issue #3 finding 3 (recall aborts on unreadable candidate) | Task 3 | T100401-09 | AC-100401-05 |
-| Issue #3 finding 4 (recall text omitted content) | Task 3 | T100401-10 | AC-100401-05 |
-| FR-26 / PR-4 (no silent corruption) | Tasks 1–3 | T100401-04, T100401-09 | AC-100401-01, AC-100401-05 |
-| Phase 100300 recorded contract (corrected) | Task 1 | Inspection + evidence | AC-100401-01 |
-| Regression / quality contract | All | T100401-12 | AC-100401-06 |
+| requirement §4.5 step 3 (rerank stage) | Task 1 | T100421-01…04 | AC-100421-01 |
+| FR-32 / §4.9.5.E (provider selection) | Task 1 | T100421-01, T100421-11 | AC-100421-01 |
+| Issue #3 finding 2 (mislabeled transport errors) | Task 2 | T100421-06…08 | AC-100421-03, AC-100421-04 |
+| Issue #3 finding 3 (recall aborts on unreadable candidate) | Task 3 | T100421-09 | AC-100421-05 |
+| Issue #3 finding 4 (recall text omitted content) | Task 3 | T100421-10 | AC-100421-05 |
+| FR-26 / PR-4 (no silent corruption) | Tasks 1–3 | T100421-04, T100421-09 | AC-100421-01, AC-100421-05 |
+| Phase 100300 recorded contract (corrected) | Task 1 | Inspection + evidence | AC-100421-01 |
+| Regression / quality contract | All | T100421-12 | AC-100421-06 |
 
 Required chain:
 
