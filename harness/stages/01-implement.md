@@ -2,10 +2,9 @@
 name: am_implement
 description: Clio implement stage - implements roadmap phases
 role: developer
-harness: ['opencode:go/deepseek-v4.1-flash@max', 'agy:gemini-3.8-flash-high', 'opencode:together/glm-5.3-flash@high', 'opencode:openrouter/deepseek-v4.1-flash@max']
+harness: ['opencode:go/deepseek-v4.1-flash@max', 'opencode:together/glm-5.3-flash@high', 'opencode:openrouter/deepseek-v4.1-flash@max']
 harness_names:
   'opencode:go/deepseek-v4.1-flash@max': "OpenCode CLI (Go . Deepseek V4.1 Flash Max)"
-  'agy:gemini-3.8-flash-high': "Antigravity CLI (Gemini 3.8 Flash High)"
   'opencode:together/glm-5.3-flash@high': "OpenCode CLI (Together . GLM-5.3 Flash High)"
   'opencode:openrouter/deepseek-v4.1-flash@max': "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)"
 placeholders:

@@ -2,10 +2,9 @@
 name: am_check_remedy
 description: Clio check-remedy stage - validates remediation; approves or rejects
 role: reviewer
-harness: ['opencode:go/space-bunny-free@max', 'agy:gemini-3.8-flash-high', 'opencode:go/space-bunny-free@max', 'cmd:deepseek/deepseek-v4.1-flash@max']
+harness: ['opencode:go/space-bunny-free@max', 'opencode:go/space-bunny-free@max', 'cmd:deepseek/deepseek-v4.1-flash@max']
 harness_names:
   'opencode:go/space-bunny-free@max': "OpenCode CLI (Go . Space Bunny Free Max)"
-  'agy:gemini-3.8-flash-high': "Antigravity CLI (Gemini 3.8 Flash High)"
   'cmd:deepseek/deepseek-v4.1-flash@max': "Command Code (DeepSeek V4.1 Flash Max)"
 placeholders:
   FINDINGS_PATH: Absolute path of findings.json.
