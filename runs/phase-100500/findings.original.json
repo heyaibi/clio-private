@@ -1,0 +1,31 @@
+{
+  "run": "phase-100500",
+  "phase": "100500",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Roadmap isolation violation: Phase number 100500 embedded in test names and module comments",
+      "evidence": "crates/clio-mcp/src/provider_adapter_tests.rs:11 (//! - Unit and integration tests for import_provider (T100500-01 through T100500-04)), crates/clio-mcp/src/provider_adapter_tests.rs:149,202,258,306 (fn t100500_01_*, fn t100500_02_*, fn t100500_03_*, fn t100500_04_*), crates/clio-mcp/src/provider_adapter_edge_tests.rs:10-12 (//! - Security tests (credential masking T100500-05)), and crates/clio-mcp/src/provider_adapter_edge_tests.rs:27,67,93 (fn t100500_05_*, fn t100500_06_*, fn t100500_07_*)",
+      "requirement_ref": "AGENTS.md §'Private / Public Boundary' ('Never reference private/... paths in any public file... Never paste private file contents (requirement text, roadmap phases, worker prompts, run logs) into public files') and Developer Hard Rules ('Roadmap isolation: never reference private/clio-private/roadmap/, phase numbers, or roadmap files from code or comments')",
+      "recommendation": "Rename test functions and update doc comments in provider_adapter_tests.rs and provider_adapter_edge_tests.rs to standard ordinal prefixes (e.g. t01_*, t02_*, etc.) without mentioning the private phase number 100500."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Dry-run and live-run intra-batch deduplication divergence",
+      "evidence": "crates/clio-mcp/src/provider_adapter.rs:180-186",
+      "requirement_ref": "requirement.md FR-29 / §4.9.5.B ('JSON import SHALL be idempotent by default... and SHALL support a dry-run report with zero writes. When a provider adapter is implemented... SHALL offer the same dry-run report before writing.')",
+      "recommendation": "Track encountered external IDs in an in-memory HashSet during the import_provider_mem0 loop so that duplicate IDs in a single pull response are counted as would_skip rather than would_create during dry_run, maintaining exact parity with live execution."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "Rename t100500_* test functions and remove phase number references from provider_adapter_tests.rs and provider_adapter_edge_tests.rs to restore roadmap isolation.",
+    "Add a local HashSet<String> of seen external IDs to import_provider_mem0 in provider_adapter.rs so that duplicates within a dry-run pull correctly count as would_skip."
+  ],
+  "plan_unlimited": [
+    "Add provider adapters for the remaining four external memory systems (hindsight, mnemosyne, honcho, supermemory) using the validated Mem0 adapter pattern.",
+    "Support configurable query filters (e.g. time range, categories) in provider options mapped to external provider search/list endpoints."
+  ]
+}

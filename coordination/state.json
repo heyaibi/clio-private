@@ -26,12 +26,32 @@
         "public": "3a638ed93486cdb4b4e4a42d1833e0bae113083c"
       },
       "claimed_at": "2026-09-24T19:00:04.437Z",
+      "completion_receipt": {
+        "path": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100500/publication.json",
+        "private_commit": "a66f62fd67ceb5acc231381d0fd69436938d9eed",
+        "public_commit": "fa256796346a360e5ad3c55a3181784dbf3d3b47",
+        "published_at": "2026-09-24T20:39:13.357Z"
+      },
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-24T20:10:49.186Z",
+      "heartbeat_at": "2026-09-24T20:39:18.032Z",
       "machine_id": "devserver",
       "reservation_id": "rsv-1aa7f1ea78b3efbd18afc0a6",
       "run_id": "phase-100500",
+      "status": "completed"
+    },
+    "100520": {
+      "base_revisions": {
+        "private": "e0c03de60559e00e6d1143a98dfcb4b3e4ba7c92",
+        "public": "fa256796346a360e5ad3c55a3181784dbf3d3b47"
+      },
+      "claimed_at": "2026-09-24T20:40:03.886Z",
+      "expires_at": null,
+      "generation": 1,
+      "heartbeat_at": "2026-09-24T20:55:17.231Z",
+      "machine_id": "devserver",
+      "reservation_id": "rsv-afd1fd3ffa51be72710bd210",
+      "run_id": "phase-100520",
       "status": "running"
     }
   },

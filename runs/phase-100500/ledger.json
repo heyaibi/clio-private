@@ -1,0 +1,101 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver",
+    "finalize"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 51c40181",
+      "harness": "agy:gemini-3.8-flash-high",
+      "authoritative": true,
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "visits": 1,
+      "output_sha256": "9c396929e801769f66073d67ed25711fbccbdb9f67c5b9d047433feab74d80dd",
+      "artifacts": {},
+      "git_head": "3a638ed93486cdb4b4e4a42d1833e0bae113083c",
+      "superseded_task_files": [],
+      "task_file": "developer-task-r1.md",
+      "task_sha256": "7e41d615ac77d81f57d1a122be175ac469308ba15e37c8fef89d9fc1e1b977c9",
+      "stage_sha256": "25a9eee0bf7bdc3665fe3d53e3759bc2424b1f5c4aa70d9b7829540a7c845fb3",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100500/findings.json 37201260",
+      "harness": "agy:gemini-3.8-flash-high",
+      "authoritative": true,
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "visits": 1,
+      "output_sha256": "bed256065bfa5addf6f074a7ff2005ea3b6187bd5dfe21aa952e40a196008bb7",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 2854,
+          "sha256": "031ccf3ebdfbbb0b2fd61a8ef28c8c7c968d9da3f59a9003604bd4ea39cbfe39"
+        }
+      },
+      "git_head": "3a638ed93486cdb4b4e4a42d1833e0bae113083c",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "e9ba409acef5c792166399a61afb4b94f8ad4cf3d2cdd73a6dffb8b53989d004",
+      "stage_sha256": "da4716215519df42bf167185485e0e5b03331e519a78413691806b31febbc9e1",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 9f21a784",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "authoritative": true,
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "visits": 1,
+      "output_sha256": "be70c38c31f111035c75f725c504fd3ad73466b0017ab75f51e877fdd9118939",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 2854,
+          "sha256": "031ccf3ebdfbbb0b2fd61a8ef28c8c7c968d9da3f59a9003604bd4ea39cbfe39"
+        }
+      },
+      "git_head": "3a638ed93486cdb4b4e4a42d1833e0bae113083c",
+      "superseded_task_files": [],
+      "task_file": "remediator-task-r1.md",
+      "task_sha256": "34be13352797a94de9106bee393fbaca9ba65818b3907de2c816fb609943aadf",
+      "stage_sha256": "ec5444b8b1975fd9b74805a82b959f44dae0ef10deba1c57e6e77a1bfb1938e3",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED b0c4bafa",
+      "harness": "agy:gemini-3.8-flash-high",
+      "authoritative": true,
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "visits": 1,
+      "output_sha256": "7d52ac00334a1fb338a7a02e0b7d7404f74b69af095f528a07505c690fe57207",
+      "artifacts": {},
+      "git_head": "3a638ed93486cdb4b4e4a42d1833e0bae113083c",
+      "superseded_task_files": [],
+      "task_file": "approver-task-r1.md",
+      "task_sha256": "3a1ea87bc34ca63e6770610447a928664719f3d8f2214c4b9268921e9c40582a",
+      "stage_sha256": "68dde6fea0ad96b5f5661b743848d9257c3c52c1d8ad1df503b95fabb407b481",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 8285c23e",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "60b6e4ae9842e54edbb37dbc9fdd111e3a750eccc3ae1fa0dd27326abe7d6113",
+      "artifacts": {},
+      "git_head": "fa256796346a360e5ad3c55a3181784dbf3d3b47",
+      "superseded_task_files": [],
+      "task_file": "finalize-task-r1.md",
+      "task_sha256": "0c80b819fd46807d80683ca3915dd7e5ee2dc73b3a6442282094e3eff2d2b326",
+      "stage_sha256": "7384223237ef16f9c0fb121082974d732f8fa357c8bd218d5c69fc6ea8cc8967",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  }
+}
