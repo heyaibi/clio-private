@@ -55,5 +55,12 @@
       "status": "running"
     }
   },
+  "publication": {
+    "acquired_at": "2026-09-24T22:12:56.247Z",
+    "generation": 1,
+    "machine_id": "devserver",
+    "phase": "100520",
+    "reservation_id": "rsv-afd1fd3ffa51be72710bd210"
+  },
   "version": 1
 }
