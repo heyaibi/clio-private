@@ -8,7 +8,8 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Adversary | r1 | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | done |
 | Remediator | r1 | OpenCode CLI (Go . Space Bunny Free Max) | done |
 | Remedy Approver | r1 | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | approved |
-| Finalize | r1 | OpenCode CLI (Go . Space Bunny Free Max) | done |
+| Finalize | r1 | OpenCode CLI (Go . Space Bunny Free Max) | blocked |
+| Finalize | r2 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
 
 **Remediation phase 100440 · **Effort:** ~4–7 days · **Gaps:** G-11, G-12 · **Source:** `gap/requirement-gaps.md` §2, §3
 
@@ -283,7 +284,7 @@ Implementation claims must be supported by the measured fidelity number and test
 - [x] Security checks pass: synthetic fixtures, bounded/redacted live handling, credential-pattern self-tests, no ungrounded admission, and no new egress path.
 - [x] Documentation and public harness evidence distinguish fixture-contract replay, mock-provider verification, and live-provider evidence.
 - [x] Evidence is recorded below, including the unavailable live extractor and the final coverage report.
-- [ ] Required approval is obtained (downstream pipeline step).
+- [x] Required approval is obtained (downstream pipeline step).
 
 ### Completion Evidence
 - **Implementation summary:** The stdlib-only harness now labels fixed responses as `fixture_contract_replay` and historical responses as `historical_fixture_replay`, rejects non-empty unlisted snapshot leaves, reports `structural_candidates` separately from authoritative admission, redacts AWS/GitHub/JWT/Slack credential forms, and exposes `--parity`. The shared `scripts/verifier_parity.json` table is executed by both Python and the Rust test. A deterministic `ChatExtractor` transport test drives the previously empty `rust_version`/`os` response through response parsing, span verification, `extract_verify_store`, admission, and the write callback. The CLI maintenance text view now prints `time_to_queryable_ms` and `structural_maintenance_ms` separately.
