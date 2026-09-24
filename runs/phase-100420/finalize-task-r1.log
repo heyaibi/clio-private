@@ -4,3 +4,7 @@
 2026-09-24T08:17:50Z Final make check: EXIT 0 (cargo fmt clean, clippy -D warnings clean, workspace tests pass: 48 suites, 2045 passed / 0 failed, doc-tests ok). Note: first invocation failed because rustdoc was not on PATH in this shell (only cargo/rustc are symlinked into /usr/local/bin); with ~/.cargo/bin on PATH make check exits 0. Code unchanged between runs.
 2026-09-24T08:17:50Z Staging main repo (git add -A) and nested private repo.
 2026-09-24T08:18:06Z Staged scope confirmed. Main repo: 32 files (clio-store clio-write sql) +2138/-177. Private repo: 4 roadmap files + 17 runs/ artifacts. Creating commits.
+2026-09-24T08:18:14Z Both commits created: main 4d42855, private 18f62da (amended to include finalize log progress). Running gitsync --mode push.
+2026-09-24T08:19:49Z gitsync --mode push EXIT 0: main merged 2 remote commits (issue #7 --category help fix), private merged 3 (phase 100401/100421 roadmap). Base changed, so re-ran make check: EXIT 0, 2053 passed / 0 failed. Safe to push.
+2026-09-24T08:19:54Z Pushed: main heyaibi/clio 606d6fb..5eeccec master (push exit 0); private heyaibi/clio-private ee1ba1b..4a5ac81 master (push exit 0). Close-out complete.
+FINALIZE_DONE 8a70e448
