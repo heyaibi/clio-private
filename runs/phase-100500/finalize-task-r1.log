@@ -6,3 +6,7 @@
 2026-09-25T02:08:11+0530 [] staging: public = 12 phase files incl. 3 unstaged remedy updates; private = roadmap only (unstaging runs/phase-100500 files so the publication helper remains the only publisher of that directory)
 2026-09-25T02:08:20+0530 [log] commits: public fa256796346a360e5ad3c55a3181784dbf3d3b47 (12 files), private f106a49159ad38589c2ea13aba086458fe5708ee (roadmap close-out)
 2026-09-25T02:08:20+0530 [] running gitsync publish
+2026-09-25T02:08:42+0530 [log] gitsync publish: exit 0, state PUBLISHED; public pushed fa256796346a360e5ad3c55a3181784dbf3d3b47, private pushed a6df1a34746dcde44341cf6acff924c70b593509; publication.json written and pushed; reservation claim verified (rsv-1aa7f1ea78b3efbd18afc0a6 gen 1)
+2026-09-25T02:08:42+0530 [log] addressed_issues: [] (empty list, valid) -> no issues to close; incidental bug #16 (memtree_cov_tests::concurrent_writes_during_refresh_wave intermittent failure) already filed by approver stage and present in reported-bugs.json; no new bugs confirmed by finalize
+2026-09-25T02:08:42+0530 [] close-out complete: attribution table complete (4 prior rows + Finalize r1), approval checkbox marked, make check exit 0 (2103 passed, 0 failed), both repos pushed
+FINALIZE_DONE 8285c23e

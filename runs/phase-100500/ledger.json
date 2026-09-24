@@ -3,7 +3,8 @@
     "developer",
     "adversary",
     "remediator",
-    "approver"
+    "approver",
+    "finalize"
   ],
   "steps": {
     "developer": {
@@ -79,6 +80,22 @@
       "stage_sha256": "68dde6fea0ad96b5f5661b743848d9257c3c52c1d8ad1df503b95fabb407b481",
       "via": "edge",
       "routed_to": "finalize"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 8285c23e",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "60b6e4ae9842e54edbb37dbc9fdd111e3a750eccc3ae1fa0dd27326abe7d6113",
+      "artifacts": {},
+      "git_head": "fa256796346a360e5ad3c55a3181784dbf3d3b47",
+      "superseded_task_files": [],
+      "task_file": "finalize-task-r1.md",
+      "task_sha256": "0c80b819fd46807d80683ca3915dd7e5ee2dc73b3a6442282094e3eff2d2b326",
+      "stage_sha256": "7384223237ef16f9c0fb121082974d732f8fa357c8bd218d5c69fc6ea8cc8967",
+      "via": "end",
+      "routed_to": "completed"
     }
   }
 }
