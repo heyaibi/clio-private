@@ -1,6 +1,10 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for normal operations.
+
+## Unattended phase-pipeline exception
+
+Pipeline stages must use `private/clio-private/harness/github_issues.py` for issue reads, bug creation, and approved issue closure. The helper obtains the existing GitHub credential through `git credential fill` in a subprocess, keeps it in memory, and uses the GitHub REST API. Stages must not run `git credential fill`, authenticated `curl`, or `gh` themselves, print the token, or place it in a command, file, log, report, or chat. A failed required helper call blocks the stage.
 
 ## Conventions
 

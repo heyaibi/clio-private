@@ -85,6 +85,7 @@ steps:
     bindings:
       PHASE_NUMBER: "{phase_number}"
       TASK_REQUIREMENTS: "{phase_file}"
+      REPORT_DIR: "{run_dir}"
       LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
     when:
       DEVELOPER_DONE: adversary
@@ -110,6 +111,7 @@ steps:
       ORIGINAL_PROMPT: {join: [{task: developer}, {output: developer}]}
       PREVIOUS_VERDICT: {output: approver}
       ROUND_INFO: "Round {round} of {rounds}"
+      REPORT_DIR: "{run_dir}"
       LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
     when:
       REMEDIATOR_DONE: approver
@@ -122,6 +124,7 @@ steps:
       BACKUP_PATH: "{run_dir}/findings.original.json"
       REMEDIATOR_AGENT_OUTPUT: {output: remediator}
       ROUND_INFO: "Round {round} of {rounds}"
+      REPORT_DIR: "{run_dir}"
       LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
     when:
       REMEDY_APPROVED: finalize
@@ -132,5 +135,7 @@ steps:
     record_as: Developer
     bindings:
       REMEDY_APPROVER_AGENT_OUTPUT: {output: approver}
+      ISSUE_AUDIT_PATH: "{run_dir}/findings.json"
+      REPORT_DIR: "{run_dir}"
       LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
     end: completed

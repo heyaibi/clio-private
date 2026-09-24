@@ -5,19 +5,19 @@ python3 private/clio-private/harness/runner.py --pipeline private/clio-private/h
    --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060-parallel-write-canonical-consolidation.md --dry-run
 ```
 
-1. Run from the repo root. Authenticate `agent`, `agy`, `hermes`, `opencode` once. Hermes needs an OpenRouter key (`hermes model`); opencode carries its own Together auth.
+1. Run from the repo root. Authenticate `agent`, `agy`, `hermes`, `opencode` once. Hermes needs an OpenRouter key (`hermes model`); opencode carries its own Together auth. The push credential must also be available through `git credential fill`; stages use `harness/github_issues.py` and never handle the token directly.
 2. `--self-test`: static harness checks, no spend. `--live` adds one-word inference probes.
 3. Drop `--dry-run` for the real run. Every harness runs attached in your terminal: cursor, agy, and opencode open interactive sessions seeded with the task pointer; hermes seeds a chat. agy runs with `--dangerously-skip-permissions`; opencode runs with `--auto` and the full TUI (mandated by the stages); cursor and the others may ask you to approve tool calls as they work. The runner closes any session itself ~15 s after the final signal lands in the run log — opencode's TUI would otherwise idle after finishing.
 4. Result: JSON summary on stdout, detail in `private/clio-private/runs/phase-100060/run.json`, per-invocation run logs beside the task files (`<step>-task-r<N>.log`) — the runner reads each step's final-line signal from that log.
 5. Exits: 0 completed, 1 rejected/blocked, 2 config error, 130 interrupted.
 
-Flow: developer → adversary → remediator ⇄ approver (3 rounds max) → finalize. Empty findings skip to finalize. Any `*_BLOCKED` ends the run. Each step rotates its two harnesses round-robin.
+Flow: developer → adversary → remediator ⇄ approver (3 rounds max) → finalize. The adversary skips directly to finalize only when both `findings` and `addressed_issues` are empty; issue-only candidates still receive remedy and approval checks. Any `*_BLOCKED` ends the run. Each step rotates its two harnesses round-robin.
 
 Before a fresh start the runner brings both checkouts (`clio` and `private/clio-private`) in line with their remotes — fast-forwarding or cleanly merging — and refuses only on a real conflict, a dirty index, or a detached HEAD. Finalize syncs again and confirms each push will fast-forward before pushing. A blocked sync exits 2 and halts the line (see `runner.md`, Sync gate).
 
-## Canary (after stage/worker edits)
+## Canary (after stage/worker/helper edits)
 
-Run one phase, then prove birth-die compliance from the run logs: each worker spawned with disjoint FILES, no worker signal line (only the main's signal routes), workers left the index alone (`git diff --cached` shows main's staging only), and the main ran the full gate exactly twice (implement) or at most once plus one `make check` (remedy). If any check fails, fix the prompt, not the worker output.
+First run `python3 private/clio-private/harness/github_issues.py --self-test` and `python3 private/clio-private/harness/check-workers.py`. Then run one phase and prove birth-die compliance from the run logs: each worker spawned with disjoint FILES, no worker signal line (only the main's signal routes), workers left the index alone (`git diff --cached` shows main's staging only), and the main ran the full gate exactly twice (implement) or at most once plus one `make check` (remedy). If any check fails, fix the prompt, not the worker output.
 
 ## Foreground
 

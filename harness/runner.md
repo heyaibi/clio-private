@@ -35,7 +35,7 @@ How each CLI is invoked (all attached in the foreground with inherited stdio; th
 
 A list of identifiers means round-robin: each invocation of that step uses the next entry, wrapping around. Counters persist across runs in `private/clio-private/runs/.harness-rotation-<pipeline>-<hash>.json` (one file per pipeline file, keyed by pipeline path), so consecutive runs keep alternating. Rotation slots are consumed only after a successful invoke, so a crash between render and invoke retries the same harness. `--fresh` does not reset rotation.
 
-Current steps and harnesses: developer (implement) rotates `opencode:together/glm-5.3-flash@high` and `opencode:go/deepseek-v4.1-flash@high`; adversary rotates `agy:gemini-3.8-flash-high` and `opencode:openrouter/deepseek-v4.1-flash@max`; remediator rotates `opencode:go/deepseek-v4.1-flash@high` and `opencode:together/glm-5.3-flash@high`; approver rotates `opencode:together/glm-5.3-flash@max` and `opencode:openrouter/deepseek-v4.1-flash@max`; finalize rotates `opencode:together/glm-5.3-flash@high` and `opencode:go/deepseek-v4.1-flash@high`.
+Current steps and harnesses: developer, remediator, and finalize rotate `opencode:together/glm-5.3-flash@high`, `opencode:go/deepseek-v4.1-flash@high`, and `opencode:go/space-bunny-free@max`; adversary and approver rotate `agy:gemini-3.8-flash-high` and `opencode:openrouter/deepseek-v4.1-flash@max`.
 
 Each stage file also declares `harness_names:` mapping every harness id to its display name, which is what `{{harness}}` renders to in prompts and what lands in Attribution rows and the ledger. Anything unmapped falls back to the raw id.
 
@@ -62,7 +62,15 @@ Signal matching is a prefix match scanned bottom-up over the last 10 non-empty r
 
 The pty write is the only delivery today; `_deliver_reminder` is the seam a harness-native sender (for example an OpenCode server call) could replace, keeping the pty write as the fallback.
 
-After the signal, `require_file` is verified before routing: for the findings report the runner parses the JSON and checks its `findings` key, otherwise it checks the file is non-empty. With `skip_when_empty`, an empty artifact routes to the skip target instead. `snapshot` copies run-dir `from` to `to` before the step unless the target already exists. Conventions that must not change silently: `agent` is the step id, and finalize is attributed Developer but logs to `finalize.log`.
+After the signal, `require_file` is verified before routing: for a findings report the runner parses the JSON and treats it as empty only when both `findings` and `addressed_issues` are empty; otherwise it checks the file is non-empty. With `skip_when_empty`, an empty artifact routes to the skip target instead. `snapshot` copies run-dir `from` to `to` before the step unless the target already exists. Conventions that must not change silently: `agent` is the step id, and finalize is attributed Developer but logs to `finalize.log`.
+
+## Open issues and incidental bugs
+
+The adversary triages every open issue through `harness/github_issues.py list-open` (light records: title, body, labels, comment count, no comment bodies) and fetches the full thread with `view` for every plausibly related issue. It records only fully resolved, directly in-scope issues in `findings.json:addressed_issues`, with the digest taken from `view`. The remediator preserves and revalidates that list; the approver rejects changed, closed, related-only, or partial candidates. Finalize receives `findings.json` through `ISSUE_AUDIT_PATH` and may close only approved candidates, after both repositories push; an empty candidate list is valid and means close nothing. The close helper checks the issue digest, uses a retry-safe public commit marker, and never closes on a mismatch.
+
+Every main stage files a public, sanitized GitHub bug report when it confirms a new bug not already named by the task or current findings. It first reads the run-local `reported-bugs.json` ledger (a ledger hit counts as an equivalent even when search misses it), then searches for an equivalent open issue, and never duplicates one. After a successful report it appends to the ledger. Reporting is incidental: stages confirm the trigger and impact, but do not hunt for unrelated root causes or fix unrelated bugs. All public titles, bodies, close comments, and ledger files are kept as run evidence under per-stage filenames and never deleted. `harness/github_issues.py --self-test` is hermetic and does not access credentials or the network.
+
+The helper is the only pipeline boundary to GitHub. It reads the credential through `git credential fill` in a subprocess and keeps it in memory. Stages never run `git credential fill`, authenticated `curl`, or `gh`; they never print, log, or pass the credential. Helper rejection or failure blocks the stage.
 
 ## Run state
 

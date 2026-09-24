@@ -670,6 +670,26 @@ def git_head(run):
         return None
 
 
+def artifact_is_empty(path):
+    """Return whether a required artifact has no actionable content.
+
+    Findings reports are actionable when either defect findings or directly
+    in-scope issue candidates remain. Other JSON/text artifacts keep the original
+    non-empty behavior.
+    """
+    try:
+        text = path.read_text()
+    except OSError as error:
+        raise Fail(f"required artifact is unreadable: {path}") from error
+    try:
+        report = json.loads(text)
+    except ValueError:
+        return not text.strip()
+    if isinstance(report, dict) and "findings" in report:
+        return not report.get("findings") and not report.get("addressed_issues")
+    return not text.strip()
+
+
 def note_completion(run, sid, sig, harness):
     """Record a step's completion proof: signal, output hash, artifact
     hashes, git HEAD. Called for every step whose signal was accepted."""
@@ -808,10 +828,7 @@ def mark_done(run, step, signal, force=False):
         elif not fpath.is_file():
             raise Fail(f"--mark-done: signal given but {fpath} missing")
         else:
-            try:
-                empty = not json.loads(fpath.read_text()).get("findings")
-            except (ValueError, AttributeError):
-                empty = not fpath.read_text().strip()
+            empty = artifact_is_empty(fpath)
         if "skip_when_empty" in s and empty:
             skip_to = s["skip_when_empty"]
     if skip_to is not None:
@@ -1735,10 +1752,7 @@ def drive(run, pipe, invoke, resumed=None):
             elif not fpath.is_file():
                 raise Fail(f"step {current}: signal received but {fpath} missing")
             else:
-                try:
-                    empty = not json.loads(fpath.read_text()).get("findings")
-                except (ValueError, AttributeError):
-                    empty = not fpath.read_text().strip()
+                empty = artifact_is_empty(fpath)
             if "skip_when_empty" in s and empty:
                 event["via"] = "skip"
                 event["routed_to"] = s["skip_when_empty"]
@@ -2393,6 +2407,21 @@ def self_test(run, live=False):
     res_f = mark_done(mr2, "s0", "SIG0", force=True)
     check("mark-done: force overrides loop cap",
           res_f.get("advanced_to") == "s1", "advanced with force")
+
+    with tempfile.TemporaryDirectory(prefix="artifact-empty") as artifact_tmp:
+        artifact_dir = Path(artifact_tmp)
+        empty_findings = artifact_dir / "empty.json"
+        issue_only = artifact_dir / "issue-only.json"
+        actionable = artifact_dir / "actionable.json"
+        empty_findings.write_text(json.dumps({"findings": [], "addressed_issues": []}))
+        issue_only.write_text(json.dumps({"findings": [], "addressed_issues": [{"number": 1}]}))
+        actionable.write_text(json.dumps({"findings": [{"id": "F-1"}], "addressed_issues": []}))
+        check("artifact: empty findings and issue audit skip",
+              artifact_is_empty(empty_findings))
+        check("artifact: issue-only report stays actionable",
+              not artifact_is_empty(issue_only))
+        check("artifact: finding report stays actionable",
+              not artifact_is_empty(actionable))
 
     # Fail-closed sync: stubbed-remote checks live in gitsync.py so the same
     # gate runs standalone (`gitsync.py --self-test`) and here.

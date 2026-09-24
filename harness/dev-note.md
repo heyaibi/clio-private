@@ -29,7 +29,9 @@ already exists, so the redirect works on a fresh clone:
 ```
 Requires: `tmux`, `flock`, `python3`, `curl` (for the optional heartbeat), and the
 Hermes profile `not-james-gosling` with Discord configured. The harnesses also need
-their own auth (opencode, agy, and git push for finalize).
+their own auth (opencode, agy, and git push for finalize). The push credential must
+be available to `git credential fill`; `harness/github_issues.py` keeps it in memory
+and the pipeline never prints it.
 
 ## Watch
 ```
@@ -118,6 +120,7 @@ LOG_KEEP_DAYS=7
 ## Check / dry-run / self-test
 ```
 python3 private/clio-private/harness/next_phase.py             # which phase is next (exit 1 = none left)
+python3 private/clio-private/harness/github_issues.py --self-test  # hermetic credential/privacy checks; no network
 bash private/clio-private/harness/phase-driver.sh --check      # tools, profile, config readiness
 bash private/clio-private/harness/phase-driver.sh --dry-run    # what the driver would do; touches nothing
 bash private/clio-private/harness/phase-driver.sh --self-test  # hermetic guard/halt/stop/orphan/notify test
