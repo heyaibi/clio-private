@@ -1,0 +1,31 @@
+{
+  "order": [
+    "developer",
+    "adversary"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 8b696a15",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "2b5e5a0afe4457036e240be33135978ca4ca9c46fe7c0283703ee71235c3e531",
+      "artifacts": {},
+      "git_head": "5eeccecdf47b09b28015fef8495c41dca0a3c39f"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/findings.json b0c70966",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "visits": 1,
+      "output_sha256": "b75d9fff3e2975adaac522041d72f5be244ded12e85ef32e4db4b44a5564f806",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 99,
+          "sha256": "ccaeb2314c6606fe4b99c621b812893987c12a3f44d006ced0bf30f40e7acfb7"
+        }
+      },
+      "git_head": "5eeccecdf47b09b28015fef8495c41dca0a3c39f"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+[2026-09-24T08:48:19Z] Adversary r1 start: phase 100421 adversarial review
+[2026-09-24T08:50:32Z] make check EXIT=0 (fmt, lint, all workspace tests passed)
+[2026-09-24T08:50:51Z] verified live TEI sidecar contract: {query,texts} returns HTTP 200 bare array, {query,documents,top_k} returns HTTP 422 missing field texts
+[2026-09-24T08:51:32Z] make coverage EXIT=0: 318 files checked >=90% floor; TOTAL lines 97.95% functions 98.89% (rerank.rs 100/100, http.rs 96.85/95, extract.rs 94.62/100, main.rs 96.97/100)
+[2026-09-24T08:55:21Z] SCOPE: main repo staged 7 files (http.rs, http_tests.rs, main.rs, recall_skip_tests.rs, rerank.rs, rerank_tests.rs, extract_tests.rs); no unstaged changes. clio-private staged phase-100421-rerank-contract-retrieval-diagnostics.md; runs/ excluded from review per rules.
+[2026-09-24T08:55:21Z] AUDIT: wc -l verified all touched files <=450 lines (max rerank_tests.rs 409, http.rs 403, main.rs 358, rerank.rs 358, http_tests.rs 228, extract_tests.rs 215, recall_skip_tests.rs 117).
+[2026-09-24T08:55:21Z] AUDIT: AGENTS.md headers present with accurate module ownership and boundaries on all new/modified files; roadmap-isolation grep clean (0 leaks in public diff).
+[2026-09-24T08:55:21Z] VERIFY: cargo fmt --all --check EXIT=0; cargo clippy --workspace --all-targets --all-features --locked -- -D warnings EXIT=0.
+[2026-09-24T08:55:21Z] VERIFY: focused test suites passed: clio-retrieve rerank 37/37 passed; clio-index http 21/21 passed; clio-lib recall_skip 3/3 passed; clio-write extract 7/7 passed.
+[2026-09-24T08:55:21Z] ATTRIBUTION: updated Attribution table in phase-100421 doc: Adversary r1 set to Antigravity CLI (Gemini 3.8 Flash) done.
+[2026-09-24T08:55:21Z] ARTIFACT: wrote findings.json (0 findings, clean review) and validated schema parse.
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/findings.json b0c70966

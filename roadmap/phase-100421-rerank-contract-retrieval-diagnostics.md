@@ -4,11 +4,11 @@
 Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
-| Developer | r1 | [TBD] | [TBD] |
-| Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
-| Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
+| Adversary | r1 | Antigravity CLI (Gemini 3.8 Flash) | done |
+| Remediator | r1 | - | pending (not run) |
+| Remedy Approver | r1 | - | pending (not run) |
+| Finalize | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
 
 **Operator-finding phase 100421 · Effort: ~1–2 days · Source: GitHub issue #3 (`heyaibi/clio`) · Slot: after the in-progress Phase 100420**
 
@@ -257,13 +257,13 @@ Stop and report if: the TEI sidecar cannot be reached for reproduction; the bare
 ## 8. Test and Verification Strategy
 
 ### Required Tests
-- [ ] Unit tests (TEI body build, bare-array parse, compatibility parse, label text)
-- [ ] Integration tests (request-capture through the real adapter; mock TEI rerank applies to a live retriever)
-- [ ] Contract tests (`Reranker` trait unchanged; full permutation always returned; fail-open intact)
-- [ ] End-to-end tests (real CLI `recall` against a TEI sidecar)
-- [ ] Regression tests (existing `results[]`/`scores[]`; recall skip; recall content; workspace green)
-- [ ] Security tests (no key in errors; 401/403 body suppression)
-- [ ] Failure-mode tests (out-of-range/duplicate index; malformed body; dead sidecar keeps fused order; unknown provider fails closed)
+- [x] Unit tests (TEI body build, bare-array parse, compatibility parse, label text) — `rerank_tests` (`tei_adapter_posts_query_and_texts_without_documents_or_top_k`, `parse_bare_array_*`, `tei_http_failure_message_carries_no_transport_label`), `http` unit tests, new `http_tests` label assertions.
+- [x] Integration tests (request-capture through the real adapter; mock TEI rerank applies to a live retriever) — capture server through `HttpReranker`/factory; `t08_reverse_reranker_reverses_fused_order`, `live_sidecar_reorders`.
+- [x] Contract tests (`Reranker` trait unchanged; full permutation always returned; fail-open intact) — `t08_rerank_failure_keeps_fused_order`, `t08_rerank_sidecar_down_keeps_fused_order`; bare-array full-permutation tests.
+- [x] End-to-end tests (real CLI `recall` against a TEI sidecar) — live Compose `rerank` sidecar; before/after `clio recall` transcripts.
+- [x] Regression tests (existing `results[]`/`scores[]`; recall skip; recall content; workspace green) — compat parse tests; `recall_skip_tests`; `recall_tty_text_and_explicit_output_override`; workspace suite green.
+- [x] Security tests (no key in errors; 401/403 body suppression) — `parse_response_json_hides_body_for_401_403`, `cohere_transport_errors_carry_no_key_material`, new no-`embed`/no-key assertions.
+- [x] Failure-mode tests (out-of-range/duplicate index; malformed body; dead sidecar keeps fused order; unknown provider fails closed) — `parse_bare_array_rejects_duplicate_and_out_of_range`, `parse_bare_array_rejects_missing_or_non_integer_index`, `dead_sidecar_fails_open_to_caller`, `factory_fails_closed_on_bad_provider_config`.
 
 ### Required Test Scenarios
 | Test ID | Scenario | Expected Result |
@@ -291,35 +291,41 @@ Implementation claims must be supported by actual test output, inspection result
 
 ## 9. Acceptance Criteria and Evidence
 
-| AC ID | Acceptance Criterion | Verification Method | Required Evidence |
-|-------|----------------------|---------------------|-------------------|
-| AC-100421-01 | TEI request/response contract corrected; a configured sidecar reranks live retrieval | T100421-01…04; real CLI repro | Captured request body, bare-array parse test, before/after `clio recall` output showing rerank applied |
-| AC-100421-02 | `results[]`/`scores[]` parsing and full-permutation guarantee preserved | T100421-05 | Existing tests green unchanged |
-| AC-100421-03 | Rerank and extraction errors are not labeled embed | T100421-06, T100421-07 | Test output / error-text assertions |
-| AC-100421-04 | Retry classification and 401/403 body suppression unchanged | T100421-08 | Test output |
-| AC-100421-05 | Recall resilience and content fixes present and regression-tested | T100421-09, T100421-10 | New/updated test output; fix locations recorded |
-| AC-100421-06 | No regression; size/coverage gates pass | T100421-11, T100421-12 | Workspace suite green; `make coverage` per-file ≥90%; files ≤450 lines; `clippy -D warnings`; `fmt --check` |
+| AC ID | Acceptance Criterion | Verification Method | Required Evidence | Result |
+|-------|----------------------|---------------------|-------------------|--------|
+| AC-100421-01 | TEI request/response contract corrected; a configured sidecar reranks live retrieval | T100421-01…04; real CLI repro | Captured request body, bare-array parse test, before/after `clio recall` output showing rerank applied | **PASS.** Live TEI sidecar (Compose `rerank`, `127.0.0.1:34312`) returns HTTP 200 bare array for `{"query","texts"}` and HTTP 422 `missing field \`texts\`` for the old `{"documents","top_k"}` shape. `tei_adapter_posts_query_and_texts_without_documents_or_top_k` captures `"query"`/`"texts"` present, `"documents"`/`"top_k"` absent. Before: `reranked:false` with warning `rerank unavailable, using fused order: embed endpoint returned HTTP 422: … missing field \`texts\``; after: `reranked:true`, `warnings:[]` (`/tmp/repro-before.txt`, `/tmp/repro-after.txt`). Bare-array parse: trust-order full permutation, omitted-append, duplicate/out-of-range/missing-or-non-integer index fail-closed. |
+| AC-100421-02 | `results[]`/`scores[]` parsing and full-permutation guarantee preserved | T100421-05 | Existing tests green unchanged | **PASS.** `parse_results_order_appends_omitted_documents`, `parse_scores_argsorts_descending`, `parse_scores_ties_keep_index_order`, `parse_scores_shorter_than_docs_appends_remainder`, `parse_rejects_malformed_bodies`, and `cohere_permutation_equals_tei_results_parse` all green unchanged. |
+| AC-100421-03 | Rerank and extraction errors are not labeled embed | T100421-06, T100421-07 | Test output / error-text assertions | **PASS.** `tei_http_failure_message_carries_no_transport_label` (HTTP 422 rerank, no `embed`); `extract::extract_tests::http_transport_failure_is_not_labeled_embed` (real `HttpTransport` against a dead endpoint, no `embed`); four `http_tests` assert no `embed` for status/dead-endpoint failures on both `post_json` and `get_ok`. |
+| AC-100421-04 | Retry classification and 401/403 body suppression unchanged | T100421-08 | Test output | **PASS.** `ureq_error_mapping_classifies_retryability`, `connection_refused_is_retryable`, `slow_response_times_out_and_is_retryable`, `error_statuses_classify_retryability`, `get_ok_rejects_4xx`, and `parse_response_json_hides_body_for_401_403` all green; the new dead-endpoint tests assert the neutral text still classifies retryable. |
+| AC-100421-05 | Recall resilience and content fixes present and regression-tested | T100421-09, T100421-10 | New/updated test output; fix locations recorded | **PASS.** Skip branch at `crates/clio-retrieve/src/hybrid.rs:393-403`; content render at `crates/clio-lib/src/cli_read_render.rs:70-75`. New CLI/MCP regression `recall_skip_tests`: `recall_skips_exactly_one_unreadable_candidate` (readable hit returned, exactly one `unreadable` warning naming the shredded id, no abort), `direct_get_of_unreadable_candidate_still_errors` (direct `get` exits non-zero; readable sibling still reads), `text_mode_recall_shows_hit_content`. Existing `recall_tty_text_and_explicit_output_override` already asserts hit content in text mode. |
+| AC-100421-06 | No regression; size/coverage gates pass | T100421-11, T100421-12 | Workspace suite green; `make coverage` per-file ≥90%; files ≤450 lines; `clippy -D warnings`; `fmt --check` | **PASS.** `cargo test --workspace --locked` green (0 failures). `make coverage-clean` PASS: TOTAL 97.95% lines / 98.89% functions, all 318 reported files ≥90% (rerank.rs 100.00/100.00, http.rs 96.85/95.00, extract.rs 94.62/100.00). `clippy --workspace --all-targets --all-features --locked -- -D warnings` clean; `cargo fmt --all --check` clean. Every touched file ≤450 lines (rerank.rs 358, rerank_tests.rs 409, http.rs 403, http_tests.rs 228, recall_skip_tests.rs 117, main.rs 358, extract_tests.rs 215). |
 
 ### Definition of Done
-- [ ] All in-scope behavior is implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass (unit, integration, contract, end-to-end, regression, security, failure-mode).
-- [ ] No unauthorized changes were introduced (no trait/fail-open/published-schema/retry changes; no dependency added).
-- [ ] Existing behavior remains intact (`results[]`/`scores[]`, fail-open, embed path, extraction).
-- [ ] Security checks pass (no key in errors; 401/403 suppression; no content in warnings).
-- [ ] Documentation is updated where required (the TEI contract correction and any `crates.md` note).
-- [ ] Evidence is collected (implementation summary, before/after repro, changed components, test output, coverage).
-- [ ] Verification is completed and the required approval is obtained.
+- [x] All in-scope behavior is implemented. (TEI `{query,texts}` request + bare-array parse; neutral shared-transport labels; recall-path regression coverage.)
+- [x] All acceptance criteria pass. (AC-100421-01…06, see table above.)
+- [x] Required tests pass (unit, integration, contract, end-to-end, regression, security, failure-mode). (`cargo test --workspace --locked` green; live TEI end-to-end repro captured; capture-server integration tests; security assertions in `http` unit tests and `recall_skip_tests`.)
+- [x] No unauthorized changes were introduced (no trait/fail-open/published-schema/retry changes; no dependency added). (`Reranker` trait unchanged; `apply_rerank` fail-open unchanged; `embed::is_retryable` untouched; no `Cargo.toml`/`Cargo.lock` change.)
+- [x] Existing behavior remains intact (`results[]`/`scores[]`, fail-open, embed path, extraction). (Compat tests green; `CohereReranker` untouched.)
+- [x] Security checks pass (no key in errors; 401/403 suppression; no content in warnings). (`parse_response_json_hides_body_for_401_403` green; new warning test asserts only id + structured error; transport errors add no body/key material.)
+- [x] Documentation is updated where required (the TEI contract correction and any `crates.md` note). (Module docs in `rerank.rs`/`http.rs` corrected; TEI-contract correction recorded below. `crates.md` needs no change: it already describes `clio-index` as the "Embedding sidecar client (TEI /embed)", which remains accurate.)
+- [x] Evidence is collected (implementation summary, before/after repro, changed components, test output, coverage). (See "Completion Evidence".)
+- [x] Verification is completed and the required approval is obtained. (Developer self-verified with real output; adversary/remediator/approver rounds run separately downstream.)
+- [x] Required approval is obtained (downstream pipeline step). (Adversary r1 returned zero findings and no `addressed_issues`, so the remedy/approver loop was skipped by `skip_when_empty`; finalize close-out proceeded per pipeline routing.)
 
 ### Completion Evidence
-- Implementation summary
-- Before/after reproduction transcript (real CLI + TEI sidecar)
-- Discovered/affected architectural components
-- Changed-component summary (file sizes)
-- Test execution output
-- Coverage report (aggregate and per-file)
-- Verification report
-- Known limitations
+- **Implementation summary.** Three tasks landed on the pre-change tree.
+  - *Task 1 (TEI contract).* `crates/clio-retrieve/src/rerank.rs`: `HttpReranker::rerank` now POSTs `{"query","texts"}` (drops `documents`/`top_k`); `parse_rerank_response` gained a bare-array branch evaluated before the object-key branches, trusting array order; the `results[]`/`scores[]` branches and the full-permutation/fail-closed index checks are unchanged. Tests in `rerank_tests.rs` updated/added.
+  - *Task 2 (transport labels).* `crates/clio-index/src/http.rs`: every hardcoded `embed` label in the shared `post_json`/`get_ok`/`HttpEndpoint` messages was replaced with neutral endpoint wording (`sidecar url`, `endpoint returned HTTP …`, `response exceeds…`, `response read…`, `body encode`, context `request`). Retry substrings (`connect failed`, `sidecar unreachable`, `read timed out`, `HTTP 429`, `HTTP 5`) and the 401/403 body suppression are untouched. Four `http_tests` added.
+  - *Task 3 (recall regression).* New `crates/clio-lib/src/recall_skip_tests.rs` (declared in `main.rs`) covers the CLI/MCP path: exactly one `unreadable` warning, readable hits still returned, direct `get` still errors, text-mode recall shows content. Added `http_transport_failure_is_not_labeled_embed` to `crates/clio-write/src/extract_tests.rs` for the hosted-extraction boundary.
+- **TEI contract correction (Phase 100300 record).** Phase 100300 recorded the TEI contract as `{"query","documents","top_k"}` with `results[]`/`scores[]`. That is factually wrong. HuggingFace `text-embeddings-inference` `RerankRequest` is `{query: String, texts: Vec<String>, …}` (no `documents`, no `top_k`) and `RerankResponse` is a bare best-first array `[{"index","score"}, …]`. Verified against the live sidecar: `{"query","texts"}` → HTTP 200 bare array; `{"documents","top_k"}` → HTTP 422 `missing field \`texts\``. This phase corrects the adapter and the recorded contract; the `Reranker` trait and fail-open policy are unchanged.
+- **Before/after reproduction (real CLI + live TEI sidecar).** Sidecar `clio-rerank-1` (Compose `rerank`, model `onnx-community/gte-multilingual-reranker-base`) at `127.0.0.1:34312`. Pre-change binary captured at `~/clio-before`.
+  - Before (`/tmp/repro-before.txt`): `clio recall "capital of France" …` → `"reranked":false`, `"warnings":["rerank unavailable, using fused order: embed endpoint returned HTTP 422: Failed to deserialize the JSON body into the target type: missing field \`texts\` …"]`.
+  - After (`/tmp/repro-after.txt`): same command → `"reranked":true`, `"warnings":[]`, `"rerank_ms":80–160`.
+- **Changed-component summary (file sizes).** `clio-retrieve/src/rerank.rs` 358, `clio-retrieve/src/rerank_tests.rs` 409, `clio-index/src/http.rs` 403, `clio-index/src/http_tests.rs` 228, `clio-lib/src/recall_skip_tests.rs` 117 (new), `clio-lib/src/main.rs` 358, `clio-write/src/extract_tests.rs` 215. All ≤450.
+- **Test execution output.** `cargo test --workspace --locked` → all suites green, 0 failures (e.g. clio-retrieve 148 passed, clio-index 64 passed, clio bin 540 passed). Targeted: `recall_skip_tests` 3 passed; `http_transport_failure_is_not_labeled_embed` 1 passed.
+- **Coverage report.** `make coverage-clean` → `coverage-guard: 318 file(s) checked against 90.0% floors; TOTAL lines 97.95% functions 98.89%; all reported files meet the per-file floor`. Touched-file rows: `rerank.rs` 100.00L/100.00F, `http.rs` 96.85L/95.00F, `extract.rs` 94.62L/100.00F.
+- **Verification report.** `cargo fmt --all --check` clean; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` clean; `cargo test --workspace --locked` green; final `make coverage-clean` green (aggregate + per-file).
+- **Known limitations.** Observation 1 (rerank score surfacing) and Observation 2 (duplicate-content collapse) remain deferred to their own phase; `rerank.model` is still required for `rerank.provider = "tei"`. See "Known Limitations" below.
 
 ---
 
@@ -387,10 +393,10 @@ After this phase is accepted:
 - Any future TEI-contract change must update Phase 100300's recorded contract so the roadmap does not re-introduce the mismatch.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
-- Verifier: [TBD]
+- Implementer: OpenCode CLI (Go . Deepseek V4.1 Flash High), Developer r1
+- Verifier: self-verified with real output — live TEI sidecar before/after `clio recall` (`reranked:false` + 422 embed-labeled warning → `reranked:true`, no warnings); `cargo test --workspace --locked` 0 failures; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` clean; `cargo fmt --all --check` clean; `make coverage-clean` PASS (TOTAL 97.95% lines / 98.89% functions, all 318 reported files ≥90%); all touched files ≤450 lines. Deferred observations are documented in "Known Limitations" and are out of scope for this phase.
 - Human Approver: [TBD, if required]
-- Date: [YYYY-MM-DD]
+- Date: 2026-09-24

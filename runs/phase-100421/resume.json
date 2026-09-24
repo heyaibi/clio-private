@@ -1,0 +1,64 @@
+{
+  "current": "finalize",
+  "outputs": {
+    "developer": "[2026-09-24] Developer r1 start: phase 100421 TEI rerank wire-contract correction + retrieval diagnostics. Read task file, phase file, AGENTS.md, crates.md, coverage.md. Discovery reads of rerank.rs, rerank_tests.rs, http.rs, embed.rs, hybrid.rs, hybrid_rank.rs, cli_read_render.rs, cli_read_tests.rs, runtime_open.rs done.\n[2026-09-24] Baseline gate launched in background: cargo llvm-cov --workspace --locked --no-clean --json --output-path /tmp/cov-baseline.json (DATABASE_URL=postgres://clio:clio@127.0.0.1:34310/clio, hermetic CLIO_DEPLOYMENT_CONFIG). PG port 34310 open.\n[2026-09-24] Baseline finished EXIT=0. coverage_guard: 318 files, TOTAL lines 97.95% functions 98.89%, all per-file floors met. No pre-existing debt -> proceed.\n[2026-09-24] Research (self): fetched HF text-embeddings-inference router/src/http/types.rs. Confirmed RerankRequest = {query, texts, truncate?, truncation_direction?, raw_scores?, return_text?} (no documents/top_k); RerankResponse = bare Vec<Rank{index,text?,score}> best-first. Defect confirmed.\n[2026-09-24] Worker A spawned (bg, session ses_f2d71ac1dffeVmEKUAPRm52qtH): slice = clio-retrieve rerank.rs + rerank_tests.rs (Task 1: TEI {\"query\",\"texts\"} request, bare-array parse, tests). Disjoint files.\n[2026-09-24] Worker B spawned (bg, session ses_f2d71ac1cffeDTMd6UyYN2T2sR): slice = clio-index http.rs + http_tests.rs (Task 2: remove hardcoded embed labels from shared transport). Disjoint files.\n[2026-09-24] Self (Task 3 + extraction label test, disjoint files): created crates/clio-lib/src/recall_skip_tests.rs (CLI/MCP-level recall skip: exactly one unreadable warning, direct get errors, text recall content) + declared module in main.rs; added http_transport_failure_is_not_labeled_embed to crates/clio-write/src/extract_tests.rs. Not yet run (deferring cargo until workers finish to avoid target-dir contention).\n[2026-09-24] Worker B completed: http.rs neutral wording (embed labels removed, retry substrings + 401/403 suppression preserved, header updated), 4 new http_tests; cargo test -p clio-index 64 passed, clippy clean, http.rs scoped 96.85L/95.00F (= baseline). Diff reviewed: correct and minimal.\n[2026-09-24] Live repro BEFORE (pre-change binary target/debug/clio copied to ~/clio-before; live TEI rerank sidecar clio-rerank-1 on 127.0.0.1:34312): curl {\"query\",\"texts\"} -> HTTP 200 bare array; curl {\"documents\",\"top_k\"} -> HTTP 422 missing field `texts`. `clio recall` -> reranked:false, warning \"rerank unavailable, using fused order: embed endpoint returned HTTP 422: ... missing field `texts`\". Transcript saved /tmp/repro-before.txt.\n[2026-09-24] Worker A completed: rerank.rs `{query,texts}` request (top_k omitted), bare-array parse branch first, full-permutation/fail-closed preserved, module docs corrected; rerank_tests.rs T01/T02/T03/T04/T06 + bare-array tests. cargo test -p clio-retrieve 148 passed, clippy clean; worker measured rerank.rs 100L/100F per-binary (shared --no-clean table polluted by stale objects; noted). Diff reviewed: correct and minimal.\n[2026-09-24] Integration verify: cargo fmt --all (fixed 1 formatting diff in recall_skip_tests.rs), fmt --check clean; clippy --workspace --all-targets --all-features -D warnings clean; cargo test --workspace --locked all suites green 0 failures (clio bin 540 passed incl. recall_skip_tests 3/3; clio-write extract transport test 1/1; clio-index 64; clio-retrieve 148).\n[2026-09-24] Live repro AFTER: rebuilt `cargo build --locked --bin clio`; `clio recall` on same DBs -> reranked:true, warnings:[], rerank_ms 80-160. Transcript /tmp/repro-after.txt.\n[2026-09-24] Final gate: first `make coverage-clean` attempt EXIT=2 because Makefile's `command -v cargo-llvm-cov` check needs ~/.cargo/bin on PATH (not on this shell's PATH); re-ran `PATH=$HOME/.cargo/bin:$PATH make coverage-clean` -> EXIT=0. coverage-guard: 318 files, TOTAL lines 97.95% functions 98.89%, all per-file floors met. rerank.rs 100.00/100.00, http.rs 96.85/95.00, extract.rs 94.62/100.00.\n[2026-09-24] Phase file updated: Attribution Developer row done; AC table filled with results; Required Tests checked; Definition of Done checked; Completion Evidence (incl. Phase 100300 TEI-contract correction record); Final Status PASS WITH DOCUMENTED LIMITATIONS; sign-off.\n[2026-09-24] Staged: root `git add -- . ':!private/clio-private/runs/'` -> 7 files (6 modified + new recall_skip_tests.rs). Nested `cd private/clio-private && git add -- roadmap/ runs/` -> phase file + runs/phase-100421/ artifacts. No commit/push/stash.\n[2026-09-24] Finish: all 3 tasks implemented and integrated; workers A (rerank) and B (transport labels) reviewed and accepted; final gate green; signal DEVELOPER_DONE.\nDEVELOPER_DONE 8b696a15\n",
+    "adversary": "[2026-09-24T08:48:19Z] Adversary r1 start: phase 100421 adversarial review\n[2026-09-24T08:50:32Z] make check EXIT=0 (fmt, lint, all workspace tests passed)\n[2026-09-24T08:50:51Z] verified live TEI sidecar contract: {query,texts} returns HTTP 200 bare array, {query,documents,top_k} returns HTTP 422 missing field texts\n[2026-09-24T08:51:32Z] make coverage EXIT=0: 318 files checked >=90% floor; TOTAL lines 97.95% functions 98.89% (rerank.rs 100/100, http.rs 96.85/95, extract.rs 94.62/100, main.rs 96.97/100)\n[2026-09-24T08:55:21Z] SCOPE: main repo staged 7 files (http.rs, http_tests.rs, main.rs, recall_skip_tests.rs, rerank.rs, rerank_tests.rs, extract_tests.rs); no unstaged changes. clio-private staged phase-100421-rerank-contract-retrieval-diagnostics.md; runs/ excluded from review per rules.\n[2026-09-24T08:55:21Z] AUDIT: wc -l verified all touched files <=450 lines (max rerank_tests.rs 409, http.rs 403, main.rs 358, rerank.rs 358, http_tests.rs 228, extract_tests.rs 215, recall_skip_tests.rs 117).\n[2026-09-24T08:55:21Z] AUDIT: AGENTS.md headers present with accurate module ownership and boundaries on all new/modified files; roadmap-isolation grep clean (0 leaks in public diff).\n[2026-09-24T08:55:21Z] VERIFY: cargo fmt --all --check EXIT=0; cargo clippy --workspace --all-targets --all-features --locked -- -D warnings EXIT=0.\n[2026-09-24T08:55:21Z] VERIFY: focused test suites passed: clio-retrieve rerank 37/37 passed; clio-index http 21/21 passed; clio-lib recall_skip 3/3 passed; clio-write extract 7/7 passed.\n[2026-09-24T08:55:21Z] ATTRIBUTION: updated Attribution table in phase-100421 doc: Adversary r1 set to Antigravity CLI (Gemini 3.8 Flash) done.\n[2026-09-24T08:55:21Z] ARTIFACT: wrote findings.json (0 findings, clean review) and validated schema parse.\nADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/findings.json b0c70966\n"
+  },
+  "visits": {
+    "developer": 1,
+    "adversary": 1,
+    "finalize": 1
+  },
+  "harness_use": {
+    "developer": 14,
+    "adversary": 11,
+    "remediator": 11,
+    "approver": 11,
+    "finalize": 10
+  },
+  "prev_step": "adversary",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "signal": "DEVELOPER_DONE 8b696a15"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/findings.json b0c70966"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/developer-task-r1.md",
+      "prompt_sha256": "74c87738e22039cc5287b5bb2c6312df38ff3fa54f97941d5c25ff2bfcfb1107",
+      "duration_s": 1078.822,
+      "visits": 1,
+      "signal": "DEVELOPER_DONE 8b696a15",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/developer-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/adversary-task-r1.md",
+      "prompt_sha256": "08dbe101d4b23d4cf56e0dda4b90399aae25ff8601542a912cfce51950032f54",
+      "duration_s": 472.081,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/findings.json b0c70966",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/adversary-task-r1.tui.log",
+      "attach": "pty",
+      "via": "skip",
+      "routed_to": "finalize"
+    }
+  ]
+}
