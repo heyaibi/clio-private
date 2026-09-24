@@ -1,0 +1,81 @@
+{
+  "run": "r1",
+  "phase": "100440",
+  "remediated_by": "OpenCode CLI (Go . Space Bunny Free Max), remediator r1",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Harness date verification diverges from the authoritative Rust verifier in both directions; the frozen held-out set contains a case only the harness grounds",
+      "evidence": "Python probe (`python3` against scripts/extract_quality.py): source \"The window opens at 2026-06-18 08:15:00.\" with snapshot {\"opens_at\": \"2026-06-18 08:15:00\"} -> accepted, spans [{'field': 'opens_at', 'start': 20, 'end': 39}]; source \"event on 25/04/2026\" -> rejected with 'ambiguous date without day_first policy'; source \"event on 04/25/2026\" -> rejected the same way. Rust probe (scratch crate calling clio_write::verify_snapshot): same space-separated date-time -> ok=false, failure reason 'no locatable date span parses to snapshot value'; 25/04/2026 -> ok=true. Cause: crates/clio-write/src/verify_date.rs:132 token charset is `'-' | '/' | '.' | ':' | 'T'` (no space) and :44 rejects (DateTime, Date), so the production matcher can never ground the space form accepted at :118; :211-217 auto-resolves numeric dates when one component is >12, which crates/clio-write/src/verify_edge_tests.rs:103-115 pins as passing. scripts/extract_quality.py:770-780 flags ambiguity whenever one interpretation matches even when the other is an invalid calendar date, and :815 allows space in the token. scripts/extract_heldout.json:212-236 expects exactly the space-separated date-time, and `python3 scripts/extract_quality.py --set heldout --unit-only` reports gold=27/27 including that case. docs/extraction-fidelity.md:5-10 claims the harness exercises the same boundary as the writer.",
+      "requirement_ref": "Task 2 / T100440-03 / AC-100440-03; Task 3 / T100440-04",
+      "recommendation": "Port the production matcher semantics exactly: only mark a numeric date ambiguous when both calendar interpretations are valid, and either support space-separated date-times in the writer (needs approval; it changes FR-4 matching) or change the held-out expectation and harness to the T-separated form. Add a parity check that runs the same inputs through the Rust verifier and the Python harness so the harness numbers stay faithful to the authoritative gate.",
+      "status": "resolved",
+      "resolution": "The Python reference now uses the Rust token alphabet, rejects space-separated source date-times, accepts unambiguous numeric/dotted dates, and reports ambiguity only when both calendar interpretations can match. The held-out set was re-frozen as v2 with production-compatible T-separated, punctuation-safe source forms; no Rust admission rule was changed. `python3 -B scripts/extract_quality.py --parity` passes 14/14, and `public_verifier_parity_table_matches_rust_verifier` passes while executing the same Python table and comparing all outcomes."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Recall-fix and historical-diagnosis evidence are hand-authored fixture replays, not extractor output; AC-100440-02 is marked pass without demonstrating that the extractor now extracts the previously empty class",
+      "evidence": "scripts/extract_fixtures.json rust_version: raw_response.snapshot equals expected_snapshot and carries source_ref \"synthetic-fixed\"; the set construction says \"Hand-authored synthetic coding-agent cases\"; baseline_raw_response is a literal empty snapshot labelled source_ref \"recorded-pre-fix\" with an authored diagnostic (extractor_status empty_snapshot, prompt_profile legacy). scripts/extract_quality.py:1180 selects raw_response/baseline_raw_response verbatim and unit mode never invokes an extractor (:1819-1822); replacing raw_response with an empty snapshot changes the reported number, so gold=21/21 and gold=19/21 are properties of the fixture file. Observed: `python3 scripts/extract_quality.py --unit-only` -> gold=21/21 fidelity=1.0000; `--unit-only --historical` -> gold=19/21 fidelity=0.9048 rust_version:empty_extract. The only regression coverage, crates/clio-write/src/extract_recall_tests.rs:26-40, asserts prompt substrings and that the source text is embedded in the request (true for any prompt that echoes source); it observes no extractor output. Live verification fails closed: `python3 scripts/extract_quality.py --live-only --set heldout --request-shape completion --endpoint http://127.0.0.1:34313 --timeout 5` -> 10/10 endpoint_unavailable (the local extractor container logs `failed to load model '/models/numind.NuExtract-tiny-v1.5.Q4_K_M.gguf' (No such file or directory)`). The phase file records AC-100440-02 as passing on \"Fixed unit run reports 21/21 gold fields, fidelity=1.0000; hosted prompt regression test passes\".",
+      "requirement_ref": "Task 2 / T100440-02 / AC-100440-02; Task 1 / T100440-01 / AC-100440-01 (historical replay)",
+      "recommendation": "Stop citing fixture replay as extractor-recall evidence: record the fixed responses from a real capture or a mock provider with a digest, rename the replay number (e.g. fixture_contract_fidelity), and mark the recall behavior as unverified with the named cause `extractor_unavailable` until a live/mock-provider run shows the previously failing class extracting non-empty, span-grounded values. Add an end-to-end test through the extraction pipeline with a mock provider returning the fixed response and asserting a non-empty, grounded snapshot.",
+      "status": "resolved",
+      "resolution": "The harness and phase evidence now label fixed and historical results as fixture contract/replay evidence, not model scores. `abstract_labels_flow_through_mock_provider_into_admitted_snapshot` drives a deterministic ChatExtractor response through parsing, span verification, `extract_verify_store`, admission, and the write callback, and asserts a non-empty grounded snapshot. The final live attempt remains 10/10 `endpoint_unavailable`; no real provider capture or digest is fabricated, so real extractor recall is explicitly unverified."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "grounding_fidelity is structurally constant: admission is only set after grounding passes, so the metric can never report an admitted-but-ungrounded snapshot",
+      "evidence": "scripts/extract_quality.py:1023-1032 sets `grounded = verify.ok` and only then `admitted = True`; :304-309 computes grounding_fidelity as grounded-admitted / admitted, which is 1.0 whenever anything is admitted. Observed historical report: `gold=19/21 ... causes=empty_extract=1,span_grounding=3 ... grounding_fidelity=1.0000`. docs/extraction-fidelity.md:98-99 describes the metric as a measured fraction of admitted cases passing span verification.",
+      "recommendation": "Either separate structural/schema admission from span grounding so the metric can measure the §8 condition, or drop grounding_fidelity and document that admission in this harness already means verifier acceptance.",
+      "status": "resolved",
+      "resolution": "CaseResult now tracks `structural_admitted` independently of authoritative `admitted`; `grounding_fidelity` uses all non-empty structural candidates, including rejected controls, as its denominator. The final tuning report is 0.7857 and the held-out contract report is 0.8000, while the old tautological 1.0000 is gone. Self-tests assert an ungrounded structural candidate cannot reach authoritative admission."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "The human `clio maintenance status` text view does not report the two new latency metrics; only the JSON tool payload carries them",
+      "evidence": "crates/clio-lib/src/cli_read_graph.rs:187-206 renders leaf_queryable, item_id, and dirty/refreshing counts only; crates/clio-lib/src/cli_read_graph_tests.rs:118-133 asserts the same and never checks the new fields. The data fields exist in crates/clio-write/src/memtree_tools.rs:128-136 (`time_to_queryable_ms`, `structural_maintenance_ms`) and tests pin them (crates/clio-write/src/memtree_tests.rs:404-410, crates/clio-write/src/ingest_leaf_tests.rs:211-213). Task 4 asks that both be reported in the diagnostic/status surface.",
+      "recommendation": "Render both metrics in render_maintenance and assert them in maintenance_status_scoped_and_text so the operator-facing status output reports them separately too.",
+      "status": "resolved",
+      "resolution": "crates/clio-lib/src/cli_read_graph.rs now renders separate `time_to_queryable_ms` and `structural_maintenance_ms` lines with zero fallback for missing/null values. cli_read_graph_tests.rs asserts both JSON fields, both text labels, and distinct populated values; `cargo test -p clio cli_read_graph::tests` passed 7/7 and the maintenance filter passed 1/1."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "`--raw-output` redaction misses common credential formats that the docs claim are redacted",
+      "evidence": "scripts/extract_quality.py:127-134 defines only sk- keys, Bearer tokens, and `(api_key|access_token|password|secret)=value`. Probe of redact_json: aws_access_key AKIAIOSFODNN7EXAMPLE, github_token ghp_abcdefghijklmnopqrstuvwxyz0123456789, jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdefghijklmnop, and slack_token REDACTED_SYNTHETIC_SLACK_TOKEN all pass through unchanged, while sk-..., Bearer ..., and api_key=... become [REDACTED]. docs/extraction-fidelity.md:71-76 claims a diagnostic record with \"common credential patterns redacted\".",
+      "recommendation": "Add patterns for AWS access key ids, GitHub tokens, JWTs, and Slack tokens (with self-test coverage), or restrict raw-record values to a schema allowlist; the current fixture sources are synthetic, but the record writer is intended for future live runs.",
+      "status": "resolved",
+      "resolution": "Bounded redaction patterns now cover AWS access-key IDs, GitHub tokens, JWTs, and Slack tokens in addition to the existing protections. The self-test reports all four families redacted. The final live `--raw-output` record was mode 0600 and contained none of the sampled credential markers."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Docs claim no ungrounded value is ever admitted, but only the declared `fields` are verified; an invented unlisted snapshot key still increments admitted/grounded counters",
+      "evidence": "scripts/extract_quality.py:847-865 verifies only FieldSpec entries in `fields`; probe with raw_response {\"snapshot\": {\"rust_version\": \"1.75.0\", \"os\": \"ubuntu-22.04\", \"invented\": \"ZZZ-4242\"}} yields admitted=True grounded=True exact=False success=False cause=snapshot_mismatch, and the report line would count it in admitted/grounded and grounding_fidelity. docs/extraction-fidelity.md:111-114 states \"a value with no locatable source span is never repaired or admitted by the harness\". The exact-snapshot check still fails the case, so the gate is not bypassed; the counters and the doc sentence are what is inaccurate.",
+      "recommendation": "Either verify every non-empty leaf of the candidate snapshot (matching the security acceptance wording) or state explicitly that only declared extractive fields are verified and that unlisted keys are outside the FR-4 check.",
+      "status": "resolved",
+      "resolution": "The reference verifier now rejects every non-empty unlisted snapshot leaf, including nested/list leaves, before authoritative admission; empty strings/nulls remain ignored. The self-test proves both direct rejection and that an unlisted leaf cannot reach admission, and the public documentation states this fail-closed scope."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "DONE — F-01: Python/Rust parity is synchronized, the held-out set is re-frozen with production-compatible date-time tokens, and the shared table passes 14/14.",
+    "DONE — F-02: fixture replay is relabeled as contract evidence; a mock-provider end-to-end test proves the non-empty grounded admitted path, while real recall remains named-cause unverified.",
+    "DONE — F-04: maintenance text and tests now report both latency metrics separately.",
+    "DONE — F-06/F-03/F-05: unlisted leaves fail closed, structural grounding fidelity is non-tautological, and four credential families have bounded redaction self-tests."
+  ],
+  "plan_unlimited": [
+    "PARTIAL — Added a deterministic mock-provider end-to-end test and truthful fixture provenance. A real provider capture with a SHA-256 digest could not be obtained: the explicit live attempt returned 10/10 endpoint_unavailable, so no real digest is claimed; deployment/runtime model provisioning owns that follow-up.",
+    "DONE — Added scripts/verifier_parity.json with 14 date/entity/number/NFC/ambiguity cases. The Rust test invokes the Python --parity command and compares every actual result; both pass.",
+    "ATTEMPTED/FAIL-CLOSED — Ran the frozen held-out set against the configured endpoint with --min-fidelity 0.99; all 10 cases returned endpoint_unavailable and no ≥99% live result is claimed.",
+    "DONE for the assigned path — Existing t05_t06_leaf_readable_before_slow_maintenance blocks the maintenance hook with a five-second watchdog while asserting queryability, t06b checks the leaf under two seconds, consolidate_wait_reports_structural_duration checks a separate non-zero wave, and the new CLI test checks distinct text metrics. No redundant production hook was added."
+  ],
+  "remediation": {
+    "make_check": "passed after one clippy-only test refactor; final serial rerun exit 0",
+    "coverage": "passed: 318 files, 97.9608% lines, 98.8955% functions, zero per-file offenders",
+    "addressed_issues": "none; addressed_issues remains empty"
+  }
+}

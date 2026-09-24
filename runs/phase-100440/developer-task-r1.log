@@ -1,0 +1,28 @@
+2026-09-24T14:40:29+05:30 started phase implementation
+2026-09-24T14:41:41+05:30 baseline coverage JSON saved: /tmp/cov-baseline.json; coverage_guard passed, 318 files, total lines 97.95% functions 98.89%
+2026-09-24T14:42:41+05:30 planned two disjoint slices: extraction fidelity harness/docs (scripts and public docs) and Rust latency instrumentation (clio-write timing/maintenance/status/tests)
+2026-09-24T15:05:59+05:30 spawned extraction fidelity worker (scripts/extract_quality.py, tuning/heldout fixtures, public diagnosis doc); outcome reported self-test 11 pass, unit fidelity 1.0000, live unavailable named endpoint_unavailable
+2026-09-24T15:05:59+05:30 spawned Rust latency worker (clio-write timing/maintenance/status/tests); outcome reported scoped ingest 17, maintenance 4, memtree 18 pass, clippy and scoped coverage pass
+2026-09-24T15:13:20+05:30 parent review: added generalized hosted recall prompt and regression test; extract_chat tests 22 passed
+2026-09-24T15:13:20+05:30 parent review: added status recording for time_to_queryable_ms and structural_maintenance_ms without waiting on maintenance; memtree status test passed
+2026-09-24T15:13:20+05:30 extraction harness self-test 11 passed; unit tuning fidelity 1.0000; held-out unit validation 1.0000 (offline responses only)
+2026-09-24T15:13:20+05:30 live held-out attempt against unavailable local endpoint exited 1: 10/10 endpoint_unavailable, fidelity 0.0000; no result fabricated
+2026-09-24T15:13:20+05:30 scoped clio-write coverage with isolated target passed: 146 tests; touched files all >=90% lines/functions (ingest 99.49/100, maintenance 100/100, memtree_maint 96.43/100, memtree_tools 96.03/100, extract_chat 94.27/100)
+2026-09-24T15:13:20+05:30 transient memtree concurrency test failed once during parallel load; exact test passed 5/5 sequential and full scoped suite passed; not reproduced as a defect
+2026-09-24T15:19:38+05:30 corrected tuning harness to frozen ten-case/21-gold-field format: fixed unit 21/21; intentional --historical replay 19/21 (rust_version empty_extract, 0.9048)
+2026-09-24T15:19:38+05:30 added llama.cpp completion request/response compatibility; self-test 13 passed; local fake completion contract passed 1/1
+2026-09-24T15:19:38+05:30 public span_verify self-check PASS; heldout unit responses 27/27 gold fields, explicitly offline only
+2026-09-24T15:21:39+05:30 moved queryability timing recording into LeafIndex (no arbitrary hook work on write path); clio-write 146 tests and clippy -D warnings passed
+2026-09-24T15:21:39+05:30 isolated scoped llvm-cov rerun passed: 146 tests; touched Rust files maintenance 100/100, ingest 99.49/100, memtree_maint 96.15/100, memtree_tools 96.03/100, extract_chat 94.27/100
+2026-09-24T15:23:15+05:30 make check reached workspace tests but hit pre-existing memtree concurrent_writes_during_refresh_wave timeout once under full parallel load; exact test had passed 5/5, investigating without changing unrelated code
+2026-09-24T15:24:22+05:30 rerun cargo test --workspace --locked passed; 147 clio-write tests and all workspace/doc tests green; load-sensitive MemTree test passed on rerun
+2026-09-24T15:25:26+05:30 make check rerun passed: fmt, workspace clippy -D warnings, 147 clio-write tests, all workspace/doc tests green
+2026-09-24T15:25:35+05:30 starting final full coverage gate (second and final full gate); serial test scheduler selected to avoid the observed pre-existing load-sensitive MemTree timeout; no further Rust edits planned
+2026-09-24T15:26:24+05:30 final extraction harness verification: self-test 14 passed, fixed tuning 21/21, historical replay 19/21 named empty_extract, heldout offline 27/27; live completion path remains endpoint_unavailable
+2026-09-24T15:27:03+05:30 FINAL make coverage passed (RUST_TEST_THREADS=1): 318 files, TOTAL lines 97.96% functions 98.90%, all per-file floors pass; report target/coverage/coverage.json
+2026-09-24T15:27:36+05:30 final script checks: span_verify PASS; extract_quality self-test 15 passed; tuning 21/21; heldout offline 27/27; historical 19/21 empty_extract; live heldout 0/27 endpoint_unavailable
+2026-09-24T15:27:59+05:30 final review complete: no forbidden public references, JSON/Python checks pass, all touched Rust files <=450 lines; final coverage report and phase evidence updated
+2026-09-24T15:27:59+05:30 FINISH developer r1: implementation, focused/workspace tests, final coverage, phase evidence, and staging preparation complete; no incidental bug report filed
+2026-09-24T15:28:11+05:30 exact main staging command was attempted but Git rejected ignored private/ paths; retrying with private/ explicitly excluded (no force-add)
+2026-09-24T15:28:39+05:30 staging complete: public changes staged explicitly after ignored-private pathspec rejection; nested private roadmap/ and runs/ staged with required command
+DEVELOPER_DONE f551e7fc

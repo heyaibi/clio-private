@@ -1,0 +1,21 @@
+2026-09-24T15:29:41+0530 ADVERSARY r1 started; phase-100440 fidelity/latency review; staged public diff 14 files (+3073/-12); nested private roadmap+runs staged
+2026-09-24T15:38:55+0530 public staged diff reviewed: 14 files, +3073/-12; nothing unstaged or untracked outside runs/; nested private roadmap+runs staged
+2026-09-24T15:38:55+0530 phase-doc omission audit: 3 In Scope bullets (diagnosis+fix, held-out >=99% run, split latency metrics) all have staged code/evidence; AC/DoD/Completion claims checked against repo
+2026-09-24T15:38:55+0530 cargo fmt --all --check + cargo clippy --workspace --all-targets --all-features -D warnings: exit 0
+2026-09-24T15:38:55+0530 make test: exit 0; 2069 passed, 0 failed; clio-write lib 147 tests (matches phase claim)
+2026-09-24T15:38:55+0530 independent RUST_TEST_THREADS=1 make coverage: exit 0; coverage-guard 318 files TOTAL lines 97.96% functions 98.90%, all per-file floors pass; touched rows extract_chat 94.27/100, ingest 99.49/100, maintenance 100/100, memtree_maint 96.58/100, memtree_tools 96.03/100 match phase evidence exactly
+2026-09-24T15:38:55+0530 baseline /tmp/cov-baseline.json present: 318 files, 97.95% lines / 98.89% functions (pre-change)
+2026-09-24T15:38:55+0530 harness: --unit-only gold=21/21 fidelity=1.0000 PASS; --historical gold=19/21 fidelity=0.9048 FAIL rust_version:empty_extract; --set heldout --unit-only gold=27/27; --self-test 15 passed; span_verify self-check PASS
+2026-09-24T15:38:55+0530 live heldout attempt --live-only --set heldout --request-shape completion --endpoint http://127.0.0.1:34313: 10/10 endpoint_unavailable fidelity=0.0000; docker logs clio-extract-1 confirm missing /models/numind.NuExtract-tiny-v1.5.Q4_K_M.gguf; named cause is real, no fabrication
+2026-09-24T15:38:55+0530 open-issue audit: list-open returned 4 open issues (#12 KMS reload, #9 index drain test, #4 recall scores feature, #3 TEI rerank contract); none directly covered by this phase; addressed_issues=[]
+2026-09-24T15:38:55+0530 F-01 high: harness date verifier diverges from Rust verify_date.rs:132/:44/:211-217; Python probe accepts space date-time / rejects 25/04/2026; Rust probe (scratch crate) rejects space date-time / accepts 25/04/2026; heldout case scripts/extract_heldout.json:212-236 only harness-grounded
+2026-09-24T15:38:55+0530 F-02 high: 21/21 and 19/21 are hand-authored fixture replays (scripts/extract_fixtures.json raw_response source_ref=synthetic-fixed, baseline source_ref=recorded-pre-fix); extract_recall_tests.rs:26-40 asserts prompt substrings only; no extractor output observed
+2026-09-24T15:38:55+0530 F-03 low: grounding_fidelity structurally 1.0 (extract_quality.py:1023-1032 then :304-309)
+2026-09-24T15:38:55+0530 F-04 low: cli_read_graph.rs:187-206 text view omits time_to_queryable_ms/structural_maintenance_ms; memtree_tools.rs:128-136 JSON carries them
+2026-09-24T15:38:55+0530 F-05 low: raw-output redaction (extract_quality.py:127-134) misses AWS/GitHub/JWT/Slack patterns per probe; docs claim common credential patterns redacted
+2026-09-24T15:38:55+0530 F-06 low: only declared fields verified (extract_quality.py:847-865); invented unlisted key -> admitted=True grounded=True exact=False; docs:111-114 overstates
+2026-09-24T15:38:55+0530 findings.json written with 6 findings, 0 addressed issues, plan_1hr and plan_unlimited; JSON validated
+2026-09-24T15:38:55+0530 no incidental bug report filed: no confirmed new out-of-scope defect separate from the findings
+2026-09-24T15:38:55+0530 phase file Attribution: Adversary row set to OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) done; no product/test/requirement edits, nothing restaged
+2026-09-24T15:38:55+0530 FINISH adversary r1: review complete; 2 high, 4 low findings; addressed_issues empty
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100440/findings.json 048d65e2

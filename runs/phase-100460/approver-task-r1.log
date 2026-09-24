@@ -1,0 +1,12 @@
+2026-09-24T17:55:33+0530 start approver r1 phase-100460 (benchmark spike, remedy validation)
+2026-09-24T17:56:00+0530 git status check: root repo working tree clean; private submodule has unstaged docs changes
+2026-09-24T17:56:04+0530 findings report check: findings.original.json backed up and matches adversary artifact sha256 0266797bedc566d5ce82abfd5776f6ee9a45c632f5c449294188383131e0f7d3 (3644 bytes)
+2026-09-24T17:56:10+0530 addressed_issues check: 0 candidates in findings.original.json, 0 in findings.json; reported-bugs ledger empty
+2026-09-24T17:56:41+0530 F-01 validation: verified against judge-calibration-results.json (30 items total; 18 LoCoMo categories 1..4; 12 LongMemEval covering 5 categories with single-session-preference absent); verified benchmark.md:168, 320, 328 and roadmap/phase-100460-benchmark-spike.md:247, 298 properly document the 6 types and defer single-session-preference to Phase 100480. Verdict: RESOLVED
+2026-09-24T17:56:48+0530 F-02 validation: verified benchmark.md:921 rewritten to clarify LoCoMo CC BY-NC 4.0 restricts redistribution/commercial use and requires human approver sign-off, matching phase file lines 173, 240, 309. Verdict: RESOLVED
+2026-09-24T17:57:10+0530 running verification: make check
+2026-09-24T17:58:01+0530 make check exit 0: fmt, clippy --workspace --all-targets --all-features --locked -- -D warnings, 149 tests passed (0 failed)
+2026-09-24T17:58:04+0530 coverage/size/roadmap-isolation check: docs-only remediation; Rust code untouched; coverage and isolation preserved
+2026-09-24T17:58:13+0530 attribution update: roadmap/phase-100460-benchmark-spike.md line 10 updated to Remedy Approver r1 Antigravity CLI (Gemini 3.8 Flash) approved
+2026-09-24T17:58:20+0530 finish: all findings resolved, no regressions, no open addressed issues, verdict APPROVE
+REMEDY_APPROVED 6d1307ba

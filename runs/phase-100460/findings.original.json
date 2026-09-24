@@ -1,0 +1,32 @@
+{
+  "run": "r1",
+  "phase": "100460",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "LongMemEval calibration sample omitted `single-session-preference` question type and mislabeled the suite as having five question types",
+      "evidence": "`private/clio-private/baseline/benchmark.md:168` lists 6 curated question types in LongMemEval oracle split ('temporal-reasoning 133, multi-session 133, knowledge-update 78, single-session-user 70, single-session-assistant 56, preference 30', totaling 500 questions). However, `private/clio-private/baseline/benchmark.md:320` states 'LongMemEval-oracle across all five question types (12 items)'. In `private/clio-private/runs/phase-100460/judge-calibration-results.json`, `per_item` contains only 5 types ('single-session-user', 'multi-session', 'single-session-assistant', 'temporal-reasoning', 'knowledge-update'); `single-session-preference` is omitted entirely and not listed under Known Limitations in `roadmap/phase-100460-benchmark-spike.md:247`.",
+      "requirement_ref": "Phase 100460 Task 2 / AC-100460-02; benchmark.md §3.6, §5.3.1",
+      "recommendation": "Update `baseline/benchmark.md` §5.3.1 to note that LongMemEval comprises 6 question types and that the 30-item sample covered 5 of them; add the `single-session-preference` omission to Known Limitations in `roadmap/phase-100460-benchmark-spike.md` §9 as deferred to Phase 100480 alongside LoCoMo category 5."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "`benchmark.md` §10.1 asserts neither dataset license requires approval, conflicting with the phase document's pending human review requirement for LoCoMo's CC BY-NC 4.0 license",
+      "evidence": "`private/clio-private/baseline/benchmark.md:920` states 'Neither requires restricted licensing arrangements or approval', whereas `private/clio-private/roadmap/phase-100460-benchmark-spike.md:173` states 'The agent must request approval for any licensing arrangement that restricts redistribution', `:240` marks DoD as '(**Pending human review**: LoCoMo is CC BY-NC 4.0...)', and `:309` records 'Human Approver: pending — LoCoMo's CC BY-NC 4.0 restricts use to non-commercial; use here is internal evaluation with no redistribution, and the approver should confirm that reading'.",
+      "requirement_ref": "Phase 100460 §6 Agent Decision Boundary, §9 Definition of Done, §12 Verification Sign-Off",
+      "recommendation": "Update `baseline/benchmark.md` §10.1 to clarify that while the licenses are compatible with internal evaluation, LoCoMo's CC BY-NC 4.0 license restricts redistribution and commercial use, requiring the human approver confirmation recorded in the phase file."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "Update benchmark.md §5.3.1 to clarify that LongMemEval contains 6 question types and that the spike calibration sample tested 5 of them, deferring single-session-preference to Phase 100480 alongside LoCoMo category 5.",
+    "Add single-session-preference question type omission to the Known Limitations in phase-100460-benchmark-spike.md §9.",
+    "Align benchmark.md §10.1 with the phase file regarding LoCoMo CC BY-NC 4.0 redistribution/non-commercial restriction and pending human approver sign-off."
+  ],
+  "plan_unlimited": [
+    "Expand the judge calibration sample in Phase 100480 to include single-session-preference items from LongMemEval and category 5 (adversarial/abstention) items from LoCoMo.",
+    "Execute end-to-end Tier 2 judge validation with gpt-4o-2024-08-06 once hosted judge API credentials are provisioned in the environment."
+  ]
+}

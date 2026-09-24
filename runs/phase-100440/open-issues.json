@@ -1,0 +1,65 @@
+{
+  "issues": [
+    {
+      "body": "## Symptom\nPer-item crypto cost grows with the number of stored items, so any path that decrypts a bounded set of rows still slows down as a bank grows.\n\n## Where\n- `crates/clio-store/src/dek.rs:263` `LocalDevKms::decrypt` calls `self.refresh(&mut slots)` before every lookup.\n- `crates/clio-store/src/dek.rs:184` `refresh` does `*slots = load_slots(path)?` \u2014 reads and parses the entire key JSON file each call.\n- `ensure_dek` (`dek.rs:223`) and `encrypt` (`dek.rs:237`) do the same.\n- The file grows because the CLI creates one DEK per item: `build_item` sets `subject_id` to the item id when the caller omits one, so every `remember` adds a new subject slot.\n\n## Impact\nEach `get_memory_item` decrypt is O(key-file size). Measured on a file-backed SQLite DB with the default profile:\n\n- `clio admit` (bounded scan of 64 rows) at 300 items: ~0.29s; at 600 items: ~0.40s; the delta tracks the key file doubling (33KB -> 67KB).\n- Before the #6 fix the same path decrypted the whole bank twice; that was ~2.2s at 588 items. The #6 fix bounded the decrypt count to 64, but each decrypt is still O(n), so the write path remains linear in bank size.\n\n## Proposed fix\n- Keep the slot map in memory and only reload on a miss, on a version/`mtime` change, or on an explicit invalidation; do not reload on every call.\n- If cross-process freshness is required, gate the reload on file `mtime`/size rather than unconditional reparse.\n- Alternatively, persist DEKs per subject so the file does not grow with item count (for example a fixed per-bank DEK when the caller omits `subject_id`).\n\nDiscovered while fixing #6; not changed there to keep that fix scoped.",
+      "comment_count": 0,
+      "comments": [],
+      "comments_truncated": false,
+      "labels": [],
+      "number": 12,
+      "state": "open",
+      "state_reason": null,
+      "title": "LocalDevKms reloads and reparses the whole key file on every decrypt/encrypt",
+      "triage_digest": "ba526777cd96caa005719420da0ff4d69965603dd8114e58c92a75085ff067ba",
+      "updated_at": "2026-09-24T09:24:18Z",
+      "url": "https://github.com/heyaibi/clio/issues/12"
+    },
+    {
+      "body": "## Symptom\n\n`make test` failed in the unrelated PostgreSQL index-drain test. The test stored a durable outbox item and then `drain_index()` returned `failed: 1` instead of `failed: 0`.\n\nObserved assertion:\n\n```text\nthread 'index_drain::index_drain_hardening_tests::postgres_store_drain_retrieve_covers_dense_and_lexical' panicked at crates/clio-mcp/src/index_drain_hardening_tests.rs:201:5:\nassertion `left == right` failed\n  left: 1\n right: 0\nnote: run with `RUST_BACKTRACE=1` ...\n```\n\n## Reproduction\n\nFrom the repository root:\n\n```bash\nmake test\n```\n\nThe failure occurs in:\n\n```text\ncrates/clio-mcp/src/index_drain_hardening_tests.rs:199-201\n```\n\nThe preceding test output shows the item was admitted and the durable outbox row was observed, but the drain report was:\n\n```text\nProcessReport { applied: 1, lexical_only: 0, skipped: 0, failed: 1 }\n```\n\n## Impact\n\nThe workspace test suite is red on the observed run. This failure is separate from issue #8, which concerns Cargo selecting a mismatched `rustdoc` during doctests.\n\n## Proposed fix\n\nInvestigate why the PostgreSQL drain marks the durable job as failed after applying it, including the drain error path and retry/outbox state. Preserve the durable job and make the test deterministic without weakening its retrieval assertions.\n\nNo production code was changed for this issue.\n",
+      "comment_count": 0,
+      "comments": [],
+      "comments_truncated": false,
+      "labels": [],
+      "number": 9,
+      "state": "open",
+      "state_reason": null,
+      "title": "Postgres index drain test reports failed job",
+      "triage_digest": "2f1efc2d42e56881e59c849287181fd964221a577b93399076a32be4ce5068d8",
+      "updated_at": "2026-09-24T07:26:54Z",
+      "url": "https://github.com/heyaibi/clio/issues/9"
+    },
+    {
+      "body": "### Summary\n\nTo match (and beat) Hindsight's recall output, clio needs to expose the signals it already computes but currently throws away, plus entity links. Today a hit carries only `dense_rank` / `lexical_rank`, so the text view can say `[semantic]` / `[lexical]` but cannot show *how strong* or *why* in a calibrated way.\n\nHindsight's recall result (for comparison) exposes a `scores` object and entities:\n- `final` \u2014 what it ranked by (reranker x boosts); Hindsight documents it as \"a relative signal, not a calibrated probability\".\n- `reranker` \u2014 cross-encoder relevance, `0-1` (`null` if passthrough).\n- `semantic` \u2014 raw cosine similarity, `0-1` (`null` if not surfaced by semantic).\n- `keyword` \u2014 raw BM25, `>=0` (`null` if not surfaced by keyword).\n- `entities[]` \u2014 entity names linked to the fact.\n\nReference: https://hindsight.vectorize.io/developer/api/recall\n\n### What to add\n\n1. **Carry per-stage raw scores into the hit.**\n   - Dense leg: `crates/clio-retrieve/src/hybrid.rs` maps dense hits to ids only, discarding the cosine similarity. Keep the score and thread it into `FusedHit` / the scored hit.\n   - Lexical leg: keep the raw BM25 score (also discarded today).\n   - Rerank: carry the reranker's normalized relevance when rerank runs. Blocked by the reranker bug (issue #3); the rerank score exists once that is fixed.\n2. **Expose a `scores` object per result** (`final`, `reranker`, `semantic`, `keyword`), matching Hindsight's shape. `final` stays the ranked value (relative); the per-stage numbers are the honest ones.\n3. **Entity links per fact.** Attach entity names to items (extraction already exists for ingest) and return `entities[]`; this is what makes a real `[entity match]` reason possible. clio currently has no entity-overlap step in retrieval.\n4. **Show a `scores` breakdown in the text view** once (1)-(3) land, and add the entity reason.\n\n### Smaller items\n\n- Add `-o` as an alias for `--output` (Hindsight uses `-o json|yaml`).\n- Document the output-mode rule in `clio help`: text when stdout is a terminal, JSON when piped/redirected, `--output` overrides.\n\n### Why\n\nThe single displayed score is weighted RRF (`crates/clio-retrieve/src/fusion.rs`, `hybrid_rank.rs`), which is relative and not comparable across queries. Hindsight shows the per-stage scores so a user can see why something ranked. We want to exceed that, not match it.\n",
+      "comment_count": 0,
+      "comments": [],
+      "comments_truncated": false,
+      "labels": [
+        "enhancement"
+      ],
+      "number": 4,
+      "state": "open",
+      "state_reason": null,
+      "title": "[Feature]: Carry per-stage scores and entity links into recall results (Hindsight parity)",
+      "triage_digest": "e8a0a112e5e3287ade703749e5fbaa70d944ba0d6767f907af97ecafc7d2e739",
+      "updated_at": "2026-09-23T18:39:09Z",
+      "url": "https://github.com/heyaibi/clio/issues/4"
+    },
+    {
+      "body": "### Summary\n\nFound while investigating #2 (`no DEK for subject`). The primary bug is that the TEI reranker never runs (silently disabled). The other findings from the same session are collected below so they are not lost.\n\n---\n\n## 1. TEI reranker sends the wrong contract, so rerank never runs (primary)\n\n**What happens.** Every `recall` returns a warning and falls back to the raw fused (RRF) order:\n\n```\nrerank unavailable, using fused order: embed endpoint returned HTTP 422:\nFailed to deserialize the JSON body into the target type: missing field `texts` ...\n```\n\nThe precision stage is dead, so ordering is fused-only and the displayed `score` is an uncalibrated RRF value (~0.02).\n\n**Root cause.**\n- `crates/clio-retrieve/src/rerank.rs:117-118` (`HttpReranker::rerank`) posts `{\"query\", \"documents\", \"top_k\"}`. TEI `/rerank` expects `{\"query\", \"texts\"}` (and has no `top_k`). The missing `texts` field is the HTTP 422.\n- `crates/clio-retrieve/src/rerank.rs:282` (`parse_rerank_response`) accepts only `{\"results\":[...]}` or `{\"scores\":[...]}`. TEI returns a bare array `[{\"index\":0,\"score\":0.98}, ...]`, so even a fixed request would fail to parse.\n- `crates/clio-retrieve/src/rerank_tests.rs` (`factory_selects_teiranker_by_provider`) asserts `\"top_k\":3` in the request and feeds the TEI client a Cohere-shaped `{\"results\":[...]}` body, so the wrong contract is baked into the tests and never caught.\n\n**Repro.**\n1. Bring up the TEI rerank sidecar (`RERANK_URL`, compose profile B/C).\n2. `clio recall \"<query>\"` -> the warning above; hits are fused order.\n3. `curl -s \"$RERANK_URL/rerank\" -H 'Content-Type: application/json' -d '{\"query\":\"q\",\"texts\":[\"a\",\"b\"]}'` -> 200 with a bare array.\n4. Same request with `\"documents\"` instead of `\"texts\"` -> 422 `missing field \\`texts\\``.\n\n**Impact.** Rerank is a precision-only stage; with it disabled, recall ordering is worse and the user-facing score is an RRF value that is not comparable across queries.\n\n**Proposed fix.** Post `{\"query\",\"texts\"}`; parse the bare array (keep the existing `results`/`scores` shapes); update the TEI test to assert the `texts` shape and a bare-array response.\n\n**Status.** Open / not fixed.\n\n---\n\n## 2. Rerank transport errors are mislabeled as \"embed endpoint\"\n\n**What happens.** Any rerank HTTP/transport error reads `embed endpoint returned HTTP ...`, pointing the reader at the embedder instead of the reranker.\n\n**Root cause.** The shared `post_json` helper hardcodes the label:\n- `crates/clio-index/src/http.rs:157`, `:252`, `:265`, `:271`, `:277`.\n\n**Impact.** Misleading diagnostics; slowed down finding bug #1.\n\n**Proposed fix.** Use a neutral label (`endpoint returned HTTP ...`) or pass the caller's endpoint name.\n\n**Status.** Open / not fixed.\n\n---\n\n## 3. `recall` aborts when any candidate's content is unreadable\n\n**What happens.** If one retrieved candidate has no DEK (missing or crypto-shredded), the whole query fails with `forbidden: no DEK for subject ...`, hiding every readable hit. Seen with pre-existing items written before the #2 fix.\n\n**Root cause.** `crates/clio-retrieve/src/hybrid.rs:382-402` (`fetch_items`): `self.store.get_memory_item(bank, id)?` propagates `Forbidden`/`ErasedSubject`.\n\n**Repro.** A database with one unreadable item plus readable items -> `clio recall \"<query>\"` exits 1.\n\n**Proposed fix.** Skip `Forbidden`/`ErasedSubject` candidates and add a warning; `get` on that id still errors.\n\n**Status.** Fixed in branch `fix/2-no-dek-for-subject` (uncommitted at time of writing).\n\n---\n\n## 4. `recall` text output omitted the content\n\n**What happens.** `clio recall` in text mode printed only `id score=...`, no content.\n\n**Root cause.** `crates/clio-lib/src/cli_read_render.rs:36` (`render_recall`).\n\n**Status.** Fixed in branch `fix/2-no-dek-for-subject` (uncommitted at time of writing).\n\n---\n\n## Observations (design, not filed as bugs)\n\n- The displayed `score` is weighted RRF (`crates/clio-retrieve/src/fusion.rs`, `hybrid_rank.rs`), not a similarity. Consider surfacing the rerank relevance (0-1) when rerank runs, and showing no number otherwise.\n- Near-identical content stored as separate items is listed once per item; consider collapsing duplicate content in the display.\n",
+      "comment_count": 0,
+      "comments": [],
+      "comments_truncated": false,
+      "labels": [
+        "bug"
+      ],
+      "number": 3,
+      "state": "open",
+      "state_reason": null,
+      "title": "[Bug]: TEI reranker uses the wrong request/response contract; rerank is silently disabled (plus other bugs found investigating #2)",
+      "triage_digest": "038501c2158cb0754c0bd406136d0951404f4bbb213e89b6333a4c9383ed3509",
+      "updated_at": "2026-09-23T18:26:11Z",
+      "url": "https://github.com/heyaibi/clio/issues/3"
+    }
+  ],
+  "repository": "heyaibi/clio"
+}

@@ -10,7 +10,7 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Remedy Approver | r1 | [TBD] | [TBD] |
 | Finalize | r1 | [TBD] | [TBD] |
 
-**Remediation phase 100480 · **Effort:** ~6–9 days · **Gap:** G-10 (build) · **Source:** `gap/requirement-gaps.md` §2, §3
+**Remediation phase 100480 · **Effort:** locked by Phase 100460 at 60 h core (range 48–66 h, assumptions in `benchmark.md` §10.2) · **Gap:** G-10 (build) · **Source:** `gap/requirement-gaps.md` §2, §3
 
 ## 1. Objective
 
@@ -68,6 +68,12 @@ If work outside this scope appears necessary: stop, document the reason, request
 | Judge | Selected and calibratable | Phase 100460 record |
 | Agent Memoir adapter target | Public library or MCP surface | Existing crates |
 | Host resources | Bounded per the Phase 100460 estimate | Estimate assumptions |
+
+### Locked decisions inherited from Phase 100460
+
+- **Datasets:** LoCoMo (`snap-research/locomo` @ `3eb6f2c…`, blob `d95b8724…`) and LongMemEval (`xiaowu0162/LongMemEval` @ `9e0b455f…`, HF `longmemeval-cleaned`, oracle sha256 `821a2034…`), license-checked per `benchmark.md` §3.6. Do not re-decide without a recorded reason.
+- **Judge:** calibrated two-tier LLM-as-a-judge per `benchmark.md` §5.3.1 — Tier 1 local `Qwen2.5-1.5B-Instruct` (temp 0, structured JSON) for trial loops; Tier 2 `gpt-4o-2024-08-06` for official scores. Token F1 is a cross-check only.
+- **Estimate:** 60 h core (range 48–66 h) per `benchmark.md` §10.2, covering steps 1, 2, 3, 4, and 6 of `benchmark.md` §6.1 plus partitioning/stubs/docs margin. Scope itself is unchanged: two suite adapters, one-command runner, judge integration, three stubs.
 
 ---
 
