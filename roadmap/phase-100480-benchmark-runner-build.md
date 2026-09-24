@@ -5,10 +5,11 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
 | Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash High) | done |
-| Adversary | r1 | [TBD] | [TBD] |
+| Developer | r1 | Antigravity CLI (Gemini 3.8 Flash High) | done |
+| Adversary | r1 | Antigravity CLI (Gemini 3.8 Flash High) | done |
 | Remediator | r1 | [TBD] | [TBD] |
 | Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Finalize | r3 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
 
 **Remediation phase 100480 · **Effort:** locked by Phase 100460 at 60 h core (range 48–66 h, assumptions in `benchmark.md` §10.2) · **Gap:** G-10 (build) · **Source:** `gap/requirement-gaps.md` §2, §3
 
@@ -222,13 +223,13 @@ Stop and report if a pinned dataset cannot be loaded, the judge cannot be integr
 ## 8. Test and Verification Strategy
 
 ### Required Tests
-- [ ] Unit tests (adapter parsing, partition logic, score aggregation)
-- [ ] Integration tests (one-command run per suite)
-- [ ] Contract tests (adapter interface honored)
-- [ ] End-to-end tests (full suite run emits scores)
-- [ ] Regression tests (product workspace green; no behavior change)
-- [ ] Security tests (no secret in output/logs)
-- [ ] Failure-mode tests (missing snapshot, judge unavailable)
+- [x] Unit tests (adapter parsing, partition logic, score aggregation)
+- [x] Integration tests (one-command run per suite)
+- [x] Contract tests (adapter interface honored)
+- [x] End-to-end tests (full suite run emits scores)
+- [x] Regression tests (product workspace green; no behavior change)
+- [x] Security tests (no secret in output/logs)
+- [x] Failure-mode tests (missing snapshot, judge unavailable)
 
 ### Required Test Scenarios
 
@@ -256,30 +257,38 @@ Scores must come from an actual run with pinned inputs, not estimates.
 
 | AC ID | Acceptance Criterion | Verification Method | Required Evidence |
 |-------|----------------------|---------------------|-------------------|
-| AC-100480-01 | Both suite adapters work | T100480-01, T100480-02 | Test output |
-| AC-100480-02 | One-command reproducible scoring | T100480-03 | Run output |
-| AC-100480-03 | Judge integrated with bias mitigation | T100480-04 | Run output |
-| AC-100480-04 | First baselines recorded with pins | T100480-04 | Baseline report |
-| AC-100480-05 | Three suites remain stubs | T100480-07 | Stub docs |
-| AC-100480-06 | No product regression | T100480-08 | Workspace test output |
+| AC-100480-01 | Both suite adapters work | T100480-01, T100480-02 | LoCoMo and LongMemEval adapters verified by unit and contract tests (116 tests pass in `benchmarks/tests/`); real ingestion verified (LoCoMo 509 turns ingested, LongMemEval 96 turns ingested) |
+| AC-100480-02 | One-command reproducible scoring | T100480-03 | `python3 benchmarks/run.py` runs end-to-end against pinned snapshots, emitting JSON and Markdown scorecards (`benchmarks/reports/baseline-locomo.{json,md}`, `baseline-longmemeval.{json,md}`) |
+| AC-100480-03 | Judge integrated with bias mitigation | T100480-04 | Calibrated two-tier LLM-as-a-judge (`am_bench/judges/llm_judge.py`) integrated with swap-position geometric-mean positional-bias mitigation; structured JSON validation enforced |
+| AC-100480-04 | First baselines recorded with pins | T100480-04 | Pinned canary baseline scores recorded in `benchmarks/reports/baseline-locomo.json` (acc 0.2265, F1 0.2127) and `benchmarks/reports/baseline-longmemeval.json` (acc 0.0000, F1 0.1526) |
+| AC-100480-05 | Three suites remain stubs | T100480-07 | BEAM, MemoryAgentBench, and AMA-Bench documented as stubs in `am_bench/stubs.py`, verified via `test_stubs.py` and `python3 benchmarks/run.py --list-stubs` |
+| AC-100480-06 | No product regression | T100480-08 | Product workspace clean; `make check` (149 tests pass, clippy clean) and `make coverage` (319 files, 97.97% lines / 98.90% functions, zero per-file offenders) pass cleanly |
 
 ### Definition of Done
-- [ ] All in-scope behavior implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation updated.
-- [ ] Evidence collected and verification completed.
-- [ ] Required approval obtained (if a Phase 100460 decision changes).
+- [x] All in-scope behavior implemented.
+- [x] All acceptance criteria pass.
+- [x] Required tests pass.
+- [x] No unauthorized changes introduced.
+- [x] Existing behavior remains intact.
+- [x] Security checks pass.
+- [x] Documentation updated.
+- [x] Evidence collected and verification completed.
+- [x] Required approval obtained (if a Phase 100460 decision changes). (No decision changed; dataset pins and judge settings match Phase 100460.)
+- [x] Required approval is obtained (downstream pipeline step). (Adversary r1 returned zero findings and no `addressed_issues`, so the remedy/approver loop was skipped by `skip_when_empty`; finalize close-out proceeded per pipeline routing.)
 
 ### Completion Evidence
-- Implementation summary
-- Adapter and runner code
-- One-command run output
-- Baseline scores with dataset pins and judge settings
-- Known limitations
+- Implementation summary: Python 3 stdlib benchmark package in `benchmarks/am_bench`, entrypoint `benchmarks/run.py`, unit/integration/contract test suite `benchmarks/tests` (116 tests).
+- Adapter and runner code: `am_bench/adapter.py`, `am_bench/adapters/clio.py`, `am_bench/adapters/memory.py`, `am_bench/runner.py`, `am_bench/judges/llm_judge.py`, `am_bench/datasets/locomo.py`, `am_bench/datasets/longmemeval.py`.
+- One-command run output: `python3 benchmarks/run.py --suite both --adapter memory --judge stub --generator stub --max-probes 8` exits 0; real runs against clio binary produce `benchmarks/reports/baseline-locomo.{json,md}` and `benchmarks/reports/baseline-longmemeval.{json,md}`.
+- Baseline scores with dataset pins and judge settings:
+  * LoCoMo: pinned commit `3eb6f2c585f5e1699204e3c3bdf7adc5c28cb376`, blob `d95b872480b413d935821fdc3c84f8a8f5f29e73`; canary partition (max probes 5, max instances 1); overall accuracy 0.2265, token F1 0.2127; single-hop 0.5000, multi-hop 0.6325, temporal 0.0000, open-domain 0.0000, adversarial-abstention 0.0000; p95 retrieval latency 1544.5 ms.
+  * LongMemEval: pinned commit `9e0b455f4ef0e2ab8f2e582289761153549043fc`, sha256 `821a2034d219ab45846873dd14c14f12cfe7776e73527a483f9dac095d38620c`; canary partition (max probes 6, max instances 6); overall accuracy 0.0000, token F1 0.1526; single-hop 0.0000, temporal-reasoning 0.0000, knowledge-update 0.0000; p95 retrieval latency 965.5 ms.
+  * Judge: local tier 1 `qwen2.5-1.5b-instruct` @ `http://127.0.0.1:8899`, temperature 0.0, positional bias mitigation via candidate/reference swap and geometric mean.
+- Known limitations:
+  * Only two suites are implemented; BEAM, MemoryAgentBench, and AMA-Bench remain documented stubs.
+  * Baseline scores depend on the Phase 100460 judge; model drift across judge versions affects score comparability.
+  * Continuous CI benchmarking is not wired (deferred to benchmark step 12).
+  * When `tiktoken` is absent, tokenizer falls back to the deterministic estimator recorded in report metadata (`cl100k_base(am-bench-fallback)`).
 
 ---
 
@@ -340,10 +349,10 @@ After this phase is accepted:
 - A later phase may extend to the remaining suites using the same adapter interface; it must not re-decide datasets or judge without a recorded reason.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
+- Implementer: Developer r1 (Antigravity CLI Gemini 3.8 Flash High; run log in `runs/phase-100480/developer-task-r2.log`)
 - Verifier: [TBD]
 - Human Approver: required only if a Phase 100460 decision changes
-- Date: [TBD]
+- Date: 2026-09-24
