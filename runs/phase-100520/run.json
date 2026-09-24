@@ -1,0 +1,111 @@
+{
+  "run_id": "phase-100520",
+  "phase": "100520",
+  "state": "publishing",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "signal": "DEVELOPER_DONE 21f62332"
+    },
+    {
+      "step": "adversary",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/findings.json a8473527"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "REMEDIATOR_DONE 59025d95"
+    },
+    {
+      "step": "approver",
+      "harness": "cmd:deepseek/deepseek-v4.1-flash@max",
+      "agent": "Command Code (DeepSeek V4.1 Flash Max)",
+      "signal": "REMEDY_APPROVED 40cb8767"
+    },
+    {
+      "step": "finalize",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "signal": "FINALIZE_DONE c15914a1"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/developer-task-r2.md",
+      "prompt_sha256": "ea53c3a437315d600e55290893bf604e2714c2205a417cf03baa6d1ab5c7d48f",
+      "duration_s": 859.01,
+      "visits": 2,
+      "signal": "DEVELOPER_DONE 21f62332",
+      "resume_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/developer-resume-r2.md",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/developer-task-r2.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/adversary-task-r1.md",
+      "prompt_sha256": "0ba6d7f40bbe35d3eb16ac6432ff4fe45476882d48c8584c757b72fb6e3ba72d",
+      "duration_s": 620.303,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/findings.json a8473527",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/adversary-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/remediator-task-r1.md",
+      "prompt_sha256": "5f5dda76a70ad7814f54c1eb17c0b91d321363aa0b48f444a17d11add5f79656",
+      "duration_s": 1036.14,
+      "visits": 1,
+      "signal": "REMEDIATOR_DONE 59025d95",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/remediator-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "cmd:deepseek/deepseek-v4.1-flash@max",
+      "agent": "Command Code (DeepSeek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/approver-task-r1.md",
+      "prompt_sha256": "6818d1e67392ba14f840103e7a457166ae8572761104c9b9ed7e9d50288c67dc",
+      "duration_s": 526.078,
+      "visits": 1,
+      "signal": "REMEDY_APPROVED 40cb8767",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/approver-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/finalize-task-r1.md",
+      "prompt_sha256": "3a34b0bf9d0d1fdcbc58ef25ed6f7a168425b750badb012203715b58bbd2e75f",
+      "duration_s": 485.978,
+      "visits": 1,
+      "signal": "FINALIZE_DONE c15914a1",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100520/finalize-task-r1.tui.log",
+      "attach": "pty",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ],
+  "publication_pending": true
+}
