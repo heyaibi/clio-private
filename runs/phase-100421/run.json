@@ -1,0 +1,69 @@
+{
+  "run_id": "phase-100421",
+  "phase": "100421",
+  "state": "completed",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "signal": "DEVELOPER_DONE 8b696a15"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/findings.json b0c70966"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "signal": "FINALIZE_DONE f3a38b7f"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/developer-task-r1.md",
+      "prompt_sha256": "74c87738e22039cc5287b5bb2c6312df38ff3fa54f97941d5c25ff2bfcfb1107",
+      "duration_s": 1078.822,
+      "visits": 1,
+      "signal": "DEVELOPER_DONE 8b696a15",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/developer-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/adversary-task-r1.md",
+      "prompt_sha256": "08dbe101d4b23d4cf56e0dda4b90399aae25ff8601542a912cfce51950032f54",
+      "duration_s": 472.081,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/findings.json b0c70966",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/adversary-task-r1.tui.log",
+      "attach": "pty",
+      "via": "skip",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/finalize-task-r1.md",
+      "prompt_sha256": "f9d77b652b49c20f40e420bc9884268ef95580898c17a8f2366f0fbc0e96ddd6",
+      "duration_s": 298.11,
+      "visits": 1,
+      "signal": "FINALIZE_DONE f3a38b7f",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100421/finalize-task-r1.tui.log",
+      "attach": "pty",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 {
   "order": [
     "developer",
-    "adversary"
+    "adversary",
+    "finalize"
   ],
   "steps": {
     "developer": {
@@ -26,6 +27,15 @@
         }
       },
       "git_head": "5eeccecdf47b09b28015fef8495c41dca0a3c39f"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE f3a38b7f",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "c78f4931601ea64ffbea2d37f75f4017ca2036746d1fc0d9ce6a522edf4272e4",
+      "artifacts": {},
+      "git_head": "abcd0019dfcadee53c72f0ee7f54f9fb4d3a64ad"
     }
   }
 }
