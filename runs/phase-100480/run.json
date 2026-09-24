@@ -1,7 +1,7 @@
 {
   "run_id": "phase-100480",
   "phase": "100480",
-  "state": "publishing",
+  "state": "completed",
   "transcript": [
     {
       "step": "developer",
@@ -68,5 +68,10 @@
       "routed_to": "completed"
     }
   ],
-  "publication_pending": true
+  "reservation": {
+    "machine_id": "macbook",
+    "reservation_id": "rsv-819a49beb4a57acc588232ef",
+    "generation": 1,
+    "state": "completed"
+  }
 }
