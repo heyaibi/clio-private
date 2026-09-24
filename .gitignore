@@ -13,3 +13,4 @@ runs/phase-*/sync-after-*.json
 .*
 !.gitignore
 !.vscode
+/glide

@@ -1,9 +1,9 @@
 # Clio — Requirements Document
 
-**Document status:** Planning · **Version:** 1.10 · **Owner:** Memory Platform
+**Document status:** Planning · **Version:** 1.11 · **Owner:** Memory Platform
 **Applies to:** any long-horizon agent or companion chat product that must persist information across sessions
 
-**Revision note:** v1.10 adds the native source `context` field and generalizes `evidence_ref` as the stable external source-identity field. Context is descriptive metadata; it is separate from category, epistemic truth, source text, and retrieval composition. Document-container (`doc_id`) semantics are explicitly deferred to a later phase (see §9).
+**Revision note:** v1.10 adds the native source `context` field and generalizes `evidence_ref` as the stable external source-identity field. Context is descriptive metadata; it is separate from category, epistemic truth, source text, and retrieval composition. Document-container (`doc_id`) semantics are explicitly deferred to a later phase (see §9). v1.11 adds the §9 retrieval temporal-anchor determinism risk: relative-date retrieval MUST use an explicit caller-supplied anchor and MUST NOT use an implicit server clock. The v1.10 context/evidence contract is unchanged.
 
 ---
 
@@ -732,6 +732,7 @@ Crypto-shredding is the sole **compliance** deletion path. Routine memory manage
 - **Document-container (`doc_id`) parity deferred.** A Hindsight-style `document_id` names a document container with replace-on-re-retain, bulk-delete, and original-text-fetch semantics — behaviors this revision deliberately does not define, because migration rehearsal has not yet shown which of them Clio needs. `evidence_ref` preserves source identity only and MUST NOT be mistaken for that container contract. If migration rehearsal demonstrates container parity is required, a dedicated later phase SHALL research the provider document lifecycle and design a `doc_id` (or equivalent) contract including upsert, bulk operations, and chunk/original-text handling; that phase MUST NOT reuse `evidence_ref` as the container key without an explicit supersession design.
 - **Context privacy and prompt-injection risk.** Source context may contain personal data or instruction-like text. It MUST be bounded, encrypted with content, treated as untrusted data by extractors and retrieval, redacted from ordinary telemetry, and excluded from automatic model injection unless an explicit budgeted policy permits it.
 - **Context relevance and retrieval drift.** Adding context to lexical matching can improve source-aware recall but can also increase noise or alter ranking. Deployments SHOULD evaluate context-aware retrieval against context-free baselines and MUST keep the policy deterministic for identical inputs and configuration.
+- **Retrieval temporal-anchor determinism.** A retrieval arm that resolves relative date/time expressions (for example "last week") MUST resolve them against an explicit caller-supplied anchor timestamp or an explicit absolute window; an implicit server clock MUST NOT be a hidden input, so the deterministic-policy rule above holds for identical inputs and configuration. An implementation MAY offer a documented wall-clock default only as an explicit opt-in that cannot silently alter results.
 - **Evidence-reference collision and identity ambiguity.** An external document or item identifier reused by different providers can collide if it is not namespaced. Provider references SHOULD use a stable provider/kind namespace, and identity/idempotency behavior MUST be documented rather than inferred from display text.
 
 ---
