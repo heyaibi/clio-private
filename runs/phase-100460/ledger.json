@@ -3,7 +3,8 @@
     "developer",
     "adversary",
     "remediator",
-    "approver"
+    "approver",
+    "finalize"
   ],
   "steps": {
     "developer": {
@@ -49,6 +50,15 @@
       "agent": "Antigravity CLI (Gemini 3.8 Flash)",
       "visits": 1,
       "output_sha256": "414c4f273dcd3d13641642f14afcd5479d09166450fb719dc6fb3c2a05af652d",
+      "artifacts": {},
+      "git_head": "23702586375678cefe77d0f1ccc647a5f796cb31"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 28dcd665",
+      "harness": "opencode:go/deepseek-v4.1-flash@high",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash High)",
+      "visits": 1,
+      "output_sha256": "5d0295cab73e7e0123166036066749af6f70f994c169cfaeb9b7a1b3f71a1585",
       "artifacts": {},
       "git_head": "23702586375678cefe77d0f1ccc647a5f796cb31"
     }
