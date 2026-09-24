@@ -16,6 +16,9 @@
 #   phase-driver.sh --stop                       # stop the live run (halt + Ctrl-C)
 #   phase-driver.sh --session <N> <phase-file>   # one phase, run inside tmux
 #
+# The server reserves the selected phase in the private coordination branch
+# before tmux starts. A coordination fetch/push failure is fail-closed.
+#
 # Cron runs the driver every few minutes. It does nothing while a phase is
 # running or while the line is halted; otherwise it starts the lowest
 # uncompleted phase in the tmux session named below. A phase that ends
@@ -27,7 +30,8 @@
 # Optional untracked overrides live in
 # private/clio-private/runs/.driver.env (sourced if present):
 # HERMES_PROFILE_NAME, DISCORD_CHANNEL, DISCORD_FALLBACK_CHANNEL,
-# HEARTBEAT_URL, STALE_AFTER_SEC, LOG_KEEP_DAYS, TMUX_WIDTH, TMUX_HEIGHT.
+# HEARTBEAT_URL, STALE_AFTER_SEC, LOG_KEEP_DAYS, TMUX_WIDTH, TMUX_HEIGHT,
+# PHASE_MACHINE_ID, PHASE_COORDINATION_BRANCH.
 #
 # Local test hooks (never set these in cron):
 #   DISABLE_NOTIFY=1      log notifications instead of sending them
@@ -80,6 +84,10 @@ HARNESS="$REPO/$PRIV/harness"
 : "${SESSION_NAME:=development}"
 : "${TMUX_WIDTH:=164}"
 : "${TMUX_HEIGHT:=48}"
+: "${PHASE_MACHINE_ID:=${CLIO_MACHINE_ID:-server-01}}"
+: "${PHASE_COORDINATION_BRANCH:=${CLIO_PHASE_COORDINATION_BRANCH:-master}}"
+export CLIO_MACHINE_ID="$PHASE_MACHINE_ID"
+export CLIO_PHASE_COORDINATION_BRANCH="$PHASE_COORDINATION_BRANCH"
 
 PIPELINE="private/clio-private/harness/pipelines/default.yaml"
 SESSION="$SESSION_NAME"
@@ -210,6 +218,7 @@ run_session() {
   trap 'on_stop 143' TERM
   printf '%s\n' "$$" >"$PIDFILE"
   cd "$REPO"
+  export CLIO_MACHINE_ID="${CLIO_MACHINE_ID:-$PHASE_MACHINE_ID}"
   notify "phase $number starting ($rel)"
   if [ -n "${DRIVER_STUB_RC:-}" ]; then
     log "STUB mode: simulating runner.py (rc=$DRIVER_STUB_RC)"
@@ -222,6 +231,7 @@ run_session() {
   state="$(phase_state "$number")"
   case "$rc" in
     0)   notify "phase $number finished: ${state:-completed}" ;;
+    3)   notify "phase $number WAIT_FOR_CLAIM; no launch occurred" ;;
     130) notify "phase $number interrupted; will resume on the next tick" ;;
     *)   printf 'phase %s rc=%s state=%s at %s\n' \
            "$number" "$rc" "${state:-unknown}" "$(ts)" >"$HALT"
@@ -281,6 +291,19 @@ heartbeat() {
     || log "heartbeat ping failed ($HEARTBEAT_URL)"
 }
 
+coordination_select() {
+  # The JSON result is deliberately consumed instead of parsing the legacy
+  # tab output. A failed fetch/push must never turn into an unclaimed launch.
+  "$PYTHON" "$HARNESS/next_phase.py" --repo "$REPO" --server \
+    --machine-id "$PHASE_MACHINE_ID" --json "$@"
+}
+
+selection_value() {
+  local key="$1"
+  "$PYTHON" -c 'import json,sys; print(json.load(sys.stdin).get(sys.argv[1], ""))' \
+    "$key"
+}
+
 _drive() {
   cd "$REPO"
 
@@ -288,15 +311,36 @@ _drive() {
     [ -f "$HALT" ] && { log "dry-run: halted; would refuse to advance"; return 0; }
     tmux has-session -t "$SESSION" 2>/dev/null \
       && { log "dry-run: session '$SESSION' is running; would skip"; return 0; }
-    local out
-    if ! out="$("$PYTHON" "$HARNESS/next_phase.py" --repo "$REPO")"; then
-      log "dry-run: no uncompleted phase"
+    local selection selection_rc=0 state
+    selection="$(coordination_select --read-only)" || selection_rc=$?
+    if [ "$selection_rc" -ne 0 ] && [ "$selection_rc" -ne 1 ] \
+        && [ "$selection_rc" -ne 2 ] && [ "$selection_rc" -ne 3 ]; then
+      log "dry-run: coordination unavailable; refusing to launch"
       return 0
     fi
-    local number="${out%%$'\t'*}" rel="${out#*$'\t'}"
-    log "dry-run: would launch phase $number in tmux '$SESSION'"
-    printf 'would launch: tmux new-session -d -s %s -x %s -y %s -c %s "bash %s/private/clio-private/harness/phase-driver.sh --session %s %s"\n' \
-      "$SESSION" "$TMUX_WIDTH" "$TMUX_HEIGHT" "$REPO" "$REPO" "$number" "$rel"
+    state="$(printf '%s' "$selection" | selection_value state)"
+    case "$state" in
+      AVAILABLE)
+        local number rel
+        number="$(printf '%s' "$selection" | selection_value phase)"
+        rel="$(printf '%s' "$selection" | selection_value path)"
+        log "dry-run: would reserve and launch phase $number in tmux '$SESSION'"
+        printf 'would launch: tmux new-session -d -s %s -x %s -y %s -c %s "bash %s/private/clio-private/harness/phase-driver.sh --session %s %s"\n' \
+          "$SESSION" "$TMUX_WIDTH" "$TMUX_HEIGHT" "$REPO" "$REPO" "$number" "$rel"
+        ;;
+      WAIT_FOR_CLAIM)
+        log "dry-run: WAIT_FOR_CLAIM ($(printf '%s' "$selection" | selection_value phase)); no launch"
+        ;;
+      COORDINATION_INCONSISTENT)
+        log "dry-run: coordination state conflicts with completion evidence; no launch"
+        ;;
+      NO_PHASE)
+        log "dry-run: no uncompleted phase"
+        ;;
+      *)
+        log "dry-run: unexpected coordination result '$state'; no launch"
+        ;;
+    esac
     return 0
   fi
 
@@ -337,13 +381,55 @@ _drive() {
   rm -f "$CURRENT" "$STALL"
   prune
 
-  local out rc=0
-  out="$("$PYTHON" "$HARNESS/next_phase.py" --repo "$REPO")" || rc=$?
-  if [ "$rc" -ne 0 ]; then
-    log "no uncompleted phase (next_phase rc=$rc)"
-    return 0
+  local out rc=0 number rel reservation_id reservation_generation
+  if [ "${1:-}" = "--self-test" ]; then
+    out="$("$PYTHON" "$HARNESS/next_phase.py" --repo "$REPO")" || rc=$?
+    if [ "$rc" -ne 0 ]; then
+      log "no uncompleted phase (next_phase rc=$rc)"
+      return 0
+    fi
+    number="${out%%$'\t'*}"; rel="${out#*$'\t'}"
+    reservation_id=""; reservation_generation=""
+  else
+    if ! "$PYTHON" "$HARNESS/gitsync.py" --root "$REPO" --mode start \
+        >"$RUN_DIR/coordination-sync.json" 2>/dev/null; then
+      log "coordination checkout sync failed; refusing to launch (see $RUN_DIR/coordination-sync.json)"
+      return 1
+    fi
+    local selection selection_rc=0 selection_state
+    selection="$(coordination_select)" || selection_rc=$?
+    if [ "$selection_rc" -ne 0 ] && [ "$selection_rc" -ne 2 ] \
+        && [ "$selection_rc" -ne 3 ]; then
+      log "coordination state unavailable; refusing to launch (next_phase rc=$selection_rc)"
+      return 1
+    fi
+    selection_state="$(printf '%s' "$selection" | selection_value state)"
+    case "$selection_state" in
+      RESERVED)
+        number="$(printf '%s' "$selection" | selection_value phase)"
+        rel="$(printf '%s' "$selection" | selection_value path)"
+        reservation_id="$(printf '%s' "$selection" | selection_value reservation_id)"
+        reservation_generation="$(printf '%s' "$selection" | selection_value generation)"
+        log "reserved phase $number ($rel) for $PHASE_MACHINE_ID"
+        ;;
+      WAIT_FOR_CLAIM)
+        log "WAIT_FOR_CLAIM for phase $(printf '%s' "$selection" | selection_value phase); no launch"
+        return 0
+        ;;
+      COORDINATION_INCONSISTENT)
+        log "coordination state conflicts with completion evidence; no launch"
+        return 1
+        ;;
+      NO_PHASE)
+        log "no uncompleted phase"
+        return 0
+        ;;
+      *)
+        log "unexpected coordination result '$selection_state'; refusing to launch"
+        return 1
+        ;;
+    esac
   fi
-  local number="${out%%$'\t'*}" rel="${out#*$'\t'}"
   log "next phase: $number ($rel)"
 
   local envs=""
@@ -355,6 +441,10 @@ _drive() {
   [ -z "${DRIVER_STUB_RC:-}" ] || envs="$envs DRIVER_STUB_RC='$DRIVER_STUB_RC'"
   [ -z "${DRIVER_STUB_SLEEP:-}" ] || envs="$envs DRIVER_STUB_SLEEP='$DRIVER_STUB_SLEEP'"
   [ -z "${DRIVER_RUN_DIR:-}" ] || envs="$envs DRIVER_RUN_DIR='$DRIVER_RUN_DIR'"
+  [ -z "${CLIO_MACHINE_ID:-}" ] || envs="$envs CLIO_MACHINE_ID='$CLIO_MACHINE_ID'"
+  [ -z "${CLIO_PHASE_COORDINATION_BRANCH:-}" ] || envs="$envs CLIO_PHASE_COORDINATION_BRANCH='$CLIO_PHASE_COORDINATION_BRANCH'"
+  [ -z "$reservation_id" ] || envs="$envs CLIO_RESERVATION_ID='$reservation_id'"
+  [ -z "$reservation_generation" ] || envs="$envs CLIO_RESERVATION_GENERATION='$reservation_generation'"
   local launch="${envs:+$envs }bash '$REPO/$PRIV/harness/phase-driver.sh' --session '$number' '$rel'"
 
   # Detached geometry: new sessions start at TMUX_WIDTH x TMUX_HEIGHT
@@ -374,7 +464,23 @@ _drive() {
 
 drive() {
   local rc=0
-  _drive || rc=$?
+  if command -v flock >/dev/null 2>&1; then
+    _drive "${1:-}" || rc=$?
+  else
+    mkdir -p "$RUN_DIR"
+    local portable_lock="$RUN_DIR/driver.lock.d"
+    if ! mkdir "$portable_lock" 2>/dev/null; then
+      log "another driver instance holds the portable lock; skip"
+      heartbeat
+      return 0
+    fi
+    (
+      trap 'rmdir "$portable_lock" 2>/dev/null || true' EXIT
+      _drive "${1:-}" || rc=$?
+      exit "$rc"
+    )
+    rc=$?
+  fi
   heartbeat
   return "$rc"
 }
@@ -418,13 +524,13 @@ driver_self_test() {
   mkdir -p "$RUN_DIR"
   echo "self-test session: $SESSION  state dir: $RUN_DIR"
 
-  drive || true
+  drive --self-test || true
   tmux has-session -t "$SESSION" 2>/dev/null \
     && echo "ok: launched a session" || { echo "FAIL: session not launched"; fail=1; }
   geom="$(tmux display-message -p -t "$SESSION" '#{window_width}x#{window_height}' 2>/dev/null || true)"
   [ "$geom" = "${TMUX_WIDTH}x${TMUX_HEIGHT}" ] \
     && echo "ok: geometry $geom" || { echo "FAIL: geometry ${geom:-gone}, want ${TMUX_WIDTH}x${TMUX_HEIGHT}"; fail=1; }
-  drive || true
+  drive --self-test || true
   grep -q "running; skip" "$LOG" \
     && echo "ok: busy run skipped" || { echo "FAIL: busy run not skipped"; fail=1; }
   wait_session_gone
@@ -433,14 +539,14 @@ driver_self_test() {
 
   DRIVER_STUB_RC=1; export DRIVER_STUB_RC
   rm -f "$HALT"
-  drive || true
+  drive --self-test || true
   wait_session_gone
   [ -f "$HALT" ] \
     && echo "ok: halt marker written" || { echo "FAIL: halt marker missing"; fail=1; }
   grep -q "HALTED" "$LOG" \
     && echo "ok: halt notification logged" || { echo "FAIL: halt notification missing"; fail=1; }
 
-  drive || true
+  drive --self-test || true
   grep -q "refusing to advance" "$LOG" \
     && echo "ok: refuses to advance while halted" || { echo "FAIL: advanced while halted"; fail=1; }
   tmux has-session -t "$SESSION" 2>/dev/null \
@@ -449,7 +555,7 @@ driver_self_test() {
   # Signal stop: Ctrl-C reaches the trap, which halts and notifies.
   rm -f "$HALT"
   DRIVER_STUB_RC=0; DRIVER_STUB_SLEEP=20; export DRIVER_STUB_RC DRIVER_STUB_SLEEP
-  drive || true
+  drive --self-test || true
   sleep 0.5
   stop || true
   wait_session_gone
@@ -458,14 +564,41 @@ driver_self_test() {
   grep -q "STOPPED by signal" "$LOG" \
     && echo "ok: stop notification logged" || { echo "FAIL: stop notification missing"; fail=1; }
 
+  # Coordination failure: the normal driver path must refuse before tmux launch.
+  old_repo="$REPO"; old_priv="$PRIV"; old_wf="$WF"; old_harness="$HARNESS"
+  old_run_dir="$RUN_DIR"; old_lock="$LOCK"; old_halt="$HALT"; old_stall="$STALL"
+  old_current="$CURRENT"; old_pid="$PIDFILE"; old_notify_broken="$NOTIFY_BROKEN"
+  old_log="$LOG"; old_session="$SESSION"
+  coord_root="$tmp/coordination-failure-root"
+  coord_run="$tmp/coordination-failure-run"
+  mkdir -p "$coord_root" "$coord_run"
+  REPO="$coord_root"; PRIV="private/clio-private"; WF="$coord_run"
+  HARNESS="$old_harness"; RUN_DIR="$coord_run"
+  LOCK="$RUN_DIR/driver.lock"; HALT="$RUN_DIR/halted"; STALL="$RUN_DIR/stalled"
+  CURRENT="$RUN_DIR/current"; PIDFILE="$RUN_DIR/pid"
+  NOTIFY_BROKEN="$RUN_DIR/notify-broken"; LOG="$RUN_DIR/driver.log"
+  SESSION="ar-driver-coord-failure-$$"
+  drive || true
+  if grep -q "coordination checkout sync failed" "$LOG" \
+      && ! tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "ok: coordination failure refuses launch"; coord_fail_ok=1
+  else
+    echo "FAIL: coordination failure did not refuse launch"; coord_fail_ok=0; fail=1
+  fi
+  tmux kill-session -t "$SESSION" 2>/dev/null || true
+  REPO="$old_repo"; PRIV="$old_priv"; WF="$old_wf"; HARNESS="$old_harness"
+  RUN_DIR="$old_run_dir"; LOCK="$old_lock"; HALT="$old_halt"; STALL="$old_stall"
+  CURRENT="$old_current"; PIDFILE="$old_pid"; NOTIFY_BROKEN="$old_notify_broken"
+  LOG="$old_log"; SESSION="$old_session"
+
   # Orphan: tmux kill-session does not signal the pane, so a live recorded PID
   # with no session must halt instead of starting a second concurrent run.
   rm -f "$HALT"
-  drive || true
+  drive --self-test || true
   sleep 0.5
   tmux kill-session -t "$SESSION" 2>/dev/null || true
   sleep 0.3
-  drive || true
+  drive --self-test || true
   grep -q "orphaned run detected" "$LOG" \
     && echo "ok: orphan detected" || { echo "FAIL: orphan not detected"; fail=1; }
   [ -f "$HALT" ] \
@@ -503,6 +636,7 @@ check() {
   echo "stall threshold: ${STALE_AFTER_SEC}s"
   echo "tmux geometry: ${TMUX_WIDTH}x${TMUX_HEIGHT} (initial detached size; attaches may resize)"
   "$PYTHON" "$HARNESS/next_phase.py" --self-test
+  "$PYTHON" "$HARNESS/phase_reservations.py" --self-test
 }
 
 case "${1:-}" in

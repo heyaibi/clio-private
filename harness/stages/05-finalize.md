@@ -11,6 +11,7 @@ placeholders:
   REMEDY_APPROVER_AGENT_OUTPUT: Final approver verdict and message.
   ISSUE_AUDIT_PATH: Absolute path of findings.json containing approved issue candidates.
   REPORT_DIR: Absolute run directory for sanitized GitHub issue inputs.
+  PHASE_NUMBER: Current phase number.
   LOG_PATH: Absolute path of this invocation's run log (beside the task file).
 ---
 
@@ -24,39 +25,43 @@ workers - commit/push must stay single-owner to avoid split-brain.
 
 ## Task
 
-Your remedy was approved. Stage all files in both repos (main + nested
-`private/clio-private`), including `private/clio-private/runs/` folder
-contents, write a commit message per repo, create the commits, and push both
-to GitHub. Here's the message from Remedy Approver agent.
+Your remedy was approved. Commit the intended product changes in both repos
+(main + nested `private/clio-private`). The publication helper owns the final
+sync-and-push, checks this phase's reservation, and scopes leftover run-state
+cleanup to this phase. Here's the message from Remedy Approver agent.
 
 =====
 
 {{REMEDY_APPROVER_AGENT_OUTPUT}}
 
-## Sync before publishing (mandatory)
+## Sync and publish (mandatory)
 
 The phase began on a synced base, but a remote can move while you work. After
-you have committed both repos and immediately before you push, run this from
-the repo root:
+you have committed both repos and immediately before publication, run this
+from the repo root:
 
-    python3 private/clio-private/harness/gitsync.py --root . --mode push
+    python3 private/clio-private/harness/gitsync.py --root . --mode publish --phase {{PHASE_NUMBER}}
 
-It fetches `clio` and `private/clio-private`, fast-forwards or merges any new
-remote commits (never rebasing, force-pushing, resetting, or discarding
-work), and confirms each push will fast-forward. If it merges remote commits
-into your work, run `make check` again before pushing, since the base changed.
+The helper reads this phase's `reservation.json`, verifies the machine ID,
+reservation ID, and generation against the latest private coordination state,
+takes the short publication lock, and refuses a stale owner. It commits only
+leftover files under `runs/phase-{{PHASE_NUMBER}}`, fetches and safely merges
+both checkouts, then performs normal pushes. It writes and pushes
+`runs/phase-{{PHASE_NUMBER}}/publication.json`; the runner requires that
+receipt before changing the shared record to `completed`. It never
+force-pushes, rebases, resets, stashes, or discards work. A future phase's
+partial run directory is never staged by this command.
 
-- Exit 0: safe to push both repos.
-- Exit 1: a real conflict remains. Resolve it yourself: open the conflicted
-  files the JSON names, edit them to the correct combined result, `git add`
-  them, and complete the merge with `git commit --no-edit`. Then run the
-  sync check again. Never `git rebase`, `git reset --hard`, or push with
-  `--force`. If you cannot resolve it confidently, leave the merge state,
-  quote the printed evidence, and end with
+- Exit 0: both repositories were published, `publication.json` was pushed, and the lock was released.
+- Exit 1: a real conflict, dirty path, failed claim check, or push failure
+  remains. Resolve only the named conflict by hand, `git add` the resolved
+  files, complete the merge with `git commit --no-edit`, and rerun the helper.
+  Never `git rebase`, `git reset --hard`, or push with `--force`. If you cannot
+  resolve it confidently, leave the evidence in place and end with
   `FINALIZE_BLOCKED: <one-line reason>`.
-
-If a push is still rejected after the check (a remote moved in the last
-instant), stop and signal `FINALIZE_BLOCKED`; never retry with `--force`.
+- Exit 2: coordination or configuration is unavailable. Do not push manually;
+  leave the reservation in place and end with `FINALIZE_BLOCKED` so an
+  operator can reconcile it.
 
 ## Close-out
 
@@ -70,13 +75,10 @@ instant), stop and signal `FINALIZE_BLOCKED`; never retry with `--force`.
   transcript is the full record.
 - Run `make check` once and confirm it passes.
 - In the active `private/clio-private/roadmap/phase-*.md` file, change `- [ ] Required approval is obtained (downstream pipeline step).` to `- [x] Required approval is obtained (downstream pipeline step).` Include that change in the same commit.
-- This stage order is the authorization. Do not ask the operator for separate per-command git approvals. Automatically select commit-all with a fixed accurate message (the previously chosen option): if the staged scope is broader than one file, write the broader message covering all staged work.
-- Stage all files in both repos, including `private/clio-private/runs/` folder contents (e.g. `git add -A` in the main repo, then `cd private/clio-private && git add -A` in the nested private repo); do not exclude pipeline-internal `runs/` paths.
-- Confirm `git status` in both repos shows only intended working-tree changes, including the staged `runs/` changes.
-- Write a clear commit message describing the change.
-- Create the commit.
-- Run the sync check above; only if it exits 0, push both repos to GitHub
-  and confirm each push succeeds.
+- This stage order is the authorization. Do not ask the operator for separate per-command git approvals. Stage the intended public files and the intended private source/roadmap files explicitly. Never use an all-files add in the private repository: the publication helper owns `runs/phase-{{PHASE_NUMBER}}` and must be the only command that publishes that run directory.
+- Confirm both repositories show only intended working-tree changes. Do not stage another phase's run files, coordination state, or partial records.
+- Write a clear commit message describing the change and create the commits.
+- Run the publication helper above; only its exit 0 confirms that both normal pushes succeeded and the claim was still valid.
 
 ## Close approved issues after publishing
 

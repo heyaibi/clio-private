@@ -1,6 +1,6 @@
 # Proposal: shared phase reservations for server and local work
 
-Status: draft. Date: 2026-09-24. Scope: phase ownership and selection. No product-code behavior changes.
+Status: implemented; code-complete with deployment acceptance pending (2026-09-24). Date: 2026-09-24. Scope: phase ownership and selection. No product-code behavior changes.
 
 ## Problem
 
@@ -12,21 +12,17 @@ There is a second concurrency risk: different phases can still publish each othe
 
 ## Proposal
 
-Use a dedicated private Git branch as a shared reservation board.
-
-Recommended branch:
-
-```text
-harness/phase-coordination
-```
-
-Recommended state location on that branch:
+Use the existing private repository's selected `master` branch as the shared
+reservation board. The state path and transaction worktree are isolated from
+phase working directories even though the branch is shared with private code:
 
 ```text
 coordination/state.json
 ```
 
-The coordination state is separate from the normal code branch and separate from individual phase run directories. It remains in the private repository and is never placed in the public repository.
+The state is never placed in the public repository. The selected answer for
+this repository is `master` on the existing private repository; do not silently
+switch to a different branch during deployment.
 
 Each host has a stable machine ID:
 
@@ -54,7 +50,7 @@ A phase with no record is available. Records remain in the state after completio
       "generation": 3,
       "claimed_at": "2026-09-24T10:00:00Z",
       "heartbeat_at": "2026-09-24T10:20:00Z",
-      "expires_at": "2026-09-24T10:30:00Z",
+      "expires_at": null,
       "run_id": "phase-100440",
       "base_revisions": {
         "public": "abc123",
@@ -68,7 +64,7 @@ A phase with no record is available. Records remain in the state after completio
       "generation": 1,
       "claimed_at": "2026-09-24T10:05:00Z",
       "heartbeat_at": "2026-09-24T10:05:00Z",
-      "expires_at": "2026-09-24T10:35:00Z",
+      "expires_at": null,
       "run_id": "phase-100601",
       "base_revisions": {
         "public": "abc123",
@@ -78,6 +74,10 @@ A phase with no record is available. Records remain in the state after completio
   }
 }
 ```
+
+`expires_at` is retained as `null` for schema compatibility. The selected
+policy has no automatic expiry; an operator must explicitly take over a
+stopped claim.
 
 Supported statuses are:
 
@@ -99,16 +99,19 @@ To reserve a phase, a host:
 1. Fetches the latest coordination branch.
 2. Reads the current state.
 3. Checks that the phase is available or already belongs to that same reservation.
-4. Updates the record with its machine ID, random reservation ID, generation, and expiry.
+4. Updates the record with its machine ID, random reservation ID, generation, and `expires_at: null`.
 5. Commits the state.
 6. Pushes the commit normally, without force.
 7. Starts work only after the push succeeds.
 
 If two hosts read the same old state, only one normal fast-forward push can win. The rejected host fetches the new state and retries. It must not overwrite the other reservation.
 
-The coordination branch must not be checked out as the working branch of a phase. State updates should use an isolated coordination checkout or an equivalent temporary Git worktree.
+The coordination state path must not be used as a phase working file. State
+updates use an isolated detached coordination checkout or an equivalent
+temporary Git worktree, even though the selected branch is the shared private
+`master` branch.
 
-A separate small private coordination repository is an acceptable alternative if branch permissions or history volume make the dedicated branch unsuitable. A GitHub Issue, a normal local file, and the server's local lock are not sufficient shared reservation mechanisms.
+A separate small private coordination repository remains an acceptable alternative if branch permissions or history volume make the selected shared branch unsuitable. A GitHub Issue, a normal local file, and the server's local lock are not sufficient shared reservation mechanisms.
 
 ## Server behavior
 
@@ -133,7 +136,9 @@ There is no global highest-completed-phase pointer and no server cursor derived 
 
 ## Recovery and fencing
 
-An active process renews its reservation while it works. A crashed process eventually leaves an expired reservation that can be taken over.
+An active process renews its reservation while it works. Under the selected
+policy there is no automatic expiry: a crashed process leaves its claim in
+place until an operator explicitly takes it over.
 
 Each takeover increments `generation`. Every renewal, resume, completion, release, and publication operation must check:
 
@@ -179,10 +184,11 @@ A Git push by itself does not update files already checked out on the server. Th
 - Prove that the server can reserve `100440` while the local machine reserves `100601`.
 - Complete `100601` locally and prove that the server still selects `100460` next.
 - Prove that the server waits when it reaches an actively reserved phase.
-- Expire a reservation, take it over, and prove that the old reservation ID and generation are rejected.
+- Treat a stopped reservation as stale, explicitly take it over, and prove that the old reservation ID and generation are rejected.
 - Prove that an update or coordination-state push failure prevents an unclaimed launch.
 - Prove that publication and run-state cleanup affect only the current phase.
 - Run the existing selector, runner, driver, and synchronization self-tests.
+- Verify the private `master` branch is not shallow and is protected from force-push, rewrite, and deletion.
 - Perform a manual two-machine check with synthetic phases before enabling real manual reservations.
 
 ## Open questions
@@ -203,4 +209,15 @@ A: Each finalizer checks its own claim before publishing
 Q: If a phase was already running before this reservation system was enabled, how should we mark it as belonging to the server and prevent anyone else from resuming it until the server finishes?
 A: Register it as a server-owned claim
 
+## Implementation record
+
+Code-complete and automated checks verified on 2026-09-24; real two-machine deployment acceptance remains pending.
+
+- `harness/phase_reservations.py` stores `coordination/state.json` on the private `master` branch through a detached temporary worktree. Claims use normal fast-forward pushes, random reservation IDs, machine/reservation/generation fencing, strict six-digit keys, and state-history continuity checks that reject deletion or shallow history.
+- `next_phase.py --server` selects the lowest incomplete phase, ignores future claims until they become lowest, returns `WAIT_FOR_CLAIM` for an active owner, and fails closed when coordination is unavailable.
+- The driver syncs both checkouts, reserves before launching tmux, and passes the claim to the runner. Direct local runs claim their exact phase. Interrupted, blocked, and rejected work keeps its claim; takeover is explicit because the selected policy has no automatic expiry.
+- `runner.py` persists the phase-local reservation token, renews it while active, resumes only with the same fence, and requires the published `publication.json` receipt before changing the shared record to `completed`. Failed publication leaves a resumable blocked marker.
+- `gitsync.py --mode publish --phase N` rechecks the claim, takes the short publication lock, scopes cleanup to `runs/phase-N`, verifies effective public/private push destinations, writes and pushes the completion receipt, syncs fail-closed, and pushes without force. The finalize stage uses this command instead of an unclaimed manual push.
+- Automated checks cover two-client claim races, independent phase claims, real Git-backed lower-phase ordering, waiting, explicit takeover fencing and retry fencing, deleted/noncanonical state, shallow-history refusal, public pushurl boundaries, unavailable coordination, valid publication-lock contention, phase-scoped cleanup, phase-file binding, publication receipts, failed-publication recovery, portable driver locking, and the driver's real fail-closed coordination path. Temporary local-runner and publication smokes also passed with synthetic phases. The existing selector, driver, worker, and synchronization checks pass; the runner self-test passes with model-catalog checks marked unavailable because the host's OpenCode catalog command is broken, so deployment must resolve that environment exception separately.
+- A real two-machine manual check with synthetic phases remains an operator acceptance action. The local two-client check uses temporary Git remotes only. Do not enable real manual reservations until that check and the first deliberate idle server checkout update are complete.
 

@@ -74,7 +74,7 @@ The helper is the only pipeline boundary to GitHub. It reads the credential thro
 
 ## Run state
 
-Each run dir holds `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>.log` run logs, `<step>-resume-r<N>.md` resume prompts, `resume.json`, `ledger.json`, `run.json`, and the step artifacts (`findings.json`, `findings.original.json`). `resume.json` (outputs, visits, harness use, transcript, events, current step) is saved before every invocation and after every routing decision; it is deleted on a clean finish but kept after Ctrl-C, step failure, or a blocked ending so the same command resumes. A finished non-blocked run refuses to rerun (use `--fresh`); a blocked run drops its stale `run.json` marker and resumes. `--from-step S` resumes at S after proving every dominator predecessor of S has a ledger entry, and inherits the previous step from the last event that routed into S.
+Each run dir holds `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>.log` run logs, `<step>-resume-r<N>.md` resume prompts, `resume.json`, `ledger.json`, `run.json`, `reservation.json`, `publication.json`, and the step artifacts (`findings.json`, `findings.original.json`). `resume.json` (outputs, visits, harness use, transcript, events, current step) is saved before every invocation and after every routing decision; it is deleted on a clean finish but kept after Ctrl-C, step failure, or a blocked ending so the same command resumes. A finished non-blocked run refuses to rerun (use `--fresh`); a blocked run drops its stale `run.json` marker and resumes. `--from-step S` resumes at S after proving every dominator predecessor of S has a ledger entry, and inherits the previous step from the last event that routed into S.
 
 `ledger.json` records per-step completion proofs (signal, harness, visits, output hash, artifact hashes, git HEAD). On resume every entry is re-proven: outputs and artifacts must hash identically (files a later step intentionally rewrites via a snapshot `from` are exempt), and later steps moving git HEAD fail the check. The resumed current step is exempt from the output pin since its saved output is the interrupted attempt.
 
@@ -82,6 +82,45 @@ Each run dir holds `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>
 
 Both checkouts must not run on a stale or diverged base. `harness/gitsync.py`
 owns this; the runner calls it and the finalize stage calls it directly.
+
+## Shared phase reservations
+
+A live runner invocation must hold the exact phase on the private coordination
+board before it invokes a harness. The board is `coordination/state.json` in
+the nested private repository on the configured branch (currently `master`).
+The server driver uses `next_phase.py --server`, which returns `RESERVED` only
+after a normal fast-forward push succeeds. A local runner claims the operator's
+exact phase directly. `WAIT_FOR_CLAIM` means another machine owns the lowest
+unfinished phase; the runner does not invoke a harness or select a later phase.
+A future local reservation therefore does not move the server past unfinished
+lower phases.
+
+The reservation record contains `machine_id`, `reservation_id`, `generation`,
+timestamps, `run_id`, and base revisions. Every renewal, resume, completion,
+publication, and takeover checks all three ownership fields. The selected
+policy has no automatic expiry. Interrupted, blocked, and rejected work keeps
+its claim; an operator must explicitly use `phase_reservations.py takeover`
+with the old reservation ID and generation plus `--confirm` after confirming
+that the old owner is gone. The old token then fails renew, resume, completion,
+and publication. A takeover retry with the old expected token is rejected
+instead of fencing the replacement owner.
+
+Run-state cleanup and final publication are phase-scoped. Finalize uses:
+
+```bash
+python3 private/clio-private/harness/gitsync.py --root . --mode publish --phase <N>
+```
+
+That command rechecks the claim, takes the short shared publication lock,
+commits only `runs/phase-<N>` leftovers, syncs both checkouts, and performs
+normal pushes. The helper writes and pushes `runs/phase-<N>/publication.json`; the
+runner requires that receipt before it changes the shared record to
+`completed`. It never force-pushes, rebases,
+resets, stashes, or hides a conflict. A publication lock left by a crashed
+process is not taken over
+implicitly; inspect the state and use the explicit
+`phase_reservations.py release-publication --confirm` command with the recorded
+triple.
 
 - **Before a fresh start** the runner syncs the public root and nested
   `private/clio-private` (`gitsync.sync_all(repo, "start")`). It fetches each
@@ -94,35 +133,32 @@ owns this; the runner calls it and the finalize stage calls it directly.
   stashes, or discards local work, and never runs `git pull` (the public repo
   sets `pull.rebase = true`, which would rewrite history). Local commits
   ahead of the remote do not block a start; the remote has nothing new.
-- **A fresh start then cleans up run state.** The runner commits and pushes
-  only the private repo's `runs/` leftovers (the runner writes `ledger.json`
-  and `run.json` after finalize's commit), so the phase begins from a clean
-  tree. Any dirty path outside `runs/` in either checkout stops the run for
-  operator review, so a half-finished human edit is never auto-published.
+- **A fresh start then cleans up only its phase's run state.** The runner
+  commits and pushes the private repo's `runs/phase-<N>` leftovers, so another
+  phase's partial records are never swept into this phase. Any staged path
+  outside that phase still stops the run for operator review.
 - **Resume is deliberately not synced.** A resume must keep the history its
   ledger already attests to (`git HEAD` per step), so a sync that moved HEAD
   would invalidate the completion proofs.
-- **Before finalize** the finalize agent commits the phase's work first, then
-  runs `gitsync.py --root . --mode push` immediately before pushing. That
-  fetches both checkouts, fast-forwards or merges any remote commits that
-  arrived (never rebasing or forcing), and confirms the remote tip is an
-  ancestor of local HEAD so the push will fast-forward. A genuine conflict is
-  left in place (not aborted): the agent resolves the conflicted files,
-  `git add`s them, completes the merge, and re-checks. If it cannot resolve
-  them confidently, the run blocks before anything is pushed. Committing
-  first is what lets the merge run against a clean index.
+- **Before finalize** the finalize agent commits the phase's product work and
+  runs `gitsync.py --root . --mode publish --phase <N>`. The helper verifies
+  the phase's three-part fence, takes the short publication lock, commits only
+  the current phase's run leftovers, fetches both checkouts, and confirms each
+  normal push will fast-forward. A genuine conflict is left in place (not
+  aborted): the agent resolves the named files, `git add`s them, completes the
+  merge, and reruns the helper. If it cannot resolve them confidently, the run
+  blocks before anything is pushed.
 - **The private checkout is normally dirty after a phase**: the runner writes
   `ledger.json` and `run.json` after finalize's commit. `start` mode treats
   that as expected — when local HEAD already equals the remote it is a no-op,
   and a fast-forward or merge preserves dirty artifacts it does not touch,
   refusing only overlapping ones. It never requires a clean working tree,
   only a clean index.
-- **Every sync attempt is recorded**: the runner writes `sync-before-start.json`
-  and `sync-before-start-clean.json` beside the run state (git-ignored
-  evidence), and a merge's own commit is durable in git history.
-- **Cross-checkout safety**: if the nested private repo shares the public
-  repo's remote URL, both are refused, so private content cannot cross into
-  the public checkout.
+- **Every sync attempt is recorded**: the runner writes `sync-before-start.json`,
+  `sync-before-start-clean.json`, and `sync-after-completion.json` beside the
+  run state (git-ignored evidence), and a merge's own commit is durable in git
+  history.
+- **Cross-checkout safety**: effective public/private fetch and push destinations are compared, including `pushurl`; both are refused if they overlap, so private content cannot cross into the public checkout.
 
 Standalone check (stubbed remotes, no repo state touched); it also runs inside
 `runner.py --self-test`:
@@ -133,7 +169,7 @@ python3 private/clio-private/harness/gitsync.py --self-test
 
 ## Verify
 
-`--dry-run`, `--self-test`, and `--fuzz` create nothing in the repo. `--self-test` checks harness binaries and model slugs statically (plus signal parsing, the opencode TUI command shape, harness display-name coverage, alias expansion, the idle reminder's schedule, signal safety, pty delivery, prompt-tail skipping, operator-typing suppression, and the swallowed-Enter retry, and rotation persistence with a stub harness in a temp dir). `--fuzz` asserts router properties over random graphs: terminal states are terminal, every routed edge matches the taken signal, exhaustion respects `max_rounds`, and consecutive events chain step-to-step.
+`--dry-run`, `--self-test`, and `--fuzz` create nothing in the repo. `--self-test` checks harness binaries and model slugs statically (plus signal parsing, the opencode TUI command shape, harness display-name coverage, alias expansion, the idle reminder's schedule, signal safety, pty delivery, prompt-tail skipping, operator-typing suppression, the swallowed-Enter retry, and rotation persistence with a stub harness in a temp dir). If the model-catalog command itself is unavailable, those checks are reported as skipped rather than falsely failed; resolve that environment exception before deployment. `--fuzz` asserts router properties over random graphs: terminal states are terminal, every routed edge matches the taken signal, exhaustion respects `max_rounds`, and consecutive events chain step-to-step.
 
 Manual idle-reminder check (needs a terminal, not part of the automated gate): run a step with a stub harness that writes its run log and then sleeps without a signal, wait for the quiet interval, and confirm the reminder appears in the harness input and that the run log stays signal-free. `reminders.log` in the run dir records each reminder; `runner: attach mode: pty (console capture on)` on stderr confirms the pty path was chosen. On a real idle `opencode` session, confirm the submitted reminder is accepted (issue #20529 can swallow it; the stderr recovery line and `--mark-done` remain the fallback).
 

@@ -28,6 +28,7 @@ tmux attach -t development
 cd ~/clio
 
 python3 private/clio-private/harness/next_phase.py
+python3 private/clio-private/harness/phase_reservations.py --self-test
 bash private/clio-private/harness/phase-driver.sh --check
 bash private/clio-private/harness/phase-driver.sh --dry-run
 bash private/clio-private/harness/phase-driver.sh --self-test

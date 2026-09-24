@@ -9,11 +9,13 @@ python3 private/clio-private/harness/runner.py --pipeline private/clio-private/h
 2. `--self-test`: static harness checks, no spend. `--live` adds one-word inference probes.
 3. Drop `--dry-run` for the real run. Every harness runs attached in your terminal: cursor, agy, and opencode open interactive sessions seeded with the task pointer; hermes seeds a chat. agy runs with `--dangerously-skip-permissions`; opencode runs with `--auto` and the full TUI (mandated by the stages); cursor and the others may ask you to approve tool calls as they work. The runner closes any session itself ~15 s after the final signal lands in the run log — opencode's TUI would otherwise idle after finishing.
 4. Result: JSON summary on stdout, detail in `private/clio-private/runs/phase-100060/run.json`, per-invocation run logs beside the task files (`<step>-task-r<N>.log`) — the runner reads each step's final-line signal from that log.
-5. Exits: 0 completed, 1 rejected/blocked, 2 config error, 130 interrupted.
+5. Exits: 0 completed, 1 rejected/blocked, 2 config error, 3 WAIT_FOR_CLAIM, 4 FENCED, 130 interrupted.
 
 Flow: developer → adversary → remediator ⇄ approver (3 rounds max) → finalize. The adversary skips directly to finalize only when both `findings` and `addressed_issues` are empty; issue-only candidates still receive remedy and approval checks. Any `*_BLOCKED` ends the run. Each step rotates its two harnesses round-robin.
 
-Before a fresh start the runner brings both checkouts (`clio` and `private/clio-private`) in line with their remotes — fast-forwarding or cleanly merging — and refuses only on a real conflict, a dirty index, or a detached HEAD. Finalize syncs again and confirms each push will fast-forward before pushing. A blocked sync exits 2 and halts the line (see `runner.md`, Sync gate).
+Before a fresh start the runner brings both checkouts (`clio` and `private/clio-private`) in line with their remotes — fast-forwarding or cleanly merging — and refuses only on a real conflict, a dirty index, or a detached HEAD. It then claims the exact phase in the private coordination board. A server claim is passed by the driver; a local run claims directly. The live runner also verifies that `phase_file` is the canonical roadmap file for `phase_number`; a missing or mismatched file fails before any claim or harness starts. If another machine owns the phase, the runner returns `WAIT_FOR_CLAIM` and does not invoke a harness. A stale reservation ID or generation returns `FENCED`.
+
+The coordination state is private-only at `private/clio-private/coordination/state.json` on the configured private branch (currently `master`). There is no automatic expiry. Interrupted, blocked, and rejected runs retain their reservation; use the explicit takeover command in `dev-note.md` with the old reservation ID and generation only after confirming the old owner is gone. Finalize uses `gitsync.py --mode publish --phase <N>`, which rechecks the claim, takes the short publication lock, scopes cleanup to the current phase, pushes `publication.json`, and refuses force-pushes. The runner requires that receipt before marking the phase completed. A coordination/configuration failure exits 2 and halts the line (see `runner.md`, Sync gate).
 
 ## Canary (after stage/worker/helper edits)
 
@@ -27,8 +29,8 @@ Prompts travel as task files: the harness receives a 2-line pointer telling it t
 
 ## Directories
 
-- `private/clio-private/runs/phase-{NNNNNN}/`: run dir (runner creates). Holds `run.json`, `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>.log` run logs, `<step>-resume-r<N>.md` resume prompts, `resume.json` (deleted on clean finish, kept after Ctrl-C or step failure), `ledger.json` (per-step completion proofs), `findings.json`, `findings.original.json`.
-- Dry-run, `--self-test`, and `--fuzz` create nothing in the repo (`--fuzz` uses temp dirs only).
+- `private/clio-private/runs/phase-{NNNNNN}/`: run dir (runner creates). Holds `run.json`, `reservation.json` (machine/reservation/generation fence), `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>.log` run logs, `<step>-resume-r<N>.md` resume prompts, `resume.json` (deleted on clean finish, kept after Ctrl-C or step failure), `ledger.json` (per-step completion proofs), `findings.json`, `findings.original.json`.
+- Dry-run, `--self-test`, and `--fuzz` create nothing in the repo (`--fuzz` uses temp dirs only). A live run does create `reservation.json` only after the coordination push succeeds; a failed fetch or push prevents the harness launch.
 
 `--pipeline` is required.
 

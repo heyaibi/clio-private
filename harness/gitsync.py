@@ -21,10 +21,14 @@ Two modes, because "local is ahead" means different things:
   remote is merged (or fast-forwarded) first so the push can proceed; a
   conflict is left in place (not aborted) for the finalize agent to resolve.
 
-``commit_leftover_run_state`` is the fresh-start cleanup: it commits and
-pushes only the private repo's ``runs/`` leftovers (the runner writes
-``ledger.json``/``run.json`` after finalize's commit) and refuses any dirty
-path outside ``runs/``, so a half-finished human edit is never published.
+``commit_leftover_run_state`` is the fresh-start cleanup: when given a phase,
+it commits and pushes only that phase's private ``runs/phase-<N>`` leftovers
+(the runner writes ``ledger.json``/``run.json`` after finalize's commit) and
+refuses staged paths outside that phase. ``--mode publish`` additionally
+checks the phase's three-part reservation fence, takes the short publication
+lock, verifies effective public/private Git push destinations, writes and pushes
+``runs/phase-<N>/publication.json``, and performs the final sync-and-push
+without force.
 
 Hard safety rules, enforced by construction:
 
@@ -36,13 +40,14 @@ Hard safety rules, enforced by construction:
   is preferred. Only a genuine conflict, a dirty index, or a detached HEAD
   stops the line, and then local work is reported, never discarded.
 * The nested ``private/clio-private`` checkout is synced only from its own
-  remote; if it shares the public repo's remote URL, both are refused, so
-  private content can never cross into the public checkout.
+  remote; effective public/private fetch and push destinations are compared,
+  so private content cannot cross into the public checkout.
 
 Usage (run from the repo root):
 
     python3 private/clio-private/harness/gitsync.py --root . --mode start
     python3 private/clio-private/harness/gitsync.py --root . --mode push
+    python3 private/clio-private/harness/gitsync.py --root . --mode publish --phase 100440
     python3 private/clio-private/harness/gitsync.py --self-test
 
 Exit codes: 0 synced/verified, 1 blocked (operator decision required),
@@ -54,6 +59,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 
 PRIVATE_REL = Path("private") / "clio-private"
@@ -110,9 +116,47 @@ def resolve_upstream(repo):
     return branch, remote, remote_branch, None
 
 
-def remote_url(repo, remote):
-    rc, out, _ = git(repo, "remote", "get-url", remote)
-    return out if rc == 0 and out else None
+def remote_urls(repo, remote, *, push=False):
+    args = ["remote", "get-url"]
+    if push:
+        args.append("--push")
+    args.extend(["--all", remote])
+    rc, out, _ = git(repo, *args)
+    if rc != 0:
+        return []
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def canonical_remote_url(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if "://" not in value and "@" not in value and ":" not in value:
+        return str(Path(value).expanduser().resolve())
+    parsed = urllib.parse.urlsplit(value)
+    if not parsed.scheme:
+        return value
+    return urllib.parse.urlunsplit((
+        parsed.scheme.lower(),
+        parsed.netloc.lower(),
+        parsed.path.rstrip("/") or "/",
+        parsed.query,
+        parsed.fragment,
+    ))
+
+
+def upstream_urls(repo, *, push=False):
+    _branch, remote, _remote_branch, why = resolve_upstream(repo)
+    if why or not remote:
+        return set()
+    return {
+        canonical_remote_url(url)
+        for url in remote_urls(repo, remote, push=push)
+    }
+
+
+def upstream_push_urls(repo):
+    return upstream_urls(repo, push=True)
 
 
 def classify(repo, upstream):
@@ -263,11 +307,6 @@ def sync_one(repo, mode, remote=None, branch=None):
                   abort_on_conflict=(mode != "push"))
 
 
-def _upstream_url(repo):
-    _, remote, _, why = resolve_upstream(repo)
-    return None if why or not remote else remote_url(repo, remote)
-
-
 def sync_all(root, mode):
     """Sync the public checkout and the nested private checkout, if present."""
     root = Path(root).resolve()
@@ -276,11 +315,21 @@ def sync_all(root, mode):
     if is_git_repo(nested):
         repos.append(nested)
     if len(repos) == 2:
-        u_root, u_nested = _upstream_url(root), _upstream_url(nested)
-        if u_root and u_nested and u_root == u_nested:
-            reason = ("nested private repo and public repo share the same "
-                      "remote URL; refusing to sync either checkout so "
-                      "private content cannot cross into the public one")
+        public_fetch = upstream_urls(root)
+        public_push = upstream_push_urls(root)
+        private_fetch = upstream_urls(nested)
+        private_push = upstream_push_urls(nested)
+        if not public_fetch or not public_push or not private_fetch or not private_push:
+            reason = ("cannot prove separate public/private Git destinations; "
+                      "refusing to sync either checkout")
+            results = [blocked({"repo": str(r), "mode": mode}, reason)
+                       for r in repos]
+            return {"ok": False, "mode": mode, "repos": results,
+                    "summary": summarize(results, mode)}
+        if public_push & private_push or public_push & private_fetch \
+                or public_fetch & private_push:
+            reason = ("nested private repo and public repo share a Git "
+                      "push/fetch destination; refusing to sync either checkout")
             results = [blocked({"repo": str(r), "mode": mode}, reason)
                        for r in repos]
             return {"ok": False, "mode": mode, "repos": results,
@@ -314,17 +363,34 @@ def is_run_state(path):
     return path == "runs" or path.startswith("runs/")
 
 
-def _commit_and_push_run_state(repo, message):
-    """Commit the staged runs/ leftovers and push, retrying once after
-    integrating a remote that moved. Never force-pushes."""
+def _commit_and_push_run_state(repo, message, pathspec="runs"):
+    """Commit one scoped run-state path and push without force.
+
+    ``pathspec`` is deliberately narrow. A phase must never publish another
+    phase's run directory merely because both are dirty at the same time.
+    """
     branch, remote, remote_branch, why = resolve_upstream(repo)
-    info = {"repo": str(repo)}
+    info = {"repo": str(repo), "pathspec": pathspec}
     if why:
         return blocked(info, why)
-    git(repo, "add", "-A", "--", "runs")
+    _, staged, _ = git(repo, "diff", "--cached", "--name-only")
+    if staged:
+        prefix = pathspec.rstrip("/") + "/"
+        outside = [p for p in staged.splitlines()
+                   if p != pathspec and not p.startswith(prefix)]
+        if outside:
+            return blocked(info, "staged changes exist outside the current phase",
+                           staged=outside,
+                           hint="commit or unstage them before publishing")
+    rc, _, err = git(repo, "add", "-A", "--", pathspec)
+    if rc != 0:
+        return blocked(info, f"could not stage {pathspec}: {err}")
     rc, out, err = git(repo, "commit", "-q", "-m", message)
     if rc != 0:
-        return blocked(info, f"commit of run state failed: {err or out}")
+        combined = err or out
+        if "nothing to commit" in combined.lower():
+            return dict(info, ok=True, action="clean", hint=message)
+        return blocked(info, f"commit of run state failed: {combined}")
     for attempt in (1, 2):
         rc, out, err = git(repo, "push", remote, branch)
         if rc == 0:
@@ -341,13 +407,26 @@ def _commit_and_push_run_state(repo, message):
                    hint="resolve the remote by hand, then rerun")
 
 
-def commit_leftover_run_state(root, message):
-    """At a fresh start, commit and push only the private repo's runs/
-    leftovers (the runner writes ledger.json/run.json after finalize's
-    commit). Any dirty path outside runs/ in either checkout is a blocker
-    for operator review, so a half-finished human edit is never published."""
+def _phase_run_pathspec(phase):
+    try:
+        number = int(phase)
+    except (TypeError, ValueError):
+        raise ConfigError(f"invalid phase number: {phase!r}") from None
+    if number < 0 or number > 999999:
+        raise ConfigError(f"phase number out of range: {number}")
+    return f"runs/phase-{number:06d}"
+
+
+def commit_leftover_run_state(root, message, phase=None):
+    """Commit only the current phase's private run state.
+
+    With ``phase`` omitted, the legacy all-``runs`` scope remains available
+    for standalone maintenance. The pipeline always supplies a phase so a
+    concurrent phase's partial records cannot be swept into this publication.
+    """
     root = Path(root).resolve()
     private = root / PRIVATE_REL
+    pathspec = _phase_run_pathspec(phase) if phase is not None else "runs"
     results = []
     # The nested private checkout is a separate repo by design; if a host
     # lacks the global ignore for it, do not mistake it for public dirt.
@@ -361,22 +440,225 @@ def commit_leftover_run_state(root, message):
             hint="commit or revert them, then rerun"))
     if is_git_repo(private):
         paths = dirty_paths(private)
-        outside = [p for p in paths if not is_run_state(p)]
-        inside = [p for p in paths if is_run_state(p)]
+        if phase is None:
+            outside = [p for p in paths if not is_run_state(p)]
+            inside = [p for p in paths if is_run_state(p)]
+        else:
+            prefix = pathspec + "/"
+            # Unstaged files from another phase are deliberately left alone;
+            # only staged paths outside this phase are dangerous because a
+            # commit would carry them accidentally.
+            _, staged, _ = git(private, "diff", "--cached", "--name-only")
+            outside = [p for p in staged.splitlines()
+                       if p != pathspec and not p.startswith(prefix)]
+            inside = [p for p in paths
+                      if p == pathspec or p.startswith(prefix)]
         if outside:
             results.append(blocked(
                 {"repo": str(private)},
-                "private checkout has changes outside runs/",
+                "private checkout has changes outside the current phase"
+                if phase is not None else "private checkout has changes outside runs/",
                 dirty=outside,
-                hint="commit or revert them, then rerun"))
+                hint="commit or move them before publishing this phase"))
         elif inside:
-            results.append(_commit_and_push_run_state(private, message))
+            results.append(_commit_and_push_run_state(
+                private, message, pathspec=pathspec))
         else:
             results.append({"repo": str(private), "ok": True,
                             "action": "clean"})
     ok = all(r.get("ok") for r in results)
     return {"ok": ok, "mode": "start-clean", "repos": results,
+            "pathspec": pathspec,
             "summary": summarize(results, "start-clean")}
+
+
+def _published_head(results, repo):
+    for result in results:
+        if result.get("repo") == str(repo) and result.get("action") == "pushed":
+            return result.get("after")
+    return None
+
+
+def _write_publication_receipt(root, phase, reservation, results):
+    private = root / PRIVATE_REL
+    run_dir = private / "runs" / f"phase-{int(phase):06d}"
+    if not run_dir.is_dir():
+        raise ConfigError(f"phase run directory is missing: {run_dir}")
+    public_commit = _published_head(results, root)
+    private_commit = _published_head(results, private)
+    if not public_commit or not private_commit:
+        raise ConfigError("publication did not produce both repository heads")
+    from phase_reservations import _now
+    receipt = {
+        "version": 1,
+        "phase": f"{int(phase):06d}",
+        "state": "published",
+        "reservation": {
+            "machine_id": reservation["machine_id"],
+            "reservation_id": reservation["reservation_id"],
+            "generation": reservation["generation"],
+        },
+        "public_commit": public_commit,
+        "private_commit": private_commit,
+        "published_at": _now(),
+    }
+    path = run_dir / "publication.json"
+    path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    pushed = commit_leftover_run_state(
+        root, f"pipeline: publish completion receipt for phase {int(phase):06d}",
+        phase=phase)
+    if not pushed.get("ok"):
+        raise ConfigError(
+            f"publication receipt was not pushed: {pushed.get('summary', 'unknown error')}")
+    receipt["private_commit"] = private_commit
+    receipt["path"] = str(path)
+    return receipt, pushed
+
+
+def _load_phase_reservation(root, phase, reservation_file=None,
+                             machine_id=None, reservation_id=None,
+                             generation=None):
+    if reservation_file is None:
+        reservation_file = root / PRIVATE_REL / "runs" / f"phase-{int(phase):06d}" / "reservation.json"
+    try:
+        data = json.loads(Path(reservation_file).read_text())
+    except (OSError, ValueError) as exc:
+        raise ConfigError(f"cannot read phase reservation: {exc}") from exc
+    if machine_id:
+        data["machine_id"] = machine_id
+    if reservation_id:
+        data["reservation_id"] = reservation_id
+    if generation is not None:
+        data["generation"] = int(generation)
+    data["phase"] = f"{int(phase):06d}"
+    return data
+
+
+def _push_one(repo):
+    branch, remote, _remote_branch, why = resolve_upstream(repo)
+    if why:
+        return blocked({"repo": str(repo)}, why)
+    rc, out, err = git(repo, "push", remote, branch)
+    if rc != 0:
+        return blocked({"repo": str(repo)},
+                       f"push failed: {err or out}",
+                       hint="resolve the remote and rerun; never force-push")
+    return {"repo": str(repo), "ok": True, "action": "pushed",
+            "after": git(repo, "rev-parse", "HEAD")[1]}
+
+
+def publish_phase(root, phase, *, reservation_file=None, machine_id=None,
+                  reservation_id=None, generation=None, commit_run_state=True):
+    """Check the phase fence, take the short publication lock, and publish.
+
+    The caller must commit the phase's product changes first. This helper
+    commits only leftover files in that phase's run directory, syncs both
+    checkouts fail-closed, and performs normal pushes. It never stages an
+    unrelated phase and never uses a force push.
+    """
+    root = Path(root).resolve()
+    try:
+        phase = int(phase)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"invalid phase number: {phase!r}") from exc
+    if phase < 0 or phase > 999999:
+        raise ConfigError(f"phase number out of range: {phase}")
+    if not commit_run_state:
+        raise ConfigError("publication requires phase-scoped run-state commit")
+    try:
+        from phase_reservations import (
+            PublicationBusy,
+            ReservationFenced,
+            ReservationStore,
+        )
+        reservation = _load_phase_reservation(
+            root, phase, reservation_file, machine_id, reservation_id, generation)
+        store = ReservationStore(root)
+        store.assert_owner(reservation)
+        store.acquire_publication(reservation)
+    except PublicationBusy as exc:
+        return {"ok": False, "mode": "publish", "state": "PUBLICATION_BUSY",
+                "error": str(exc), "phase": f"{int(phase):06d}"}
+    except ReservationFenced as exc:
+        return {"ok": False, "mode": "publish", "state": "FENCED",
+                "error": str(exc), "phase": f"{int(phase):06d}"}
+    except Exception as exc:  # noqa: BLE001 - normalize boundary errors
+        return {"ok": False, "mode": "publish", "state": "COORDINATION_UNAVAILABLE",
+                "error": str(exc), "phase": f"{int(phase):06d}"}
+
+    results = []
+    outcome = None
+    try:
+        if commit_run_state:
+            clean = commit_leftover_run_state(
+                root, f"pipeline: publish run state for phase {int(phase):06d}",
+                phase=phase)
+            results.append(clean)
+            if not clean["ok"]:
+                outcome = {"ok": False, "mode": "publish",
+                           "phase": f"{int(phase):06d}", "state": "BLOCKED",
+                           "repos": results, "summary": clean["summary"]}
+        if outcome is None:
+            dirty = [p for p in dirty_paths(root)
+                     if not (p == "private" or p.startswith("private/"))]
+            if is_git_repo(root / PRIVATE_REL):
+                dirty += [f"private/clio-private/{p}"
+                          for p in dirty_paths(root / PRIVATE_REL)]
+            if dirty:
+                outcome = {"ok": False, "mode": "publish",
+                           "phase": f"{int(phase):06d}", "state": "BLOCKED",
+                           "repos": results,
+                           "error": "working tree is dirty after phase cleanup",
+                           "dirty": dirty}
+        if outcome is None:
+            sync = sync_all(root, "push")
+            results.append(sync)
+            if not sync["ok"]:
+                outcome = {"ok": False, "mode": "publish",
+                           "phase": f"{int(phase):06d}", "state": "BLOCKED",
+                           "repos": results, "summary": sync["summary"]}
+        if outcome is None:
+            for checkout in (root, root / PRIVATE_REL):
+                if not is_git_repo(checkout):
+                    continue
+                store.assert_owner(reservation)
+                pushed = _push_one(checkout)
+                results.append(pushed)
+                if not pushed.get("ok"):
+                    outcome = {"ok": False, "mode": "publish",
+                               "phase": f"{int(phase):06d}", "state": "BLOCKED",
+                               "repos": results,
+                               "summary": summarize([pushed], "publish")}
+                    break
+        if outcome is None:
+            push_results = [r for r in results
+                            if isinstance(r, dict) and "repo" in r]
+            outcome = {"ok": True, "mode": "publish",
+                       "phase": f"{int(phase):06d}", "state": "PUBLISHED",
+                       "repos": results,
+                       "summary": summarize(push_results, "publish")}
+        if outcome.get("ok") and commit_run_state:
+            receipt, receipt_result = _write_publication_receipt(
+                root, phase, reservation, results)
+            results.append(receipt_result)
+            outcome["receipt"] = receipt
+            outcome["repos"] = results
+            outcome["summary"] = summarize(
+                [r for r in results if isinstance(r, dict) and "repo" in r],
+                "publish")
+    except Exception as exc:  # noqa: BLE001 - publication is fail-closed
+        outcome = {"ok": False, "mode": "publish",
+                   "phase": f"{int(phase):06d}", "state": "BLOCKED",
+                   "repos": results, "error": str(exc)}
+    try:
+        store.release_publication(reservation)
+    except Exception as exc:  # noqa: BLE001 - a stale lock must be visible
+        outcome = dict(outcome or {"ok": False, "mode": "publish",
+                                   "phase": f"{int(phase):06d}"})
+        outcome["ok"] = False
+        outcome["state"] = "COORDINATION_UNAVAILABLE"
+        outcome["error"] = f"could not release publication lock: {exc}"
+    return outcome
 
 
 def summarize(results, mode):
@@ -432,6 +714,45 @@ def _local_commit(work, name):
     (work / "b.txt").write_text(f"{name}\n")
     git(work, "add", "b.txt")
     git(work, "commit", "-q", "-m", f"local {name}")
+
+
+def _publication_receipt_check(base):
+    d = base / "publication-receipt"
+    d.mkdir()
+    _public_remote, pub = _init_remote(d, "pub")
+    nested = pub / PRIVATE_REL
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    private_remote, _ = _init_remote(d, "priv")
+    subprocess.run(["git", "clone", "-q", str(private_remote), str(nested)],
+                   check=True, capture_output=True, text=True)
+    git(nested, "config", "user.email", "sync-test@example.com")
+    git(nested, "config", "user.name", "sync test")
+    old_branch = os.environ.get("CLIO_PHASE_COORDINATION_BRANCH")
+    os.environ["CLIO_PHASE_COORDINATION_BRANCH"] = "main"
+    try:
+        from phase_reservations import ReservationStore, save_reservation_file
+        store = ReservationStore(pub, branch="main")
+        reservation = store.reserve(100440, "server-01")
+        run_dir = nested / "runs" / "phase-100440"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        save_reservation_file(run_dir / "reservation.json", reservation)
+        (run_dir / "run.json").write_text('{"state":"completed"}\\n')
+        result = publish_phase(pub, 100440)
+        if not result.get("ok") or result.get("state") != "PUBLISHED":
+            return False, str(result)
+        receipt_path = result.get("receipt", {}).get("path")
+        if not receipt_path or not Path(receipt_path).is_file():
+            return False, "publication receipt was not written"
+        store.set_status(reservation, "completed", evidence_path=receipt_path)
+        return store.read()[0]["phases"]["100440"]["status"] == "completed", \
+            "receipt-backed completion"
+    except Exception as exc:  # noqa: BLE001 - self-test reports the failure
+        return False, str(exc)
+    finally:
+        if old_branch is None:
+            os.environ.pop("CLIO_PHASE_COORDINATION_BRANCH", None)
+        else:
+            os.environ["CLIO_PHASE_COORDINATION_BRANCH"] = old_branch
 
 
 def self_test_checks():
@@ -640,7 +961,23 @@ def self_test_checks():
                    check=True, capture_output=True, text=True)
     res = sync_all(pub, "start")
     _check(checks, "sync: shared remote URL refuses both checkouts",
-           (not res["ok"]) and "same remote URL" in res["summary"],
+           (not res["ok"]) and "share a Git push/fetch destination" in res["summary"],
+           res["summary"])
+
+    # 9b. a private pushurl aimed at the public remote is refused.
+    d = base / "pushurl"
+    d.mkdir()
+    public_remote, pub = _init_remote(d, "pub")
+    nested = pub / PRIVATE_REL
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    private_remote, _ = _init_remote(d, "priv")
+    subprocess.run(["git", "clone", "-q", str(private_remote), str(nested)],
+                   check=True, capture_output=True, text=True)
+    git(nested, "remote", "set-url", "--push", "origin", str(public_remote))
+    res = sync_all(pub, "start")
+    _check(checks, "sync: public pushurl boundary refuses both checkouts",
+           (not res["ok"])
+           and "share a Git push/fetch destination" in res["summary"],
            res["summary"])
 
     # 10. a fresh start commits and pushes only the private repo's runs/
@@ -684,6 +1021,43 @@ def self_test_checks():
            (not res["ok"]) and "outside runs/" in res["summary"],
            res["summary"])
 
+    # 11. Phase-scoped cleanup publishes only the requested run directory.
+    d = base / "runstate-phase"
+    d.mkdir()
+    _, pub = _init_remote(d, "pub")
+    nested = pub / PRIVATE_REL
+    nested.parent.mkdir(parents=True, exist_ok=True)
+    priv_remote, _ = _init_remote(d, "priv")
+    subprocess.run(["git", "clone", "-q", str(priv_remote), str(nested)],
+                   check=True, capture_output=True, text=True)
+    git(nested, "config", "user.email", "sync-test@example.com")
+    git(nested, "config", "user.name", "sync test")
+    for number in (100440, 100601):
+        path = nested / "runs" / f"phase-{number:06d}"
+        path.mkdir(parents=True)
+        (path / "run.json").write_text('{"state": "running"}\n')
+    git(nested, "add", "runs")
+    git(nested, "commit", "-q", "-m", "run dirs")
+    git(nested, "push", "-q", "origin", "main")
+    (nested / "runs" / "phase-100440" / "run.json").write_text('{"state": "completed"}\n')
+    (nested / "runs" / "phase-100601" / "run.json").write_text('{"state": "blocked"}\n')
+    res = commit_leftover_run_state(pub, "pipeline: phase test", phase=100440)
+    _check(checks, "sync: cleanup is scoped to the current phase",
+           res["ok"]
+           and json.loads((nested / "runs" / "phase-100440" / "run.json").read_text())["state"] == "completed"
+           and json.loads((nested / "runs" / "phase-100601" / "run.json").read_text())["state"] == "blocked"
+           and "runs/phase-100601/run.json" in dirty_paths(nested),
+           res["summary"])
+
+    _check(checks, "publish: coordination failure maps to exit 2",
+           result_exit_code({"ok": False, "state": "COORDINATION_UNAVAILABLE"}) == 2
+           and result_exit_code({"ok": False, "state": "FENCED"}) == 1
+           and result_exit_code({"ok": True, "state": "PUBLISHED"}) == 0,
+           "state-specific exit codes")
+    receipt_ok, receipt_detail = _publication_receipt_check(base)
+    _check(checks, "publish: receipt-backed completion", receipt_ok,
+           receipt_detail)
+
     return checks
 
 
@@ -695,22 +1069,44 @@ def self_test():
     return 0 if ok else 1
 
 
+def result_exit_code(out):
+    if out.get("state") in {"COORDINATION_UNAVAILABLE", "CONFIG_ERROR"}:
+        return 2
+    return 0 if out.get("ok") else 1
+
+
 def main():
     ap = argparse.ArgumentParser(description="Fail-closed git sync.")
     ap.add_argument("--root", default=".",
                     help="repo root; syncs it and private/clio-private")
     ap.add_argument("--repo", default=None,
                     help="sync one checkout instead of --root")
-    ap.add_argument("--mode", choices=["start", "push"], default="start",
-                    help="start: fast-forward before a phase; "
-                         "push: verify a fast-forward before publishing")
+    ap.add_argument("--mode", choices=["start", "push", "publish"], default="start",
+                    help="start: sync before a phase; push: verify a "
+                         "fast-forward; publish: claim-check and publish a phase")
+    ap.add_argument("--phase", default=None,
+                    help="phase number for --mode publish")
+    ap.add_argument("--reservation-file", default=None,
+                    help="phase-local reservation.json for --mode publish")
+    ap.add_argument("--machine-id", default=None)
+    ap.add_argument("--reservation-id", default=None)
+    ap.add_argument("--generation", type=int, default=None)
     ap.add_argument("--self-test", action="store_true",
                     help="run stubbed-remote checks and exit")
     args = ap.parse_args()
     if args.self_test:
         return self_test()
     try:
-        if args.repo:
+        if args.mode == "publish":
+            if args.phase is None:
+                raise ConfigError("--phase is required with --mode publish")
+            out = publish_phase(
+                Path(args.root).resolve(), args.phase,
+                reservation_file=args.reservation_file,
+                machine_id=args.machine_id,
+                reservation_id=args.reservation_id,
+                generation=args.generation)
+        elif args.repo:
             res = sync_one(Path(args.repo).resolve(), args.mode)
             out = {"ok": res["ok"], "mode": args.mode, "repos": [res],
                    "summary": summarize([res], args.mode)}
@@ -721,7 +1117,7 @@ def main():
                           "state": "config_error", "error": str(e)}, indent=2))
         return 2
     print(json.dumps(out, indent=2))
-    return 0 if out["ok"] else 1
+    return result_exit_code(out)
 
 
 if __name__ == "__main__":

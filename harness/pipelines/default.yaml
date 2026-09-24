@@ -137,5 +137,6 @@ steps:
       REMEDY_APPROVER_AGENT_OUTPUT: {output: approver}
       ISSUE_AUDIT_PATH: "{run_dir}/findings.json"
       REPORT_DIR: "{run_dir}"
+      PHASE_NUMBER: "{phase_number}"
       LOG_PATH: "{run_dir}/{agent}-task-r{round}.log"
     end: completed

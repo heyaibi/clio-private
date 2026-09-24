@@ -21,9 +21,14 @@ Conventions (load-bearing, do not change silently):
     attributed Developer but logs to finalize.log; that split is intended.
   - Repo root is the process working directory. run_dir resolves against it.
   - Exit codes: 0 completed, 1 terminal non-complete (rejected/blocked),
-    2 config_error (machine-readable JSON on stdout in all cases).
+    2 config_error, 3 WAIT_FOR_CLAIM, 4 FENCED (machine-readable JSON on
+    stdout in all cases).
   - Parked phase numbers (>= 900000) are roadmap-only; runner rejects them
     and next_phase.py never selects them.
+  - Every live run claims the exact phase in the private coordination board
+    before invoking a harness. A server passes its claim through the driver;
+    a local run claims it directly. An active claim by another machine returns
+    WAIT_FOR_CLAIM, and stale machine/reservation/generation tokens are fenced.
   - No runner timeouts, but agy enforces its own --print-timeout
     (default 5m) inside the harness; long reviews near that ceiling need
     an explicit harness-side decision, not a runner change.
@@ -43,6 +48,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -63,6 +69,16 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gitsync  # noqa: E402 - path set just above
 from phase_policy import PARKED_PHASE_FLOOR, is_runnable_phase  # noqa: E402
+from phase_reservations import (  # noqa: E402
+    CoordinationError,
+    ReservationConflict,
+    ReservationFenced,
+    ReservationStore,
+    load_reservation_file,
+    reservation_file,
+    reservation_from_environment,
+    save_reservation_file,
+)
 
 TOKEN_RE = re.compile(r"\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}")
 HARNESS_RE = re.compile(r"[a-z0-9_-]+:[^\s:]+")
@@ -139,6 +155,7 @@ SUBMIT_MAX_S = 120.0
 # can neither close the session nor route the pipeline. *_BLOCKED lines
 # need no nonce (ending as blocked is always operator-visible).
 NONCE_BYTES = 4
+RESERVATION_HEARTBEAT_S = 300.0
 NONCE_FOOTER = (
     "\n\n## Signal nonce for this invocation: `{nonce}`\n\n"
     "Append this nonce as a separate token after your signal word, e.g. "
@@ -670,6 +687,254 @@ def git_head(run):
         return None
 
 
+def _reservation_store(repo):
+    return ReservationStore(repo)
+
+
+def _reservation_path(run):
+    return reservation_file(run.repo, run.inputs["phase_number"])
+
+
+def _reservation_from_run(run):
+    """Load the phase token from the driver environment or run directory."""
+    try:
+        from_env = reservation_from_environment(run.inputs["phase_number"])
+    except CoordinationError:
+        raise
+    sidecar = load_reservation_file(_reservation_path(run))
+    if from_env is not None:
+        if sidecar is not None:
+            if any(sidecar.get(field) != from_env.get(field)
+                   for field in ("phase", "machine_id", "reservation_id", "generation")):
+                raise Fail("driver and run reservation tokens disagree")
+            return {**sidecar, **from_env}
+        return from_env
+    return sidecar
+
+
+def _validate_phase_file(repo, phase, value):
+    """Bind the operator's phase number to one canonical roadmap file."""
+    if not isinstance(value, str) or not value:
+        raise Fail("phase_file is required for a live run")
+    path = Path(value)
+    if not path.is_absolute():
+        path = repo / path
+    path = path.resolve()
+    import next_phase
+    roadmap = next_phase.roadmap_dir(repo)
+    if roadmap is None:
+        raise Fail("no private roadmap directory is available")
+    try:
+        path.relative_to(roadmap.resolve())
+    except ValueError as exc:
+        raise Fail("phase_file is outside the private roadmap directory") from exc
+    match = next_phase.PHASE_RE.fullmatch(path.name)
+    if not match or int(match.group(1)) != int(phase):
+        raise Fail(
+            f"phase_file {path.name!s} does not match phase_number={phase}")
+    if not path.is_file():
+        raise Fail(f"phase_file does not exist: {path}")
+    return value
+
+
+def _has_completion_marker(run):
+    """Check existing roadmap/run evidence without trusting a reservation."""
+    try:
+        import next_phase
+        phase = int(run.inputs["phase_number"])
+        path = Path(run.inputs["phase_file"])
+        if not path.is_absolute():
+            path = run.repo / path
+        return next_phase.is_done(
+            run.repo, phase, path, next_phase.index_complete(run.repo))
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def _prepare_reservation(run, *, resumed, fresh=False, machine_id=None,
+                         takeover=False):
+    """Acquire or verify the phase fence before any harness can start."""
+    machine_id = machine_id or os.environ.get("CLIO_MACHINE_ID", "local-01")
+    store = _reservation_store(run.repo)
+    current = _reservation_from_run(run)
+    if current is None and not resumed and not fresh and not takeover:
+        state, _commit = store.read()
+        key = f"{int(run.inputs['phase_number']):06d}"
+        if key not in state.get("phases", {}) and _has_completion_marker(run):
+            raise Fail(
+                "phase already has completion evidence; use an explicit fresh "
+                "operator decision before rerunning it")
+    if current is not None:
+        current_machine = current.get("machine_id")
+        if current_machine != machine_id:
+            raise Fail(
+                f"phase reservation belongs to {current_machine!r}, "
+                f"not this machine {machine_id!r}")
+        if fresh and not takeover:
+            raise Fail(
+                "--fresh would discard an active phase reservation; "
+                "use --takeover only after confirming the old owner stopped")
+        if takeover:
+            reservation = store.takeover(
+                run.inputs["phase_number"], machine_id, confirm=True,
+                run_id=f"phase-{int(run.inputs['phase_number']):06d}",
+                expected_reservation_id=current["reservation_id"],
+                expected_generation=current["generation"])
+        else:
+            record = store.assert_owner(current)
+            if record.get("status") in {"completed", "rejected"}:
+                raise Fail(
+                    f"phase reservation is already {record.get('status')}; "
+                    "use an explicit operator decision before rerunning it")
+            reservation = current
+    elif resumed:
+        raise Fail(
+            "resume has no phase reservation token; register the existing "
+            "server-owned claim before resuming")
+    elif takeover:
+        state, _commit = store.read()
+        key = f"{int(run.inputs['phase_number']):06d}"
+        current_record = state.get("phases", {}).get(key)
+        if current_record is None:
+            reservation = store.reserve(
+                run.inputs["phase_number"], machine_id,
+                run_id=f"phase-{key}")
+        else:
+            reservation = store.takeover(
+                run.inputs["phase_number"], machine_id, confirm=True,
+                run_id=f"phase-{key}",
+                expected_reservation_id=current_record["reservation_id"],
+                expected_generation=current_record["generation"])
+    else:
+        reservation = store.reserve(
+            run.inputs["phase_number"], machine_id,
+            run_id=f"phase-{int(run.inputs['phase_number']):06d}")
+
+    # Persist the token before the first harness invocation. If this write
+    # fails, the shared claim remains visible and the operator can recover it;
+    # no unclaimed process is launched.
+    save_reservation_file(_reservation_path(run), reservation)
+    store.set_status(reservation, "running")
+    run.reservation = reservation
+    run.reservation_store = store
+    run.reservation_heartbeat = ReservationHeartbeat(store, reservation)
+    run.reservation_heartbeat.start()
+    return reservation
+
+
+class ReservationHeartbeat:
+    """Best-effort audit heartbeat; lost ownership is checked by the runner."""
+
+    def __init__(self, store, reservation):
+        self.store = store
+        self.reservation = reservation
+        try:
+            self.interval = float(os.environ.get(
+                "CLIO_RESERVATION_HEARTBEAT_S", RESERVATION_HEARTBEAT_S))
+        except ValueError:
+            self.interval = RESERVATION_HEARTBEAT_S
+        self.stop_event = threading.Event()
+        self.error = None
+        self.thread = None
+
+    def start(self):
+        if self.interval <= 0:
+            return
+        self.thread = threading.Thread(
+            target=self._run, name="phase-reservation-heartbeat", daemon=True)
+        self.thread.start()
+
+    def _run(self):
+        while not self.stop_event.wait(self.interval):
+            try:
+                self.store.renew(self.reservation)
+            except Exception as exc:  # noqa: BLE001 - surfaced by check()
+                self.error = str(exc)
+                return
+
+    def check(self):
+        if self.error:
+            raise Fail(f"phase reservation heartbeat failed: {self.error}")
+
+    def stop(self):
+        self.stop_event.set()
+        if self.thread is not None:
+            self.thread.join(timeout=max(1.0, min(self.interval + 1.0, 5.0)))
+
+
+def _set_reservation_state(run, status, *, evidence_path=None):
+    if not getattr(run, "reservation", None):
+        return
+    run.reservation_store.set_status(
+        run.reservation, status, evidence_path=evidence_path)
+
+
+def _publish_completion_evidence(run):
+    """Run the claim-checked publication helper and return its receipt."""
+    if not getattr(run, "reservation", None):
+        return None
+    evidence = gitsync.publish_phase(
+        run.repo, run.inputs["phase_number"])
+    _record_sync(run, "sync-after-completion", evidence)
+    if not evidence.get("ok") or evidence.get("state") != "PUBLISHED":
+        detail = evidence.get("error", evidence.get("summary", "unknown error"))
+        if evidence.get("dirty"):
+            detail += f" (dirty: {evidence['dirty']})"
+        raise Fail(f"completion evidence was not published: {detail}")
+    receipt = evidence.get("receipt")
+    if not isinstance(receipt, dict) or not receipt.get("path"):
+        raise Fail("publication helper returned no completion receipt")
+    return receipt["path"]
+
+
+def _write_pending_completion(run, result):
+    pending = dict(result)
+    pending["state"] = "publishing"
+    pending["publication_pending"] = True
+    (run._run_dir / "run.json").write_text(json.dumps(pending, indent=2))
+
+
+def _mark_publication_failed(run, error):
+    path = getattr(run, "_run_dir", None)
+    if path is None:
+        return
+    marker = path / "run.json"
+    try:
+        data = json.loads(marker.read_text())
+    except (OSError, ValueError):
+        return
+    if data.get("state") != "publishing":
+        return
+    data["state"] = "blocked"
+    data["publication_pending"] = False
+    data["publication_error"] = str(error)
+    marker.write_text(json.dumps(data, indent=2))
+
+
+def _finish_reservation(run, result, *, receipt_path=None):
+    """Retain the reservation and record the terminal state after evidence."""
+    if not getattr(run, "reservation", None):
+        return result
+    state = result.get("state")
+    if state == "completed":
+        if not receipt_path:
+            raise Fail("completed run has no publication receipt")
+        _set_reservation_state(
+            run, "completed", evidence_path=receipt_path)
+    elif state == "rejected":
+        _set_reservation_state(run, "rejected")
+    elif state == "blocked":
+        _set_reservation_state(run, "blocked")
+    result = dict(result)
+    result["reservation"] = {
+        "machine_id": run.reservation["machine_id"],
+        "reservation_id": run.reservation["reservation_id"],
+        "generation": run.reservation["generation"],
+        "state": state,
+    }
+    return result
+
+
 def artifact_is_empty(path):
     """Return whether a required artifact has no actionable content.
 
@@ -886,7 +1151,8 @@ def mark_done(run, step, signal, force=False):
                   "state": target, "transcript": transcript,
                   "events": events}
         done_path.write_text(json.dumps(result, indent=2))
-        rpath.unlink(missing_ok=True)
+        # Keep resume.json until the terminal publication path succeeds. If
+        # publication fails, the next invocation can resume this step.
         return result
     event["routed_to"] = target
     events.append(event)
@@ -1586,8 +1852,9 @@ def preflight_sync(run, commit_run_state=False):
     run stops with a clear message instead of starting on it. Never discards
     or rewrites local work (see gitsync).
 
-    commit_run_state commits and pushes the private repo's runs/ leftovers so
-    the phase begins clean, and halts on any dirty path outside runs/."""
+    commit_run_state remains available for callers that already own the
+    reservation. The normal runner calls it only after its exact phase claim
+    succeeds."""
     res = gitsync.sync_all(run.repo, "start")
     _record_sync(run, "sync-before-start", res)
     if not res["ok"]:
@@ -1596,11 +1863,25 @@ def preflight_sync(run, commit_run_state=False):
         clean = gitsync.commit_leftover_run_state(
             run.repo,
             f"pipeline: commit leftover run state before phase "
-            f"{int(run.inputs['phase_number'])}")
+            f"{int(run.inputs['phase_number'])}",
+            phase=run.inputs["phase_number"])
         _record_sync(run, "sync-before-start-clean", clean)
         if not clean["ok"]:
             raise Fail(f"dirty working tree before start: {clean['summary']}")
     return res
+
+
+def commit_start_run_state(run):
+    """Publish only this phase's run leftovers after its claim is secured."""
+    clean = gitsync.commit_leftover_run_state(
+        run.repo,
+        f"pipeline: commit leftover run state before phase "
+        f"{int(run.inputs['phase_number'])}",
+        phase=run.inputs["phase_number"])
+    _record_sync(run, "sync-before-start-clean", clean)
+    if not clean["ok"]:
+        raise Fail(f"dirty working tree before start: {clean['summary']}")
+    return clean
 
 
 def drive(run, pipe, invoke, resumed=None):
@@ -1649,6 +1930,9 @@ def drive(run, pipe, invoke, resumed=None):
     while True:
         if len(events) >= Guard:
             raise Fail("routing loop exceeded 10000 steps (uncapped cycle?)")
+        heartbeat = getattr(run, "reservation_heartbeat", None)
+        if heartbeat is not None:
+            heartbeat.check()
         s = run.steps[current]
         run.visits[current] = run.visits.get(current, 0) + 1
         t0 = time.time()
@@ -1688,6 +1972,9 @@ def drive(run, pipe, invoke, resumed=None):
         when_keys = list(s["when"]) if "when" in s else None
         output, meta = invoke(harness, invoke_path, log_path, usage_path, when_keys,
                               nonce, sid=current)
+        heartbeat = getattr(run, "reservation_heartbeat", None)
+        if heartbeat is not None:
+            heartbeat.check()
         # Consume the rotation slot only now: a crash before this point
         # retries the same harness instead of shifting the rotation.
         run.harness_use[current] = run.harness_use.get(current, 0) + 1
@@ -1813,21 +2100,31 @@ def self_test(run, live=False):
             full = f"{provider}/{model}" if provider else model
             if cli == "agy":
                 try:
-                    out = subprocess.run(["agy", "models"], capture_output=True,
-                                         text=True, timeout=60).stdout
-                    check(f"{h} model listed", full in out,
-                          "slug in agy models" if full in out else "slug missing")
+                    result = subprocess.run(["agy", "models"], capture_output=True,
+                                             text=True, timeout=60)
+                    if result.returncode != 0:
+                        check(f"{h} model listed", None,
+                              "agy model catalog unavailable")
+                    else:
+                        out = result.stdout
+                        check(f"{h} model listed", full in out,
+                              "slug in agy models" if full in out else "slug missing")
                 except subprocess.TimeoutExpired:
                     check(f"{h} model listed", False, "agy models timed out")
             elif cli == "opencode" and provider:
                 try:
                     # v2 only: `opencode models` takes no provider argument;
                     # it lists every configured provider's catalog at once.
-                    out = subprocess.run(["opencode", "models"],
-                                         capture_output=True, text=True,
-                                         timeout=120).stdout
-                    check(f"{h} model listed", model in out,
-                          "slug in opencode models" if model in out else "slug missing")
+                    result = subprocess.run(["opencode", "models"],
+                                             capture_output=True, text=True,
+                                             timeout=120)
+                    if result.returncode != 0:
+                        check(f"{h} model listed", None,
+                              "opencode model catalog unavailable")
+                    else:
+                        out = result.stdout
+                        check(f"{h} model listed", model in out,
+                              "slug in opencode models" if model in out else "slug missing")
                 except subprocess.TimeoutExpired:
                     check(f"{h} model listed", False, "opencode models timed out")
             elif cli == "hermes":
@@ -2423,6 +2720,66 @@ def self_test(run, live=False):
         check("artifact: finding report stays actionable",
               not artifact_is_empty(actionable))
 
+    with tempfile.TemporaryDirectory(prefix="phase-file-binding") as phase_tmp:
+        phase_root = Path(phase_tmp)
+        phase_roadmap = phase_root / "private" / "clio-private" / "roadmap"
+        phase_roadmap.mkdir(parents=True)
+        phase_ok = phase_roadmap / "phase-100440-test.md"
+        phase_ok.write_text("x")
+        phase_bad = phase_roadmap / "phase-100460-test.md"
+        phase_bad.write_text("x")
+        try:
+            valid_phase_file = _validate_phase_file(
+                phase_root, 100440, str(phase_ok))
+            mismatch_refused = False
+        except Fail:
+            valid_phase_file = None
+            mismatch_refused = True
+        if valid_phase_file is not None:
+            try:
+                _validate_phase_file(phase_root, 100440, str(phase_bad))
+                mismatch_refused = False
+            except Fail:
+                mismatch_refused = True
+        check("phase file binding rejects mismatched phase",
+              valid_phase_file is not None and mismatch_refused,
+              "canonical match required")
+
+    with tempfile.TemporaryDirectory(prefix="publication-failure") as failure_tmp:
+        failure_dir = Path(failure_tmp)
+        failure_run = type("FailureRun", (), {"_run_dir": failure_dir})()
+        (failure_dir / "run.json").write_text(json.dumps({
+            "state": "publishing", "publication_pending": True}))
+        _mark_publication_failed(failure_run, Fail("injected publication failure"))
+        failed_marker = json.loads((failure_dir / "run.json").read_text())
+        check("publication failure leaves resumable blocked marker",
+              failed_marker.get("state") == "blocked"
+              and not failed_marker.get("publication_pending"),
+              str(failed_marker.get("state")))
+
+        publication_run = type("PublicationRun", (), {
+            "repo": failure_run._run_dir,
+            "inputs": {"phase_number": 100440},
+            "reservation": {"phase": "100440", "machine_id": "local-01",
+                            "reservation_id": "rsv-test",
+                            "generation": 1},
+        })()
+        publication_run._run_dir = failure_run._run_dir
+        old_publish = gitsync.publish_phase
+        gitsync.publish_phase = lambda *a, **k: {
+            "ok": False, "state": "COORDINATION_UNAVAILABLE",
+            "error": "injected publication failure"}
+        try:
+            try:
+                _publish_completion_evidence(publication_run)
+                publication_refused = False
+            except Fail:
+                publication_refused = True
+        finally:
+            gitsync.publish_phase = old_publish
+        check("publication helper failure is surfaced to the runner",
+              publication_refused, "failure path")
+
     # Fail-closed sync: stubbed-remote checks live in gitsync.py so the same
     # gate runs standalone (`gitsync.py --self-test`) and here.
     checks += gitsync.self_test_checks()
@@ -2643,6 +3000,11 @@ def main():
     ap.add_argument("--reset-rotation", action="store_true",
                     help="delete this pipeline's rotation file and exit "
                          "(rotation restarts at slot 0)")
+    ap.add_argument("--machine-id", default=None,
+                    help="stable host ID for the shared phase reservation")
+    ap.add_argument("--takeover", action="store_true",
+                    help="explicitly take over a retained phase reservation; "
+                         "requires an operator decision")
     args = ap.parse_args()
 
     if args.fuzz:
@@ -2663,6 +3025,7 @@ def main():
         fp.unlink(missing_ok=True)
         print(json.dumps({"reset_rotation": fp.name, "reset": True}))
         return
+    run = None
     try:
         try:
             pipe = yaml.safe_load(pipe_path.read_text())
@@ -2700,6 +3063,10 @@ def main():
             raise Fail(
                 f"input phase_number={phase} is parked at or above "
                 f"{PARKED_PHASE_FLOOR}; the pipeline ignores parked phases")
+        if not args.self_test and "phase_file" in inputs:
+            inputs["phase_file"] = _validate_phase_file(
+                repo, phase, inputs["phase_file"])
+            run.inputs["phase_file"] = inputs["phase_file"]
         try:
             run._run_dir = (repo / pipe["run_dir"].format(phase=phase)).resolve()
         except (KeyError, ValueError, IndexError) as e:
@@ -2707,6 +3074,7 @@ def main():
         if args.self_test:
             self_test(run, live=args.live)
             return
+        had_run_dir = run._run_dir.exists()
         if not args.dry_run:
             run._run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -2726,10 +3094,6 @@ def main():
             print("dry-run ok: pipeline validates, all steps render")
             return
 
-        if args.fresh and run._run_dir.exists():
-            backup = Path(str(run._run_dir) + f".prev-{int(time.time())}")
-            shutil.move(str(run._run_dir), str(backup))
-            print(json.dumps({"fresh": True, "archived": str(backup)}), file=sys.stderr)
         done_path = run._run_dir / "run.json"
         if done_path.is_file() and not args.fresh:
             try:
@@ -2771,33 +3135,98 @@ def main():
             print(json.dumps({"resuming": resumed["current"], "auto": auto,
                               **assess(run, resumed.get("current"))}), file=sys.stderr)
 
+        if resumed is None:
+            # A fresh phase must refresh both checkouts before its base
+            # revision is recorded or any reservation is acquired.
+            preflight_sync(run, commit_run_state=False)
+        _prepare_reservation(
+            run, resumed=resumed is not None, fresh=args.fresh,
+            machine_id=args.machine_id, takeover=args.takeover)
+        if args.fresh and had_run_dir:
+            backup = Path(str(run._run_dir) + f".prev-{int(time.time())}")
+            shutil.move(str(run._run_dir), str(backup))
+            run._run_dir.mkdir(parents=True, exist_ok=True)
+            # The token was written before the archive and moved with it;
+            # restore it in the new run directory before any harness starts.
+            if run.reservation:
+                save_reservation_file(_reservation_path(run), run.reservation)
+            print(json.dumps({"fresh": True, "archived": str(backup)}), file=sys.stderr)
+        if resumed is None:
+            commit_start_run_state(run)
+
         try:
             if args.mark_done:
                 step, sig = args.mark_done
                 result = mark_done(run, step, sig, force=args.force)
+                if result["state"] in {"completed", "blocked", "rejected"}:
+                    receipt_path = None
+                    if result["state"] == "completed":
+                        # Keep a nonterminal marker until the claim-checked
+                        # publication and state transition both succeed.
+                        _write_pending_completion(run, result)
+                        receipt_path = _publish_completion_evidence(run)
+                    result = _finish_reservation(
+                        run, result, receipt_path=receipt_path)
+                    if result["state"] != "blocked":
+                        (run._run_dir / "resume.json").unlink(missing_ok=True)
                 print(json.dumps(result, indent=2))
                 sys.exit(0 if result["state"] in ("completed", "advanced")
                          else 1)
-            if resumed is None:
-                # Fresh start only: a resume keeps the history its ledger
-                # already attests to, so it is deliberately not synced. The
-                # fresh start also commits/pushes the private repo's runs/
-                # leftovers so the phase begins clean.
-                preflight_sync(run, commit_run_state=True)
             result = drive(run, pipe, run.invoke, resumed)
+            heartbeat = getattr(run, "reservation_heartbeat", None)
+            if heartbeat is not None:
+                heartbeat.check()
         except KeyboardInterrupt:
+            if getattr(run, "reservation", None):
+                _mark_publication_failed(run, "interrupted during publication")
+                try:
+                    _set_reservation_state(run, "paused")
+                except CoordinationError as exc:
+                    print(f"runner: could not mark reservation paused: {exc}",
+                          file=sys.stderr)
             # Operator Ctrl-C killed the step. resume.json was saved before
             # the invocation; keep it so the same command resumes.
             print(json.dumps({"state": "interrupted",
                               "resume": str(run._run_dir / "resume.json")},
                              indent=2))
             sys.exit(130)
+        finally:
+            heartbeat = getattr(run, "reservation_heartbeat", None)
+            if heartbeat is not None:
+                heartbeat.stop()
+        # Write a nonterminal marker before publication. The publication
+        # helper verifies the claim and creates a receipt; only after that
+        # succeeds do we change the shared record to completed.
+        if result.get("state") == "completed":
+            _write_pending_completion(run, result)
+            receipt_path = _publish_completion_evidence(run)
+        else:
+            receipt_path = None
+            (run._run_dir / "run.json").write_text(json.dumps(result, indent=2))
+        result = _finish_reservation(
+            run, result, receipt_path=receipt_path)
         (run._run_dir / "run.json").write_text(json.dumps(result, indent=2))
         if result["state"] != "blocked":
             (run._run_dir / "resume.json").unlink(missing_ok=True)
         print(json.dumps(result, indent=2))
         sys.exit(0 if result["state"] == "completed" else 1)
-    except Fail as e:
+    except ReservationConflict as e:
+        print(json.dumps({"state": "WAIT_FOR_CLAIM", "phase": e.phase,
+                          "owner": e.record.get("machine_id"),
+                          "status": e.record.get("status"),
+                          "error": str(e)}, indent=2))
+        sys.exit(3)
+    except ReservationFenced as e:
+        print(json.dumps({"state": "FENCED", "error": str(e)}, indent=2))
+        sys.exit(4)
+    except (Fail, CoordinationError) as e:
+        if run is not None and getattr(run, "reservation", None):
+            _mark_publication_failed(run, e)
+            try:
+                _set_reservation_state(run, "blocked")
+            except CoordinationError as reservation_error:
+                print(f"runner: could not mark reservation blocked: "
+                      f"{reservation_error}", file=sys.stderr)
         print(json.dumps({"state": "config_error", "error": str(e)}, indent=2))
         sys.exit(2)
 

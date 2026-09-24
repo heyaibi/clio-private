@@ -12,10 +12,24 @@ drives developer → adversary → remediator ⇄ approver → finalize.
 One phase at a time. A phase that ends blocked/rejected/crashed, or that is stopped
 by a signal, writes a halt marker and stops the line until you clear it.
 
+Before an idle tick selects a phase, the driver syncs both checkouts and fetches
+`coordination/state.json` from the private repository's `master` branch. A
+successful push alone does not refresh a checkout, so the first deployment of
+coordination must update the server checkout while the line is idle; every later
+idle tick repeats the sync. It
+reserves the exact phase before launching the tmux session. A future local claim
+does not block lower server phases; when the server reaches an active claim it
+logs `WAIT_FOR_CLAIM` and launches nothing. The selected answer is **no automatic
+expiry**. A stopped owner keeps its claim until an operator explicitly takes it
+over; takeover increments the generation and fences the old token.
+
 ## Files
 - `private/clio-private/harness/next_phase.py` — picks the next phase (done = `run.json: completed`, a
   checked "Required approval is obtained" box, or Complete in `private/clio-private/roadmap/index.md`).
 - `private/clio-private/harness/phase-driver.sh` — guard + launcher + notifier + stop + self-test.
+- `private/clio-private/harness/phase_reservations.py` — private Git reservation board, fencing, and explicit takeover CLI.
+- `private/clio-private/coordination/state.json` — versioned state on the private coordination branch; it is not run evidence. If this file disappears after initialization, every client fails closed instead of treating the board as empty.
+- `private/clio-private/runs/phase-<N>/publication.json` — claim-checked public/private publication receipt required before a reservation becomes `completed`.
 - `private/clio-private/runs/.driver/` — runtime state: `driver.log`, `halted`, `stalled`,
   `notify-broken`, `current`, `pid`, `driver.lock`, `session-<N>.log`.
 - `private/clio-private/runs/.driver.env` — optional untracked overrides (see Config below).
@@ -27,11 +41,12 @@ already exists, so the redirect works on a fresh clone:
 ```
 */10 * * * * /path/to/clio/private/clio-private/harness/phase-driver.sh >> /path/to/clio/private/clio-private/runs/.driver-cron.log 2>&1
 ```
-Requires: `tmux`, `flock`, `python3`, `curl` (for the optional heartbeat), and the
-Hermes profile `not-james-gosling` with Discord configured. The harnesses also need
-their own auth (opencode, agy, and git push for finalize). The push credential must
-be available to `git credential fill`; `harness/github_issues.py` keeps it in memory
-and the pipeline never prints it.
+Requires: `tmux`, `python3`, `curl` (for the optional heartbeat), and the
+Hermes profile `not-james-gosling` with Discord configured. `flock` is used
+when present; otherwise the driver uses an atomic portable lock directory.
+The harnesses also need their own auth (opencode, agy, and git push for
+finalize). The push credential must be available to `git credential fill`;
+`harness/github_issues.py` keeps it in memory and the pipeline never prints it.
 
 ## Watch
 ```
@@ -54,13 +69,41 @@ rm private/clio-private/runs/.driver/halted        # next tick resumes the same 
 the pane, leaving the run orphaned. The driver detects that on the next tick (live PID,
 no session) and halts rather than start a duplicate — but it is the messy path.
 
+There is no automatic expiry. If an operator has confirmed that the old owner
+is gone, take over explicitly; this increments the generation and rejects the
+old reservation ID:
+
+```bash
+python3 private/clio-private/harness/phase_reservations.py takeover \
+  --repo-root . --phase <N> --machine-id <host-id> \
+  --expected-reservation-id <old-id> --expected-generation <old-n> --confirm
+```
+
+For a phase that was already running when coordination was enabled, register it
+as a server-owned running claim once, then resume it through the normal runner:
+
+```bash
+python3 private/clio-private/harness/phase_reservations.py register-running \
+  --repo-root . --phase <N> --machine-id server-01 --confirm
+```
+
+If a finalizer crashed while holding the publication lock, release that exact
+lock with the recorded token before taking over the phase:
+
+```bash
+python3 private/clio-private/harness/phase_reservations.py release-publication \
+  --repo-root . --phase <N> --machine-id <host-id> \
+  --reservation-id <id> --generation <n> --confirm
+```
+
 ## Halted (blocked / rejected / config error / stop)
 The driver writes `private/clio-private/runs/.driver/halted` and stops. After fixing the cause:
 ```
 rm private/clio-private/runs/.driver/halted        # next tick resumes the same phase
 ```
-A **rejected** phase is terminal and cannot resume — rerun it manually with `--fresh`,
-or reset its phase state, then clear the halt.
+A **rejected** phase is terminal and cannot resume automatically. Its reservation
+is retained; use the explicit takeover command only after deciding to rerun it,
+then use the normal runner with the new token.
 
 ## Stalled (watchdog)
 If a live session writes no output for `STALE_AFTER_SEC` (default 45 min), the driver
@@ -115,11 +158,21 @@ DISCORD_FALLBACK_CHANNEL=
 HEARTBEAT_URL=
 STALE_AFTER_SEC=2700
 LOG_KEEP_DAYS=7
+PHASE_MACHINE_ID=server-01
+PHASE_COORDINATION_BRANCH=master
 ```
+
+`PHASE_MACHINE_ID` is stable configuration, not a secret. Set it to the same
+value on every process for one host. The server uses `server-01`; a local
+operator normally uses `local-01`. The branch is the private repository's
+coordination branch selected for this repository; state updates always use a
+short-lived detached worktree and a normal push.
 
 ## Check / dry-run / self-test
 ```
 python3 private/clio-private/harness/next_phase.py             # which phase is next (exit 1 = none left)
+python3 private/clio-private/harness/next_phase.py --server --machine-id server-01 --read-only  # inspect the shared board
+python3 private/clio-private/harness/phase_reservations.py --self-test  # two-client Git race/fencing check
 python3 private/clio-private/harness/github_issues.py --self-test  # hermetic credential/privacy checks; no network
 bash private/clio-private/harness/phase-driver.sh --check      # tools, profile, config readiness
 bash private/clio-private/harness/phase-driver.sh --dry-run    # what the driver would do; touches nothing
@@ -139,8 +192,20 @@ DISABLE_DISCORD=1 bash private/clio-private/harness/phase-driver.sh && tmux atta
 ```
 `DISABLE_NOTIFY=1` (or `DISABLE_DISCORD=1`) logs messages instead of sending them;
 both reach the tmux session, so they silence the start/end/halt messages too. On
-macOS there is no `flock`; the double-start guard then falls back to the tmux session
-check.
+macOS there is no `flock`; the driver uses the atomic lock directory and the
+tmux session check as a second guard.
+
+Before enabling real manual reservations, verify the private checkout's
+effective push URL is not the public repository, that it is not a shallow
+clone, and that the private `master` branch is protected from force-push,
+rewrite, and deletion. Confirm that the initialized coordination state file is
+present. Then run
+`phase_reservations.py --self-test`
+and repeat the same synthetic check from two temporary clones. Confirm one client
+gets `WAIT_FOR_CLAIM` for `100601`, the server can reserve `100440`, completing
+`100601` does not make the server skip `100460`, and an explicit takeover fences
+the old token. The real two-machine check is an operator action; the automated
+check uses local Git remotes only.
 
 ## Design decisions
 - **Shell-only, no Hermes skill.** The original ask was a Hermes skill that picks the
@@ -152,7 +217,12 @@ check.
   advance or retry.
 
 ## Manual single phase
-```
+
+A direct local run is valid only with the exact canonical roadmap file for
+`phase_number`; the runner rejects a missing, outside-roadmap, or mismatched
+phase file before claiming the phase.
+
+```bash
 python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml \
   --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060-parallel-write-canonical-consolidation.md
 ```
