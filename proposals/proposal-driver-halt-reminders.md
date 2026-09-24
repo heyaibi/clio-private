@@ -2,6 +2,8 @@
 
 Status: draft. Date: 2026-09-23. Scope: driver only. No runner, stage, or pipeline changes.
 
+Note: on implementation, move this file to implemented/ with its implementation record.
+
 ## Problem
 
 The driver notifies once when the line halts, then stays silent on later ticks while halted. If the operator misses that one message, the line sits stuck with no further signal until someone reads the log.
