@@ -1,0 +1,72 @@
+{
+  "run_id": "phase-100480",
+  "phase": "100480",
+  "state": "publishing",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "signal": "DEVELOPER_DONE 2eebfc75"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/findings.json 790d08e8"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "FINALIZE_DONE b6bcf47c"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/developer-task-r2.md",
+      "prompt_sha256": "80afdb149aaefec9dbef36f7a4f5faf07b0249f9e5921eb88ee042ac7cf04d00",
+      "duration_s": 583.937,
+      "visits": 2,
+      "signal": "DEVELOPER_DONE 2eebfc75",
+      "resume_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/developer-resume-r2.md",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/developer-task-r2.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "agy:gemini-3.8-flash-high",
+      "agent": "Antigravity CLI (Gemini 3.8 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/adversary-task-r1.md",
+      "prompt_sha256": "95b3a8448fee7036b5f0bd7af27112d2a0206f1cbc139a07cb7f112d182e53a1",
+      "duration_s": 656.129,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/findings.json 790d08e8",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/adversary-task-r1.tui.log",
+      "attach": "pty",
+      "via": "skip",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/finalize-task-r3.md",
+      "prompt_sha256": "57b4b7a535cbaf034e98756fb9df521130a6ce2036870b3b56318b409eb9b1e3",
+      "duration_s": 303.134,
+      "visits": 3,
+      "signal": "FINALIZE_DONE b6bcf47c",
+      "resume_file": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/finalize-resume-r3.md",
+      "tui_log": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100480/finalize-task-r3.tui.log",
+      "attach": "pty",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ],
+  "publication_pending": true
+}

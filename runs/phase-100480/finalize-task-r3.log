@@ -6,3 +6,9 @@
 2026-09-25T00:16:15+0530 committed private close-out 108ea80 (roadmap only, pathspec commit; run-state files left for the publication helper)
 2026-09-25T00:16:15+0530 root repo has no new commits to make: product changes already committed and pushed as 3a638ed by developer stage
 2026-09-25T00:16:15+0530 running publication helper
+2026-09-25T00:16:46+0530 publication helper exit 0: public repo pushed at 3a638ed (up-to-date), private repo pushed at b999066 + receipt 99bb0d2; reservation claim validated; publication.json written and pushed
+2026-09-25T00:16:46+0530 addressed_issues in findings.json is present and an empty list; zero issues to close, no close commands run
+2026-09-25T00:16:46+0530 incidental bug reports: none new confirmed during final checks; existing ledger entry #15 (from adversary stage) unchanged
+2026-09-25T00:16:50+0530 final tree state: both repos clean except this run log (helper-owned run directory); nothing staged, no cross-phase files touched
+2026-09-25T00:16:50+0530 leftover observation (not acted on): Verification Sign-Off Verifier field still [TBD] in the phase roadmap; attribution table contract only required finalize-row fill
+FINALIZE_DONE b6bcf47c
