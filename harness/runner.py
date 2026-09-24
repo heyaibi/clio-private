@@ -32,6 +32,8 @@ Conventions (load-bearing, do not change silently):
   - No runner timeouts, but agy enforces its own --print-timeout
     (default 5m) inside the harness; long reviews near that ceiling need
     an explicit harness-side decision, not a runner change.
+  - The ledger's task_file/harness pair is the authority for completed
+    attempts; other task files remain historical records.
 
 Foreground: every harness runs attached in the operator's terminal with
 inherited stdio; the runner polls the step's run log and closes the
@@ -224,36 +226,52 @@ def rotation_key_for(pipe_path):
 
 
 def load_rotation(repo, key):
-    """Read durable rotation counts. A missing file starts at zero; a
-    corrupt one warns and starts empty: a cosmetic counter never blocks."""
+    """Read durable rotation counts.
+
+    A missing file means no rotation has been recorded yet. Any present
+    but unusable file fails closed: rotation determines model identity,
+    so silently resetting to zero could repeat a model and recreate the
+    confusion this runner prevents. Repair with --reset-rotation after
+    confirming no resumable run depends on the counts.
+    """
     fp = rotation_file(repo, key)
     try:
         data = json.loads(fp.read_text())
-    except OSError:
+    except FileNotFoundError:
         return {}
+    except OSError as e:
+        raise Fail(f"rotation: {fp.name} unreadable ({e}); "
+                   f"repair or use --reset-rotation") from e
     except ValueError as e:
-        print(f"rotation: {fp.name} does not parse ({e}); "
-              f"starting at zero", file=sys.stderr)
-        return {}
+        raise Fail(f"rotation: {fp.name} does not parse ({e}); "
+                   f"repair or use --reset-rotation") from e
     try:
         counts = {str(k): int(v) for k, v in dict(data).items()}
     except (TypeError, ValueError) as e:
-        print(f"rotation: {fp.name} has bad counts ({e}); "
-              f"starting at zero", file=sys.stderr)
-        return {}
+        raise Fail(f"rotation: {fp.name} has bad counts ({e}); "
+                   f"repair or use --reset-rotation") from e
+    for sid, count in counts.items():
+        if not isinstance(count, int) or count < 0:
+            raise Fail(f"rotation: {fp.name} has invalid count for {sid!r}; "
+                       f"repair or use --reset-rotation")
+        # bool is an int subclass; rotation counts must be real integers.
+        if isinstance(count, bool):
+            raise Fail(f"rotation: {fp.name} has invalid count for {sid!r}; "
+                       f"repair or use --reset-rotation")
     return counts
 
 
 def save_rotation(repo, key, harness_use):
-    # Single-operator assumption: runs are foreground and sequential, so a
-    # plain write is enough; concurrent runs are last-writer-wins.
+    # Single-operator assumption: runs are foreground and sequential, so an
+    # atomic replacement is enough; concurrent runs are last-writer-wins.
+    # Rotation determines model identity, so a write failure fails the
+    # completion instead of silently continuing without durable state.
     fp = rotation_file(repo, key)
     try:
         fp.parent.mkdir(parents=True, exist_ok=True)
-        fp.write_text(json.dumps(harness_use, indent=2))
-    except OSError as e:
-        print(f"rotation: cannot write {fp.name} ({e})",
-              file=sys.stderr)
+        write_json_atomic(fp, harness_use)
+    except (Fail, OSError) as e:
+        raise Fail(f"rotation: cannot write {fp.name} ({e})") from e
 
 
 def opencode_launch(model, effort, pointer, stage_name=OPENCODE_AGENT):
@@ -472,6 +490,9 @@ class Run:
         self.persist_rotation = True
         self.rotation_key = None
         self.prev_step = None
+        # Use a completed ledger entry for prior steps whenever one exists.
+        # The dry-run path explicitly disables this for planned previews.
+        self.require_authoritative = True
         self.stages = {}
         for sid, s in self.steps.items():
             meta, body = load_stage((pipe_dir / s["stage"]).resolve())
@@ -500,15 +521,56 @@ class Run:
         if "prev_output" in src:
             return self.outputs.get(self.prev_step, "") if self.prev_step else ""
         if "task" in src:
-            # Quoted prior prompt renders with that step's planned r1 name:
-            # context, not a recording instruction.
+            # A completed step is attributed to its authoritative task
+            # snapshot, not to the first rotation slot. The snapshot file
+            # named by the ledger is the exact prompt the successful agent
+            # saw; re-rendering the current stage template could inject a
+            # mutated stage or a different model name.
+            source_sid = src["task"]
+            if source_sid in seen:
+                raise Fail(f"task reference cycle at step {source_sid}")
+            attempt = (self.authoritative_attempt(source_sid)
+                       if self.require_authoritative else None)
+            if attempt is not None:
+                task_rel = attempt.get("task_file")
+                if not isinstance(task_rel, str) or not task_rel:
+                    raise Fail(f"ledger.json entry for {source_sid!r} has no task file")
+                run_dir = Path(self._run_dir).resolve()
+                candidate = Path(task_rel)
+                if not candidate.is_absolute():
+                    candidate = run_dir / candidate
+                try:
+                    task_path = candidate.resolve()
+                    task_path.relative_to(run_dir)
+                except (OSError, ValueError, RuntimeError) as exc:
+                    raise Fail(f"ledger.json task file for {source_sid!r} escapes "
+                               f"the run directory") from exc
+                try:
+                    content = task_path.read_text()
+                except OSError as exc:
+                    raise Fail(f"authoritative task for {source_sid!r} unreadable: "
+                               f"{exc}") from exc
+                expected_sha = attempt.get("task_sha256")
+                if isinstance(expected_sha, str) and expected_sha:
+                    if sha_str(content) != expected_sha:
+                        raise Fail(f"authoritative task for {source_sid!r} changed since "
+                                   f"completion; refusing to use a tampered snapshot")
+                # Stale nonces must never be reusable as signal tokens.
+                return strip_nonce_footer(content)
+            if self.require_authoritative and source_sid in self.outputs:
+                raise Fail(
+                    f"task reference {source_sid!r} has output but no valid "
+                    "ledger entry; refusing to guess its harness")
+            source_harness = self.planned_harness(source_sid)
             return self.render_task(
-                src["task"], seen | {sid},
-                harness_name=display_name(self.planned_harness(src["task"])))
+                source_sid, seen | {sid},
+                harness_name=display_name(source_harness),
+                include_authority=False)
         subs = [self.resolve(sid, sub, ctx, seen) for sub in src["join"]]
         return src.get("sep", "\n\n").join(subs)
 
-    def render_task(self, sid, seen=..., harness_name=None):
+    def render_task(self, sid, seen=..., harness_name=None,
+                    include_authority=True):
         if seen is ...:
             seen = {sid}
         elif sid in seen:
@@ -530,22 +592,196 @@ class Run:
                 raise Fail(f"step {sid}: unbound body token {tok!r}")
             return values[tok]
 
-        return TOKEN_RE.sub(sub_token, body)
+        rendered = TOKEN_RE.sub(sub_token, body)
+        return (ATTEMPT_AUTHORITY + "\n\n" + rendered
+                if include_authority else rendered)
+
+    def _ledger(self):
+        """Read and validate the run ledger when it exists.
+
+        The ledger is deliberately fail-closed: malformed completion data
+        must not silently fall back to a planned model, because that would
+        recreate the attribution confusion this runner is meant to prevent.
+        """
+        run_dir = getattr(self, "_run_dir", None)
+        if run_dir is None:
+            return None
+        path = Path(run_dir) / "ledger.json"
+        if not path.is_file():
+            return None
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError) as exc:
+            raise Fail(f"ledger.json cannot be read: {path} ({exc})") from exc
+        if (not isinstance(data, dict)
+                or not isinstance(data.get("order"), list)
+                or not isinstance(data.get("steps"), dict)):
+            raise Fail(f"ledger.json has an invalid shape: {path}")
+        return data
+
+    def authoritative_attempt(self, sid):
+        """Return the validated completion record for *sid*, if any.
+
+        New entries carry task_file, task_sha256, and authoritative=True.
+        Legacy entries without those fields are migrated deterministically
+        when unambiguous; ambiguous legacy state fails closed with an
+        explicit recovery command.
+        """
+        ledger = self._ledger()
+        if ledger is None:
+            return None
+        entry = ledger["steps"].get(sid)
+        if entry is None:
+            return None
+        if not isinstance(entry, dict):
+            raise Fail(f"ledger.json entry for {sid!r} is not an object")
+        needs_migration = (
+            entry.get("authoritative") is not True
+            or "task_file" not in entry
+            or "task_sha256" not in entry)
+        if needs_migration:
+            return self._migrate_legacy_entry(sid, ledger, entry)
+        authoritative = entry.get("authoritative", False)
+        if authoritative is not True and "authoritative" in entry:
+            raise Fail(f"ledger.json entry for {sid!r} is not authoritative")
+        harness = entry.get("harness")
+        if not isinstance(harness, str) or not harness:
+            raise Fail(f"ledger.json entry for {sid!r} has no valid harness")
+        signal = entry.get("signal")
+        if "signal" in entry and (not isinstance(signal, str) or not signal):
+            raise Fail(f"ledger.json entry for {sid!r} has no valid signal")
+        if authoritative is True and "signal" not in entry:
+            raise Fail(f"ledger.json entry for {sid!r} has no valid signal")
+        agent = entry.get("agent")
+        if authoritative is True and agent != display_name(harness):
+            raise Fail(
+                f"ledger.json harness and agent disagree for {sid!r}")
+        try:
+            _cli, _provider, _model, _effort = parse_harness(harness)
+        except (Fail, ValueError) as exc:
+            raise Fail(
+                f"ledger.json entry for {sid!r} has an invalid harness "
+                f"{harness!r}") from exc
+        # Older private run ledgers may contain harness identifiers from a
+        # retired CLI. Keep their displayable raw identifier usable for
+        # forensic context; current invocations are still restricted by
+        # pipeline validation.
+        task_file = entry.get("task_file")
+        if task_file is not None:
+            if not isinstance(task_file, str) or not task_file:
+                raise Fail(f"ledger.json entry for {sid!r} has an invalid task_file")
+            run_dir = Path(self._run_dir).resolve()
+            try:
+                task_candidate = Path(task_file)
+                if not task_candidate.is_absolute():
+                    task_candidate = run_dir / task_candidate
+                task_path = task_candidate.resolve()
+                task_path.relative_to(run_dir)
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise Fail(
+                    f"ledger.json task_file for {sid!r} escapes the run directory"
+                ) from exc
+            if not task_path.is_file():
+                raise Fail(
+                    f"ledger.json task_file for {sid!r} is missing: {task_path}")
+            if (not task_path.name.startswith(f"{sid}-task-r")
+                    or not task_path.name.endswith(".md")):
+                raise Fail(
+                    f"ledger.json task_file for {sid!r} has the wrong name")
+            task_sha = entry.get("task_sha256")
+            if not isinstance(task_sha, str) or not task_sha:
+                raise Fail(f"ledger.json entry for {sid!r} has no task hash")
+            try:
+                actual_sha = sha_file(task_path)
+            except OSError as exc:
+                raise Fail(f"ledger.json task file unreadable for {sid!r}: {exc}") from exc
+            if actual_sha != task_sha:
+                raise Fail(f"ledger.json task file for {sid!r} changed since completion "
+                           f"(expected {task_sha[:12]}, got {actual_sha[:12]}); "
+                           f"the authoritative snapshot no longer matches")
+        superseded = entry.get("superseded_task_files", [])
+        if not isinstance(superseded, list) or not all(
+                isinstance(item, str) for item in superseded):
+            raise Fail(
+                f"ledger.json entry for {sid!r} has invalid superseded task files")
+        return entry
+
+    def _migrate_legacy_entry(self, sid, ledger, entry, persist=False):
+        """Backfill task_file/task hash for pre-authority ledger entries.
+
+        Deterministic cases (visits points at an existing task file, or a
+        single task file exists) are migrated. Ambiguous cases fail closed
+        with the exact recovery command. Persistence is explicit: read-only
+        contexts must never mutate run state, so only live resume and
+        --migrate-ledger pass persist=True.
+        """
+        run_dir = Path(self._run_dir).resolve()
+        candidates = sorted(
+            run_relative_path(self, p)
+            for p in Path(self._run_dir).glob(f"{sid}-task-r*.md")
+            if "-resume-" not in p.name)
+        if not candidates:
+            raise Fail(f"ledger.json entry for {sid!r} has no task file and no "
+                       f"task candidates exist; recover with "
+                       f"--mark-done {sid} SIGNAL or re-run the step")
+        visits = entry.get("visits")
+        chosen = None
+        if isinstance(visits, int) and visits >= 1:
+            wanted = f"{sid}-task-r{visits}.md"
+            if wanted in candidates:
+                chosen = wanted
+        if chosen is None and len(candidates) == 1:
+            chosen = candidates[0]
+        if chosen is None:
+            raise Fail(f"ledger.json entry for {sid!r} is ambiguous: "
+                       f"{len(candidates)} task candidates {candidates}; "
+                       f"run with --migrate-ledger to review, or recover with "
+                       f"--mark-done {sid} SIGNAL")
+        task_path = (run_dir / chosen) if not Path(chosen).is_absolute() else Path(chosen)
+        try:
+            task_sha = sha_file(task_path.resolve())
+        except OSError as exc:
+            raise Fail(f"ledger.json migration for {sid!r} cannot read {chosen} ({exc})") from exc
+        # Preserve existing fields, add authority fields. Do not invent a
+        # stage hash for legacy runs; record that migration was post-hoc.
+        migrated = dict(entry)
+        migrated["task_file"] = chosen
+        migrated["task_sha256"] = task_sha
+        migrated["authoritative"] = True
+        migrated["migrated_legacy"] = True
+        if "agent" not in migrated or not migrated.get("agent"):
+            try:
+                migrated["agent"] = display_name(migrated.get("harness", ""))
+            except Exception:  # noqa: BLE001 - display fallback is best-effort
+                pass
+        if "superseded_task_files" not in migrated:
+            migrated["superseded_task_files"] = [c for c in candidates if c != chosen]
+        stage_sha = stage_fingerprint(self, sid)
+        if stage_sha is not None:
+            migrated["stage_sha256"] = stage_sha
+            migrated["stage_migrated_posthoc"] = True
+        ledger["steps"][sid] = migrated
+        if persist:
+            try:
+                write_json_atomic(Path(self._run_dir) / "ledger.json", ledger)
+            except Fail as exc:
+                raise Fail(f"ledger.json migration for {sid!r} cannot persist ({exc})") from exc
+        return migrated
 
     def planned_harness(self, sid):
-        """First rotation slot: the planned r1 harness for previews and
-        quoted context. The single source is the stage frontmatter list."""
+        """Return the first rotation slot for previews without completion data."""
         meta, _ = self.stages[sid]
         hs = meta["harness"] if isinstance(meta["harness"], list) else [meta["harness"]]
         return hs[0]
 
     def harness_for(self, sid):
-        """Peek the harness for the next invocation WITHOUT consuming a
-        rotation slot. The slot is consumed only after a successful invoke
-        (see drive()), so a crash between render and invoke retries the
-        same harness instead of silently shifting the rotation. Note: the
-        visits counter still pre-increments, so a retried render lands in
-        an rN+1 task file running the same harness — cosmetic only."""
+        """Peek the next harness without consuming a rotation slot.
+
+        A slot is consumed only after a signal and all completion gates pass;
+        interrupted, blocked, and otherwise failed attempts therefore retry
+        the same harness. The visits counter still increments so each attempt
+        gets a distinct forensic task/log file.
+        """
         meta, _ = self.stages[sid]
         hs = meta["harness"] if isinstance(meta["harness"], list) else [meta["harness"]]
         return hs[self.harness_use.get(sid, 0) % len(hs)]
@@ -609,7 +845,10 @@ def resume_frame(run, sid):
              "Your previous attempt at this step was interrupted (runner crash",
              "or harness failure). The full original instructions follow below.",
              "Do NOT redo work that is already done. Inspect the state described",
-             "here first, then continue from where the previous attempt stopped.", ""]
+             "here first, then continue from where the previous attempt stopped.",
+             "The previous task file is history unless `ledger.json` names it "
+             "as the completed task. Ignore model names in every other attempt "
+             "file; the ledger entry is authoritative.", ""]
     try:
         st = subprocess.run(["git", "status", "--porcelain=v1", "--untracked-files=no"],
                             cwd=run.repo, capture_output=True, text=True, timeout=30)
@@ -676,6 +915,145 @@ def sha_str(s):
 
 def sha_file(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def write_json_atomic(path, value):
+    """Replace a JSON record without leaving a half-written authority file."""
+    path = Path(path)
+    tmp = path.with_name(f".{path.name}.{secrets.token_hex(6)}.tmp")
+    try:
+        tmp.write_text(json.dumps(value, indent=2))
+        tmp.replace(path)
+    except (OSError, TypeError, ValueError) as exc:
+        raise Fail(f"cannot write {path.name}: {exc}") from exc
+    finally:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
+COMMIT_VERSION = 1
+
+
+def pending_commit_path(run):
+    return Path(run._run_dir) / ".pending-commit.json"
+
+
+def stage_fingerprint(run, sid):
+    """Hash the stage file that produced a task, for forensics.
+
+    The authoritative task snapshot itself is the source of downstream
+    context, so a stage change does not alter history. The fingerprint
+    records which stage version the snapshot came from.
+    """
+    try:
+        stage_path = (Path(run.pipe_dir) / run.steps[sid]["stage"]).resolve()
+        return sha_file(stage_path)
+    except (OSError, KeyError):
+        return None
+
+
+def strip_nonce_footer(text):
+    """Remove the per-invocation nonce footer from a stored task snapshot.
+
+    The nonce is valid only for its own invocation. Downstream context
+    must not see a stale nonce as a usable signal token.
+    """
+    marker = "\n\n## Signal nonce for this invocation:"
+    idx = (text or "").find(marker)
+    if idx < 0:
+        return text or ""
+    return (text[:idx].rstrip() + "\n")
+
+
+def latest_run_log(run, sid):
+    """Return the latest run log for a step, excluding console mirrors."""
+    logs = sorted(p for p in Path(run._run_dir).glob(f"{sid}-task-r*.log")
+                  if not p.name.endswith(".tui.log"))
+    return logs[-1] if logs else None
+
+
+def write_pending_commit(run, record):
+    write_json_atomic(pending_commit_path(run), record)
+
+
+def read_pending_commit(run):
+    path = pending_commit_path(run)
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, ValueError) as exc:
+        raise Fail(f"pending commit cannot be read: {path} ({exc})") from exc
+    if not isinstance(data, dict) or data.get("version") != COMMIT_VERSION:
+        raise Fail(f"pending commit has unsupported version: {path}")
+    for key in ("step", "signal", "harness", "task_file", "resume_after"):
+        if key not in data:
+            raise Fail(f"pending commit missing {key!r}: {path}")
+    return data
+
+
+def clear_pending_commit(run):
+    try:
+        pending_commit_path(run).unlink()
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        raise Fail(f"cannot clear pending commit ({exc})") from exc
+
+
+def apply_pending_commit(run, record):
+    """Idempotently apply a pending completion to ledger, rotation, resume.
+
+    Safe to call multiple times: ledger writes overwrite the same entry,
+    rotation writes set the same counts, and resume writes replace the same
+    snapshot. Used both for the normal commit path and for crash recovery.
+    The record carries the full accepted output so ledger hashing works
+    even after memory was cleared by a crash.
+    """
+    step = record["step"]
+    resume_after = record.get("resume_after")
+    if not isinstance(resume_after, dict):
+        raise Fail("pending commit has no resume snapshot")
+    # Restore in-memory state from the commit snapshot so ledger hashing
+    # uses the accepted output even after a crash cleared memory.
+    if "output" in record:
+        outputs = dict(resume_after.get("outputs", {}))
+        outputs[step] = record["output"]
+        resume_after = dict(resume_after, outputs=outputs)
+    run.outputs = dict(resume_after.get("outputs", {}))
+    try:
+        run.visits = {k: int(v) for k, v in dict(resume_after.get("visits", {})).items()}
+        run.harness_use = {k: int(v) for k, v in dict(resume_after.get("harness_use", {})).items()}
+    except (TypeError, ValueError) as exc:
+        raise Fail(f"pending commit has bad counts ({exc})") from exc
+    run.prev_step = resume_after.get("prev_step")
+    task_file = record.get("task_file")
+    task_path = Path(task_file) if task_file else None
+    if task_path is not None and not task_path.is_absolute():
+        task_path = Path(run._run_dir) / task_path
+    note_completion(run, step, record["signal"], record["harness"],
+                    task_path=task_path,
+                    via=record.get("via"), routed_to=record.get("routed_to"))
+    if run.persist_rotation:
+        if not run.rotation_key:
+            raise Fail("rotation persistence needs a key")
+        save_rotation(run.repo, run.rotation_key, dict(run.harness_use))
+    write_json_atomic(Path(run._run_dir) / "resume.json", resume_after)
+    return resume_after
+
+
+def run_relative_path(run, path):
+    """Return a run-dir-relative path, rejecting escapes and broken links."""
+    run_dir = Path(run._run_dir).resolve()
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        candidate = run_dir / candidate
+    try:
+        return str(candidate.resolve().relative_to(run_dir))
+    except (OSError, ValueError, RuntimeError) as exc:
+        raise Fail(f"path escapes run directory: {path}") from exc
 
 
 def git_head(run):
@@ -955,9 +1333,16 @@ def artifact_is_empty(path):
     return not text.strip()
 
 
-def note_completion(run, sid, sig, harness):
-    """Record a step's completion proof: signal, output hash, artifact
-    hashes, git HEAD. Called for every step whose signal was accepted."""
+def note_completion(run, sid, sig, harness, task_path=None, via=None, routed_to=None):
+    """Record one authoritative completion proof for a step.
+
+    The signal, harness, and task snapshot are recorded together so
+    downstream context can use the exact attempt that completed. Older task
+    files remain on disk and are listed as superseded rather than deleted.
+    The task file hash makes tampering fail closed; the stage fingerprint
+    records which stage version produced the snapshot. via/routed_to records
+    the routing decision so crash recovery can replay advancement.
+    """
     s = run.steps[sid]
     arts = {}
     for rel in [s.get("require_file"), (s.get("snapshot") or {}).get("to")]:
@@ -967,18 +1352,82 @@ def note_completion(run, sid, sig, harness):
         if fp.is_file():
             arts[rel] = {"bytes": fp.stat().st_size, "sha256": sha_file(fp)}
     lp = run._run_dir / "ledger.json"
-    try:
-        ledger = json.loads(lp.read_text())
-    except (OSError, ValueError):
+    if lp.is_file():
+        try:
+            ledger = json.loads(lp.read_text())
+        except (OSError, ValueError) as exc:
+            raise Fail(f"ledger.json cannot be read: {lp} ({exc})") from exc
+        if (not isinstance(ledger, dict)
+                or not isinstance(ledger.get("order"), list)
+                or not isinstance(ledger.get("steps"), dict)):
+            raise Fail(f"ledger.json has an invalid shape: {lp}")
+    else:
         ledger = {"order": [], "steps": {}}
     if sid not in ledger["order"]:
         ledger["order"].append(sid)
-    ledger["steps"][sid] = {"signal": sig, "harness": harness,
-                            "agent": display_name(harness),
-                            "visits": run.visits.get(sid, 0),
-                            "output_sha256": sha_str(run.outputs.get(sid, "")),
-                            "artifacts": arts, "git_head": git_head(run)}
-    lp.write_text(json.dumps(ledger, indent=2))
+    current_task = (run_relative_path(run, task_path)
+                    if task_path is not None else None)
+    task_sha = None
+    if task_path is not None:
+        task_candidate = Path(task_path)
+        if not task_candidate.is_absolute():
+            task_candidate = Path(run._run_dir) / task_candidate
+        if not task_candidate.is_file():
+            raise Fail(f"completion task file is missing: {task_path}")
+        try:
+            task_sha = sha_file(task_candidate)
+        except OSError as exc:
+            raise Fail(f"completion task file unreadable: {task_path} ({exc})") from exc
+    task_files = sorted(
+        run_relative_path(run, path)
+        for path in run._run_dir.glob(f"{sid}-task-r*.md")
+        if "-resume-" not in path.name
+        and run_relative_path(run, path) != current_task)
+    entry = {"signal": sig, "harness": harness,
+             "authoritative": True,
+             "agent": display_name(harness),
+             "visits": run.visits.get(sid, 0),
+             "output_sha256": sha_str(run.outputs.get(sid, "")),
+             "artifacts": arts, "git_head": git_head(run),
+             "superseded_task_files": task_files}
+    if task_path is not None:
+        entry["task_file"] = current_task
+        entry["task_sha256"] = task_sha
+    stage_sha = stage_fingerprint(run, sid)
+    if stage_sha is not None:
+        entry["stage_sha256"] = stage_sha
+    if via is not None:
+        entry["via"] = via
+    if routed_to is not None:
+        entry["routed_to"] = routed_to
+    ledger["steps"][sid] = entry
+    write_json_atomic(lp, ledger)
+
+
+def _already_completed(run, sid):
+    """Return the ledger entry when a step's output already proves completion.
+
+    Used for crash recovery when advancement never landed: ledger plus
+    matching output hash means the harness already succeeded and must not
+    be re-invoked. Returns None when the step still needs to run.
+    """
+    try:
+        attempt = run.authoritative_attempt(sid)
+    except Fail:
+        return None
+    if attempt is None:
+        return None
+    if sid not in run.outputs:
+        return None
+    output_sha = attempt.get("output_sha256")
+    if not isinstance(output_sha, str) or not output_sha:
+        return None
+    try:
+        if sha_str(run.outputs[sid]) != output_sha:
+            return None
+    except Exception:  # noqa: BLE001 - hashing must not crash recovery
+        return None
+    return attempt
 
 
 def verify_ledger(run, outputs, current=None):
@@ -995,18 +1444,38 @@ def verify_ledger(run, outputs, current=None):
         return
     try:
         ledger = json.loads(lp.read_text())
-    except ValueError:
-        raise Fail("ledger.json does not parse")
+    except (OSError, ValueError) as exc:
+        raise Fail(f"ledger.json does not parse: {exc}") from exc
+    if (not isinstance(ledger, dict)
+            or not isinstance(ledger.get("order"), list)
+            or not isinstance(ledger.get("steps"), dict)):
+        raise Fail("ledger.json has an invalid shape")
     mutable = {(run.steps[sid].get("snapshot") or {}).get("from")
                for sid in run.steps} - {None}
     head_now = git_head(run)
-    for sid in ledger.get("order", []):
+    for sid in ledger["order"]:
+        if not isinstance(sid, str):
+            raise Fail("ledger: order contains a non-string step id")
+        if sid not in run.steps or sid not in ledger["steps"]:
+            raise Fail(f"ledger: entry for unknown step {sid!r}")
         e = ledger["steps"][sid]
+        if not isinstance(e, dict):
+            raise Fail(f"ledger: entry for {sid!r} is not an object")
+        run.authoritative_attempt(sid)
         if sid not in outputs:
             raise Fail(f"ledger: step {sid} completed earlier but its output is gone")
-        if sid != current and sha_str(outputs[sid]) != e["output_sha256"]:
+        output_sha = e.get("output_sha256")
+        if not isinstance(output_sha, str) or not output_sha:
+            raise Fail(f"ledger: step {sid} has no valid output hash")
+        if sid != current and sha_str(outputs[sid]) != output_sha:
             raise Fail(f"ledger: step {sid} output changed since completion")
-        for rel, a in e.get("artifacts", {}).items():
+        artifacts = e.get("artifacts", {})
+        if not isinstance(artifacts, dict):
+            raise Fail(f"ledger: step {sid} has invalid artifacts")
+        for rel, a in artifacts.items():
+            if not isinstance(rel, str) or not isinstance(a, dict) \
+                    or not isinstance(a.get("sha256"), str) or not a.get("sha256"):
+                raise Fail(f"ledger: step {sid} has an invalid artifact record")
             if rel in mutable:
                 continue
             fp = run._run_dir / rel
@@ -1017,6 +1486,76 @@ def verify_ledger(run, outputs, current=None):
         if e.get("git_head") and head_now and e["git_head"] != head_now:
             raise Fail(f"ledger: git HEAD moved since step {sid} completed "
                        f"({e['git_head'][:8]} -> {head_now[:8]})")
+
+
+def audit_or_migrate_ledger(run, migrate=False):
+    """Report authority gaps and optionally backfill deterministic entries.
+
+    Returns a report with migrated, already_authoritative, ambiguous, and
+    errors lists, plus a migration-report.json path when files were scanned.
+    Ambiguous steps are never guessed; recover them with --mark-done.
+    """
+    run_dir = Path(run._run_dir)
+    ledger_path = run_dir / "ledger.json"
+    report = {"run_dir": str(run_dir), "migrated": [], "already_authoritative": [],
+              "ambiguous": [], "errors": []}
+    if not ledger_path.is_file():
+        report["errors"].append("no ledger.json in run directory")
+        return report
+    try:
+        ledger = json.loads(ledger_path.read_text())
+    except (OSError, ValueError) as exc:
+        report["errors"].append(f"ledger.json cannot be read ({exc})")
+        return report
+    if not isinstance(ledger, dict) or not isinstance(ledger.get("steps"), dict):
+        report["errors"].append("ledger.json has an invalid shape")
+        return report
+    for sid in list(ledger.get("order", [])):
+        entry = ledger["steps"].get(sid)
+        if not isinstance(entry, dict):
+            report["errors"].append(f"{sid}: entry is not an object")
+            continue
+        if entry.get("authoritative") is True and "task_file" in entry and "task_sha256" in entry:
+            report["already_authoritative"].append(sid)
+            continue
+        candidates = sorted(
+            p.name for p in run_dir.glob(f"{sid}-task-r*.md")
+            if "-resume-" not in p.name)
+        visits = entry.get("visits")
+        deterministic = None
+        if isinstance(visits, int) and visits >= 1:
+            wanted = f"{sid}-task-r{visits}.md"
+            if wanted in candidates:
+                deterministic = wanted
+        if deterministic is None and len(candidates) == 1:
+            deterministic = candidates[0]
+        if deterministic is None:
+            if not candidates:
+                report["errors"].append(f"{sid}: no task candidates exist")
+            else:
+                report["ambiguous"].append({"step": sid, "candidates": candidates,
+                                            "detail": f"{len(candidates)} task candidates",
+                                            "recovery": f"--mark-done {sid} SIGNAL"})
+            continue
+        if not migrate:
+            # Audit only: report what would migrate without changing files.
+            report["migrated"].append(f"{sid} (would backfill {deterministic})")
+            continue
+        try:
+            fresh_ledger = json.loads(ledger_path.read_text())
+            fresh_entry = fresh_ledger["steps"].get(sid)
+            run._migrate_legacy_entry(sid, fresh_ledger, fresh_entry, persist=True)
+            report["migrated"].append(sid)
+        except Fail as exc:
+            report["errors"].append(f"{sid}: {exc}")
+    report_path = run_dir / "migration-report.json"
+    try:
+        if migrate or report["ambiguous"] or report["migrated"]:
+            report_path.write_text(json.dumps(report, indent=2))
+            report["report_path"] = str(report_path)
+    except OSError as exc:
+        report["errors"].append(f"cannot write migration report ({exc})")
+    return report
 
 
 def mark_done(run, step, signal, force=False):
@@ -1048,7 +1587,8 @@ def mark_done(run, step, signal, force=False):
             raise Fail(f"--mark-done: signal {line!r} is not a "
                        f"DONE/APPROVED/REJECTED signal")
         target = "blocked" if blocked else s["end"]
-    logs = sorted(run._run_dir.glob(f"{step}-task-r*.log"))
+    logs = sorted(p for p in run._run_dir.glob(f"{step}-task-r*.log")
+                  if not p.name.endswith(".tui.log"))
     if not logs:
         raise Fail(f"--mark-done: no run log for step {step}")
     log_path = logs[-1]
@@ -1134,33 +1674,66 @@ def mark_done(run, step, signal, force=False):
     if blocked:
         event["routed_to"] = "blocked"
         events.append(event)
-        rpath.write_text(json.dumps({
+        write_json_atomic(rpath, {
             "current": step, "outputs": run.outputs, "visits": run.visits,
             "harness_use": run.harness_use, "prev_step": run.prev_step,
-            "transcript": transcript, "events": events}, indent=2))
+            "transcript": transcript, "events": events})
         result = {"run_id": run_id, "phase": f"{phase:06d}",
                   "state": "blocked", "transcript": transcript,
                   "events": events}
-        done_path.write_text(json.dumps(result, indent=2))
+        write_json_atomic(done_path, result)
         return result
-    note_completion(run, step, line, harness)
+    # Journal the operator recovery the same way as drive() completions so a
+    # crash between ledger and resume cannot strand the run. Rotation is
+    # untouched (no new invocation happened).
+    via_mark = "mark-done"
     if target in run.pipe["ends"]:
         event["routed_to"] = target
         events.append(event)
+        resume_after = {"current": step, "outputs": dict(run.outputs),
+                        "visits": dict(run.visits),
+                        "harness_use": dict(run.harness_use),
+                        "prev_step": run.prev_step,
+                        "transcript": list(transcript), "events": list(events)}
+        record = {"version": COMMIT_VERSION, "kind": "terminal",
+                  "step": step, "signal": line, "harness": harness,
+                  "task_file": run_relative_path(run, task_path),
+                  "output": run.outputs[step],
+                  "via": via_mark, "routed_to": target,
+                  "harness_use_after": dict(run.harness_use),
+                  "resume_after": resume_after,
+                  "terminal_state": target,
+                  "transcript_after": list(transcript),
+                  "events_after": list(events)}
+        write_pending_commit(run, record)
+        apply_pending_commit(run, record)
+        clear_pending_commit(run)
         result = {"run_id": run_id, "phase": f"{phase:06d}",
                   "state": target, "transcript": transcript,
                   "events": events}
-        done_path.write_text(json.dumps(result, indent=2))
+        write_json_atomic(done_path, result)
         # Keep resume.json until the terminal publication path succeeds. If
         # publication fails, the next invocation can resume this step.
         return result
     event["routed_to"] = target
     events.append(event)
     run.prev_step, nxt = step, target
-    rpath.write_text(json.dumps({
-        "current": nxt, "outputs": run.outputs, "visits": run.visits,
-        "harness_use": run.harness_use, "prev_step": run.prev_step,
-        "transcript": transcript, "events": events}, indent=2))
+    resume_after = {"current": nxt, "outputs": dict(run.outputs),
+                    "visits": dict(run.visits),
+                    "harness_use": dict(run.harness_use),
+                    "prev_step": run.prev_step,
+                    "transcript": list(transcript), "events": list(events)}
+    record = {"version": COMMIT_VERSION, "kind": "advance",
+              "step": step, "signal": line, "harness": harness,
+              "task_file": run_relative_path(run, task_path),
+              "output": run.outputs[step],
+              "via": via_mark, "routed_to": target,
+              "harness_use_after": dict(run.harness_use),
+              "resume_after": resume_after,
+              "next_current": nxt}
+    write_pending_commit(run, record)
+    apply_pending_commit(run, record)
+    clear_pending_commit(run)
     return {"run_id": run_id, "phase": f"{phase:06d}", "state": "advanced",
             "advanced_to": nxt, "transcript": transcript, "events": events}
 
@@ -1277,6 +1850,20 @@ TASK_POINTER = ("Your full task instructions are in this file: {path}\n"
                     "signal word. If you already "
                     "summarized in chat, still append that signal line to "
                     "the log file: chat text alone never counts.")
+
+
+ATTEMPT_AUTHORITY = """## ATTEMPT AUTHORITY
+
+The file containing this notice is the active attempt. This run keeps one
+task file per attempt for forensics. `ledger.json` is the only authoritative
+completion record: for any other completed step, use only the `task_file` named
+in that step's ledger entry. Use the entry keyed by the step id, not the
+newest-looking file. Every other task file is an incomplete or
+superseded attempt. Never treat a superseded task file as a live requirement,
+instruction, or model attribution. If task files disagree, the ledger entry
+wins. A model-name difference between attempts is historical information, never
+a finding and never a request to switch models.
+"""
 
 
 BANNER_ART = r"""
@@ -1896,6 +2483,9 @@ def drive(run, pipe, invoke, resumed=None):
     """
     phase = int(run.inputs["phase_number"])
     run_id = f"{run.inputs.get('run_label', 'phase')}-{phase:06d}"
+    # Once a live invocation begins, prior-step context must come from the
+    # completion ledger rather than a planned rotation slot.
+    run.require_authoritative = True
     if run.persist_rotation and not run.rotation_key:
         raise Fail("rotation persistence needs a key; main() sets it "
                    "from the pipeline path")
@@ -1906,26 +2496,98 @@ def drive(run, pipe, invoke, resumed=None):
         run.visits = resumed.get("visits", {})
         run.harness_use = resumed.get("harness_use", {})
         if run.persist_rotation:
-            # The file normally leads (every consume writes through);
-            # max-merge keeps both orders safe.
             for sid, n in load_rotation(run.repo, run.rotation_key).items():
                 run.harness_use[sid] = max(run.harness_use.get(sid, 0), n)
         run.prev_step = resumed.get("prev_step")
         current = resumed["current"]
         transcript = resumed.get("transcript", [])
         events = resumed.get("events", [])
-        verify_ledger(run, resumed.get("outputs", {}), current)
+        # Crash recovery: a pending commit means the previous invocation
+        # accepted a signal and wrote its intent before all durable files
+        # landed. Replay it idempotently instead of re-invoking the harness.
+        pending = read_pending_commit(run)
+        if pending is not None:
+            resume_after = apply_pending_commit(run, pending)
+            clear_pending_commit(run)
+            transcript = list(resume_after.get("transcript", []))
+            events = list(resume_after.get("events", []))
+            if pending.get("kind") == "terminal":
+                return {"run_id": run_id, "phase": f"{phase:06d}",
+                        "state": pending.get("terminal_state", "completed"),
+                        "transcript": transcript, "events": events}
+            current = resume_after.get("current", current)
+            run.prev_step = resume_after.get("prev_step")
+        # Idempotency fallback: the completed step's ledger entry and output
+        # are both durable, but advancement never landed (e.g. crash after
+        # clearing a pending commit for a terminal step). Re-derive routing
+        # from the ledger instead of re-running the harness.
+        else:
+            completed = _already_completed(run, current)
+            if completed is not None:
+                via, routed_to = completed.get("via"), completed.get("routed_to")
+                if routed_to in pipe["ends"]:
+                    # Terminal already completed; return without re-invoking.
+                    return {"run_id": run_id, "phase": f"{phase:06d}",
+                            "state": routed_to, "transcript": transcript,
+                            "events": events}
+                if isinstance(routed_to, str) and routed_to in run.steps:
+                    run.prev_step, current = current, routed_to
+                    write_json_atomic(run._run_dir / "resume.json", {
+                        "current": current, "outputs": run.outputs,
+                        "visits": run.visits, "harness_use": run.harness_use,
+                        "prev_step": run.prev_step,
+                        "transcript": transcript, "events": events})
+        verify_ledger(run, run.outputs, current)
+        # Persist deterministic legacy migrations on live resume so the
+        # on-disk ledger becomes authoritative. Ambiguous histories already
+        # failed closed in verify_ledger above.
+        try:
+            ledger_now = run._ledger()
+        except Fail:
+            ledger_now = None
+        if ledger_now is not None:
+            for sid in list(ledger_now.get("order", [])):
+                entry_now = ledger_now["steps"].get(sid)
+                if not isinstance(entry_now, dict):
+                    continue
+                if entry_now.get("authoritative") is True and "task_sha256" in entry_now:
+                    continue
+                try:
+                    fresh = run._ledger()
+                    run._migrate_legacy_entry(sid, fresh, fresh["steps"][sid], persist=True)
+                    ledger_now = run._ledger()
+                except Fail:
+                    # verify_ledger already proved this cannot happen for
+                    # deterministic entries; any failure here is re-raised
+                    # as an explicit recovery error below.
+                    raise
     else:
         current, transcript, events = pipe["start"], [], []
         if run.persist_rotation:
             run.harness_use = load_rotation(run.repo, run.rotation_key)
+        # A stale pending commit without resume state means a previous fresh
+        # start crashed mid-commit. Replay it before starting over when it
+        # names a valid step; otherwise fail closed.
+        pending = read_pending_commit(run)
+        if pending is not None:
+            resume_after = apply_pending_commit(run, pending)
+            clear_pending_commit(run)
+            transcript = list(resume_after.get("transcript", []))
+            events = list(resume_after.get("events", []))
+            if pending.get("kind") == "terminal":
+                return {"run_id": run_id, "phase": f"{phase:06d}",
+                        "state": pending.get("terminal_state", "completed"),
+                        "transcript": transcript, "events": events}
+            current = resume_after.get("current", current)
+            run.prev_step = resume_after.get("prev_step")
     reframe = resumed is not None
 
     def save(nxt):
-        (run._run_dir / "resume.json").write_text(json.dumps({
+        write_json_atomic(run._run_dir / "resume.json", {
             "current": nxt, "outputs": run.outputs, "visits": run.visits,
             "harness_use": run.harness_use, "prev_step": run.prev_step,
-            "transcript": transcript, "events": events}, indent=2))
+            "transcript": transcript, "events": events})
+
     Guard = 10000
     while True:
         if len(events) >= Guard:
@@ -1975,11 +2637,9 @@ def drive(run, pipe, invoke, resumed=None):
         heartbeat = getattr(run, "reservation_heartbeat", None)
         if heartbeat is not None:
             heartbeat.check()
-        # Consume the rotation slot only now: a crash before this point
-        # retries the same harness instead of shifting the rotation.
-        run.harness_use[current] = run.harness_use.get(current, 0) + 1
-        if run.persist_rotation:
-            save_rotation(run.repo, run.rotation_key, run.harness_use)
+        # The rotation slot is consumed only after the signal and all
+        # completion gates pass below. A failed, blocked, or interrupted
+        # attempt must retry the same harness.
         run.outputs[current] = output
         sig = find_signal(output, when_keys, nonce)
         via_mirror = False
@@ -2024,7 +2684,27 @@ def drive(run, pipe, invoke, resumed=None):
             transcript.append({"step": current, "harness": harness,
                                "agent": agent, "signal": sig})
             events.append(event)
-            note_completion(run, current, sig, harness)
+            harness_use_after = dict(run.harness_use)
+            harness_use_after[current] = harness_use_after.get(current, 0) + 1
+            resume_after = {"current": current, "outputs": dict(run.outputs),
+                            "visits": dict(run.visits),
+                            "harness_use": dict(harness_use_after),
+                            "prev_step": run.prev_step,
+                            "transcript": list(transcript), "events": list(events)}
+            record = {"version": COMMIT_VERSION, "kind": "terminal",
+                      "step": current, "signal": sig, "harness": harness,
+                      "task_file": run_relative_path(run, task_path),
+                      "output": run.outputs[current],
+                      "via": "end", "routed_to": s["end"],
+                      "harness_use_after": dict(harness_use_after),
+                      "resume_after": resume_after,
+                      "terminal_state": s["end"],
+                      "transcript_after": list(transcript),
+                      "events_after": list(events)}
+            write_pending_commit(run, record)
+            run.harness_use = dict(harness_use_after)
+            apply_pending_commit(run, record)
+            clear_pending_commit(run)
             return {"run_id": run_id, "phase": f"{phase:06d}",
                     "state": s["end"], "transcript": transcript, "events": events}
         key = match_signal(sig, s["when"])
@@ -2044,31 +2724,108 @@ def drive(run, pipe, invoke, resumed=None):
                 event["via"] = "skip"
                 event["routed_to"] = s["skip_when_empty"]
                 events.append(event)
-                note_completion(run, current, sig, harness)
-                run.prev_step, current = current, s["skip_when_empty"]
-                save(current)
+                nxt = s["skip_when_empty"]
+                harness_use_after = dict(run.harness_use)
+                harness_use_after[current] = harness_use_after.get(current, 0) + 1
+                resume_after = {"current": nxt, "outputs": dict(run.outputs),
+                                "visits": dict(run.visits),
+                                "harness_use": dict(harness_use_after),
+                                "prev_step": current,
+                                "transcript": list(transcript), "events": list(events)}
+                record = {"version": COMMIT_VERSION, "kind": "advance",
+                          "step": current, "signal": sig, "harness": harness,
+                          "task_file": run_relative_path(run, task_path),
+                          "output": run.outputs[current],
+                          "via": "skip", "routed_to": nxt,
+                          "harness_use_after": dict(harness_use_after),
+                          "resume_after": resume_after,
+                          "next_current": nxt}
+                write_pending_commit(run, record)
+                run.harness_use = dict(harness_use_after)
+                run.prev_step, current = current, nxt
+                apply_pending_commit(run, record)
+                clear_pending_commit(run)
                 if current in pipe["ends"]:
                     return {"run_id": run_id, "phase": f"{phase:06d}",
                             "state": current, "transcript": transcript, "events": events}
                 continue
         target = s["when"][key]
+        loop_exhausted = (target in run.visits and "max_rounds" in s
+                          and run.visits[current] >= s["max_rounds"])
+        if loop_exhausted and "on_exhausted" not in s:
+            raise Fail(f"step {current}: loop cap hit with no on_exhausted")
         event["via"] = "edge"
         event["routed_to"] = target
         events.append(event)
-        note_completion(run, current, sig, harness)
+        harness_use_after = dict(run.harness_use)
+        harness_use_after[current] = harness_use_after.get(current, 0) + 1
         if target in pipe["ends"]:
             event["via"] = "edge-end"
+            # Mutating the appended dict keeps transcript/events consistent;
+            # rebuild the stored copies from the mutated lists.
+            resume_after = {"current": current, "outputs": dict(run.outputs),
+                            "visits": dict(run.visits),
+                            "harness_use": dict(harness_use_after),
+                            "prev_step": run.prev_step,
+                            "transcript": list(transcript), "events": list(events)}
+            record = {"version": COMMIT_VERSION, "kind": "terminal",
+                      "step": current, "signal": sig, "harness": harness,
+                      "task_file": run_relative_path(run, task_path),
+                      "output": run.outputs[current],
+                      "via": "edge-end", "routed_to": target,
+                      "harness_use_after": dict(harness_use_after),
+                      "resume_after": resume_after,
+                      "terminal_state": target,
+                      "transcript_after": list(transcript),
+                      "events_after": list(events)}
+            write_pending_commit(run, record)
+            run.harness_use = dict(harness_use_after)
+            apply_pending_commit(run, record)
+            clear_pending_commit(run)
             return {"run_id": run_id, "phase": f"{phase:06d}",
                     "state": target, "transcript": transcript, "events": events}
-        if target in run.visits and "max_rounds" in s \
-                and run.visits[current] >= s["max_rounds"]:
-            if "on_exhausted" not in s:
-                raise Fail(f"step {current}: loop cap hit with no on_exhausted")
+        if loop_exhausted:
             event["via"] = "exhausted"
+            resume_after = {"current": current, "outputs": dict(run.outputs),
+                            "visits": dict(run.visits),
+                            "harness_use": dict(harness_use_after),
+                            "prev_step": run.prev_step,
+                            "transcript": list(transcript), "events": list(events)}
+            record = {"version": COMMIT_VERSION, "kind": "terminal",
+                      "step": current, "signal": sig, "harness": harness,
+                      "task_file": run_relative_path(run, task_path),
+                      "output": run.outputs[current],
+                      "via": "exhausted", "routed_to": s["on_exhausted"],
+                      "harness_use_after": dict(harness_use_after),
+                      "resume_after": resume_after,
+                      "terminal_state": s["on_exhausted"],
+                      "transcript_after": list(transcript),
+                      "events_after": list(events)}
+            write_pending_commit(run, record)
+            run.harness_use = dict(harness_use_after)
+            apply_pending_commit(run, record)
+            clear_pending_commit(run)
             return {"run_id": run_id, "phase": f"{phase:06d}",
                     "state": s["on_exhausted"], "transcript": transcript, "events": events}
-        run.prev_step, current = current, target
-        save(current)
+        nxt = target
+        resume_after = {"current": nxt, "outputs": dict(run.outputs),
+                        "visits": dict(run.visits),
+                        "harness_use": dict(harness_use_after),
+                        "prev_step": current,
+                        "transcript": list(transcript), "events": list(events)}
+        record = {"version": COMMIT_VERSION, "kind": "advance",
+                  "step": current, "signal": sig, "harness": harness,
+                  "task_file": run_relative_path(run, task_path),
+                  "output": run.outputs[current],
+                  "via": "edge", "routed_to": nxt,
+                  "harness_use_after": dict(harness_use_after),
+                  "resume_after": resume_after,
+                  "next_current": nxt}
+        write_pending_commit(run, record)
+        run.harness_use = dict(harness_use_after)
+        run.prev_step, current = current, nxt
+        apply_pending_commit(run, record)
+        clear_pending_commit(run)
 
 
 def self_test(run, live=False):
@@ -2587,10 +3344,29 @@ def self_test(run, live=False):
           other[0].endswith("GLM-5.3-Flash@high") and other[0] != other[1],
           "rk-b alternates from zero on its own file")
     rotation_file(rd, "rk-a").write_text("{oops")
-    rec = rot_drive(5, "rk-a", rot_end)
-    check("rotation: corrupt file restarts at zero",
-          rec["transcript"][0]["harness"].endswith("GLM-5.3-Flash@high"),
-          "warned and completed on slot 0")
+    try:
+        rot_drive(5, "rk-a", rot_end)
+        corrupt_refused = False
+    except Fail:
+        corrupt_refused = True
+    check("rotation: corrupt file fails closed",
+          corrupt_refused, "repair or --reset-rotation instead of silent reset")
+    rotation_file(rd, "rk-neg").write_text(json.dumps({"s0": -1}))
+    try:
+        rot_drive(7, "rk-neg", rot_end)
+        negative_refused = False
+    except Fail:
+        negative_refused = True
+    check("rotation: negative count fails closed",
+          negative_refused, "no silent model switch")
+    rotation_file(rd, "rk-bad").write_text(json.dumps({"s0": "one"}))
+    try:
+        rot_drive(8, "rk-bad", rot_end)
+        badcount_refused = False
+    except Fail:
+        badcount_refused = True
+    check("rotation: non-integer count fails closed",
+          badcount_refused, "no silent model switch")
 
     rot_loop = {
         "s0": {"stage": "s0.md", "record_as": "R0",
@@ -2615,6 +3391,435 @@ def self_test(run, live=False):
           resm["transcript"][0]["harness"]
           == "opencode:go/deepseek-v4.1-flash@high",
           "file count 5 beats resume count 1 (slot 5 % 2 = 1)")
+
+    # Failed attempts retain history but reuse their rotation slot. The
+    # successful task is recorded in the ledger, and downstream context uses
+    # its actual harness rather than the first planned slot.
+    retry_dir = Path(tempfile.mkdtemp(prefix="retry-authority"))
+    (retry_dir / "developer.md").write_text(
+        "---\nname: developer\n"
+        "harness: ['opencode:go/retry-first@high', 'opencode:go/retry-second@high']\n"
+        "harness_names:\n"
+        "  'opencode:go/retry-first@high': 'Retry first'\n"
+        "  'opencode:go/retry-second@high': 'Retry second'\n"
+        "placeholders:\n  X: x\n---\nDeveloper {{X}} on {{harness}}.")
+    (retry_dir / "review.md").write_text(
+        "---\nname: review\n"
+        "harness: ['opencode:go/retry-review@high']\n"
+        "harness_names:\n"
+        "  'opencode:go/retry-review@high': 'Retry review'\n"
+        "placeholders:\n  CONTEXT: x\n---\nReview: {{CONTEXT}}")
+    retry_pipe = {"version": 1, "run_dir": "run",
+                  "inputs": {"phase_number": 7, "phase_file": "phase.md",
+                             "max_remedy_rounds": 3},
+                  "start": "developer", "ends": ["completed"],
+                  "steps": {
+                      "developer": {"stage": "developer.md", "record_as": "D",
+                                    "bindings": {"X": "work"},
+                                    "when": {"DEV_DONE": "review"}},
+                      "review": {"stage": "review.md", "record_as": "R",
+                                 "bindings": {"CONTEXT": {"task": "developer"}},
+                                 "end": "completed"}}}
+    validate(retry_pipe, retry_dir)
+    retry_run = Run(retry_pipe, retry_dir, retry_dir, dict(retry_pipe["inputs"]))
+    retry_run.rotation_key = "rk-retry"
+    retry_run._run_dir = retry_dir / "run"
+    retry_run._run_dir.mkdir()
+    # Start one slot in so the accepted retry is deliberately not the first
+    # planned slot; this catches a planned-name regression in rebuilt context.
+    save_rotation(retry_dir, "rk-retry", {"developer": 1})
+    retry_calls = []
+
+    def retry_stub(harness, task_path, log_path, usage_path=None, when=None,
+                   nonce=None, **kw):
+        sid = kw.get("sid")
+        retry_calls.append((sid, harness, Path(task_path).read_text()))
+        if sid == "developer" and sum(c[0] == sid for c in retry_calls) == 1:
+            Path(log_path).write_text("attempt failed before signal")
+            return "attempt failed before signal", {}
+        signal = "DEV_DONE" if sid == "developer" else "REVIEW_DONE"
+        if nonce:
+            signal += " " + nonce
+        Path(log_path).write_text(signal)
+        return signal, {}
+
+    first_failed = False
+    try:
+        drive(retry_run, retry_pipe, retry_stub)
+    except Fail:
+        first_failed = True
+    retry_rotation = rotation_file(retry_dir, "rk-retry")
+    check("retry: failed attempt does not consume rotation",
+          first_failed and retry_rotation.is_file()
+          and json.loads(retry_rotation.read_text()) == {"developer": 1},
+          "same non-first slot remains")
+    resumed_retry = json.loads((retry_run._run_dir / "resume.json").read_text())
+    drive(retry_run, retry_pipe, retry_stub, resumed_retry)
+    review_prompt = next(text for sid, _h, text in retry_calls if sid == "review")
+    retry_ledger = json.loads((retry_run._run_dir / "ledger.json").read_text())
+    developer_entry = retry_ledger["steps"]["developer"]
+    check("retry: successful attempt is authoritative",
+          retry_calls[1][1] == "opencode:go/retry-second@high"
+          and developer_entry["task_file"].endswith("developer-task-r2.md")
+          and any(path.endswith("developer-task-r1.md")
+                  for path in developer_entry["superseded_task_files"]),
+          "ledger names the accepted attempt and preserves the failed one")
+    check("retry: downstream context uses actual harness",
+          "Retry second" in review_prompt and "Retry first" not in review_prompt
+          and "ledger.json" in review_prompt and "superseded" in review_prompt,
+          "no model-name conflict is presented as live context")
+    bad_authority_dir = Path(tempfile.mkdtemp(prefix="retry-bad-ledger"))
+    (bad_authority_dir / "ledger.json").write_text("{not-json")
+    bad_authority = Run(retry_pipe, retry_dir, bad_authority_dir,
+                        dict(retry_pipe["inputs"]))
+    bad_authority._run_dir = bad_authority_dir
+    bad_authority.require_authoritative = True
+    try:
+        bad_authority.render_task("review")
+        bad_authority_refused = False
+    except Fail:
+        bad_authority_refused = True
+    check("retry: malformed authority fails closed",
+          bad_authority_refused, "no planned-model fallback")
+
+    # Crash journal: fault injection at each durable boundary must recover
+    # without re-invoking the completed harness or switching models.
+    for boundary in ("after-ledger", "after-rotation", "after-resume"):
+        crash_dir = Path(tempfile.mkdtemp(prefix=f"crash-{boundary}-"))
+        (crash_dir / "s.md").write_text(
+            "---\nname: s\nharness: ['opencode:go/crash-a@high', 'opencode:go/crash-b@high']\n"
+            "harness_names:\n  'opencode:go/crash-a@high': 'Crash A'\n"
+            "  'opencode:go/crash-b@high': 'Crash B'\n"
+            "placeholders:\n  X: x\n---\nDo {{X}} on {{harness}}.")
+        crash_pipe = {"version": 1, "run_dir": "run",
+                      "inputs": {"phase_number": 9, "phase_file": "p",
+                                 "max_remedy_rounds": 3},
+                      "start": "s", "ends": ["completed"],
+                      "steps": {"s": {"stage": "s.md", "record_as": "S",
+                                      "bindings": {"X": "x"}, "end": "completed"}}}
+        validate(crash_pipe, crash_dir)
+        crash_run = Run(crash_pipe, crash_dir, crash_dir, dict(crash_pipe["inputs"]))
+        crash_run.rotation_key = f"rk-crash-{boundary}"
+        crash_run._run_dir = crash_dir / "run"
+        crash_run._run_dir.mkdir()
+        save_rotation(crash_dir, crash_run.rotation_key, {"s": 1})
+
+        def crash_stub(harness, task_path, log_path, usage_path=None, when=None,
+                       nonce=None, **kw):
+            sig = "BYE_DONE" + (f" {nonce}" if nonce else "")
+            Path(log_path).write_text(sig)
+            return sig, {}
+
+        orig_note = note_completion
+        orig_save_rot = save_rotation
+        orig_write_atomic = write_json_atomic
+
+        def fail_after_ledger(*a, **k):
+            out = orig_note(*a, **k)
+            if boundary == "after-ledger":
+                raise KeyboardInterrupt("injected crash after ledger")
+            return out
+
+        def fail_after_rotation(*a, **k):
+            out = orig_save_rot(*a, **k)
+            if boundary == "after-rotation":
+                raise KeyboardInterrupt("injected crash after rotation")
+            return out
+
+        def fail_after_resume(path, value):
+            out = orig_write_atomic(path, value)
+            if boundary == "after-resume" and Path(path).name == "resume.json":
+                # Only crash on the commit's resume write (which carries the
+                # accepted output), not on the pre-invoke save with empty outputs.
+                try:
+                    outputs = value.get("outputs", {}) if isinstance(value, dict) else {}
+                    has_output = any(isinstance(v, str) and "BYE_DONE" in v
+                                     for v in outputs.values())
+                except Exception:  # noqa: BLE001 - test helper must not crash
+                    has_output = False
+                if has_output:
+                    raise KeyboardInterrupt("injected crash after resume")
+            return out
+
+        import builtins as _builtins
+        globals()["note_completion"] = fail_after_ledger
+        globals()["save_rotation"] = fail_after_rotation
+        globals()["write_json_atomic"] = fail_after_resume
+        crashed = False
+        try:
+            drive(crash_run, crash_pipe, crash_stub)
+        except (KeyboardInterrupt, Fail):
+            crashed = True
+        finally:
+            globals()["note_completion"] = orig_note
+            globals()["save_rotation"] = orig_save_rot
+            globals()["write_json_atomic"] = orig_write_atomic
+        resumed_crash = json.loads((crash_run._run_dir / "resume.json").read_text()) \
+            if (crash_run._run_dir / "resume.json").is_file() else None
+        # Pending commit must exist for all three boundaries (written before
+        # ledger), so recovery replays instead of re-invoking.
+        pending_exists = pending_commit_path(crash_run).is_file()
+        calls_after = []
+        def crash_stub2(harness, task_path, log_path, usage_path=None, when=None,
+                        nonce=None, **kw):
+            calls_after.append(harness)
+            sig = "BYE_DONE" + (f" {nonce}" if nonce else "")
+            Path(log_path).write_text(sig)
+            return sig, {}
+        if resumed_crash is not None:
+            # Fresh Run object to simulate a new process after crash.
+            crash_run2 = Run(crash_pipe, crash_dir, crash_dir, dict(crash_pipe["inputs"]))
+            crash_run2.rotation_key = crash_run.rotation_key
+            crash_run2._run_dir = crash_run._run_dir
+            result = drive(crash_run2, crash_pipe, crash_stub2, resumed_crash)
+            recovered = result.get("state") == "completed" and not calls_after
+        else:
+            # Crash before any resume was saved (should not happen for
+            # journaled commits which save resume via pending replay, but
+            # treat as failed attempt and retry same harness).
+            recovered = False
+        check(f"journal: crash {boundary} recovers without re-invoke",
+              crashed and pending_exists and recovered,
+              "pending replay, same model, no duplicate harness call")
+
+    # Task snapshot integrity: tampering with the authoritative task fails.
+    tamper_dir = Path(tempfile.mkdtemp(prefix="task-tamper-"))
+    (tamper_dir / "s.md").write_text(
+        "---\nname: s\nharness: ['opencode:go/tamper@high']\n"
+        "harness_names:\n  'opencode:go/tamper@high': 'Tamper'\n"
+        "placeholders:\n  X: x\n---\nDo {{X}}.")
+    tamper_pipe = {"version": 1, "run_dir": "run",
+                   "inputs": {"phase_number": 11, "phase_file": "p",
+                              "max_remedy_rounds": 3},
+                   "start": "s", "ends": ["completed"],
+                   "steps": {"s": {"stage": "s.md", "record_as": "S",
+                                   "bindings": {"X": "x"}, "end": "completed"}}}
+    validate(tamper_pipe, tamper_dir)
+    tamper_run = Run(tamper_pipe, tamper_dir, tamper_dir, dict(tamper_pipe["inputs"]))
+    tamper_run.rotation_key = "rk-tamper"
+    tamper_run._run_dir = tamper_dir / "run"
+    tamper_run._run_dir.mkdir()
+
+    def tamper_stub(harness, task_path, log_path, usage_path=None, when=None,
+                    nonce=None, **kw):
+        sig = "BYE_DONE" + (f" {nonce}" if nonce else "")
+        Path(log_path).write_text(sig)
+        return sig, {}
+    drive(tamper_run, tamper_pipe, tamper_stub)
+    tamper_task = tamper_run._run_dir / "s-task-r1.md"
+    tamper_task.write_text(tamper_task.read_text() + "\nTampered.")
+    try:
+        tamper_run.authoritative_attempt("s")
+        tamper_refused = False
+    except Fail:
+        tamper_refused = True
+    check("authority: tampered task snapshot fails closed",
+          tamper_refused, "hash mismatch refuses")
+
+    # Stage mutation: downstream context uses the stored snapshot, not the
+    # mutated stage template.
+    stage_dir = Path(tempfile.mkdtemp(prefix="stage-mutation-"))
+    (stage_dir / "dev.md").write_text(
+        "---\nname: dev\nharness: ['opencode:go/stage-a@high', 'opencode:go/stage-b@high']\n"
+        "harness_names:\n  'opencode:go/stage-a@high': 'Stage A'\n"
+        "  'opencode:go/stage-b@high': 'Stage B'\n"
+        "placeholders:\n  X: x\n---\nOriginal {{X}} on {{harness}}.")
+    (stage_dir / "rev.md").write_text(
+        "---\nname: rev\nharness: ['opencode:go/rev@high']\n"
+        "harness_names:\n  'opencode:go/rev@high': 'Rev'\n"
+        "placeholders:\n  C: x\n---\nReview {{C}}")
+    stage_pipe = {"version": 1, "run_dir": "run",
+                  "inputs": {"phase_number": 12, "phase_file": "p",
+                             "max_remedy_rounds": 3},
+                  "start": "dev", "ends": ["completed"],
+                  "steps": {"dev": {"stage": "dev.md", "record_as": "D",
+                                    "bindings": {"X": "work"},
+                                    "when": {"DEV_DONE": "rev"}},
+                            "rev": {"stage": "rev.md", "record_as": "R",
+                                    "bindings": {"C": {"task": "dev"}},
+                                    "end": "completed"}}}
+    validate(stage_pipe, stage_dir)
+    stage_run = Run(stage_pipe, stage_dir, stage_dir, dict(stage_pipe["inputs"]))
+    stage_run.rotation_key = "rk-stage"
+    stage_run._run_dir = stage_dir / "run"
+    stage_run._run_dir.mkdir()
+    save_rotation(stage_dir, "rk-stage", {"dev": 1})
+
+    def stage_stub(harness, task_path, log_path, usage_path=None, when=None,
+                   nonce=None, **kw):
+        sid = kw.get("sid")
+        sig = ("DEV_DONE" if sid == "dev" else "REVIEW_DONE") + (f" {nonce}" if nonce else "")
+        Path(log_path).write_text(sig)
+        return sig, {}
+    drive(stage_run, stage_pipe, stage_stub)
+    # Mutate the stage file after completion; downstream rendering happens
+    # in a fresh Run object that re-reads stages from disk.
+    (stage_dir / "dev.md").write_text(
+        "---\nname: dev\nharness: ['opencode:go/stage-a@high', 'opencode:go/stage-b@high']\n"
+        "harness_names:\n  'opencode:go/stage-a@high': 'Stage A'\n"
+        "  'opencode:go/stage-b@high': 'Stage B'\n"
+        "placeholders:\n  X: x\n---\nMUTATED {{X}} on {{harness}}.")
+    stage_run2 = Run(stage_pipe, stage_dir, stage_dir, dict(stage_pipe["inputs"]))
+    stage_run2.rotation_key = "rk-stage"
+    stage_run2._run_dir = stage_run._run_dir
+    stage_run2.require_authoritative = True
+    snap_text = stage_run2.resolve("rev", {"task": "dev"},
+                                   stage_run2.ctx("rev"), {"rev"})
+    check("authority: stage mutation does not alter snapshot",
+          "Original" in snap_text and "MUTATED" not in snap_text
+          and "Stage B" in snap_text and "Stage A" not in snap_text,
+          "exact completed task is the source")
+
+    # Legacy migration: deterministic backfill succeeds, ambiguous fails.
+    legacy_dir = Path(tempfile.mkdtemp(prefix="legacy-migrate-"))
+    (legacy_dir / "s.md").write_text(
+        "---\nname: s\nharness: ['opencode:go/leg-a@high', 'opencode:go/leg-b@high']\n"
+        "harness_names:\n  'opencode:go/leg-a@high': 'Leg A'\n"
+        "  'opencode:go/leg-b@high': 'Leg B'\n"
+        "placeholders:\n  X: x\n---\nDo {{X}}.")
+    legacy_pipe = {"version": 1, "run_dir": "run",
+                   "inputs": {"phase_number": 13, "phase_file": "p",
+                              "max_remedy_rounds": 3},
+                   "start": "s", "ends": ["completed"],
+                   "steps": {"s": {"stage": "s.md", "record_as": "S",
+                                   "bindings": {"X": "x"}, "end": "completed"}}}
+    validate(legacy_pipe, legacy_dir)
+    legacy_run = Run(legacy_pipe, legacy_dir, legacy_dir, dict(legacy_pipe["inputs"]))
+    legacy_run._run_dir = legacy_dir / "run"
+    legacy_run._run_dir.mkdir()
+    (legacy_run._run_dir / "s-task-r1.md").write_text("old attempt")
+    (legacy_run._run_dir / "s-task-r2.md").write_text("successful attempt")
+    (legacy_run._run_dir / "ledger.json").write_text(json.dumps({
+        "order": ["s"], "steps": {"s": {
+            "signal": "BYE_DONE", "harness": "opencode:go/leg-b@high",
+            "visits": 2, "output_sha256": "x", "artifacts": {}}}}))
+    legacy_run.require_authoritative = True
+    try:
+        migrated = legacy_run.authoritative_attempt("s")
+        legacy_ok = (migrated.get("task_file") == "s-task-r2.md"
+                     and migrated.get("authoritative") is True
+                     and "task_sha256" in migrated)
+    except Fail:
+        legacy_ok = False
+    check("migration: deterministic legacy backfill succeeds",
+          legacy_ok, "visits selects the authoritative task")
+    amb_dir = Path(tempfile.mkdtemp(prefix="legacy-ambiguous-"))
+    (amb_dir / "s.md").write_text((legacy_dir / "s.md").read_text())
+    amb_pipe = {"version": 1, "run_dir": "run",
+                "inputs": {"phase_number": 14, "phase_file": "p",
+                           "max_remedy_rounds": 3},
+                "start": "s", "ends": ["completed"],
+                "steps": {"s": {"stage": "s.md", "record_as": "S",
+                                "bindings": {"X": "x"}, "end": "completed"}}}
+    validate(amb_pipe, amb_dir)
+    amb_run = Run(amb_pipe, amb_dir, amb_dir, dict(amb_pipe["inputs"]))
+    amb_run._run_dir = amb_dir / "run"
+    amb_run._run_dir.mkdir()
+    (amb_run._run_dir / "s-task-r1.md").write_text("a")
+    (amb_run._run_dir / "s-task-r2.md").write_text("b")
+    (amb_run._run_dir / "ledger.json").write_text(json.dumps({
+        "order": ["s"], "steps": {"s": {
+            "signal": "BYE_DONE", "harness": "opencode:go/leg-a@high",
+            "output_sha256": "x", "artifacts": {}}}}))
+    amb_run.require_authoritative = True
+    try:
+        amb_run.authoritative_attempt("s")
+        amb_refused = False
+    except Fail as e:
+        amb_refused = "--migrate-ledger" in str(e) or "ambiguous" in str(e)
+    check("migration: ambiguous legacy fails closed",
+          amb_refused, "explicit recovery, no guessing")
+
+    # Rotation write failure fails the completion instead of silently continuing.
+    rotfail_dir = Path(tempfile.mkdtemp(prefix="rotfail-"))
+    (rotfail_dir / "s.md").write_text(
+        "---\nname: s\nharness: ['opencode:go/one@high']\n"
+        "harness_names:\n  'opencode:go/one@high': 'One'\n"
+        "placeholders:\n  X: x\n---\nDo {{X}}.")
+    rotfail_pipe = {"version": 1, "run_dir": "run",
+                    "inputs": {"phase_number": 15, "phase_file": "p",
+                               "max_remedy_rounds": 3},
+                    "start": "s", "ends": ["completed"],
+                    "steps": {"s": {"stage": "s.md", "record_as": "S",
+                                    "bindings": {"X": "x"}, "end": "completed"}}}
+    validate(rotfail_pipe, rotfail_dir)
+    rotfail_run = Run(rotfail_pipe, rotfail_dir, rotfail_dir, dict(rotfail_pipe["inputs"]))
+    rotfail_run.rotation_key = "rk-rotfail"
+    rotfail_run._run_dir = rotfail_dir / "run"
+    rotfail_run._run_dir.mkdir()
+
+    def rotfail_stub(harness, task_path, log_path, usage_path=None, when=None,
+                     nonce=None, **kw):
+        sig = "BYE_DONE" + (f" {nonce}" if nonce else "")
+        Path(log_path).write_text(sig)
+        return sig, {}
+    orig_save = save_rotation
+    def fail_save(*a, **k):
+        raise Fail("injected rotation write failure")
+    globals()["save_rotation"] = fail_save
+    try:
+        drive(rotfail_run, rotfail_pipe, rotfail_stub)
+        rotfail_completed = True
+    except Fail:
+        rotfail_completed = False
+    finally:
+        globals()["save_rotation"] = orig_save
+    check("rotation: write failure fails completion",
+          not rotfail_completed, "no silent success without durable rotation")
+
+    # Adversarial fixture: multiple plausible model names and stale
+    # requirements must not leak into downstream context.
+    adv_dir = Path(tempfile.mkdtemp(prefix="adversarial-fixture-"))
+    (adv_dir / "dev.md").write_text(
+        "---\nname: dev\nharness: ['opencode:go/adv-a@high', 'opencode:go/adv-b@high']\n"
+        "harness_names:\n  'opencode:go/adv-a@high': 'Adv Model Alpha'\n"
+        "  'opencode:go/adv-b@high': 'Adv Model Beta'\n"
+        "placeholders:\n  X: x\n---\nBuild {{X}} with {{harness}}. REQUIREMENT: use database X.")
+    (adv_dir / "rev.md").write_text(
+        "---\nname: rev\nharness: ['opencode:go/adv-rev@high']\n"
+        "harness_names:\n  'opencode:go/adv-rev@high': 'Adv Review'\n"
+        "placeholders:\n  C: x\n---\nReview {{C}}")
+    adv_pipe = {"version": 1, "run_dir": "run",
+                "inputs": {"phase_number": 16, "phase_file": "p",
+                           "max_remedy_rounds": 3},
+                "start": "dev", "ends": ["completed"],
+                "steps": {"dev": {"stage": "dev.md", "record_as": "D",
+                                  "bindings": {"X": "work"},
+                                  "when": {"DEV_DONE": "rev"}},
+                          "rev": {"stage": "rev.md", "record_as": "R",
+                                  "bindings": {"C": {"task": "dev"}},
+                                  "end": "completed"}}}
+    validate(adv_pipe, adv_dir)
+    adv_run = Run(adv_pipe, adv_dir, adv_dir, dict(adv_pipe["inputs"]))
+    adv_run.rotation_key = "rk-adv"
+    adv_run._run_dir = adv_dir / "run"
+    adv_run._run_dir.mkdir()
+    save_rotation(adv_dir, "rk-adv", {"dev": 1})
+    adv_calls = []
+    def adv_stub(harness, task_path, log_path, usage_path=None, when=None,
+                 nonce=None, **kw):
+        sid = kw.get("sid")
+        text = Path(task_path).read_text()
+        adv_calls.append((sid, harness, text))
+        if sid == "dev" and sum(c[0] == sid for c in adv_calls) == 1:
+            Path(log_path).write_text("failed, no signal")
+            return "failed, no signal", {}
+        sig = ("DEV_DONE" if sid == "dev" else "REVIEW_DONE") + (f" {nonce}" if nonce else "")
+        Path(log_path).write_text(sig)
+        return sig, {}
+    try:
+        drive(adv_run, adv_pipe, adv_stub)
+    except Fail:
+        resumed_adv = json.loads((adv_run._run_dir / "resume.json").read_text())
+        drive(adv_run, adv_pipe, adv_stub, resumed_adv)
+    adv_review = next(t for s, _h, t in adv_calls if s == "rev")
+    # The failed r1 file contains Alpha; the successful r2 uses Beta. The
+    # reviewer must see only Beta and the authority notice, never Alpha as
+    # a live requirement.
+    check("adversarial: stale model and requirement do not leak",
+          "Adv Model Beta" in adv_review and "Adv Model Alpha" not in adv_review
+          and "ledger.json" in adv_review and "superseded" in adv_review,
+          "exact snapshot wins")
 
     # --mark-done recovery, pinned: a finished-but-unsignalled step advances
     # without invoking any harness; a wrong signal is refused.
@@ -2651,10 +3856,12 @@ def self_test(run, live=False):
           and (mr._run_dir / "s0-task-r1.log").read_text().splitlines()[-1] == "SIG0"
           and json.loads((mr._run_dir / "resume.json").read_text())["current"] == "s1",
           "resume at s1, signal appended")
+    mark_done_ledger = json.loads((mr._run_dir / "ledger.json").read_text())
     check("mark-done: ledger proves the step",
-          "s0" in json.loads(
-              (mr._run_dir / "ledger.json").read_text())["steps"],
-          "s0 entry present")
+          "s0" in mark_done_ledger["steps"]
+          and mark_done_ledger["steps"]["s0"].get("task_file")
+          == "s0-task-r1.md",
+          "s0 entry points at the recovered task")
     try:
         mark_done(mr, "s1", "NOPE")
         check("mark-done: wrong signal refused", False, "no Fail raised")
@@ -2704,6 +3911,34 @@ def self_test(run, live=False):
     res_f = mark_done(mr2, "s0", "SIG0", force=True)
     check("mark-done: force overrides loop cap",
           res_f.get("advanced_to") == "s1", "advanced with force")
+
+    # mark-done ignores the console mirror sidecar when selecting the run log.
+    md_tui = Path(tempfile.mkdtemp(prefix="markdone-tui"))
+    (md_tui / "s0.md").write_text((md / "s0.md").read_text())
+    (md_tui / "s1.md").write_text((md / "s0.md").read_text())
+    import copy as _copy_tui
+    mtui_pipe = _copy_tui.deepcopy(mp)
+    validate(mtui_pipe, md_tui)
+    mtui = Run(mtui_pipe, md_tui, md_tui, dict(mtui_pipe["inputs"]))
+    mtui.rotation_key = "rk-md-tui"
+    mtui._run_dir = md_tui / "rd"
+    mtui._run_dir.mkdir(exist_ok=True)
+    (mtui._run_dir / "s0-task-r1.md").write_text("Do x.")
+    (mtui._run_dir / "s0-task-r1.log").write_text("real work, forgot signal\n")
+    (mtui._run_dir / "s0-task-r1.tui.log").write_text("console mirror\n")
+    (mtui._run_dir / "resume.json").write_text(json.dumps({
+        "current": "s0", "outputs": {}, "visits": {"s0": 1},
+        "harness_use": {"s0": 0}, "prev_step": None,
+        "transcript": [], "events": []}))
+    res_tui = mark_done(mtui, "s0", "SIG0")
+    tui_ledger = json.loads((mtui._run_dir / "ledger.json").read_text())
+    check("mark-done: ignores console mirror sidecar",
+          res_tui.get("advanced_to") == "s1"
+          and "SIG0" in (mtui._run_dir / "s0-task-r1.log").read_text()
+          and "SIG0" not in (mtui._run_dir / "s0-task-r1.tui.log").read_text()
+          and tui_ledger["steps"]["s0"]["output_sha256"] == sha_str(
+              (mtui._run_dir / "s0-task-r1.log").read_text()),
+          "run log is the provenance source, not the mirror")
 
     with tempfile.TemporaryDirectory(prefix="artifact-empty") as artifact_tmp:
         artifact_dir = Path(artifact_tmp)
@@ -3000,6 +4235,11 @@ def main():
     ap.add_argument("--reset-rotation", action="store_true",
                     help="delete this pipeline's rotation file and exit "
                          "(rotation restarts at slot 0)")
+    ap.add_argument("--audit-ledger", action="store_true",
+                    help="report ledger authority gaps for this run without changing files")
+    ap.add_argument("--migrate-ledger", action="store_true",
+                    help="backfill deterministic task_file/task hashes for legacy ledger "
+                         "entries; ambiguous steps are reported, not guessed")
     ap.add_argument("--machine-id", default=None,
                     help="stable host ID for the shared phase reservation")
     ap.add_argument("--takeover", action="store_true",
@@ -3074,11 +4314,18 @@ def main():
         if args.self_test:
             self_test(run, live=args.live)
             return
+        if args.audit_ledger or args.migrate_ledger:
+            report = audit_or_migrate_ledger(run, migrate=args.migrate_ledger)
+            print(json.dumps(report, indent=2))
+            sys.exit(0 if not report.get("ambiguous") and not report.get("errors") else 1)
         had_run_dir = run._run_dir.exists()
         if not args.dry_run:
             run._run_dir.mkdir(parents=True, exist_ok=True)
 
         if args.dry_run:
+            # A preview shows the first planned slot; live execution reads
+            # completed harness data from the ledger.
+            run.require_authoritative = False
             for sid in run.steps:
                 meta, _ = run.stages[sid]
                 hs = meta["harness"] if isinstance(meta["harness"], list) else [meta["harness"]]
