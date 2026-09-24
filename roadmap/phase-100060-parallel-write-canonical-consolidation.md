@@ -7,6 +7,7 @@
 | Adversary | Antigravity CLI (Gemini 3.8 Flash) |
 | Remediator | Cursor Agent CLI (auto) |
 | Remedy Approver | Antigravity CLI (Gemini 3.8 Flash) |
+| Close-out verdict (reconstructed, no finalize log) | OpenCode CLI (Together . GLM-5.3 Flash High), phase-100420 Developer r1 |
 
 **Index slice 100060 · **Effort:** `1×` · **Scope:** `roadmap/index.md` slice 100060 (authoritative)
 
@@ -474,6 +475,6 @@ PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
 - Implementer: Cursor Agent CLI (auto)
-- Verifier: (pending adversary / human)
+- Verifier: Remedy Approver (Antigravity CLI, REMEDY_APPROVED); close-out verdict reconstructed by the phase-100420 developer from `ledger.json`, `findings.json`, and the developer/adversary/remediator/approver logs (see `runs/phase-100060/close-out-verdict.md`); the finalize run log (`finalize-task-r1.log`) was never written
 - Human Approver: [Name, if required]
-- Date: 2026-09-17
+- Date: 2026-09-17 (verdict reconstructed 2026-09-24)

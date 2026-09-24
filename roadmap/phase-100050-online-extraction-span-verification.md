@@ -7,6 +7,7 @@
 | Adversary | Antigravity (Gemini 3.8 Flash) |
 | Remediator | Cursor (Auto) |
 | Remedy Approver | Antigravity (Gemini 3.8 Flash) |
+| Adversary (phase-100420 r1 pass) | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max); 7 findings filed (`runs/phase-100420/findings-task2-003-005.json`), 6 remedied with tests, F-04 accepted risk (live-model CI exercise, unowned), F-07 build-time validation accepted as designed |
 
 **Index slice 100050 · **Effort:** `1×` · **Scope:** `roadmap/index.md` slice 100050 (authoritative)
 
