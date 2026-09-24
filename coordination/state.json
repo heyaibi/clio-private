@@ -8,12 +8,19 @@
       "claimed_at": "2026-09-24T18:01:45.537Z",
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-24T18:08:04.618Z",
+      "heartbeat_at": "2026-09-24T18:42:18.638Z",
       "machine_id": "macbook",
       "reservation_id": "rsv-819a49beb4a57acc588232ef",
       "run_id": "phase-100480",
       "status": "running"
     }
+  },
+  "publication": {
+    "acquired_at": "2026-09-24T18:46:22.575Z",
+    "generation": 1,
+    "machine_id": "macbook",
+    "phase": "100480",
+    "reservation_id": "rsv-819a49beb4a57acc588232ef"
   },
   "version": 1
 }
