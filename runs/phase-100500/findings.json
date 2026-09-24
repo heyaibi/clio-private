@@ -1,0 +1,35 @@
+{
+  "run": "phase-100500",
+  "phase": "100500",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Roadmap isolation violation: Phase number 100500 embedded in test names and module comments",
+      "evidence": "crates/clio-mcp/src/provider_adapter_tests.rs:11 (//! - Unit and integration tests for import_provider (T100500-01 through T100500-04)), crates/clio-mcp/src/provider_adapter_tests.rs:149,202,258,306 (fn t100500_01_*, fn t100500_02_*, fn t100500_03_*, fn t100500_04_*), crates/clio-mcp/src/provider_adapter_edge_tests.rs:10-12 (//! - Security tests (credential masking T100500-05)), and crates/clio-mcp/src/provider_adapter_edge_tests.rs:27,67,93 (fn t100500_05_*, fn t100500_06_*, fn t100500_07_*)",
+      "requirement_ref": "AGENTS.md §'Private / Public Boundary' ('Never reference private/... paths in any public file... Never paste private file contents (requirement text, roadmap phases, worker prompts, run logs) into public files') and Developer Hard Rules ('Roadmap isolation: never reference private/clio-private/roadmap/, phase numbers, or roadmap files from code or comments')",
+      "recommendation": "Rename test functions and update doc comments in provider_adapter_tests.rs and provider_adapter_edge_tests.rs to standard ordinal prefixes (e.g. t01_*, t02_*, etc.) without mentioning the private phase number 100500.",
+      "status": "resolved",
+      "resolution": "r1 resolved. Renamed t100500_01..t100500_07 to t01..t07 in crates/clio-mcp/src/provider_adapter_tests.rs (lines 149,202,258,306) and crates/clio-mcp/src/provider_adapter_edge_tests.rs (lines 27,67,93), and removed the T100500-NN identifiers from both module doc comments. Verified: a scan of the public tree for '100500|T100500' (excluding target/, .git/, private/) returns 0 matches; `cargo test -p clio-mcp --locked --lib provider_adapter` -> 'test result: ok. 14 passed; 0 failed', listing t01_dry_run_against_provider_zero_writes .. t07_unimplemented_provider_returns_stub_code under the new names. Phase-file evidence rows were updated to the new test names."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Dry-run and live-run intra-batch deduplication divergence",
+      "evidence": "crates/clio-mcp/src/provider_adapter.rs:180-186",
+      "requirement_ref": "requirement.md FR-29 / §4.9.5.B ('JSON import SHALL be idempotent by default... and SHALL support a dry-run report with zero writes. When a provider adapter is implemented... SHALL offer the same dry-run report before writing.')",
+      "recommendation": "Track encountered external IDs in an in-memory HashSet during the import_provider_mem0 loop so that duplicate IDs in a single pull response are counted as would_skip rather than would_create during dry_run, maintaining exact parity with live execution.",
+      "status": "resolved",
+      "resolution": "r1 resolved. import_provider_mem0 now keeps a HashSet<String> of external ids (crates/clio-mcp/src/provider_adapter.rs:104); process_mem0_item consults it before the store lookup (line 192) and records the id when the gate passes (line 270), so duplicates inside one pull report would_skip in a dry run exactly as the live path skips the second occurrence. Reproduced on the pre-fix staged baseline (git show of the staged file; index untouched): the new regression test mem0_duplicate_external_ids_dry_run_matches_live_counts failed with \"assertion `left == right` failed  left: Number(3)  right: 2\"; after the fix the same test passes (dry run would_create 2 / would_skip 1 / writes_performed 0; live run would_create 2 / would_skip 1 / writes_performed 2). `make check` -> 2103 passed, 0 failed; `make coverage` -> 320 files, TOTAL lines 97.95% functions 98.83%, no file below the floor, provider_adapter.rs 95.54% lines / 90.00% functions (unchanged function ratio)."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "DONE r1 (F-01): Rename t100500_* test functions and remove phase number references from provider_adapter_tests.rs and provider_adapter_edge_tests.rs to restore roadmap isolation.",
+    "DONE r1 (F-02): Add a local HashSet<String> of seen external IDs to import_provider_mem0 in provider_adapter.rs so that duplicates within a dry-run pull correctly count as would_skip."
+  ],
+  "plan_unlimited": [
+    "DECLINED for this phase (r1, no code change): Add provider adapters for the remaining four external memory systems (hindsight, mnemosyne, honcho, supermemory) using the validated Mem0 adapter pattern. The phase scope explicitly places the other four adapters out of scope and forbids implementing them in this phase; the non-writing stub contract stays. Remains future work.",
+    "DECLINED for this phase (r1, no code change): Support configurable query filters (e.g. time range, categories) in provider options mapped to external provider search/list endpoints. Not part of this phase's in-scope behavior (pull, masking, dry-run report, gating, provenance, idempotency); a single category override already exists via options.category. Remains future work."
+  ]
+}
