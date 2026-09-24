@@ -5,6 +5,7 @@
 |------|-------|
 | Developer | Cursor (Auto) |
 | Adversary | Cursor (Auto) |
+| Adversary (phase-100420 r1 pass) | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max); 7 findings filed (`runs/phase-100420/findings-task2-003-005.json`), 6 remedied with tests, F-04 accepted risk (live-model CI exercise, unowned), F-07 build-time validation accepted as designed |
 
 **Index slice 100030 · **Effort:** `1×` · **Scope:** `roadmap/index.md` slice 100030 (authoritative)
 

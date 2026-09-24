@@ -1,0 +1,58 @@
+{
+  "run": "phase-100420",
+  "phase": "100420",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "Upgrade test (T100420-10 / exit-contract rule 4) never opens a previous-schema database; the old-index drop and the v10 to v11 migration are untested",
+      "evidence": "crates/clio-store/src/triple_open_uniq_tests.rs:341-377 `sqlite_existing_db_gains_unique_index_on_reopen` creates the database with the CURRENT schema (`SqliteStore::open`) and then only runs `DROP INDEX IF EXISTS triples_open_uniq`; crates/clio-store/src/pg_triple_open_uniq_tests.rs:192-230 `pg_existing_db_gains_unique_index_on_reopen` does the same. Neither test creates `triples_bank_id_subject_predicate_open_both_inx`, seeds schema_version '10', or otherwise materializes the previous schema shape. `grep -rn triples_bank_id_subject_predicate_open_both_inx` outside roadmap text finds the name only at sql/001_core.sql:259 (the DROP) and crates/clio-store/src/migrate.rs:121 (the SQL-text assertion); no test materializes the old index so the DROP has something to remove, and no test opens a real v10 database that must come up at v11.",
+      "requirement_ref": "roadmap/phase-100420 section 5 Task 3 Required Changes 5; section 8 T100420-10; section 12 Pre-existing-Data Compatibility Policy rule 4 (\"At least one test opens a database created with the previous schema\")",
+      "recommendation": "Add one test per backend that builds a v10-shaped database (old non-unique `triples_bank_id_subject_predicate_open_both_inx` present, `schema_version` '10', no `triples_open_uniq`), opens the store, and asserts: the old index is gone, `triples_open_uniq` exists and rejects a raw duplicate insert, and `schema_version` reads '11'."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Task 2 required change \"Update the phase files' attribution\" is missing: phases 100030/100050 attribution tables are untouched",
+      "evidence": "`git -C private/clio-private diff --cached --name-only -- roadmap/` lists only `phase-100060-parallel-write-canonical-consolidation.md` and `phase-100420-history-temporal-invariant.md`. roadmap/phase-100030-memory-item-core.md:3-7 shows only `| Developer | Cursor (Auto) |` and `| Adversary | Cursor (Auto) |`; roadmap/phase-100050-online-extraction-span-verification.md:3-9 shows only the original four rows. No row anywhere records the phase-100420 r1 adversary pass over those two phases.",
+      "requirement_ref": "roadmap/phase-100420 section 5 Task 2 Required Changes 3 (\"Update the phase files' attribution\")",
+      "recommendation": "Append an attribution row to roadmap/phase-100030-memory-item-core.md and roadmap/phase-100050-online-extraction-span-verification.md recording the phase-100420 r1 adversary pass and its disposition (6 remedied, F-04 accepted), or record explicitly why the attribution update is not required."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "New subject-immutability guard assumes a non-NULL stored subject_id: a NULL row panics the Postgres update and returns a generic driver error on SQLite",
+      "evidence": "crates/clio-store/src/item_update.rs:53-61 (SQLite) reads the stored subject into `String` (`|r| r.get(0)`); a NULL raises rusqlite InvalidColumnType which `.am(\"subject lookup\")` maps to a generic `Internal` error (crates/clio-store/src/migrate.rs:18-20). crates/clio-store/src/item_update.rs:135-141 (Postgres) calls `row.get(0)` inside `.map(...)`, and postgres::Row::get panics on a conversion failure. sql/001_core.sql:130 declares `subject_id text,` (nullable) and crates/clio-store/src/schema_converge.rs only adds the correction-lineage columns, so a legacy or hand-written row with NULL subject_id hits this path; every current write path supplies a non-empty subject, so reachability is limited to data written outside the current API.",
+      "requirement_ref": null,
+      "recommendation": "Read the stored subject as `Option<String>` on both backends and handle NULL explicitly (return the named error, or allow the update when the caller supplies a subject), instead of a generic driver error on SQLite and a panic on Postgres."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "F-05 remediation is partial: the ungated correction primitive can still re-point an item to another subject (DEK/erasure-domain move)",
+      "evidence": "The F-05 fix rejects subject changes only in `update_memory_item_*_tx` (crates/clio-store/src/item_update.rs:62-64 and :148-150). The correction primitive still takes a caller-built `MemoryItem` (crates/clio-store/src/audit_model.rs:35-42, `pub new_item: MemoryItem`), seals it under `new_item.subject_id` (crates/clio-store/src/sqlite_correct.rs:48-53; postgres_correct.rs parity) and inserts that subject (sqlite_correct.rs:104-140) without comparing it to the prior row's subject. The compliance facade builds `new_item` from the prior item (crates/clio-compliance/src/correct.rs:177 `build_corrected_item(&prior, ...)`), so exposed tool paths are safe; direct library callers can still move a record out of its subject's erasure scope.",
+      "requirement_ref": "FR-19 / requirement.md section 7.4 (erasure scope by subject); phase-100420 Task 2 finding F-05 disposition",
+      "recommendation": "Add the same stored-subject comparison to `correct_item_impl` and its Postgres twin (reject `spec.new_item.subject_id != prior.subject_id` with the named error), or document the correction move as an explicit, audited operation."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "New constraint tests drop a live index on the shared public schema, against the phase's \"No destructive DDL on public\" control",
+      "evidence": "crates/clio-store/src/pg_triple_open_uniq_tests.rs:214 and :256 run `DROP INDEX IF EXISTS triples_open_uniq` against the shared Compose database (`DATABASE_URL`, public schema), and :283-287 deletes rows; roadmap/phase-100420 section 7 Required Controls state \"No destructive DDL on `public`\" and prefer a private schema per coverage.md section 4.4. The serialization lock is a process-wide mutex (crates/clio-store/src/pg_lock.rs:16-27) and the index is restored only by the next `PostgresStore::open` (crates/clio-store/src/postgres.rs:63-64), so a process dying between the drop and the reopen leaves the shared database without the DB backstop until some later store open. The repo already has the private-schema pattern for DDL cases: crates/clio-store/src/pg_assoc_edge_tests.rs:156-178 creates a temporary schema and sets search_path.",
+      "requirement_ref": "roadmap/phase-100420 section 7 Security Constraints (Required Controls)",
+      "recommendation": "Run the drop/reopen and legacy-duplicate Postgres cases in a private temporary schema (CREATE SCHEMA + search_path + schema bootstrap) as pg_assoc_edge_tests does, or guarantee index restoration in a drop guard so a panic cannot leave the shared schema without the constraint."
+    }
+  ],
+  "plan_1hr": [
+    "F-01: add the missing previous-schema upgrade test on both backends (materialize the old non-unique open-both index plus schema_version '10', open, assert old index gone, triples_open_uniq present and effective, version reads '11').",
+    "F-02: append the phase-100420 adversary-pass attribution rows to roadmap/phase-100030-memory-item-core.md and roadmap/phase-100050-online-extraction-span-verification.md.",
+    "F-03: read the stored subject as Option<String> in item_update.rs (both backends) and reject NULL with a named error instead of a driver error/panic."
+  ],
+  "plan_unlimited": [
+    "Everything in the 1-hour plan.",
+    "F-04: apply the stored-subject comparison to correct_item_impl and postgres_correct so the subject-repointing class is closed on both mutation primitives, with a parity test each.",
+    "F-05: move the destructive Postgres cases into a private schema (or add a restore guard) so the shared public schema keeps the unique index at all times.",
+    "After remediation: re-run make check and make coverage, and update the phase file's Completion Evidence and Known Limitations for any changed disposition."
+  ],
+  "review_scope": "Staged diff reviewed with `git diff --cached -- . ':!private/clio-private/runs/'` (main repo): 31 files, all staged, nothing unstaged or untracked outside private/ (which is git-ignored in the root repo); the nested private repo has roadmap/phase-100060 (close-out verdict lines) and roadmap/phase-100420 (evidence/attribution fill) staged, plus runs/ artifacts that are out of review scope per the task. Independent verification: `make lint` (clippy -D warnings) exit 0; `make test` all workspace suites green (clio-store 271 passed) except the doctest step, which failed only because rustdoc is not on PATH in this shell (rerun with PATH fixed: `cargo test --locked --workspace --doc` exit 0); `make coverage` exit 0 via `PATH=$HOME/.cargo/bin:$PATH`, coverage-guard 318 files all >=90% lines/functions, TOTAL lines 97.95% functions 98.89%; the four Postgres open-edge tests and the Postgres shred-guard test were rerun with --nocapture against Compose Postgres and executed (no skip messages); cargo fmt --check clean; all touched Rust files <=450 lines (max triple_open_uniq_tests.rs 432); roadmap-isolation grep over the public diff clean."
+}
