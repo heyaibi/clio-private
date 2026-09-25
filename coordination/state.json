@@ -79,6 +79,20 @@
       "reservation_id": "rsv-d3ea0a11eb388d1af74c6b93",
       "run_id": "phase-100601",
       "status": "completed"
+    },
+    "100606": {
+      "base_revisions": {
+        "private": "bfe29119fc909468fee2b703df4fc5b5a7486929",
+        "public": "09679d6878a13a033f25ddab3a7267764747cc52"
+      },
+      "claimed_at": "2026-09-25T00:20:03.675Z",
+      "expires_at": null,
+      "generation": 1,
+      "heartbeat_at": "2026-09-25T00:20:03.675Z",
+      "machine_id": "devserver",
+      "reservation_id": "rsv-4399cefc8e894f129083508d",
+      "run_id": "phase-100606",
+      "status": "claimed"
     }
   },
   "version": 1
