@@ -238,10 +238,23 @@ def signals(repo, number, path, index_done):
     }
 
 
-def audit(repo):
-    """Report index.md drift without editing anything. Returns issue count."""
+def audit(repo, apply_index=False):
+    """Report index.md drift. Returns issue count.
+
+    With ``apply_index`` the second drift class is also repaired: a phase that
+    carries a completion marker but is not indexed Complete gets its row
+    annotated in place. ``index_complete`` looks for the word ``Complete`` in
+    a ``| <number> |`` row, so that annotation is what closes the drift, and it
+    goes on the row's last cell rather than in a new column, because these
+    tables vary in width and adding a column would break their headers.
+
+    The first class is never repaired automatically: a phase indexed Complete
+    with no marker is a claim the evidence does not support, and dropping the
+    index entry is an operator decision, not a mechanical fix.
+    """
     index_done = index_complete(repo)
     issues = 0
+    drifted = []
     for number, path in candidates(repo):
         s = signals(repo, number, path, index_done)
         markers = (s["run"] or s["ledger"] or s["finalize_log"]
@@ -255,7 +268,137 @@ def audit(repo):
             print(f"drift: phase {number} has completion markers but index is "
                   f"not Complete ({path.name})")
             issues += 1
+            drifted.append((number, path))
+    if apply_index and drifted:
+        applied, skipped = _annotate_index_complete(repo, drifted)
+        print(f"index: marked {applied} entr(ies) Complete"
+              + (f", {skipped} left for a human" if skipped else ""))
     return issues
+
+
+def _annotate_index_complete(repo, drifted):
+    """Mark each named phase's index.md entry Complete, in place.
+
+    Two shapes exist and they need different edits:
+
+    * A heading (``## 100155. Title ...``) gets ``· **Complete** ·`` inserted
+      before its link, matching the convention the already-complete phases use.
+    * A table row is handled by its table's header. When the header names a
+      Status column, that cell is *replaced*, because it holds a real value
+      such as ``Plan ready`` and appending would produce a contradiction like
+      ``Plan ready | — Complete``. When the table has no Status column, the
+      marker goes on the last cell.
+
+    A row or heading that already says Complete is left alone, so this is safe
+    to re-run. Anything not matching one of those shapes is reported, not
+    guessed at.
+    """
+    base = roadmap_dir(repo)
+    if base is None:
+        return 0, 0
+    path = base / "index.md"
+    try:
+        text = path.read_text()
+    except OSError as exc:
+        print(f"index: cannot read index.md ({exc})")
+        return 0, 0
+    wanted = {f"{number:06d}" for number, _ in drifted}
+    lines = text.splitlines(keepends=True)
+    # Column 0 is the phase number in every table here. The header labels it
+    # "Slice" or "Phase" rather than a number, so the status column is tracked
+    # positionally from the header row, and reset when a new table starts.
+    status_col = None
+    applied = 0
+    skipped = 0
+    out = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("|"):
+            cells = line.rstrip("\n").split("|")
+            if _is_header_row(cells):
+                status_col = _status_column_index(cells)
+                out.append(line)
+                continue
+        if not stripped.startswith("|"):
+            # Outside any table: headings are the other entry shape.
+            head = INDEX_HEAD_RE.match(line)
+            if head and head.group(1) in wanted and "Complete" not in line:
+                new = _mark_heading_complete(line)
+                if new is None:
+                    skipped += 1
+                else:
+                    applied += 1
+                out.append(new or line)
+                continue
+        row = INDEX_ROW_RE.match(line)
+        if not row or row.group(1) not in wanted or "Complete" in line:
+            out.append(line)
+            continue
+        new = _mark_row_complete(line, status_col)
+        if new is None:
+            skipped += 1
+            out.append(line)
+        else:
+            applied += 1
+            out.append(new)
+    if applied:
+        path.write_text("".join(out))
+    return applied, skipped
+
+
+def _is_header_row(cells):
+    """True for a table header: a non-numeric first cell naming the column.
+
+    ``cells`` is the raw ``split("|")``, so index 0 is the empty string before
+    the leading bar and the labels start at index 1.
+    """
+    labels = [c.strip() for c in cells[1:-1]]
+    if not labels or labels[0].isdigit():
+        return False
+    return labels[0].lower() in {"slice", "phase", "number", "id"}
+
+
+def _status_column_index(cells):
+    """Index into a raw ``split("|")`` row for the Status cell, or None."""
+    for idx, cell in enumerate(cells[1:-1], start=1):
+        if cell.strip().lower().startswith("status"):
+            return idx
+    return None
+
+
+def _mark_heading_complete(line):
+    """Insert the marker before the link, not inside it."""
+    newline = "\n" if line.endswith("\n") else ""
+    body = line.rstrip("\n")
+    start = body.find("[")
+    if start == -1:
+        return None
+    before = body[:start].rstrip()
+    if before.endswith("·"):
+        return f"{before} **Complete** · {body[start:]}{newline}"
+    return f"{before} · **Complete** · {body[start:]}{newline}"
+
+
+def _mark_row_complete(line, status_col):
+    """Replace the Status cell when the table has one, else mark the last cell.
+
+    The rebuilt row keeps the line's original indentation and column widths by
+    editing only the target cell in place, so the file stays diffable and
+    renders the same as before apart from the status text.
+    """
+    newline = "\n" if line.endswith("\n") else ""
+    body = line.rstrip("\n")
+    # Split on the cell separator, keeping the empties produced by the leading
+    # and trailing "|", so cells[0] is "" and the last is "".
+    cells = body.split("|")
+    if len(cells) < 3:
+        return None
+    if status_col is not None and 0 < status_col < len(cells) - 1:
+        cells[status_col] = " Complete — PASS WITH DOCUMENTED LIMITATIONS "
+    else:
+        last = len(cells) - 2
+        cells[last] = f"{cells[last].rstrip()} — Complete "
+    return "|".join(cells) + newline
 
 
 def select_next(repo):
@@ -285,6 +428,14 @@ def select_server_phase(repo, machine_id, *, reserve=True, store=None):
     A future claim is intentionally ignored until it becomes the lowest
     unfinished phase.  At that point the server waits; it never jumps over a
     blocked, paused, rejected, or actively running phase.
+
+    One exception: a phase that already carries completion evidence on disk is
+    finished work, not queue work.  An operator close-out (a ticked approval
+    box, a published receipt, a completed run) can leave a live claim behind,
+    because the board has no state for "an operator closed this".  Gating the
+    line on that stale record would strand every later phase behind a phase
+    nobody is working on.  Coordination claiming ``completed`` with no evidence
+    at all is still an inconsistency and still fails closed.
     """
     machine_id = machine_id or os.environ.get("CLIO_MACHINE_ID", "local-01")
     store = store or ReservationStore(repo)
@@ -293,8 +444,13 @@ def select_server_phase(repo, machine_id, *, reserve=True, store=None):
     for number, path in candidates(repo):
         key = f"{number:06d}"
         record = state.get("phases", {}).get(key)
+        done = is_done(repo, number, path, index_done)
         if record is not None:
             status = record.get("status")
+            # Finished on disk, and the board is not asserting a completion we
+            # can check: skip it. The claim is stale either way.
+            if done and status != "completed":
+                continue
             if status in {"claimed", "running", "paused", "blocked"}:
                 return {
                     "state": "WAIT_FOR_CLAIM",
@@ -305,14 +461,15 @@ def select_server_phase(repo, machine_id, *, reserve=True, store=None):
                     "reservation_id": record.get("reservation_id"),
                     "generation": record.get("generation"),
                 }
-            if status == "completed":
-                if is_done(repo, number, path, index_done):
+            if status in {"completed", "accepted"}:
+                if done:
                     continue
                 return {
                     "state": "COORDINATION_INCONSISTENT",
                     "phase": key,
                     "path": str(path.relative_to(repo)),
-                    "error": "coordination says completed but no completion evidence exists",
+                    "error": (f"coordination says {status} but no completion "
+                              "evidence exists"),
                 }
             return {
                 "state": "WAIT_FOR_CLAIM",
@@ -324,7 +481,7 @@ def select_server_phase(repo, machine_id, *, reserve=True, store=None):
                 "generation": record.get("generation"),
                 "error": "explicit operator takeover is required",
             }
-        if is_done(repo, number, path, index_done):
+        if done:
             continue
         if not reserve:
             result = _reservation_result(number, path, {}, "AVAILABLE")
@@ -496,6 +653,25 @@ def self_test():
         got = select_server_phase(repo, "server-01", store=fake, reserve=False)
         assert got["state"] == "WAIT_FOR_CLAIM" and got["phase"] == "100601", got
 
+        # An operator close-out ticks the approval box but cannot produce a
+        # published receipt, so it leaves a live claim behind. A phase that is
+        # finished on disk must not gate the line on that stale record: the
+        # selector moves past it to the next unfinished phase.
+        (repo / "roadmap" / "phase-100620-synthetic.md").write_text("x\\n")
+        p601 = repo / "roadmap" / "phase-100601-synthetic.md"
+        p601.write_text("- [x] Required approval is obtained\n")
+        got = select_server_phase(repo, "server-01", store=fake, reserve=False)
+        assert got["state"] == "AVAILABLE" and got["phase"] == "100620", got
+        p601.write_text("x\n")
+
+        # The fail-closed half is unchanged: coordination asserting
+        # "completed" with no completion evidence anywhere is still an
+        # inconsistency, not a silent pass.
+        (repo / PRIV / "runs" / "phase-100601").mkdir(parents=True, exist_ok=True)
+        fake.state["phases"]["100601"]["status"] = "completed"
+        got = select_server_phase(repo, "server-01", store=fake, reserve=False)
+        assert got["state"] == "COORDINATION_INCONSISTENT", got
+
         class FailingStore(FakeStore):
             def reserve(self, phase, machine_id, **kwargs):
                 raise CoordinationError("coordination push failed")
@@ -560,8 +736,13 @@ def main():
     parser.add_argument("--verbose", action="store_true",
                         help="print per-signal evidence for every phase to stderr")
     parser.add_argument("--audit", action="store_true",
-                        help="report index.md drift without changing anything; "
-                             "exit 0 when clean, 1 when drift is found")
+                        help="report index.md drift; exit 0 when clean, 1 when "
+                             "drift is found")
+    parser.add_argument("--fix-index", action="store_true",
+                        help="with --audit, annotate index.md rows for phases "
+                             "that have a completion marker but are not "
+                             "indexed Complete; a drift in the other "
+                             "direction is never repaired automatically")
     parser.add_argument("--server", action="store_true",
                         help="select and reserve the lowest incomplete phase")
     parser.add_argument("--read-only", action="store_true",
@@ -592,7 +773,7 @@ def main():
                 "WAIT_FOR_CLAIM": 3,
                 "COORDINATION_INCONSISTENT": 2}.get(result["state"], 2)
     if args.audit:
-        return 0 if audit(repo) == 0 else 1
+        return 0 if audit(repo, apply_index=args.fix_index) == 0 else 1
     if args.verbose:
         index_done = index_complete(repo)
         for number, path in candidates(repo):
