@@ -170,6 +170,7 @@ python3 private/clio-private/harness/phase_reservations.py --self-test  # two-cl
 python3 private/clio-private/harness/github_issues.py --self-test  # hermetic credential/privacy checks; no network
 python3 private/clio-private/harness/check-cmd-harness.py  # hermetic stubbed-cmd harness check; no spend
 python3 private/clio-private/harness/check-harness-availability.py  # hermetic skip/halt check on a stub PATH; no spend
+python3 private/clio-private/harness/check-harness-plan.py  # hermetic per-run harness plan + --customize-harness check; no spend
 bash private/clio-private/harness/phase-driver.sh --check      # tools, profile, config readiness
 bash private/clio-private/harness/phase-driver.sh --dry-run    # what the driver would do; touches nothing
 bash private/clio-private/harness/phase-driver.sh --self-test  # hermetic guard/halt/stop/orphan/notify test

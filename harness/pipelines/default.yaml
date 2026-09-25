@@ -36,14 +36,16 @@
 # expands it: glm-5.3-flash to zai-org/GLM-5.3-Flash on together,
 # deepseek-v4.1-flash to deepseek-ai/DeepSeek-V4.1-Flash on together and
 # to deepseek/deepseek-v4.1-flash on openrouter.
-# A list means
-# round-robin: each invocation of that step uses the next entry, wrapping
-# around, with a per-step counter, so remedy-loop rounds alternate
-# harnesses. Counters persist across runs in
-# private/clio-private/runs/.harness-rotation-<pipeline>-<hash>.json
-# (one file per pipeline file), so consecutive runs keep alternating. --fresh does not reset
-# rotation: it archives run state, and alternation is independent of it. Always quote entries: YAML reads [opencode: model] as a
-# mapping, not a string.
+# A list means round-robin ACROSS RUNS, not across the rounds of one run. The
+# runner picks one entry per stage before the job starts, saves the whole map
+# to <run_dir>/harnesses.json, and every round of that stage in that run uses
+# it. The per-step counter lives in
+# private/clio-private/runs/.harness-rotation-<pipeline>-<hash>.json (one file
+# per pipeline file) and advances once per run per step, when the step is
+# accepted, so consecutive runs alternate. --fresh does not reset rotation: it
+# archives run state, and alternation is independent of it. Pass
+# --customize-harness to choose this run's entry per stage yourself. Always
+# quote entries: YAML reads [opencode: model] as a mapping, not a string.
 #
 # Runner contract (fixed, so this file stays small):
 # - No timeouts. A stage runs until it signals. Only you kill a process.

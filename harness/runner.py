@@ -275,6 +275,403 @@ def save_rotation(repo, key, harness_use):
         raise Fail(f"rotation: cannot write {fp.name} ({e})") from e
 
 
+# Per-run harness plan: the whole step -> harness map, decided once before the
+# job starts and saved beside the run state as <run_dir>/harnesses.json, so one
+# file per phase run dir names the model every stage will use. One harness per
+# stage for the whole run, so every round of a loop, every retry, and every
+# rendered prompt names the same model. The durable rotation file still
+# supplies the starting offset, so consecutive runs keep alternating; a step
+# consumes its slot once per run, when the step is accepted. Without the flag
+# the runner decides this map on its own; with --customize-harness the operator
+# picks each stage's slot from the options that stage declares.
+PLAN_FILENAME = "harnesses.json"
+PLAN_VERSION = 1
+
+
+def plan_path(run):
+    """Where the run's harness map lives (one file per phase run dir).
+
+    None while the run has no directory yet: a caller that drives a Run in
+    memory (the hermetic checks) keeps its map in memory only and writes
+    nothing.
+    """
+    run_dir = getattr(run, "_run_dir", None)
+    return None if run_dir is None else Path(run_dir) / PLAN_FILENAME
+
+
+def plan_options(run, sid, lookup=shutil.which):
+    """The stage's declared harness list with live availability, in order.
+
+    The list is the stage file's rotation order. Availability is binary
+    presence only, exactly as the invoke-time skip uses it, so the plan can
+    never name a CLI that is not installed.
+    """
+    return [{"harness": h, "display": display_name(h),
+             "binary": binary_for(h),
+             "available": is_harness_available(h, lookup)}
+            for h in run.harnesses(sid)]
+
+
+def _stored_options(options):
+    return [{k: o[k] for k in ("harness", "display", "binary", "available")}
+            for o in options]
+
+
+def plan_entry(run, sid, offset, options=None, lookup=shutil.which):
+    """Decide one step's harness: the first installed option from `offset`.
+
+    Same walk as the invoke-time selection (start at the offset, wrap, take the
+    first installed entry), recorded with what it walked over, so the banner,
+    the event, and the saved plan all name the same skips. Raises
+    HarnessUnavailable when nothing is installed, which halts the run before
+    any harness is invoked.
+    """
+    options = plan_options(run, sid, lookup) if options is None else options
+    idx = select_harness([o["harness"] for o in options], offset, lookup)
+    if idx is None:
+        raise HarnessUnavailable(sid, [o["harness"] for o in options])
+    walked = (idx - offset) % len(options)
+    chosen = options[idx]
+    return {
+        "stage": run.steps[sid].get("stage", sid),
+        "name": run.stages[sid][0].get("name", sid),
+        "record_as": run.steps[sid].get("record_as", sid),
+        "harness": chosen["harness"],
+        "display": chosen["display"],
+        "offset": offset,
+        "index": idx,
+        "next_count": offset + walked + 1,
+        "skipped": [{"harness": options[(offset + off) % len(options)]["harness"],
+                     "missing_binary": options[(offset + off) % len(options)]["binary"]}
+                    for off in range(walked)],
+        "options": _stored_options(options),
+        "selected_by": "runner",
+    }
+
+
+def _usable_plan_counts(recorded, options):
+    """True when a recorded entry's index and next counter can be trusted."""
+    index = recorded.get("index")
+    nxt = recorded.get("next_count")
+    for value in (index, nxt):
+        if not isinstance(value, int) or isinstance(value, bool):
+            return False
+    if nxt < 0 or not 0 <= index < len(options):
+        return False
+    if options[index]["harness"] != recorded.get("harness"):
+        return False
+    return isinstance(recorded.get("skipped", []), list)
+
+
+def planned_entry(run, sid, offset, recorded=None, lookup=shutil.which):
+    """One step's planned entry, keeping a recorded choice that still holds.
+
+    A saved plan is the run's model map, so a recorded harness survives as long
+    as the stage still declares it and its CLI is still installed. The entry is
+    re-decided from the rotation offset only when the run has no plan for this
+    step, when a pipeline edit dropped the id, or when the binary went away;
+    availability in the record is always refreshed from the live PATH.
+    """
+    options = plan_options(run, sid, lookup)
+    if isinstance(recorded, dict) and _usable_plan_counts(recorded, options):
+        chosen = next((o for o in options
+                       if o["harness"] == recorded["harness"]), None)
+        if chosen is not None and chosen["available"]:
+            entry = dict(recorded)
+            entry["stage"] = run.steps[sid].get("stage", entry.get("stage", sid))
+            entry["name"] = run.stages[sid][0].get("name", entry.get("name", sid))
+            entry["display"] = chosen["display"]
+            entry["options"] = _stored_options(options)
+            return entry
+    return plan_entry(run, sid, offset, options, lookup)
+
+
+def plan_offsets(run, resumed=None):
+    """Rotation offsets a fresh plan decision starts from.
+
+    The durable file is the record of consumed slots. A resume max-merges it
+    with resume.json exactly as drive() does, so a plan decided mid-run starts
+    from the slot the run itself would have used.
+    """
+    offsets = {}
+    if run.persist_rotation and run.rotation_key:
+        offsets.update(load_rotation(run.repo, run.rotation_key))
+    for sid, count in dict((resumed or {}).get("harness_use", {})).items():
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            continue
+        offsets[sid] = max(offsets.get(sid, 0), count)
+    return offsets
+
+
+def _plan_run_id(run):
+    try:
+        return (f"{run.inputs.get('run_label', 'phase')}"
+                f"-{int(run.inputs['phase_number']):06d}")
+    except (KeyError, TypeError, ValueError):
+        return str(run.inputs.get("run_label", "phase"))
+
+
+def decide_harness_plan(run, *, saved=None, offsets=None, resumed=None,
+                        lookup=shutil.which):
+    """Build the run's whole harness map from the stage files.
+
+    `saved` is the plan already on disk (its steps win wherever they still
+    hold), `offsets` the rotation offsets for the steps that need a decision.
+    Nothing is prompted and nothing is written: the caller decides whether to
+    ask the operator and when to persist the result.
+    """
+    if offsets is None:
+        offsets = plan_offsets(run, resumed)
+    recorded = saved["steps"] if saved else {}
+    return {
+        "version": PLAN_VERSION,
+        "run_id": _plan_run_id(run),
+        "pipeline": str(getattr(run, "pipe_path", "") or ""),
+        "rotation_key": run.rotation_key,
+        "created_at": (saved or {}).get("created_at")
+        or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "source": (saved or {}).get("source", "auto"),
+        "steps": {sid: planned_entry(run, sid, int(offsets.get(sid, 0)),
+                                     recorded.get(sid), lookup)
+                  for sid in run.steps},
+    }
+
+
+def plan_harnesses(run, *, custom=False, fresh=False, resumed=None, offsets=None,
+                   lookup=shutil.which):
+    """Decide the run's whole harness map and return it with a changed flag.
+
+    A run that already saved a plan keeps it (a resume must not change
+    models), as does every step a saved plan still covers. Missing steps are
+    decided from the durable rotation offset. `custom` asks the operator to
+    pick each stage's slot from that stage's installed options. The `changed`
+    flag is False when the saved plan already says exactly this, so the caller
+    leaves the file untouched. Nothing is written here: the caller saves the
+    plan once, after --fresh has archived the previous run dir.
+    """
+    ensure_harness_path()
+    saved = None if fresh else load_harness_plan(run)
+    if offsets is None:
+        offsets = plan_offsets(run, resumed)
+    plan = decide_harness_plan(run, saved=saved, offsets=offsets, lookup=lookup)
+    if custom:
+        prompt_harness_plan(run, plan)
+    changed = (saved is None
+               or saved.get("steps") != plan["steps"]
+               or saved.get("source") != plan["source"]
+               or saved.get("rotation_key") != plan["rotation_key"]
+               or saved.get("pipeline") != plan["pipeline"])
+    return plan, changed
+
+
+def load_harness_plan(run):
+    """The run's saved harness map, or None when it has none yet.
+
+    Fail-closed like the rotation file: a present but unusable plan must not
+    fall back to a fresh decision, because that would switch a stage's model
+    in the middle of a run. Repair by deleting the file (the next run replans)
+    or with --fresh.
+    """
+    path = plan_path(run)
+    if path is None:
+        return None
+    try:
+        raw = path.read_text()
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        raise Fail(f"plan: {path.name} unreadable ({e}); delete it to replan "
+                   f"this run, or use --fresh") from e
+    try:
+        data = json.loads(raw)
+    except ValueError as e:
+        raise Fail(f"plan: {path.name} does not parse ({e}); delete it to "
+                   f"replan this run, or use --fresh") from e
+    if (not isinstance(data, dict) or data.get("version") != PLAN_VERSION
+            or not isinstance(data.get("steps"), dict)):
+        raise Fail(f"plan: {path.name} has an unusable shape (expected "
+                   f"version {PLAN_VERSION} and a steps mapping); delete it "
+                   f"to replan this run, or use --fresh")
+    return data
+
+
+def save_harness_plan(run, plan):
+    """Persist the run's harness map. Called once, before the job starts.
+
+    A write failure fails the run: the plan names the model for every stage,
+    so an unsaved plan must not start the job.
+    """
+    path = plan_path(run)
+    if path is None:
+        raise Fail("plan: the run has no run directory to save the harness "
+                   "map into")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json_atomic(path, plan)
+    except (Fail, OSError) as e:
+        raise Fail(f"plan: cannot write {path.name} ({e})") from e
+
+
+def _completed_harnesses(run):
+    """step -> harness for every step ledger.json already proves complete."""
+    try:
+        ledger = run._ledger()
+    except Fail:
+        return {}
+    steps = ledger.get("steps") if isinstance(ledger, dict) else None
+    if not isinstance(steps, dict):
+        return {}
+    return {sid: entry["harness"] for sid, entry in steps.items()
+            if isinstance(entry, dict) and isinstance(entry.get("harness"), str)
+            and entry["harness"]}
+
+
+def _read_choice(prompt):
+    """One answer from the operator's terminal (prompt on stderr, read stdin).
+
+    stdout stays machine-readable JSON. EOF is refused rather than treated as
+    the default: a plan nobody answered must not start a run.
+    """
+    sys.stderr.write(prompt)
+    sys.stderr.flush()
+    line = sys.stdin.readline()
+    if line == "":
+        raise Fail("--customize-harness: stdin closed before the harness plan "
+                   "was confirmed; nothing was started")
+    return line.strip()
+
+
+def _apply_plan_choice(entry, index, selected_by):
+    """Point one plan entry at an option and keep its rotation counters sound.
+
+    An operator pick advances the rotation past the chosen slot and records no
+    availability skip: the choice was made, not forced by a missing binary.
+    """
+    option = entry["options"][index]
+    entry["index"] = index
+    entry["harness"] = option["harness"]
+    entry["display"] = option["display"]
+    entry["offset"] = index
+    entry["next_count"] = index + 1
+    entry["skipped"] = []
+    entry["selected_by"] = selected_by
+
+
+def _resolve_plan_answer(answer, entry):
+    """Map one typed answer to an option index plus a complaint.
+
+    Returns (None, "") when the operator aborted. The option number, the
+    harness id, and the display name are all accepted, so the operator can type
+    whichever they can see; an empty answer keeps the current choice.
+    """
+    if answer.lower() in ("q", "quit", "abort"):
+        return None, ""
+    options = entry["options"]
+    if not answer:
+        return entry["index"], ""
+    if answer.isdigit() and 1 <= int(answer) <= len(options):
+        index = int(answer) - 1
+    else:
+        index = next((i for i, o in enumerate(options)
+                      if answer in (o["harness"], o["display"])), -1)
+        if index < 0:
+            return index, f"{answer!r} is not one of the options"
+    if not options[index]["available"]:
+        return index, (f"option {index + 1} is not installed: "
+                       f"{options[index]['binary']} is not on PATH")
+    return index, ""
+
+
+def _choose_plan_step(run, plan, sid, entry, locked_harness=None):
+    """Show one stage's options and record the operator's choice."""
+    print(f"\n  stage {sid} [{entry['stage']}] "
+          f"({entry.get('record_as', entry.get('name', sid))})",
+          file=sys.stderr)
+    if locked_harness:
+        # The ledger is the authority for a completed step: its harness is part
+        # of the completion record, so re-planning cannot rewrite it.
+        entry["harness"] = locked_harness
+        entry["display"] = display_name(locked_harness)
+        entry["locked"] = True
+        entry["selected_by"] = "ledger"
+        print(f"    already completed as {entry['display']} "
+              f"[{locked_harness}] - kept from ledger.json", file=sys.stderr)
+        return
+    entry.pop("locked", None)
+    for number, option in enumerate(entry["options"], 1):
+        state = ("available" if option["available"]
+                 else f"MISSING binary: {option['binary']} not on PATH")
+        print(f"    {number}) {option['display']} [{option['harness']}] "
+              f"- {state}", file=sys.stderr)
+    options = entry["options"]
+    installed = [i for i, o in enumerate(options) if o["available"]]
+    if not installed:
+        # plan_entry already halted on this; never reached with a saved plan.
+        raise HarnessUnavailable(sid, [o["harness"] for o in options])
+    if len(installed) == 1:
+        _apply_plan_choice(entry, installed[0], "operator")
+        print(f"    only installed option; using it without asking",
+              file=sys.stderr)
+        return
+    while True:
+        answer = _read_choice(f"    choose 1-{len(options)} (Enter keeps "
+                              f"{entry['index'] + 1}, q aborts): ")
+        index, complaint = _resolve_plan_answer(answer, entry)
+        if index is None:
+            raise Aborted(f"operator aborted the harness choice for stage {sid}")
+        if complaint:
+            print(f"    {complaint}", file=sys.stderr)
+            continue
+        _apply_plan_choice(entry, index, "operator")
+        return
+
+
+def prompt_harness_plan(run, plan, isatty=None):
+    """Let the operator choose the harness for every stage, then confirm.
+
+    Only the options the stage itself declares are offered, and only the ones
+    whose CLI is installed: a plan picks this run's rotation slot, it never
+    invents a harness id (stage files own those, with their display names and
+    effort checks). A stage the ledger already completed is shown and kept.
+    The whole map is printed and confirmed before the job starts, and
+    declining starts nothing. `isatty` is injectable so the prompt is
+    testable; it defaults to the real terminal check, because a piped run
+    must fail rather than wait for a keystroke that will never come.
+    """
+    has_terminal = sys.stdin.isatty() if isatty is None else bool(isatty)
+    if not has_terminal:
+        raise Fail("--customize-harness needs an interactive terminal (stdin "
+                   "is not a tty); run it from the operator terminal")
+    locked = _completed_harnesses(run)
+    print("runner: choosing one harness per stage for this run", file=sys.stderr)
+    for sid, entry in plan["steps"].items():
+        _choose_plan_step(run, plan, sid, entry, locked.get(sid))
+    print("\nrunner: harness plan for this run", file=sys.stderr)
+    for sid, entry in plan["steps"].items():
+        print(f"    {sid} -> {entry['display']} [{entry['harness']}]",
+              file=sys.stderr)
+    answer = _read_choice("  start the run with this plan? [y/N] ")
+    if answer.lower() not in ("y", "yes"):
+        raise Aborted(f"operator declined the harness plan (answered {answer!r})")
+    plan["source"] = "custom"
+    plan["confirmed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return plan
+
+
+def render_plan(plan, path=None):
+    """One line per stage, with the availability skips named."""
+    lines = [f"harness plan for {plan.get('run_id') or 'this run'} "
+             f"(source: {plan.get('source', 'auto')})"]
+    for sid, entry in plan["steps"].items():
+        lines.append(f"  {sid}: {entry['harness']} ({entry['display']})")
+        for skipped in entry.get("skipped", []):
+            lines.append(f"      skipped {skipped['harness']}: "
+                         f"{skipped['missing_binary']} not on PATH")
+    if path is not None:
+        lines.append(f"  saved: {path}")
+    return "\n".join(lines)
+
+
 def opencode_launch(model, effort, pointer, stage_name=OPENCODE_AGENT):
     """Build the opencode full-TUI launch command and environment.
 
@@ -563,6 +960,10 @@ class HarnessUnavailable(Fail):
             f"missing from PATH): {listing}")
 
 
+class Aborted(Fail):
+    """The operator declined the harness plan; nothing was started."""
+
+
 def load_stage(path):
     text = path.read_text()
     parts = text.split("---", 2)
@@ -701,8 +1102,14 @@ class Run:
         self.outputs = {}
         self.visits = {}
         self.harness_use = {}
+        # The run's harness map (harnesses.json). main() decides it before the
+        # job starts and saves it; a caller that drives a Run directly gets the
+        # same map built in memory by ensure_plan().
+        self.plan = None
         self.persist_rotation = True
         self.rotation_key = None
+        # Set by main(); recorded in the saved plan, never load-bearing.
+        self.pipe_path = None
         self.prev_step = None
         # Use a completed ledger entry for prior steps whenever one exists.
         # The dry-run path explicitly disables this for planned previews.
@@ -775,7 +1182,7 @@ class Run:
                 raise Fail(
                     f"task reference {source_sid!r} has output but no valid "
                     "ledger entry; refusing to guess its harness")
-            source_harness = self.planned_harness(source_sid)
+            source_harness = self.preview_harness(source_sid)
             return self.render_task(
                 source_sid, seen | {sid},
                 harness_name=display_name(source_harness),
@@ -796,9 +1203,9 @@ class Run:
         values = {n: self.resolve(sid, src, sub, seen | {sid})
                   for n, src in s["bindings"].items()}
         # {{harness}} always resolves: the actual invocation name when
-        # given, else this step's planned r1 name. Never a pipeline binding.
+        # given, else this step's planned name. Never a pipeline binding.
         values["harness"] = (harness_name if harness_name is not None
-                             else display_name(self.planned_harness(sid)))
+                             else display_name(self.preview_harness(sid)))
 
         def sub_token(m):
             tok = m.group(1)
@@ -992,48 +1399,71 @@ class Run:
         """Return the first rotation slot for previews without completion data."""
         return self.harnesses(sid)[0]
 
+    def ensure_plan(self, offsets=None):
+        """The run's harness map, built in memory on first use.
+
+        main() decides the map before the job starts and saves it to
+        <run_dir>/harnesses.json. A caller that drives a Run directly (the
+        hermetic checks) gets the same map here, decided once for the whole run
+        from the rotation offsets already loaded onto harness_use.
+        """
+        if self.plan is None:
+            self.plan, _changed = plan_harnesses(
+                self, offsets=offsets if offsets is not None
+                else dict(self.harness_use))
+        return self.plan
+
+    def preview_harness(self, sid):
+        """The harness a preview names: the planned one once a plan is loaded.
+
+        Without a plan this falls back to the stage's first declared slot, so
+        a preview never depends on live availability.
+        """
+        entry = (self.plan or {}).get("steps", {}).get(sid)
+        return entry["harness"] if entry else self.planned_harness(sid)
+
     def harness_for(self, sid):
-        """Peek the next rotation slot without consuming it.
+        """Peek the step's planned harness without consuming anything.
 
         Used for attribution of an already-finished step (--mark-done), so it
-        reads the recorded offset rather than the live availability of the
-        CLI; drive() picks the live harness through select_harness. A slot is
-        consumed only after a signal and all completion gates pass;
-        interrupted, blocked, and otherwise failed attempts therefore retry
-        the same harness. The visits counter still increments so each attempt
-        gets a distinct forensic task/log file.
+        reports the planned map rather than probing the live PATH: a saved
+        plan is what the run decided, and drive() invokes from that same map.
+        Without a plan it reads the recorded offset, exactly as before. A slot
+        is consumed only after a signal and all completion gates pass, so
+        interrupted, blocked, and otherwise failed attempts retry the same
+        harness; the visits counter still increments so each attempt gets a
+        distinct forensic task/log file.
         """
+        entry = (self.plan or {}).get("steps", {}).get(sid)
+        if entry:
+            return entry["harness"]
         hs = self.harnesses(sid)
         return hs[self.harness_use.get(sid, 0) % len(hs)]
 
     def select_harness(self, sid):
-        """Choose the harness for this invocation, skipping unavailable ones.
+        """Return this step's planned (harness, skipped, index, next_count).
 
-        Walks the stage list from the current rotation offset, wrapping
-        around, and returns (harness, skipped, used_index, next_count):
+        The map is decided once per run, before the job starts, so every round
+        of a loop step, every retry, and every rendered prompt names the same
+        harness:
 
-        - harness: the first entry whose CLI binary is on PATH.
-        - skipped: the entries walked over before it, in order, as
-          (harness_id, missing_binary) pairs. Empty when the head is up.
-        - used_index: the index of the chosen entry. The caller records it
-          in the pre-invocation resume state so a failed attempt's retry and
-          an operator --mark-done both reproduce the exact harness.
-        - next_count: the rotation counter the *accepted* invocation persists
-          past the skips, so a later run does not retry a known-missing head.
+        - harness: the entry this run planned for the step.
+        - skipped: the entries the availability walk passed over, as
+          (harness_id, missing_binary) pairs; empty when the head was up.
+        - used_index: the index of the planned entry. The caller records it in
+          the pre-invocation resume state so a failed attempt's retry and an
+          operator --mark-done both reproduce the exact harness.
+        - next_count: the rotation counter the *accepted* invocation persists,
+          past any skips, so a later run does not retry a known-missing head.
 
-        When every entry is missing its binary this raises HarnessUnavailable
-        naming the step and the whole list; no harness is invoked.
+        When no entry for the step can be installed this raises
+        HarnessUnavailable naming the step and the whole list; no harness is
+        invoked and no state is written.
         """
-        hs = self.harnesses(sid)
-        n = len(hs)
-        count = self.harness_use.get(sid, 0)
-        idx = select_harness(hs, count)
-        if idx is None:
-            raise HarnessUnavailable(sid, hs)
-        walked = (idx - count) % n
-        skipped = [(hs[(count + off) % n], binary_for(hs[(count + off) % n]))
-                   for off in range(walked)]
-        return hs[idx], skipped, idx, count + walked + 1
+        entry = self.ensure_plan()["steps"][sid]
+        skipped = [(s["harness"], s["missing_binary"])
+                   for s in entry.get("skipped", [])]
+        return entry["harness"], skipped, entry["index"], entry["next_count"]
 
     def invoke(self, harness, task_path, log_path, usage_path=None, when=None,
                nonce=None, sid=None, skipped=None):
@@ -2847,6 +3277,13 @@ def drive(run, pipe, invoke, resumed=None):
             current = resume_after.get("current", current)
             run.prev_step = resume_after.get("prev_step")
     reframe = resumed is not None
+    # The harness map is decided once for the whole run, before the first
+    # invocation: every round of a loop step, every retry, and every prompt
+    # names the same model. main() has already saved it to the run dir; here
+    # it is built (or reused) from the rotation offsets loaded above, so a
+    # step with nothing installed halts before any task, log, ledger, or
+    # resume file is written.
+    run.ensure_plan()
 
     def save(nxt):
         write_json_atomic(run._run_dir / "resume.json", {
@@ -2862,15 +3299,14 @@ def drive(run, pipe, invoke, resumed=None):
         if heartbeat is not None:
             heartbeat.check()
         s = run.steps[current]
-        # Availability before any file write or invocation: skip a harness
-        # whose CLI binary is missing and use the next one in the stage list
-        # (wrapping from the rotation offset). A halt here has touched no
-        # task, log, snapshot, ledger, or resume file. The used index is
-        # recorded in the pre-invocation resume state (persisted by save
-        # below) so a retry and an operator --mark-done both reproduce the
-        # exact harness; only the accepted invocation advances the counter
-        # past the skips (next_count), so a failed attempt re-skips and a
-        # later run does not retry a known-missing head.
+        # The planned harness for this run, with the availability skips the
+        # plan recorded. A halt here has touched no task, log, snapshot,
+        # ledger, or resume file. The used index is recorded in the
+        # pre-invocation resume state (persisted by save below) so a retry
+        # and an operator --mark-done both reproduce the exact harness; only
+        # the accepted invocation advances the counter past the skips
+        # (next_count), so a failed attempt re-skips and a later run does not
+        # retry a known-missing head.
         harness, skipped, used_index, next_count = run.select_harness(current)
         run.harness_use[current] = used_index
         run.visits[current] = run.visits.get(current, 0) + 1
@@ -3206,6 +3642,7 @@ def self_test(run, live=False):
                 except Exception as e:  # noqa: BLE001 - probe must report, not crash
                     check(f"{h} live probe", False, f"{type(e).__name__}: {e}")
 
+    import io
     import tempfile
     # Signal convention: last_line strips one leading ISO-8601 timestamp from
     # the final log line, then match_signal matches on the bare signal word.
@@ -3716,6 +4153,223 @@ def self_test(run, live=False):
         check("harness availability: all-missing halts fail-closed",
               select_harness(["agy:a", "hermes:b"], 0) is None,
               "no usable harness -> None")
+
+        # Per-run harness plan: every stage's harness is decided once, before
+        # the first invocation, and saved to <run_dir>/harnesses.json. A plan
+        # already on disk is reused (a resume must not change models), a step
+        # whose planned CLI went away is re-decided, a new step a pipeline edit
+        # added is filled in, and a corrupt plan fails closed instead of
+        # silently replanning mid-run.
+        plan_root = Path(tempfile.mkdtemp(prefix="harness-plan-"))
+
+        def stub_path(name, binaries):
+            """A PATH directory holding only the named stub CLIs."""
+            directory = plan_root / ("bin-" + "-".join(sorted(binaries)))
+            directory.mkdir(exist_ok=True)
+            for cli in binaries:
+                stub = directory / cli
+                stub.write_text("#!/bin/sh\nexit 0\n")
+                stub.chmod(0o755)
+            return directory
+
+        # Which CLIs are "installed" per scenario: agy alone forces the plan
+        # to skip step one's opencode head; opencode+agy gives the operator a
+        # real choice; cmd alone proves a vanished CLI is re-decided.
+        agy_only = stub_path("agy", ["agy"])
+        opencode_agy = stub_path("both", ["opencode", "agy"])
+        cmd_only = stub_path("cmd", ["cmd"])
+        (plan_root / "one.md").write_text(
+            "---\nname: one\nharness: ['opencode:go/one-a@high', "
+            "'agy:one-b', 'opencode:go/one-c@high']\n"
+            "harness_names:\n  'opencode:go/one-a@high': 'One A'\n"
+            "  'agy:one-b': 'One B'\n  'opencode:go/one-c@high': 'One C'\n"
+            "placeholders:\n  X: x\n---\nDo {{X}} on {{harness}}.")
+        (plan_root / "two.md").write_text(
+            "---\nname: two\nharness: ['opencode:go/two-a@high', 'agy:two-b']\n"
+            "harness_names:\n  'opencode:go/two-a@high': 'Two A'\n"
+            "  'agy:two-b': 'Two B'\n"
+            "placeholders:\n  Y: x\n---\nDo {{Y}} on {{harness}}.")
+        (plan_root / "three.md").write_text(
+            "---\nname: three\nharness: ['opencode:go/three-a@high']\n"
+            "harness_names:\n  'opencode:go/three-a@high': 'Three A'\n"
+            "placeholders:\n  Z: x\n---\nDo {{Z}} on {{harness}}.")
+        plan_inputs = {"phase_number": 42, "phase_file": "p",
+                       "max_remedy_rounds": 3}
+
+        def plan_pipe(steps, name="one"):
+            return {"version": 1, "run_dir": "run",
+                    "inputs": dict(plan_inputs), "start": name,
+                    "ends": ["completed"], "steps": steps}
+
+        plan_step_one = {"stage": "one.md", "record_as": "One",
+                         "bindings": {"X": "x"}, "when": {"ONE_DONE": "two"}}
+        plan_step_two = {"stage": "two.md", "record_as": "Two",
+                         "bindings": {"Y": {"output": "one"}},
+                         "end": "completed"}
+
+        def make_plan_run(steps, name="one", run_dir="run"):
+            pipe = plan_pipe(steps, name)
+            validate(pipe, plan_root)
+            run = Run(pipe, plan_root, plan_root, dict(plan_inputs))
+            run.rotation_key = "rk-plan"
+            run.pipe_path = plan_root / "plan.yaml"
+            run._run_dir = plan_root / run_dir
+            run._run_dir.mkdir(exist_ok=True)
+            return pipe, run
+
+        # Only `agy` is installed here, so step one skips to its agy slot and
+        # the plan records the skip, the slot index, and the counter that
+        # passes it.
+        os.environ["PATH"] = f"{agy_only}:/usr/bin:/bin"
+        two_step = make_plan_run({"one": plan_step_one, "two": plan_step_two})
+        first_plan, first_changed = plan_harnesses(two_step[1])
+        one_entry = first_plan["steps"]["one"]
+        check("harness plan: decided for every stage before the run starts",
+              set(first_plan["steps"]) == {"one", "two"}
+              and first_plan["steps"]["two"]["harness"] == "agy:two-b"
+              and first_changed,
+              f"one={one_entry['harness']} two={first_plan['steps']['two']['harness']}")
+        check("harness plan: availability skip is recorded, not lost",
+              one_entry["skipped"] == [
+                  {"harness": "opencode:go/one-a@high", "missing_binary": "opencode"}]
+              and one_entry["index"] == 1 and one_entry["next_count"] == 2,
+              f"skipped={one_entry['skipped']} next={one_entry['next_count']}")
+        check("harness plan: every option is offered with its availability",
+              [(o["harness"], o["available"]) for o in one_entry["options"]]
+              == [("opencode:go/one-a@high", False), ("agy:one-b", True),
+                  ("opencode:go/one-c@high", False)],
+              "options carry the availability the prompt shows")
+        save_harness_plan(two_step[1], first_plan)
+        saved_plan = json.loads(plan_path(two_step[1]).read_text())
+        again, again_changed = plan_harnesses(two_step[1])
+        check("harness plan: a saved plan is reused, not replanned",
+              again["steps"] == first_plan["steps"] and not again_changed,
+              "resume keeps the same map and leaves the file alone")
+        check("harness plan: saved per run, with the model for each stage",
+              saved_plan["version"] == PLAN_VERSION
+              and saved_plan["run_id"] == "phase-000042"
+              and saved_plan["steps"]["one"]["display"] == "One B",
+              f"{plan_path(two_step[1]).name} in {plan_path(two_step[1]).parent.name}")
+        plan_twice = make_plan_run({"one": plan_step_one, "two": plan_step_two})[1]
+        plan_twice.plan = None
+        check("harness plan: a fresh Run reuses the run's saved map",
+              plan_twice.select_harness("one")[0] == "agy:one-b",
+              "the saved plan, not a fresh rotation decision")
+        # agy is not installed now, but cmd is: the saved agy slot cannot be
+        # honoured, so the plan is re-decided from the stage list and the
+        # file is rewritten, never a missing binary invoked.
+        (plan_root / "four.md").write_text(
+            "---\nname: four\nharness: ['opencode:go/four-a@high', "
+            "'cmd:four-b@high']\n"
+            "harness_names:\n  'opencode:go/four-a@high': 'Four A'\n"
+            "  'cmd:four-b@high': 'Four B'\n"
+            "placeholders:\n  W: x\n---\nDo {{W}} on {{harness}}.")
+        four_steps = {"four": {"stage": "four.md", "record_as": "Four",
+                               "bindings": {"W": "w"}, "end": "completed"}}
+        four_step = make_plan_run(four_steps, name="four", run_dir="four")
+        os.environ["PATH"] = f"{opencode_agy}:/usr/bin:/bin"
+        four_plan, _ = plan_harnesses(four_step[1])
+        save_harness_plan(four_step[1], four_plan)
+        os.environ["PATH"] = f"{cmd_only}:/usr/bin:/bin"
+        replan, replan_changed = plan_harnesses(four_step[1])
+        check("harness plan: a vanished CLI is re-decided, not invoked",
+              four_plan["steps"]["four"]["harness"] == "opencode:go/four-a@high"
+              and replan["steps"]["four"]["harness"] == "cmd:four-b@high"
+              and replan["steps"]["four"]["skipped"] == [
+                  {"harness": "opencode:go/four-a@high",
+                   "missing_binary": "opencode"}]
+              and replan_changed,
+              "re-decided from the stage list; changed=True so it is saved")
+        # A stage the saved plan does not know yet is filled in from the
+        # rotation offset instead of failing the run.
+        os.environ["PATH"] = f"{opencode_agy}:/usr/bin:/bin"
+        three_step = make_plan_run({"one": plan_step_one, "two": plan_step_two,
+                                    "three": {"stage": "three.md",
+                                              "record_as": "Three",
+                                              "bindings": {"Z": "z"},
+                                              "end": "completed"}})
+        save_harness_plan(three_step[1], first_plan)
+        filled, filled_changed = plan_harnesses(three_step[1])
+        check("harness plan: a step a pipeline edit added is filled in",
+              filled["steps"]["three"]["harness"] == "opencode:go/three-a@high"
+              and filled["steps"]["one"]["harness"] == one_entry["harness"]
+              and filled_changed,
+              "new step planned, existing steps untouched")
+        plan_path(three_step[1]).write_text("{not-json")
+        try:
+            plan_harnesses(three_step[1])
+            corrupt_refused = False
+        except Fail:
+            corrupt_refused = True
+        check("harness plan: a corrupt plan fails closed",
+              corrupt_refused, "delete it or use --fresh; never replan mid-run")
+
+        # The operator's own choice: a typed answer picks a stage's slot, the
+        # whole map is confirmed, and a decline starts nothing. Driven with a
+        # scripted stdin, so no terminal and no harness is involved.
+        plan_prompt_pipe, plan_prompt_run = make_plan_run(
+            {"one": plan_step_one, "two": plan_step_two}, run_dir="prompt")
+        four_prompt_pipe, four_prompt_run = make_plan_run(
+            four_steps, name="four", run_dir="four-prompt")
+        os.environ["PATH"] = f"{opencode_agy}:/usr/bin:/bin"
+
+        def with_stdin(answers, body):
+            """Run body() with a scripted stdin; nothing is typed for real."""
+            saved_stdin = sys.stdin
+            sys.stdin = io.StringIO(answers)
+            try:
+                return body()
+            finally:
+                sys.stdin = saved_stdin
+
+        # One installed CLI only: the plan is decided without a keystroke.
+        os.environ["PATH"] = f"{cmd_only}:/usr/bin:/bin"
+        os.environ["PATH"] = f"{opencode_agy}:/usr/bin:/bin"
+        # Stage one takes the typed answer, stage two keeps its default on an
+        # empty line, then the map is confirmed.
+        chosen = with_stdin("3\n\ny\n", lambda: prompt_harness_plan(
+            plan_prompt_run, decide_harness_plan(plan_prompt_run), isatty=True))
+        one_chosen = chosen["steps"]["one"]
+        two_chosen = chosen["steps"]["two"]
+        check("harness plan: an operator choice drives the map",
+              one_chosen["harness"] == "opencode:go/one-c@high"
+              and one_chosen["index"] == 2 and one_chosen["skipped"] == []
+              and one_chosen["selected_by"] == "operator"
+              and two_chosen["harness"] == "opencode:go/two-a@high"
+              and chosen["source"] == "custom",
+              f"picked {one_chosen['harness']} (next slot "
+              f"{one_chosen['next_count']}), Enter kept the default for two")
+        check("harness plan: a single installed option is not asked about",
+              with_stdin("y\n", lambda: prompt_harness_plan(
+                  four_prompt_run, decide_harness_plan(four_prompt_run),
+                  isatty=True))["steps"]["four"]["selected_by"] == "operator",
+              "no per-stage keystroke needed when there is nothing to choose")
+        results = {}
+        for label, answers in (("decline", "2\n\nn\n"), ("quit", "q\n")):
+            try:
+                with_stdin(answers, lambda: prompt_harness_plan(
+                    plan_prompt_run, decide_harness_plan(plan_prompt_run),
+                    isatty=True))
+                results[label] = None
+            except Aborted as exc:
+                results[label] = exc
+        check("harness plan: a declined plan starts nothing",
+              results["decline"] is not None
+              and config_error_payload(results["decline"])["state"] == "aborted",
+              "aborted before any state is written")
+        check("harness plan: 'q' aborts the choice",
+              results["quit"] is not None,
+              "no stage is silently accepted")
+        try:
+            with_stdin("", lambda: prompt_harness_plan(
+                plan_prompt_run, decide_harness_plan(plan_prompt_run),
+                isatty=False))
+            piped_refused = False
+        except Fail as exc:
+            piped_refused = "interactive terminal" in str(exc)
+        check("harness plan: a piped run cannot hang on the prompt",
+              piped_refused, "refused without reading stdin")
+        os.environ["PATH"] = f"{avail_bin}:/usr/bin:/bin"
 
         # End to end through drive(): the missing head is skipped, the
         # installed stub runs, the skip is recorded, and the accepted run
@@ -4711,8 +5365,12 @@ def config_error_payload(error):
 
     A HarnessUnavailable halt additionally names the step and every harness
     tried with the missing binary, so an operator can install one and resume
-    (resume.json is untouched and retries the same step).
+    (resume.json is untouched and retries the same step). A declined or
+    aborted harness plan reports state "aborted" instead: nothing ran and
+    nothing was claimed.
     """
+    if isinstance(error, Aborted):
+        return {"state": "aborted", "reason": str(error)}
     payload = {"state": "config_error", "error": str(error)}
     if isinstance(error, HarnessUnavailable):
         payload["step"] = error.step
@@ -4753,6 +5411,13 @@ def main():
     ap.add_argument("--reset-rotation", action="store_true",
                     help="delete this pipeline's rotation file and exit "
                          "(rotation restarts at slot 0)")
+    ap.add_argument("--customize-harness", dest="customize_harness",
+                    action="store_true",
+                    help="before the run starts, show every stage's installed "
+                         "harness options, pick one per stage, save the whole "
+                         "map to <run_dir>/harnesses.json, and start only once "
+                         "the map is confirmed; without it the runner decides "
+                         "the same map from the rotation order on its own")
     ap.add_argument("--audit-ledger", action="store_true",
                     help="report ledger authority gaps for this run without changing files")
     ap.add_argument("--migrate-ledger", action="store_true",
@@ -4765,6 +5430,16 @@ def main():
                          "requires an operator decision")
     args = ap.parse_args()
 
+    if args.customize_harness and (args.fuzz or args.autoexit_test
+                                   or args.self_test or args.audit_ledger
+                                   or args.migrate_ledger or args.mark_done
+                                   or args.reset_rotation):
+        # These paths never start a job, so there is no map to decide. Fail
+        # loudly rather than silently ignoring the flag.
+        ap.error("--customize-harness applies only to a run that starts "
+                 "harnesses: not with --fuzz, --autoexit-test, --self-test, "
+                 "--audit-ledger, --migrate-ledger, --mark-done, or "
+                 "--reset-rotation")
     if args.fuzz:
         fuzz(args.fuzz)
         return
@@ -4813,6 +5488,9 @@ def main():
         # pipeline files with the same stem in different directories are
         # different workflows and rotate independently.
         run.rotation_key = rotation_key_for(pipe_path)
+        # The pipeline this plan belongs to, recorded in harnesses.json so a
+        # saved map says which workflow it was decided for.
+        run.pipe_path = pipe_path
         try:
             phase = int(inputs["phase_number"])
         except (ValueError, TypeError):
@@ -4841,25 +5519,26 @@ def main():
             run._run_dir.mkdir(parents=True, exist_ok=True)
 
         if args.dry_run:
-            # A preview shows the first planned slot; live execution reads
-            # completed harness data from the ledger and skips any harness
-            # whose CLI is missing, so the preview names the first available
-            # slot and lists the skips.
+            # A preview shows the same harness map a live run would use: the
+            # run's saved plan when it has one, otherwise the plan the runner
+            # would decide now (prompting with --customize-harness). A dry run
+            # saves nothing, so a previewed choice is not kept.
             run.require_authoritative = False
-            ensure_harness_path()
+            plan, _changed = plan_harnesses(
+                run, custom=args.customize_harness, fresh=args.fresh)
+            run.plan = plan
+            print(render_plan(plan) + "\n  (dry run: nothing saved)",
+                  file=sys.stderr)
             for sid in run.steps:
-                hs = run.harnesses(sid)
-                missing = [h for h in hs if not is_harness_available(h)]
-                available = [h for h in hs if is_harness_available(h)]
-                first = available[0] if available else hs[0]
-                prompt = run.render_task(sid, harness_name=display_name(first))
+                entry = plan["steps"][sid]
+                prompt = run.render_task(sid, harness_name=entry["display"])
                 print(f"===== step {sid} =====")
-                print(f"harness: {hs}")
-                if missing:
+                print(f"harness: {[o['harness'] for o in entry['options']]}")
+                print(f"planned: {entry['harness']} ({entry['display']})")
+                if entry["skipped"]:
                     print("skipped (CLI binary not on PATH): "
-                          + ", ".join(f"{h} ({binary_for(h)})" for h in missing))
-                    print(f"first available: {first}" if available
-                          else "no harness available: the run would halt here")
+                          + ", ".join(f"{s['harness']} ({s['missing_binary']})"
+                                      for s in entry["skipped"]))
                 print(f"prompt: {len(prompt.encode())} bytes -> "
                       f"{run._run_dir}/{sid}-task-r1.md")
                 if args.show_prompts:
@@ -4908,6 +5587,17 @@ def main():
             print(json.dumps({"resuming": resumed["current"], "auto": auto,
                               **assess(run, resumed.get("current"))}), file=sys.stderr)
 
+        # Every stage's harness is chosen here, before the job starts: the
+        # runner decides from the rotation order, or the operator picks each
+        # stage's slot with --customize-harness. A saved plan wins, so a resume
+        # keeps the models the run already committed to. Deciding before the
+        # sync and the phase claim means a plan this run cannot honour (no
+        # harness installed, a declined plan) stops the run having claimed
+        # nothing and synced nothing.
+        plan, plan_changed = plan_harnesses(
+            run, custom=args.customize_harness, fresh=args.fresh, resumed=resumed)
+        run.plan = plan
+
         if resumed is None:
             # A fresh phase must refresh both checkouts before its base
             # revision is recorded or any reservation is acquired.
@@ -4924,6 +5614,12 @@ def main():
             if run.reservation:
                 save_reservation_file(_reservation_path(run), run.reservation)
             print(json.dumps({"fresh": True, "archived": str(backup)}), file=sys.stderr)
+        # One write, after any --fresh archive: the plan is the run's model
+        # map, so it must be on disk before the first harness starts. An
+        # unchanged resume leaves the saved file alone.
+        if plan_changed:
+            save_harness_plan(run, plan)
+        print(render_plan(plan, plan_path(run)), file=sys.stderr)
         if resumed is None:
             commit_start_run_state(run)
 

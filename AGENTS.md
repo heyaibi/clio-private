@@ -69,13 +69,30 @@ Pushing the private repo to its own private remote is fine and expected. Pushing
 - Use short sentences. One idea in each sentence.
 - Use a full sentence when a short phrase is unclear.
 - Say what happened in plain words. Do not hide it behind a hard name.
+- Say why it happened in plain words when you know why.
+- Explain what the numbers mean. Do not just report numbers, percentages, or metrics.
 - If you must use a hard word, explain it the first time in plain words.
-- Act like a calm helper. No jokes. No big words to impress. No debate tone.
-- Ask one clear question at a time. Shape: `What should happen if X?`
+- Do not use corporate, managerial, or AI-sounding language when a normal word works.
+- Avoid phrases like `leverage`, `optimize the workflow`, `drive alignment`, `unlock efficiency`, `operationalize`, `surface area`, `moving forward`, `the key takeaway`, and `this suggests an opportunity to`.
+- Say the actual problem directly. Do not soften it with vague language.
 - Say who did what. Use I, you, and the name of the part or tool. Do not hide the actor.
 - Bad: `The order was canceled.` Good: `I canceled the order.`
-- Bad: `Mid-ladder fill during sync: remaining budget vs 95 targets vs currently open entries?` Good: `Sync is still placing buys and some fill. Do we stop at 95 prices or keep 95 buys on the book?`
-- Order: 1. Correct. 2. Honest. 3. Clear. 4. Simple. 5. Short. Simple words beat clever words.
+- Bad: `The system exhibited repeated remediation cycles.` Good: `The review ran three times because the first two fixes were rejected.`
+- Bad: `This increased operational overhead.` Good: `This added 2 hours of work.`
+- Bad: `There is an opportunity to optimize verification.` Good: `The checker reruns the same tests even when the code has not changed.`
+- When explaining a process, tell the reader what happened first, then why it happened, then what should change.
+- Separate facts from guesses. Say what you observed. Then say what you think it means.
+- Keep useful technical details such as filenames, line numbers, commands, counts, timings, and identifiers. Make the explanation around them simpler instead of removing the details.
+- Do not assume the reader knows internal terms. Explain a term the first time you use it.
+- Use concrete examples when they make the point easier to understand.
+- Do not turn a simple observation into elaborate analysis.
+- If something went wrong, say why in direct terms.
+- If something worked correctly, say that too. Do not weaken a check just because it found a problem.
+- Write like a calm senior engineer explaining the situation to another engineer at a whiteboard.
+- Ask one clear question at a time. Shape: `What should happen if X?`
+- Order: 1. Correct. 2. Honest. 3. Clear. 4. Simple. 5. Short.
+- Simple words beat clever words.
+- Before sending, ask: `Could a busy engineer understand what happened, why it happened, and what should change after reading this once?` If not, rewrite it.
 
 ## Coverage Gate
 
