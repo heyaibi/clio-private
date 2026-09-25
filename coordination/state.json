@@ -88,11 +88,11 @@
       "claimed_at": "2026-09-25T16:00:42.650Z",
       "expires_at": null,
       "generation": 3,
-      "heartbeat_at": "2026-09-25T16:00:45.197Z",
+      "heartbeat_at": "2026-09-25T16:00:47.812Z",
       "machine_id": "devserver",
       "reservation_id": "rsv-794af98c4ac427dd251dbfd3",
       "run_id": "phase-100606",
-      "status": "running"
+      "status": "rejected"
     },
     "100720": {
       "base_revisions": {
