@@ -1,0 +1,207 @@
+{
+  "run": "phase-100720",
+  "phase": "100720",
+  "subject": "Phase 100720: CLI `-o` alias for `--output` and output-mode help",
+  "verdict": "Good",
+  "verdict_justification": "The `-o` alias is implemented and honored at every `--output` recognition site, the output-mode rule is documented, fail-closed behavior is preserved, and all gates pass with independently reproduced evidence. Only minor documentation-accuracy issues remain; no functional defect was found.",
+  "metadata": {
+    "generated": "2026-09-25",
+    "applies_to": "staged worktree (git head 0ec3235352afe14134ecd940e7a661c9392c308d), 14 staged files",
+    "source": "crates/clio-lib/src/cli_args.rs, cli_output.rs, main.rs, cli_help_usage.rs and their tests; tests/output_alias_harness.rs; phase doc; make test/lint/coverage"
+  },
+  "standard": [
+    "Phase 100720 acceptance criteria AC-100720-01..06 and test scenarios T100720-01..09",
+    "requirement.md §4.9.2 item 2 (binding syntax may differ; names and semantics must not change)",
+    "Output-mode rule unchanged: explicit flag wins, else text on TTY and JSON when piped",
+    "Fail-closed rejection of unknown single-dash tokens must be preserved",
+    "Every Rust file <=450 total lines; new/modified files use the AGENTS.md header",
+    "Per-file >=90% line and function coverage; aggregate >=90%",
+    "No roadmap/private references in public files"
+  ],
+  "requirements": [
+    {
+      "requirement": "AC-100720-01: `-o` behaves identically to `--output` at every recognition site",
+      "status": "Fully satisfied",
+      "evidence": "git diff adds `-o`/`-o=` handling in cli_args::parse, cli_args::split_leading_globals, cli_output::explicit_output, and main::parse_flags. Real binary: `recall coffee -o json`, `--output json`, `-o=json`, and before-verb `-o json` all exit 0 with the same JSON envelope; `status -o json` emits JSON.",
+      "severity": "Low",
+      "confidence": "High"
+    },
+    {
+      "requirement": "AC-100720-02: unknown single-dash tokens still fail closed",
+      "status": "Fully satisfied",
+      "evidence": "Real binary `recall coffee -x` -> exit 2, `{\"message\":\"unknown flag \\`-x\\`\"}`; `-ojson` -> exit 2 unknown flag. Tests `attached_short_output_alias_fails_closed`, e2e `-x` assertion.",
+      "severity": "Low",
+      "confidence": "High"
+    },
+    {
+      "requirement": "AC-100720-03: output-mode rule documented in help, lists `-o`",
+      "status": "Fully satisfied",
+      "evidence": "`clio help` prints `Global flags: --db --backend --bank --actor --output (-o)` and the output-mode paragraph with all four forms. `help_documents_the_output_mode_rule_and_short_alias` pins it.",
+      "severity": "Low",
+      "confidence": "High"
+    },
+    {
+      "requirement": "AC-100720-04: per-verb usage decision made and applied consistently",
+      "status": "Fully satisfied",
+      "evidence": "Decision recorded: leave 62 usage lines on canonical `[--output json|text]`. Independently counted 62 entries and exactly 8 not ending in the suffix. Pin test `verb_usage_lines_keep_the_canonical_output_spelling`.",
+      "severity": "Low",
+      "confidence": "High"
+    },
+    {
+      "requirement": "AC-100720-05: no payload or default change",
+      "status": "Fully satisfied",
+      "evidence": "resolve_output/stdout_is_tty untouched; `make check` passed 571 clio bin tests plus workspace suites; existing --output tests unchanged and green.",
+      "severity": "Low",
+      "confidence": "High"
+    },
+    {
+      "requirement": "AC-100720-06: no regression; size/coverage gates pass",
+      "status": "Fully satisfied",
+      "evidence": "`make coverage` exit 0: 324 files, TOTAL lines 97.96% / functions 98.85%, all per-file >=90%. Touched production files: cli_args.rs 99.00/100, cli_output.rs 100/100, main.rs 99.05/100, cli_help_usage.rs 100/100. All touched Rust files <=450 lines (max 391).",
+      "severity": "Low",
+      "confidence": "High"
+    },
+    {
+      "requirement": "New/modified Rust files use the AGENTS.md header with truthful ownership",
+      "status": "Partially satisfied",
+      "evidence": "Both new files carry the header; cli_read_output_tests.rs:11 names `run_with_state` although the module only calls the `run_state` helper (imported at line 26).",
+      "severity": "Low",
+      "confidence": "High",
+      "correction_needed": "Restate the Owns bullet in terms of `run_state` (or remove the function name)."
+    },
+    {
+      "requirement": "No roadmap/private/phase references in public files",
+      "status": "Fully satisfied",
+      "evidence": "`git diff --cached` grep for roadmap|clio-private|100720|phase-[0-9] returned none.",
+      "severity": "Low",
+      "confidence": "High"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "New test module header names a helper the module never calls",
+      "evidence": "crates/clio-lib/src/cli_read_output_tests.rs:11 says the module owns `Assertions over \\`run_with_state\\``, but the file imports and calls `run_state` (line 26) and never references `run_with_state`.",
+      "requirement_ref": "private AGENTS.md File Header (ownership statements MUST accurately describe the module)",
+      "recommendation": "Change the Owns bullet to name `run_state` (the helper actually exercised); no code behavior changes.",
+      "status": "resolved",
+      "resolution": "Remediator r1: crates/clio-lib/src/cli_read_output_tests.rs:11 now reads `//! - Assertions over `run_state` for output modes and the recall text view`. The module imports `run_state` at line 24 and calls it at lines 41, 57, 66, 74, 84, 92, 104 and 112; `run_with_state` (the seam at crates/clio-lib/src/cli_read.rs:108) appears nowhere in the file (`grep -n run_with_state crates/clio-lib/src/cli_read_output_tests.rs` -> no match). File is 116 lines. Verified by `make check` -> exit 0 and `test result: ok. 571 passed; 0 failed` for the clio bin suite."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "Phase Definition of Done marks downstream approval as obtained before it happened",
+      "evidence": "Phase doc DoD line `Required approval is obtained (downstream pipeline step)` is checked [x], but Adversary/Remediator/Remedy Approver stages have not run and their Attribution rows are still [TBD] (git-staged phase file).",
+      "requirement_ref": "phase doc Definition of Done",
+      "recommendation": "Leave that checkbox unchecked until the approval stage completes, or annotate it as pending.",
+      "status": "resolved",
+      "resolution": "Remediator r1: the phase doc Definition of Done item now reads `- [ ] Required approval is obtained (downstream pipeline step) - pending downstream approval (Remedy Approver has not run).` No other DoD row was changed. The unstaged phase-file diff shows exactly that line plus the Remediator r1 attribution row; the Remedy Approver row remains [TBD], so the unchecked item matches the actual pipeline state."
+    }
+  ],
+  "addressed_issues": [],
+  "remediation": {
+    "round": 1,
+    "stage": "Remediator",
+    "findings": {
+      "F-01": "resolved",
+      "F-02": "resolved"
+    },
+    "plans": {
+      "plan_1hr": "Both items done: F-01 and F-02 (see the resolutions above).",
+      "plan_unlimited": "Deliberately not implemented. (1) A shared alias table: the phase explicitly forbids adding a general alias framework unless needed and asks for the minimal, consistent handling of `-o` at every existing `--output` site; a table would be framework work outside the assigned findings and would widen a two-line remediation diff. (2) A negative test for `-o <single-dash-token>`: the attached form and unknown short tokens are already pinned (`attached_short_output_alias_fails_closed`, e2e `-x`), and the accepted-as-value nuance mirrors the pre-existing long-flag behaviour and is already recorded in `dismissed`; adding that test is new work on a green tree with no assigned finding asking for it, so it stays with the known limitation (no phase assigned)."
+    },
+    "verification": "`make check` exit 0: cargo fmt --all (no changes), cargo clippy --workspace --all-targets --all-features --locked -- -D warnings (clean), cargo test --locked --workspace (clio bin suite `test result: ok. 571 passed; 0 failed`; 50 of 50 test-result blocks ok; zero `test result: FAILED` lines). `make coverage` exit 0: `python3 scripts/coverage_guard.py target/coverage/coverage.json` -> `coverage-guard: 324 file(s) checked against 90.0% floors`, `coverage-guard: TOTAL lines 97.96% functions 98.85%`, `coverage-guard: all reported files meet the per-file floor` (identical to the developer gate; the only Rust line touched lives in `crates/clio-lib/src/cli_read_output_tests.rs`, which has 0 rows in the coverage JSON because `*_tests.rs` paths are excluded).",
+    "first_check_attempt": "The first `make check` failed once on the unrelated pre-existing flake `http_bind::tests::occupied_port_advances_to_next_free` (`panicked at crates/clio-lib/src/http_bind_tests.rs:79:62: binds the next free port: ... no free port in 64178-64179 on 127.0.0.1`; 570 passed; 1 failed) while a second pipeline run was executing tests on the same machine. The isolated re-run passed (7 passed; 0 failed) and the next full `make check` passed. Filed as incidental GitHub issue #26; not fixed, because it is outside the assigned findings.",
+    "addressed_issues": "Left as an empty array. No candidate qualified: neither resolved finding names a GitHub issue, and issue #25 (reported earlier in this run) is not resolved by these documentation fixes, so it must not be added; no existing candidate needed removal or broadening.",
+    "scope": "crates/clio-lib/src/cli_read_output_tests.rs (one header line) and the phase doc Definition of Done line plus the Remediator attribution row. No production file, test assertion, threshold, or coverage gate was weakened; no test was deleted."
+  },
+  "issues": [
+    {
+      "id": 1,
+      "title": "New test module header names a helper the module never calls",
+      "severity": "Minor",
+      "why_it_matters": "The repo mandates that each file header's ownership statements accurately describe the module; a wrong helper name misleads future maintainers about what the file exercises.",
+      "impact": "Documentation-only; no behavior or test effect.",
+      "evidence": "crates/clio-lib/src/cli_read_output_tests.rs:11 vs import at line 26 (`use crate::cli_read_test_support::{json_of, run_state, seed_item, state};`).",
+      "confidence": "High",
+      "proposed_fix": "Reword the Owns bullet to `Assertions over \\`run_state\\` for output modes and the recall text view`."
+    },
+    {
+      "id": 2,
+      "title": "Phase DoD marks downstream approval as obtained before it occurred",
+      "severity": "Minor",
+      "why_it_matters": "A checked DoD box is completion evidence; checking an approval item before the approval stage runs overstates phase completion.",
+      "impact": "Procedural/evidence accuracy only; the code gates themselves pass.",
+      "evidence": "Phase doc Definition of Done: `- [x] Required approval is obtained (downstream pipeline step)`, while Remediator / Remedy Approver / Finalize attribution rows are [TBD].",
+      "confidence": "High",
+      "proposed_fix": "Uncheck the approval item until the approval stage completes, or mark it `[ ] pending downstream approval`."
+    }
+  ],
+  "dismissed": [
+    "Possible `-o`/`--output` divergence when the next token starts with a single dash (parse accepts `-x` as a value, main::parse_flags does not): this mirrors the pre-existing long-flag behavior exactly and is not introduced by this change; resolve_output still rejects the bad value with exit 2.",
+    "Attached short value `-ojson` not accepted: the phase explicitly allows mirroring only the forms the long flag supports (space and `=`), and it is recorded as a known limitation, not claimed as implemented.",
+    "Per-verb usage lines and the `clio status` usage line do not print `-o`: documented decision consistent with treating `-o` as one global flag documented once in the catalog.",
+    "Reserved surfaces (`ops`, `mcp`, `retention`, `compose`) ignore `-o` like they ignore `--output`: pre-existing and tracked as open issue #25, out of this phase's scope."
+  ],
+  "verification": [
+    {
+      "claim": "`-o`/`-o=` produce the same JSON as `--output` on the real binary",
+      "classification": "Established",
+      "source_note": "Rebuilt target/debug/clio from the staged tree and ran remember+recall with all four spellings; identical envelopes (timing fields differ)."
+    },
+    {
+      "claim": "Unknown short tokens still fail closed with exit 2",
+      "classification": "Established",
+      "source_note": "Real binary: `-x` and `-ojson` both exit 2 with the usage envelope; bare `-o` exits 2 with `flag \\`-o\\` requires a value`."
+    },
+    {
+      "claim": "Workspace tests, clippy, and fmt pass",
+      "classification": "Established",
+      "source_note": "`make check` completed through all workspace test binaries and doc-tests with no failures."
+    },
+    {
+      "claim": "Coverage gate passes per-file and aggregate",
+      "classification": "Established",
+      "source_note": "`make coverage` exit 0; guard: 324 files, TOTAL lines 97.96% / functions 98.85%, all files meet the 90% floor. Baseline /tmp/cov-baseline.json was 97.95/98.85; no touched file regressed (cli_args 98.91->99.00, main 96.97->99.05)."
+    },
+    {
+      "claim": "62 usage entries, 8 without the output suffix",
+      "classification": "Established",
+      "source_note": "Independent parse of cli_help_usage.rs: 62 `usage: clio` literals, 8 do not end in `[--output json|text]`."
+    },
+    {
+      "claim": "`clio status -o json` and `-o=text` select modes like `--output`",
+      "classification": "Established",
+      "source_note": "Real binary status runs: `-o json` JSON envelope exit 0; `-o=text` `clio status: healthy`; `-o xml` exit 2."
+    }
+  ],
+  "unknowns": [
+    {
+      "what": "Whether the median user expects attached `-ojson` to work",
+      "why_unknown": "No user research or issue asking for it; the phase chose minimal handling.",
+      "what_would_resolve_it": "A follow-up CLI phase adding a short-flag framework; already listed as a known limitation.",
+      "materiality": "Low; behavior is fail-closed and documented."
+    }
+  ],
+  "strengths": [
+    "Alias handled at all four real recognition sites, including the non-obvious `main::parse_flags` used by `clio status`.",
+    "Fail-closed semantics preserved and explicitly pinned by both unit and real-binary e2e tests.",
+    "Pre-existing 454-line cli_read_tests.rs violation reduced by extracting output-mode tests into a focused, header-documented module.",
+    "Coverage floor met per-file with a verified baseline comparison showing no regression."
+  ],
+  "regrets": [
+    "The new module header could have been checked against the actual helper names before claiming the file was done."
+  ],
+  "process_changes": [
+    "For any new file, verify each symbol named in the header actually appears in the file."
+  ],
+  "plan_1hr": [
+    "Fix F-01: reword the cli_read_output_tests.rs header Owns bullet to name `run_state`.",
+    "Fix F-02: mark the phase DoD approval item pending until the approval stage runs."
+  ],
+  "plan_unlimited": [
+    "Add a small shared alias table so future short aliases are declared once instead of at four sites.",
+    "Add a negative test for `-o <single-dash-token>` documenting the accepted-as-value behavior that mirrors the long flag."
+  ]
+}

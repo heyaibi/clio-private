@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Phase 100720: CLI `-o` alias for `--output` and output-mode help</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Phase 100720: CLI `-o` alias for `--output` and output-mode help</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">2 minor · 4 dismissed</span>
+    </div>
+    <p class="sum">The `-o` alias is implemented and honored at every `--output` recognition site, the output-mode rule is documented, fail-closed behavior is preserved, and all gates pass with independently reproduced evidence. Only minor documentation-accuracy issues remain; no functional defect was found.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-25</span>
+      <span><b>Applies to</b>staged worktree (git head 0ec3235352afe14134ecd940e7a661c9392c308d), 14 staged files</span>
+      <span><b>Source</b>crates/clio-lib/src/cli_args.rs, cli_output.rs, main.rs, cli_help_usage.rs and their tests; tests/output_alias_harness.rs; phase doc; make test/lint/coverage</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>Phase 100720 acceptance criteria AC-100720-01..06 and test scenarios T100720-01..09</li>
+        <li>requirement.md §4.9.2 item 2 (binding syntax may differ; names and semantics must not change)</li>
+        <li>Output-mode rule unchanged: explicit flag wins, else text on TTY and JSON when piped</li>
+        <li>Fail-closed rejection of unknown single-dash tokens must be preserved</li>
+        <li>Every Rust file &lt;=450 total lines; new/modified files use the AGENTS.md header</li>
+        <li>Per-file &gt;=90% line and function coverage; aggregate &gt;=90%</li>
+        <li>No roadmap/private references in public files</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">7 of 8 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>AC-100720-01: `-o` behaves identically to `--output` at every recognition site</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">git diff adds `-o`/`-o=` handling in cli_args::parse, cli_args::split_leading_globals, cli_output::explicit_output, and main::parse_flags. Real binary: `recall coffee -o json`, `--output json`, `-o=json`, and before-verb `-o json` all exit 0 with the same JSON envelope; `status -o json` emits JSON.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100720-02: unknown single-dash tokens still fail closed</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Real binary `recall coffee -x` -&gt; exit 2, `{&quot;message&quot;:&quot;unknown flag \`-x\`&quot;}`; `-ojson` -&gt; exit 2 unknown flag. Tests `attached_short_output_alias_fails_closed`, e2e `-x` assertion.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100720-03: output-mode rule documented in help, lists `-o`</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`clio help` prints `Global flags: --db --backend --bank --actor --output (-o)` and the output-mode paragraph with all four forms. `help_documents_the_output_mode_rule_and_short_alias` pins it.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100720-04: per-verb usage decision made and applied consistently</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Decision recorded: leave 62 usage lines on canonical `[--output json|text]`. Independently counted 62 entries and exactly 8 not ending in the suffix. Pin test `verb_usage_lines_keep_the_canonical_output_spelling`.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100720-05: no payload or default change</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">resolve_output/stdout_is_tty untouched; `make check` passed 571 clio bin tests plus workspace suites; existing --output tests unchanged and green.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>AC-100720-06: no regression; size/coverage gates pass</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`make coverage` exit 0: 324 files, TOTAL lines 97.96% / functions 98.85%, all per-file &gt;=90%. Touched production files: cli_args.rs 99.00/100, cli_output.rs 100/100, main.rs 99.05/100, cli_help_usage.rs 100/100. All touched Rust files &lt;=450 lines (max 391).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>New/modified Rust files use the AGENTS.md header with truthful ownership</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Both new files carry the header; cli_read_output_tests.rs:11 names `run_with_state` although the module only calls the `run_state` helper (imported at line 26).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>No roadmap/private/phase references in public files</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">`git diff --cached` grep for roadmap|clio-private|100720|phase-[0-9] returned none.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">02</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>New test module header names a helper the module never calls</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The repo mandates that each file header&#39;s ownership statements accurately describe the module; a wrong helper name misleads future maintainers about what the file exercises.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Documentation-only; no behavior or test effect.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-lib/src/cli_read_output_tests.rs:11 vs import at line 26 (`use crate::cli_read_test_support::{json_of, run_state, seed_item, state};`).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Reword the Owns bullet to `Assertions over \`run_state\` for output modes and the recall text view`.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Phase DoD marks downstream approval as obtained before it occurred</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>A checked DoD box is completion evidence; checking an approval item before the approval stage runs overstates phase completion.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Procedural/evidence accuracy only; the code gates themselves pass.</dd></div>
+              <div><dt>Evidence</dt><dd>Phase doc Definition of Done: `- [x] Required approval is obtained (downstream pipeline step)`, while Remediator / Remedy Approver / Finalize attribution rows are [TBD].</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Uncheck the approval item until the approval stage completes, or mark it `[ ] pending downstream approval`.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Possible `-o`/`--output` divergence when the next token starts with a single dash (parse accepts `-x` as a value, main::parse_flags does not): this mirrors the pre-existing long-flag behavior exactly and is not introduced by this change; resolve_output still rejects the bad value with exit 2.</li>
+        <li>Attached short value `-ojson` not accepted: the phase explicitly allows mirroring only the forms the long flag supports (space and `=`), and it is recorded as a known limitation, not claimed as implemented.</li>
+        <li>Per-verb usage lines and the `clio status` usage line do not print `-o`: documented decision consistent with treating `-o` as one global flag documented once in the catalog.</li>
+        <li>Reserved surfaces (`ops`, `mcp`, `retention`, `compose`) ignore `-o` like they ignore `--output`: pre-existing and tracked as open issue #25, out of this phase&#39;s scope.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>`-o`/`-o=` produce the same JSON as `--output` on the real binary — Rebuilt target/debug/clio from the staged tree and ran remember+recall with all four spellings; identical envelopes (timing fields differ).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Unknown short tokens still fail closed with exit 2 — Real binary: `-x` and `-ojson` both exit 2 with the usage envelope; bare `-o` exits 2 with `flag \`-o\` requires a value`.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Workspace tests, clippy, and fmt pass — `make check` completed through all workspace test binaries and doc-tests with no failures.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Coverage gate passes per-file and aggregate — `make coverage` exit 0; guard: 324 files, TOTAL lines 97.96% / functions 98.85%, all files meet the 90% floor. Baseline /tmp/cov-baseline.json was 97.95/98.85; no touched file regressed (cli_args 98.91-&gt;99.00, main 96.97-&gt;99.05).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>62 usage entries, 8 without the output suffix — Independent parse of cli_help_usage.rs: 62 `usage: clio` literals, 8 do not end in `[--output json|text]`.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>`clio status -o json` and `-o=text` select modes like `--output` — Real binary status runs: `-o json` JSON envelope exit 0; `-o=text` `clio status: healthy`; `-o xml` exit 2.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether the median user expects attached `-ojson` to work</p>
+          <p class="d">No user research or issue asking for it; the phase chose minimal handling. · A follow-up CLI phase adding a short-flag framework; already listed as a known limitation. · Low; behavior is fail-closed and documented.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>Alias handled at all four real recognition sites, including the non-obvious `main::parse_flags` used by `clio status`.</li>
+        <li>Fail-closed semantics preserved and explicitly pinned by both unit and real-binary e2e tests.</li>
+        <li>Pre-existing 454-line cli_read_tests.rs violation reduced by extracting output-mode tests into a focused, header-documented module.</li>
+        <li>Coverage floor met per-file with a verified baseline comparison showing no regression.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>The new module header could have been checked against the actual helper names before claiming the file was done.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>For any new file, verify each symbol named in the header actually appears in the file.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Fix F-01: reword the cli_read_output_tests.rs header Owns bullet to name `run_state`.</li>
+          <li>Fix F-02: mark the phase DoD approval item pending until the approval stage runs.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Add a small shared alias table so future short aliases are declared once instead of at four sites.</li>
+          <li>Add a negative test for `-o &lt;single-dash-token&gt;` documenting the accepted-as-value behavior that mirrors the long flag.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100720/report.html</span>
+          <span><b>Findings:</b>/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100720/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

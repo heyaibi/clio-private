@@ -1,0 +1,1 @@
+Reserved CLI surfaces ignore unknown flags and exit 0 instead of a usage error

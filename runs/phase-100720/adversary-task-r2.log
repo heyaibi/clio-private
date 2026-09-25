@@ -1,0 +1,12 @@
+[2026-09-25 21:56] start: adversary r2 phase 100720; branch=master
+[2026-09-25 22:03] reviewed staged diff 14 files (+520/-77); branch=master; unstaged non-runs clean
+[2026-09-25 22:03] re-read phase doc, private AGENTS.md, coverage.md; omission audit of In Scope + Expected Outcome + AC-01..06 + T-01..09 -> all present in diff/tests
+[2026-09-25 22:03] real-binary repro on rebuilt target/debug/clio: -o json/-o=json/--output json/before-verb -o json identical; -o text human; bare -o exit 2; -x exit 2; -ojson exit 2; -o= exit 2; status -o json JSON; status -o=text text
+[2026-09-25 22:03] grep: no roadmap/private/phase leaks in staged diff; all 14 touched Rust files <=450 lines (max 391)
+[2026-09-25 22:03] `make check` completed: all workspace test binaries + doc-tests ok, clippy/fmt clean
+[2026-09-25 22:03] `make coverage` exit 0; guard 324 files, TOTAL lines 97.96% / functions 98.85%, all per-file >=90%; cli_args 99.00/100, cli_output 100/100, main 99.05/100, cli_help_usage 100/100; baseline 97.95/98.85 no touched-file regression
+[2026-09-25 22:03] verified 62 usage entries, 8 without suffix (matches decision record); per-verb decision pinned by test
+[2026-09-25 22:03] open issues: 7; viewed #25 (digest 85fe9826...); no addressed_issues candidates (change does not fix #25, which is out of scope)
+[2026-09-25 22:03] findings: F-01 low (cli_read_output_tests.rs:11 header names run_with_state, calls run_state), F-02 low (phase DoD marks approval obtained pre-approval); no functional defect found; verdict Good
+[2026-09-25 22:03] wrote findings.json + report.html/style.css; appended Adversary r1 attribution row to phase doc (no code/test edits)
+ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100720/findings.json 18a3f701
