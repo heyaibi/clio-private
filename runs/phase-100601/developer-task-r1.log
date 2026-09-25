@@ -1,0 +1,36 @@
+# Phase 100601 Developer run log (r1)
+
+- start: read task file, phase file, coverage.md, crates.md. Phase = native source context + evidence identity.
+- repo: master @ af61796, clean tree.
+- discovery: requirement.md v1.10 already carries the context/evidence contract (FR-34, FR-35, NFR-9, §4.4). Code has no `context` field anywhere; `source_ref` is the item-level evidence alias.
+- baseline: launching `cargo llvm-cov --workspace --locked --no-clean --json --output-path /tmp/cov-baseline.json` (background) with DATABASE_URL=postgres://clio:clio@127.0.0.1:34310/clio (pg port 34310 reachable).
+- baseline done: `cargo llvm-cov --workspace --locked --no-clean --json --output-path /tmp/cov-baseline.json` exit=0; coverage_guard: 320 files, TOTAL lines 97.95% functions 98.83%, all files >=90%. Gate green; no per-file debt.
+- BLOCKER CHECK: none. Proceeding to research + decomposition.
+- groundwork (me): clio-types `MemoryItem.context` + `CONTEXT_MAX_BYTES=4096` + `validate_context` (empty -> invalid_argument, >4096 bytes -> out_of_range); serde default/skip_serializing_if. Mechanical `context: None` inserted into 110 literals across 108 files (script), workspace check clean.
+- groundwork (me): clio-store `DualContent.context` sealed with content; both item read maps populate it; audit `detail_json` now carries `context_present/context_len/context_hash` (no raw value) on create/update/correct; `ItemRevision.context` decrypted per revision in both backends. clio-compliance `CorrectArgs.context` (Some=replace, None=preserve).
+- refactor (me): clio-mcp mutator_tools.rs hit 451 lines after the field line; extracted persona/task/failure handlers into new clio-mcp/src/mutator_record_tools.rs (230 lines); clio-write triple.rs `triple_add` hit the clippy 100-line limit; extracted `triple_carrier` helper. clippy workspace green.
+- workers spawned (background): W1=clio-mcp bindings/store/admit/batch/correct/inspect schemas+tests; W2=clio-lib CLI `remember|admit|correct --context` + help + render_get; W3=clio-compliance export/import/erase/audit/correct tests. Each owns disjoint files; none may run llvm-cov; I run the combined coverage pass.
+- me: context_store_tests.rs (new, clio-store): SQLite + Postgres context round trip (sealed at rest, audit revision exposes value, telemetry carries hash-only), legacy v1 payload without context reads, erasure makes revision context unreadable. All pass.
+- me: clio-write store_path_tests: context does not satisfy span verification; context carried on admitted item. Pass.
+- me: clio-sync apply_tests: item upsert carries context; pre-field payload (no context key) applies unchanged. Pass.
+- me: workspace tests excluding worker crates: green (552 + suites); one unrelated mid-flight failure in W2's new cli_context_tests (worker-owned, not touched).
+- deferred (documented): retrieve/compose metadata exposure + domain-record context params (persona/task/failure/triple/belief) left to Phase 100606 per phase Known Limitations.
+- me: baseline per-file rows saved for comparison (item.rs 100/100, item_persist 100/100, content_envelope 100/100, sqlite_memory L99.3, postgres_memory L97.6, item_update L95.3, sqlite_audit L97.2, postgres_audit L93.5/F91.7, sqlite_correct L97.4, postgres_correct L97.5, triple L98.9, mcp write_tools L97.1/F93.1, read_tools L99.4, mutator_tools L94.8, cli_write_core L96.8/F96.7, compliance export L94.7/F90.9).
+- me: drafted clio-lib/src/context_parity_tests.rs (CLI remember vs in-process MCP store produce identical stored context); registering it after W2 finishes to avoid file overlap.
+- waiting on W1/W2/W3 background workers.
+- phase file: added "Implementation Discovery (r1)" with real subsystems/locations, confirmed assumptions, adjustments (inspect decrypts per-row; schema maxLength is code points so bytes enforced in code), and the deferred-question list.
+- W3 (compliance) integrated: export_mask.rs extracted (export.rs 438), context scrubbed in export/import/audit views, 13 new context tests, correct preserve/replace tests; compliance 109 tests pass; clippy clean.
+- W2 (CLI) integrated: `remember|admit|correct --context` validated via validate_context (usage errors, no raw echo), usage lines, render_get shows context; 13 tests pass.
+- me: fixed export_tests.rs size regression (my mechanical +1 line pushed 450 -> 451): moved the 3 completeness scenarios into new export_completeness_tests.rs; export_tests.rs is now the shared fixture module (361 lines).
+- me: registered/fixed clio-lib/src/context_parity_tests.rs (module names cli_read_test_support/cli_write_test_support); test proves CLI remember and in-process MCP store persist identical context; clippy clean for clio + clio-compliance.
+- W1 (MCP) integrated: opt_context decode + store/admit/batch/canonical_put/shared_store wiring, schemas (store_like -> covers store/admit_preview/admit_preview_batch; canonical_put; shared_store; correct), inspect per-row context with ErasedSubject skip, correct preview echoes context_present only. 289 mcp tests pass; clippy clean.
+- integrated union: `cargo fmt --all` clean; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` clean; `cargo test --workspace --locked` all suites pass (0 failed).
+- size check: 142 changed/new .rs files, none >450 lines.
+- coverage: fresh workspace JSON running (/tmp/cov-final.json) before the single final `make coverage`.
+- coverage diagnosis: fresh JSON showed item.rs at 70.8% lines with impossible mapping (236 measured lines vs 146 baseline, struct-field lines "uncovered") -> stale incremental coverage mapping from the warm llvm-cov target. First `make coverage-clean` attempt failed because make's PATH lacked ~/.cargo/bin; relaunched with PATH fixed.
+- phase file updated (Attribution done row, Acceptance Evidence per AC, scenario coverage map, DoD, Completion Evidence, Known Limitations including deferred retrieve/compose metadata + domain-record context params, Final Status PASS WITH DOCUMENTED LIMITATIONS, sign-off).
+- FINAL GATE (from scratch, `make coverage-clean` with PATH=$HOME/.cargo/bin): exit 0; coverage-guard: 322 files checked, TOTAL lines 97.96% functions 98.84%, all reported files meet the per-file floor. Changed production files all >=90% (item.rs 100/100, item_persist 100/100, content_envelope 100/100, export_mask 100/100, compliance audit 100/100, read_tools L98.84, mutator_record_tools L91.11, export.rs L94.51/F90.48, postgres_audit L93.72/F91.67, others 95-99%).
+- FINAL tests: `cargo test --workspace --locked` all suites pass (0 failed); `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` clean; `cargo fmt --all` clean. Size check: 142 changed/new .rs files, none >450 lines. No private paths, phase numbers, or roadmap/crates.md references in changed public files.
+- INCIDENTAL BUGS: none confirmed outside this task; no GitHub issue filed (no developer-bug-* files created).
+- STAGED: root `git add -- .` staged 142 files under crates/ (private/ remains globally ignored); nested private repo `git add -- roadmap/ runs/` staged the phase file, run log, task file, resume.json, and pre-existing pipeline bookkeeping.
+DEVELOPER_DONE d526692b

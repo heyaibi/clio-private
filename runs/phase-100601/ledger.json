@@ -1,0 +1,90 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE d526692b",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "c4f7c134320329b99bbf75dc7e5bb3455415eb4f740cc62a58f9dee7c5fa7e28",
+      "artifacts": {},
+      "git_head": "af617969e18ac90092647152f42af5827955e4eb",
+      "superseded_task_files": [],
+      "task_file": "developer-task-r1.md",
+      "task_sha256": "695a0685e237969e23ae4334bb542da10d00aefe9b9f428c0f7023b4332c1e18",
+      "stage_sha256": "e7922dfb5828ee581ed26707260171e3faf56670e7dd6539f05e74236b0b6ad2",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/findings.json c3f107f3",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "d6269613e83db88db1a81f9667d8141aef0632a6678cb6c45f4b9ddbed8adf62",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 7965,
+          "sha256": "3edfd1cb1871309edab870ce1847ebf5a9ccc9517f5a13b365db0526caf89c40"
+        }
+      },
+      "git_head": "af617969e18ac90092647152f42af5827955e4eb",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "ff9453e5eb74bfa5e672f0f5d9a733d639ff9bb3937ad1078ef3752b543252d0",
+      "stage_sha256": "fe6d74e4235f9728ec1dee23233a63adb223bbd1772925058e113d77c2fc6b72",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 2711cee4",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "authoritative": true,
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "visits": 3,
+      "output_sha256": "55ac4d7f29103e5941607756b4a19fa3a6eceb67f5174161e57f0e910c2a56f0",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 7965,
+          "sha256": "3edfd1cb1871309edab870ce1847ebf5a9ccc9517f5a13b365db0526caf89c40"
+        }
+      },
+      "git_head": "af617969e18ac90092647152f42af5827955e4eb",
+      "superseded_task_files": [
+        "remediator-task-r1.md",
+        "remediator-task-r2.md"
+      ],
+      "task_file": "remediator-task-r3.md",
+      "task_sha256": "dca94bed781d440144822dc8fedad54f9241cb1e24a5f6949ad418f09389f233",
+      "stage_sha256": "ec5444b8b1975fd9b74805a82b959f44dae0ef10deba1c57e6e77a1bfb1938e3",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 4787a3fc",
+      "harness": "cmd:deepseek/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "Command Code (DeepSeek V4.1 Flash Max)",
+      "visits": 3,
+      "output_sha256": "3856b390457c13c606dac603d208a208d592ff8a67fcb921eb67c5773a0ecdaa",
+      "artifacts": {},
+      "git_head": "af617969e18ac90092647152f42af5827955e4eb",
+      "superseded_task_files": [
+        "approver-task-r1.md",
+        "approver-task-r2.md"
+      ],
+      "task_file": "approver-task-r3.md",
+      "task_sha256": "97a2a676e13a8e39278d705b941696d7b08391e114122dec92b04880049822b9",
+      "stage_sha256": "45f1735c6857978ea1f9fa097773d998b383cf82e44967cb1841e6d04a52e69f",
+      "via": "edge",
+      "routed_to": "finalize"
+    }
+  }
+}

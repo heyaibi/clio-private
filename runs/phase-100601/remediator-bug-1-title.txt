@@ -1,0 +1,1 @@
+One unreadable ciphertext row blocks all new writes to the bank with factor_unavailable during admission

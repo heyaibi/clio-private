@@ -1,0 +1,68 @@
+{
+  "run": "phase-100601",
+  "phase": "100601",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "`correct --context` silently drops the supplied context when the target is a declared continuous attribute",
+      "evidence": "Real CLI, fresh data dir: `clio persona observe pref.formality 0.5 --bank demo --actor agent` registered the continuous attribute; `clio correct pref.formality 0.7 --reason \"recenter formality\" --context \"team chat\" --bank demo --actor agent --output json` returned `{\"ok\":true,\"rule\":\"continuous\",...}` and wrote no context. The `correct` audit row is `{\"as_of\":...,\"attr_key\":\"pref.formality\",\"observed_value\":0.7,\"reason\":\"recenter formality\",\"state\":...,\"trend\":...}`; no audit row or item contains `team chat`. Code: `crates/clio-compliance/src/correct.rs:111-118` routes a declared attribute to `route_declared`, which never reads `args.context` (`crates/clio-compliance/src/correct.rs:121-152`); context validation only runs on the discrete path (`crates/clio-compliance/src/correct.rs:181-183`).",
+      "requirement_ref": "FR-34 (preserve through update/correct); phase Task 3/4 (no silent discard); phase file Known Limitations does not name this path",
+      "recommendation": "Reject a supplied `context` on the continuous route with a usage/domain error, or persist it on the continuous audit row; add a clio-compliance regression test for `correct` + `context` against a declared continuous attribute."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "`inspect` now fails the whole listing when any listed item's sealed body cannot be decrypted for a non-erasure reason (legacy opaque rows)",
+      "evidence": "`crates/clio-mcp/src/read_tools.rs:216-237` calls `get_memory_item` per row and returns the error for anything except `ErasedSubject` (`:230-231`). `crates/clio-mcp/src/context_read_schema_tests.rs:120-138` (`inspect_propagates_non_erasure_content_errors`) asserts that one legacy `put_item` row makes the entire `inspect` call fail with `invalid_argument`. Before this change `inspect` was metadata-only (`git show HEAD:crates/clio-mcp/src/read_tools.rs` inspect used `inspect_items` only), so a bank containing such rows listed fine.",
+      "requirement_ref": "Phase Objective (existing items remain readable); AC-100601-05; Task 4",
+      "recommendation": "Treat an unreadable sealed body like the erased case: keep the metadata row and omit context for that row; restrict hard failure to genuine authorization errors, and update the test to assert the resilient behavior."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Published `inspect` description and in-code doc still say the listing never returns payload/decrypted content, but it now returns decrypted `context`",
+      "evidence": "`crates/clio-mcp/src/schema_read_defs.rs:277-279` publishes \"List items with epistemic_kind, scores, validity windows (never payloads/DEKs).\" and `crates/clio-mcp/src/read_tools.rs:189` says \"Never returns ciphertext, DEKs, or decrypted content\". Both contradict `crates/clio-mcp/src/read_tools.rs:216-237` and the passing test `crates/clio-mcp/src/context_read_schema_tests.rs:64-79`, where `inspect` returns `\"context\":\"inspect context\"`.",
+      "requirement_ref": "Task 1 (update the tool catalog/schemas together); Task 3 (schemas describe the same behavior)",
+      "recommendation": "Update the published `inspect` description and the module doc to state that the listing includes optional source `context` as metadata for authorized readers."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "Phase-file Definition of Done claims \"no-context paths byte-identical by test\", but no-context audit telemetry changed and no test asserts byte identity",
+      "evidence": "`crates/clio-store/src/item_persist.rs:49-61` returns `{\"context_present\":false,\"context_len\":0}` for absent context, and `crates/clio-store/src/sqlite_memory.rs:208-222`, `crates/clio-store/src/postgres_memory.rs:173-186`, `crates/clio-store/src/item_update.rs:124-133` now bind that as `detail_json` where `'{}'` was written before. Real CLI run: `clio remember \"no context note\" --category task_spec --bank demo --actor agent`, then the audit row is `create_memory_item | {\"context_len\":0,\"context_present\":false}`. The phase file DoD states \"no-context paths byte-identical by test\".",
+      "requirement_ref": "Phase file \u00a79 Definition of Done",
+      "recommendation": "Scope the claim to the sealed payload (which `content_envelope` tests do pin) and state that audit telemetry is additively extended for every create/update/correct."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "`retrieve`/`compose_context` do not expose stored `context` although FR-34 requires it; the deferral is documented but leaves the requirement unsatisfied",
+      "evidence": "`crates/clio-types/src/read.rs:119-146`: `RetrieveHit` has no `context` field and `from_item` does not carry it; `crates/clio-retrieve/src` has no context handling. Phase file \u00a712 Known Limitations states retrieve/compose exposure is deferred to the retrieval phase.",
+      "requirement_ref": "FR-34; \u00a74.4; AC-100601-02 read surface",
+      "recommendation": "Track the exposure in the retrieval phase and do not treat FR-34 as fully satisfied until hits carry context and any pack inclusion is budgeted under PR-1."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Requirement tool table lists `context?` for persona/task/failure/triple/belief writes; this phase implements none of them, and their reads cannot surface a stored context",
+      "evidence": "Requirement tool table entries `persona_put_stable(..., context?)`, `persona_observe_preference(..., context?)`, `task_upsert(..., context?)`, `failure_record(..., context?)`, `triple_add(..., context?)`, `belief_observe(..., context?)`. MCP schemas declare no `context` on those tools; only store/admit/batch/canonical_put/shared_store/correct declare it (`crates/clio-mcp/src/context_read_schema_tests.rs:141-166`). Phase file \u00a712 documents the deferral.",
+      "requirement_ref": "FR-34; \u00a74.4 tool table",
+      "recommendation": "Keep the documented deferral but name the owning phase explicitly and add the domain reads (persona_get, task_get/task_history, temporal_history, belief_history) to that phase's acceptance criteria."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "F-01: make `clio_compliance::correct` reject or persist a supplied `context` on the continuous route, and add a regression test covering `correct` + `context` against a declared continuous attribute.",
+    "F-02: make `inspect` keep metadata rows whose sealed body cannot be read (omit context instead of failing the page), and update `inspect_propagates_non_erasure_content_errors` to assert the resilient behavior.",
+    "F-03: update the published `inspect` description and doc comment to mention the optional metadata `context`.",
+    "F-04: correct the phase-file DoD wording about no-context paths being byte-identical (audit telemetry changed additively).",
+    "F-05/F-06: keep the deferrals but record the owning phase IDs for retrieve/compose exposure and domain-record `context?` params."
+  ],
+  "plan_unlimited": [
+    "Implement FR-34 retrieve/compose_context exposure with PR-1 budget accounting and cross-binding parity tests.",
+    "Add `context?` to persona/task/failure/triple/belief writes plus their record reads, with per-record persistence and SQLite/Postgres parity.",
+    "Add an end-to-end legacy-data test that inspects and reads a bank containing pre-DualContent opaque rows without losing the listing.",
+    "Add a contract test that every tool declaring a `context` parameter either persists it or rejects it, so no path can silently drop it again."
+  ]
+}
