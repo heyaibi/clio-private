@@ -1,0 +1,61 @@
+{
+  "hits": 3,
+  "pre_scores": [
+    0.01182377049180328,
+    0.011609345351043642,
+    0.011448412545316509
+  ],
+  "post_scores": [
+    0.01182377049180328,
+    0.011609345351043642,
+    0.011448412545316509
+  ],
+  "post_scores_object": [
+    {
+      "final": 0.01182377049180328,
+      "keyword": 2.4821624004032445,
+      "reranker": null,
+      "semantic": null
+    },
+    {
+      "final": 0.011609345351043642,
+      "keyword": 0.8681901363967511,
+      "reranker": null,
+      "semantic": null
+    },
+    {
+      "final": 0.011448412545316509,
+      "keyword": 0.790247879762629,
+      "reranker": null,
+      "semantic": null
+    }
+  ],
+  "pre_has_scores_object": false,
+  "dedup_pre": null,
+  "dedup_post": null,
+  "scenarios": [
+    {
+      "scenario": "second-query",
+      "query": "postgres bm25 ranking fusion",
+      "hits": 2,
+      "pre_scores": [
+        0.011823770333687544,
+        0.011609345351043642
+      ],
+      "post_scores": [
+        0.011823770333687544,
+        0.011609345351043642
+      ],
+      "identical_excluding_scores": true
+    },
+    {
+      "scenario": "third-query-no-match",
+      "query": "quantum chromodynamics lattice",
+      "hits": 0,
+      "pre_scores": [],
+      "post_scores": [],
+      "identical_excluding_scores": true
+    }
+  ],
+  "failures": []
+}
