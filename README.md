@@ -14,10 +14,15 @@ Manually copy over the contents of the local excludes file to remote.
 
 ```bash
 git clone https://github.com/heyaibi/clio
-cd clio
-mkdir private
-cd private
+
+mkdir -p clio/private
+cd clio/private
+
 git clone https://github.com/heyaibi/clio-private
+
+cd clio-private
+
+git clone https://github.com/agentmemoir/glide
 ```
 
 

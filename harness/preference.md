@@ -13,6 +13,7 @@ Implementation
 
 - Opencode Go Deepseek v4.1 Flash Max
 - Opencode Together AI GLM 5.3 Flash High
+- Opencode Go Space Bunny Free Max
 - Opencode OpenRouter Deepseek v4.1 Flash Max
 
 Adversarial Analysis
@@ -25,6 +26,7 @@ Remedy
 
 - Opencode Together AI GLM 5.3 Flash High
 - Command Code DeepSeek V4 Flash (latest) Max
+- Opencode Go Space Bunny Free Max
 
 
 Remedy Cheker
@@ -37,3 +39,4 @@ Finalization
 
 - Opencode Together AI GLM 5.3 Flash High
 - Command Code DeepSeek V4 Flash (latest) Max
+- Opencode Go Space Bunny Free Max
