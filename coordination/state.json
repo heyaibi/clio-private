@@ -85,14 +85,14 @@
         "private": "f25d04f6b0bc55b547be817bc1e75deda8718def",
         "public": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3"
       },
-      "claimed_at": "2026-09-25T16:00:42.650Z",
+      "claimed_at": "2026-09-25T16:01:45.900Z",
       "expires_at": null,
-      "generation": 3,
-      "heartbeat_at": "2026-09-25T16:00:47.812Z",
+      "generation": 4,
+      "heartbeat_at": "2026-09-25T16:01:45.900Z",
       "machine_id": "devserver",
-      "reservation_id": "rsv-794af98c4ac427dd251dbfd3",
+      "reservation_id": "rsv-fb3c70d07f327e144708e092",
       "run_id": "phase-100606",
-      "status": "rejected"
+      "status": "claimed"
     },
     "100720": {
       "base_revisions": {
