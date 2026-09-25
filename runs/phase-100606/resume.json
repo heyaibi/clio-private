@@ -10,13 +10,13 @@
     "developer": 2,
     "adversary": 1,
     "remediator": 3,
-    "approver": 4
+    "approver": 5
   },
   "harness_use": {
     "developer": 20,
     "adversary": 17,
     "remediator": 21,
-    "approver": 0,
+    "approver": 2,
     "finalize": 17
   },
   "prev_step": "remediator",
