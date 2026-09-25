@@ -1,0 +1,359 @@
+{
+  "audit": {
+    "target": "/Users/aiuser/Documents/projects/agentmemoir/clio",
+    "date": "2026-09-25",
+    "mode": "read-only",
+    "repository_modified": false,
+    "reproduction_harness": "/private/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/opencode/audit",
+    "limitations": [
+      "No dependency advisory scan: cargo-audit, cargo-deny, osv-scanner, semgrep, and trivy are not installed on this host. Third-party crate risk is unreviewed.",
+      "PostgreSQL was not exercised; no server was available. Postgres variants of findings 1 and 3 are confirmed by code and schema reading only.",
+      "Codebase-memory graph indexing was unavailable; discovery used grep/glob and direct reading rather than call-graph analysis."
+    ],
+    "github_issues_created": true,
+    "public_issue_sanitisation": "Issue bodies on the public repo contain no private/ paths, no requirement.md quotes, and no private file contents. The compliance-erosure argument in #20 is made entirely from public evidence: the beliefs table DDL comment at sql/001_core.sql:335-337."
+  },
+  "findings": [
+    {
+      "id": "CLIO-SEC-001",
+      "title": "Plaintext triple subject/predicate/object survives compliance erasure",
+      "severity": "high",
+      "category": "data-protection, compliance-erasure",
+      "confidence": "high",
+      "cwe": [
+        "CWE-312",
+        "CWE-459"
+      ],
+      "status": "confirmed-by-reproduction",
+      "locations": [
+        {
+          "file": "sql/001_core.sql",
+          "lines": "236-238",
+          "note": "triples.subject / predicate / object are plain text NOT NULL columns"
+        },
+        {
+          "file": "crates/clio-store/src/sqlite_triple.rs",
+          "lines": "158-186",
+          "note": "inserts SPO verbatim"
+        },
+        {
+          "file": "crates/clio-store/src/postgres_triple.rs",
+          "lines": null,
+          "note": "same insert on the Postgres backend"
+        },
+        {
+          "file": "crates/clio-store/src/sqlite_erase_purge.rs",
+          "lines": "113-161",
+          "note": "erase purges item_embeddings, index_pending, items_fts, assoc_edges, memtree_nodes; no statement against triples"
+        },
+        {
+          "file": "crates/clio-store/src/postgres_erase.rs",
+          "lines": null,
+          "note": "same omission on Postgres"
+        }
+      ],
+      "description": "Triple SPO content is stored as plaintext in the triples table even though the identical content is correctly DEK-sealed inside the carrier item's content_ciphertext. The compliance erasure path never references the triples table, so erasing a data subject destroys the DEK (correctly rendering the carrier item unreadable) while the same content remains readable in cleartext with no key.",
+      "requirement_conflict": [
+        {
+          "ref": "private/clio-private/baseline/requirement.md:707",
+          "section": "7.4.1",
+          "text_summary": "Every memory item's content payload including belief proposition text is stored encrypted under a per-data-subject DEK; only bi-temporal structure may remain in plaintext."
+        },
+        {
+          "ref": "private/clio-private/baseline/requirement.md:709",
+          "section": "7.4.3",
+          "text_summary": "Anything that references or paraphrases erased content must be regenerated so no derived projection continues to describe content that is no longer legible."
+        }
+      ],
+      "contrasting_design": "The beliefs table at sql/001_core.sql:335-337 documents the intended rule in its DDL comment: proposition content sealed under the subject DEK, only the normalized identity key and structure plaintext. The triples table applies the opposite treatment to the same kind of content.",
+      "reachability": {
+        "entry_point": "MCP tool `triple_add` (crates/clio-mcp/src/write_tools.rs:279, calls clio_write::triple::triple_add at :315, which calls store.commit_triple_add at crates/clio-write/src/triple.rs:210)",
+        "caller_controlled": true,
+        "notes": "subject/predicate/object are free-text arguments supplied by the model or user invoking the tool."
+      },
+      "reproduction": {
+        "command": "cargo run --release --bin mcp_erase",
+        "output": [
+          "[mcp] triple_add over the real MCP handler -> ok=true",
+          "[mcp] triples rows now: 1",
+          "[mcp]   service:hunter2Correct | runs_on host:db-hunter2Correct.internal:5432",
+          "[erase] erase_subject ok: 1 tombstone(s) written",
+          "[erase] carrier item now: unreadable (ErasedSubject)",
+          "[erase] triples rows surviving erase: 1",
+          "[erase]   contains the secret: true"
+        ],
+        "used_real_code": [
+          "clio_mcp::runtime::McpState",
+          "clio_mcp::protocol::McpHandler",
+          "clio_store::SqliteStore",
+          "clio_store::LocalDevKms",
+          "SubjectEraseSpec / erase_subject"
+        ]
+      },
+      "impact": "Confidentiality: any reader of the database file, a backup, or a snapshot reads every triple in cleartext; the per-subject DEK offers no protection for this content. Compliance: an erasure request is recorded as successful (tombstone written, DEK destroyed, verification probe passes) while the subject's content remains readable, producing a false attestation of erasure in the system's own audit trail.",
+      "fix": "Seal the SPO under the subject DEK and retain only a normalized identity key in plaintext, matching the beliefs table design and its DDL comment. Alternatively add triples to the purge in both sqlite_erase_purge.rs and postgres_erase.rs. Add a regression test asserting that triple_add followed by erase_subject leaves no readable copy.",
+      "github_issue": "heyaibi/clio#20"
+    },
+    {
+      "id": "CLIO-SEC-002",
+      "title": "XChaCha20-Poly1305 nonce derived from wall clock and plaintext length instead of a CSPRNG",
+      "severity": "medium",
+      "category": "cryptography",
+      "confidence": "high",
+      "cwe": [
+        "CWE-329"
+      ],
+      "status": "confirmed-by-reproduction",
+      "locations": [
+        {
+          "file": "crates/clio-sync/src/crypto.rs",
+          "lines": "76-106",
+          "note": "seal() derives the nonce; see also the acknowledged shortcut comment at :77-78"
+        },
+        {
+          "file": "crates/clio-sync/src/client_feed.rs",
+          "lines": "217-226",
+          "note": "content_for() calls seal() once per outgoing mutation"
+        },
+        {
+          "file": "crates/clio-lib/src/sync_cli.rs",
+          "lines": "238-239",
+          "note": "--sync-key / CLIO_SYNC_KEY enables the cipher"
+        },
+        {
+          "file": "crates/clio-mcp/src/sync_tools.rs",
+          "lines": "157",
+          "note": "MCP sync_key argument builds the cipher"
+        }
+      ],
+      "description": "The nonce is SHA256(\"<nanos>|<plaintext_len>\" || 0x1f || \"am-sync-nonce\") truncated to 24 characters, with no random input. Reuse of a (key, nonce) pair repeats the ChaCha20 keystream and the Poly1305 one-time key.",
+      "reproduction": {
+        "command": "cargo run --release --bin check_xor",
+        "output": [
+          "[seal] 240000 seals across 8 threads -> 43932 distinct nonces",
+          "[seal] nonce values reused = 42793, worst single-nonce reuse = 8",
+          "[leak] msg ct#13836 XOR msg ct#43800 == pt#13836 XOR pt#43800 : true",
+          "[leak] recovered pt#13836 with NO key                 : {\"w\":0,\"i\":0013836}",
+          "[leak] recovery matches the true plaintext         : true",
+          "[predict] nonce reproduced offline in 200/200 trials = 200/200"
+        ],
+        "used_real_code": [
+          "clio_sync::crypto::SyncCipherKey::seal"
+        ]
+      },
+      "impact": "An observer holding two ciphertexts under a reused nonce learns the XOR of the plaintexts. One known plaintext \u2014 including a guess validated against the cleartext content_hash the protocol already sends (client_feed.rs:236-240) \u2014 yields full recovery of the other.",
+      "accuracy_corrections": [
+        "The 24-byte nonce is 24 ASCII hex characters, not 24 raw digest bytes; that is 96 bits of hash output, not 192.",
+        "The XOR identity holds for the ciphertext body, not the full ciphertext_b64 value, which appends the 16-byte Poly1305 tag.",
+        "A single CLI push is sequential (client.rs:93-99). Reuse arises from genuine concurrency: MCP HTTP serves each connection on its own thread (clio-mcp/src/http.rs:99-106), and multiple clients or devices share one sync_key.",
+        "Nonce predictability alone is not a vulnerability; nonces are public. The defect is reuse. Poly1305 key reuse enables forgery only with further known or chosen message-tag pairs, which was not demonstrated."
+      ],
+      "severity_rationale": "Medium as measured. Becomes High against a malicious sync peer or on-path observer that holds one known plaintext, since the server stores client ciphertext verbatim.",
+      "fix": "Draw 24 raw bytes from OsRng per seal, or use a persisted per-key counter. Add a concurrency uniqueness test; crypto_tests.rs:58-65 only checks two sequential seals differ, which passes merely because the clock ticked.",
+      "github_issue": "heyaibi/clio#21"
+    },
+    {
+      "id": "CLIO-SEC-003",
+      "title": "Sync server buffers requests without bound before authenticating, and handles connections serially",
+      "severity": "medium",
+      "category": "availability, input-handling",
+      "confidence": "high",
+      "cwe": [
+        "CWE-400",
+        "CWE-770"
+      ],
+      "status": "confirmed-by-reproduction",
+      "locations": [
+        {
+          "file": "crates/clio-sync/src/http.rs",
+          "lines": "90-118",
+          "note": "read_request grows buf with no cap on the header block or the declared Content-Length"
+        },
+        {
+          "file": "crates/clio-sync/src/server.rs",
+          "lines": "173",
+          "note": "read_request is called before any auth decision"
+        },
+        {
+          "file": "crates/clio-sync/src/server.rs",
+          "lines": "181",
+          "note": "authorized() is checked only afterwards"
+        },
+        {
+          "file": "crates/clio-sync/src/server.rs",
+          "lines": "151-170",
+          "note": "serve_loop handles each connection serially in the accept loop, no thread spawn"
+        },
+        {
+          "file": "crates/clio-sync/src/server.rs",
+          "lines": "160-162",
+          "note": "5s set_read_timeout, a per-read timeout rather than a total deadline; its result is discarded"
+        }
+      ],
+      "description": "Unlike the MCP transport, which enforces a 10 MiB MAX_BODY (crates/clio-mcp/src/http.rs:37-38), the sync transport's framing loop grows its buffer until it sees the header terminator and Content-Length bytes. Because the read happens before authorization, an unauthenticated client can occupy the server's single accept slot and grow server memory, without presenting a token.",
+      "reproduction": {
+        "command": "cargo run --release --bin audit (sync server harness)",
+        "output": [
+          "[baseline] authorized empty push -> HTTP/1.1 200 OK",
+          "[flood] one connection buffered ~11 MiB in 5.117s with no header terminator",
+          "[hol]   legitimate request during one stalled connection: HTTP/1.1 200 OK",
+          "[hol]   legitimate request waited 11.130s",
+          "[after] server recovered -> HTTP/1.1 200 OK in 55.172ms"
+        ],
+        "used_real_code": [
+          "clio_sync::server::sync_serve",
+          "clio_store::SqliteStore::open_in_memory",
+          "clio_store::LocalDevKms"
+        ]
+      },
+      "impact": "Pre-authentication denial of service against the sync peer. Availability only; not an authorization bypass.",
+      "accuracy_corrections": [
+        "The 5s timeout is per-read, not a total request deadline; a client sending one byte every few seconds holds the connection indefinitely.",
+        "The default bind is loopback, so exposure requires an operator binding to a LAN or 0.0.0.0 with a token.",
+        "The ~11 MiB figure is host-speed dependent. The unbounded-growth property is structural; the number is not portable."
+      ],
+      "severity_rationale": "Medium when network-exposed, Low for the documented loopback default.",
+      "fix": "Cap the header block and declared body length, add a total request deadline, and replace the serial accept loop with a bounded worker pool.",
+      "github_issue": "heyaibi/clio#22"
+    },
+    {
+      "id": "CLIO-SEC-004",
+      "title": "MCP HTTP transport spawns one unbounded thread per connection with no read timeout",
+      "severity": "low",
+      "category": "availability",
+      "confidence": "high",
+      "cwe": [
+        "CWE-400",
+        "CWE-770"
+      ],
+      "status": "confirmed-by-reproduction",
+      "locations": [
+        {
+          "file": "crates/clio-mcp/src/http.rs",
+          "lines": "99-106",
+          "note": "std::thread::spawn per accepted connection, no cap and no pool"
+        },
+        {
+          "file": "crates/clio-mcp/src/http.rs",
+          "lines": "111-124",
+          "note": "handle_conn blocks in read_request; no read timeout is ever set on the stream"
+        },
+        {
+          "file": "crates/clio-mcp/src/http.rs",
+          "lines": "165-189",
+          "note": "MAX_BODY bounds completed data but not an idle connection"
+        },
+        {
+          "file": "crates/clio-mcp/src/http.rs",
+          "lines": "90-96",
+          "note": "non-loopback binds require a token, but the token is not needed to occupy a thread"
+        }
+      ],
+      "description": "Each accepted connection allocates a thread that blocks on read with no deadline. Threads accumulate without limit, and thread allocation happens before any authentication or origin decision.",
+      "reproduction": {
+        "command": "cargo run --release --bin audit (mcp http harness)",
+        "output": [
+          "[idle] 200 idle connections held open, none authenticated",
+          "[idle] live threads on this host: 202",
+          "[serve] after 200 idle conns, authorized request -> HTTP/1.1 200 in 3.4ms",
+          "[exhaust] connect() started failing after 14727 extra idle connections",
+          "[exhaust] authorized request now -> connect failed: Can't assign requested address"
+        ],
+        "used_real_code": [
+          "clio_mcp::http::serve_with_listener",
+          "clio_mcp::runtime::McpState::open"
+        ]
+      },
+      "impact": "Local or container-level denial of service. Not a privilege escalation.",
+      "accuracy_corrections": [
+        "Request bodies are capped at 10 MiB; the missing protection is the count and lifetime of threads, not body size.",
+        "A non-loopback bind cannot start without a token, but authentication runs after the thread is already allocated and blocked in read.",
+        "A valid-token holder doing this to themselves is self-DoS, not escalation. Realistic adversaries are an untrusted local process or a setup that publishes the loopback port."
+      ],
+      "severity_rationale": "Low for the documented loopback default; Medium if the listener is exposed.",
+      "fix": "Set read and write deadlines before parsing, and replace one-thread-per-connection with a bounded worker pool or semaphore.",
+      "github_issue": "heyaibi/clio#23"
+    },
+    {
+      "id": "CLIO-SEC-005",
+      "title": "Provider API key and memory payload sent over cleartext http:// to any host",
+      "severity": "low",
+      "category": "transport-security, secrets-exposure",
+      "confidence": "high",
+      "cwe": [
+        "CWE-319",
+        "CWE-522"
+      ],
+      "status": "confirmed-by-reproduction",
+      "locations": [
+        {
+          "file": "crates/clio-index/src/http.rs",
+          "lines": "71-80",
+          "note": "HttpEndpoint::parse accepts http:// for any host, not only loopback"
+        },
+        {
+          "file": "crates/clio-index/src/http.rs",
+          "lines": "252",
+          "note": "embed request attaches authorization: Bearer {key}"
+        },
+        {
+          "file": "crates/clio-index/src/http.rs",
+          "lines": "285",
+          "note": "health probe path attaches the same header"
+        },
+        {
+          "file": "crates/clio-config/src/config/validate.rs",
+          "lines": "254-266",
+          "note": "embed.url / rerank.url / extract.url validated as string only; no scheme or host restriction"
+        }
+      ],
+      "description": "The sidecar/provider transport, documented as plain http for local sidecars, applies no host restriction. An operator who configures a remote http:// provider URL causes the long-lived provider API key and the memory text being embedded or extracted to be transmitted in cleartext, with no warning at configuration time.",
+      "reproduction": {
+        "command": "cargo run --release --bin audit (provider transport harness)",
+        "output": [
+          "[parse] accepted remote http:// -> host=api.vendor.example.com port=80 path=/v1/embed",
+          "[wire]   POST /v1/embed HTTP/1.1",
+          "[wire]   authorization: Bearer sk-live-VENDORKEY-abc123",
+          "[wire]   {\"input\":\"confidential memory text\",\"model\":\"m\"}",
+          "[wire] provider API key appeared in cleartext on the wire: true",
+          "[wire] confidential request payload in cleartext           : true"
+        ],
+        "used_real_code": [
+          "clio_index::HttpEndpoint::parse",
+          "clio_index::post_json"
+        ]
+      },
+      "impact": "Disclosure of the provider API key and of memory content to any network observer, plus the ability to read and modify the request in transit.",
+      "severity_rationale": "Requires an operator configuration choice, but the local-sidecar default is silently extended to arbitrary remote hosts with no guard.",
+      "fix": "Require https:// for any non-loopback host and warn or refuse on http:// to a remote address, matching the loopback-only rule the MCP HTTP bind already enforces at clio-mcp/src/http.rs:90-96.",
+      "github_issue": "heyaibi/clio#24"
+    }
+  ],
+  "examined_and_not_reported": [
+    {
+      "hypothesis": "Caller-controlled bank argument crosses a bank boundary in MCP tools",
+      "conclusion": "not-a-vulnerability",
+      "reasoning": "resolve_ctx (crates/clio-mcp/src/runtime_context.rs:69-93) lets the caller name any bank, with a single gate on the reserved `shared` bank. Banks are per-agent namespaces within one deployment, not a tenant boundary. The sync server, which is a genuine multi-party boundary, does enforce an allowlist (crates/clio-sync/src/server.rs:230-232)."
+    },
+    {
+      "hypothesis": "Plaintext gist in memtree_nodes.summary_gist",
+      "conclusion": "latent-defect-not-reachable",
+      "reasoning": "sql/001_core.sql:465 is a plaintext column and memtree_attach.rs:54 copies the plaintext gist into it; the row was proven to land in cleartext on disk. However upsert_memtree_node has no production caller. The only call sites are test fixtures (memtree_persist_tests.rs, erase_test_support.rs, task_tests.rs). The live MCP runtime keeps the forest in memory (runtime_open.rs). Worth a guard test before anyone wires the primitive up."
+    },
+    {
+      "hypothesis": "postgres::NoTls exposes the database connection",
+      "conclusion": "configuration-dependent",
+      "reasoning": "crates/clio-store/src/postgres.rs:54 never uses TLS, so a non-loopback Postgres would carry credentials and content in cleartext. The shipped default is 127.0.0.1 (.env.example:16) and the compose service is local."
+    },
+    {
+      "hypothesis": "Prompt injection through stored gists into compose_context",
+      "conclusion": "architectural-property-not-defect",
+      "reasoning": "The retrieval pack is token-budgeted and section-structured but does not mark memory content as untrusted data. This is inherent to any memory system; no concrete injection path was demonstrated."
+    },
+    {
+      "hypothesis": "Incomplete summary_gist cleanup on erase",
+      "conclusion": "minor",
+      "reasoning": "Erase deletes the leaf and NULLs ancestor summaries (sqlite_erase_purge.rs:113-161), but the ancestor walk caps at 64 hops. Superseded by CLIO-SEC-001, which is the material gap."
+    }
+  ]
+}
