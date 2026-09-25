@@ -25,15 +25,13 @@ Adversarial Analysis
 Remedy
 
 - Opencode Together AI GLM 5.3 Flash High
-- Command Code DeepSeek V4 Flash (latest) Max
+- Command Code Space Bunny Alpha High
 - Opencode Go Space Bunny Free Max
-
 
 Remedy Cheker
 
 - Opencode Go Space Bunny Free Max - 2x weight
-- Command Code DeepSeek V4.1 Flash Max
-
+- Command Code Space Bunny Alpha High
 
 Finalization
 
