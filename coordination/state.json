@@ -104,7 +104,7 @@
       "claimed_at": "2026-09-25T20:40:04.758Z",
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-25T21:55:54.212Z",
+      "heartbeat_at": "2026-09-25T22:00:56.813Z",
       "machine_id": "devserver",
       "reservation_id": "rsv-6140e1f1fbfa5814d73ba459",
       "run_id": "phase-100620",
@@ -132,7 +132,7 @@
     }
   },
   "publication": {
-    "acquired_at": "2026-09-25T22:00:08.101Z",
+    "acquired_at": "2026-09-25T22:03:02.724Z",
     "generation": 1,
     "machine_id": "devserver",
     "phase": "100620",
