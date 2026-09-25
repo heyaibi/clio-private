@@ -9,6 +9,15 @@
 - **Question unrealistic constraints.** If a requested constraint makes the stated requirements impossible or materially risks correctness, explain the conflict and ask for a decision. Otherwise, use reasonable engineering judgment rather than stopping unnecessarily.
 - **Verify your work.** Run appropriate checks and tests when possible. Clearly state what was and was not verified.
 
+## Branch and Pull Request Workflow (mandatory)
+
+- **Check the branch before any code or documentation edit.** Run `git branch --show-current` first and report the branch before changing files.
+- **Work on `master` by default.** Unless the user explicitly asks for a feature branch or fix branch, do not create a branch. If the current branch is not `master`, stop before editing and ask the user what to do.
+- **Create a fix or feature branch only when requested.** Create it before making the requested changes, and use the branch name the user requested.
+- **Use descriptive branch names.** Use `fix/<short-behavior>` for bug fixes and `feat/<short-behavior>` for features. Do not use an issue number alone; include the behavior being changed. For example, use `fix/memtree-cov-concurrent-refresh` for issue #16.
+- **A fix or feature branch means a pull request is required.** Finish the branch with a pull request unless the user changes that instruction. Follow the repository's approval rules before running commit, push, or pull-request commands.
+- **Work on `master` means merge and push are expected.** Do not create a branch for that workflow unless the user asks for one.
+
 ## Reproduce Before You Fix (mandatory)
 
 A passing test is not proof that a reported bug is fixed. Reproduce the report first, then change code.
