@@ -1,0 +1,139 @@
+{
+  "run": "phase-100640",
+  "phase": "100640",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Required E2E test bullet was rewritten after implementation to drop the real-CLI configured-reranker case; no test runs the CLI recall with a configured reranker and observes a populated scores.reranker",
+      "evidence": "Staged phase-doc diff (roadmap/phase-100640-rerank-relevance-normalization.md): the Required Tests bullet '- [ ] End-to-end tests (real CLI/MCP `recall` with a configured reranker shows `scores.reranker`)' was replaced by '- [x] End-to-end tests (MCP in-process `retrieve` ... ; CLI JSON shares the same binding and asserts the `scores` key contract)'. Repo scan: no test under crates/clio-lib configures a reranker (grep 'set_reranker|build_reranker_from|rerank_active' matches only clio-retrieve and clio-mcp); crates/clio-lib/src/cli_read_scores_tests.rs:155 and :231 assert scores[\"reranker\"] == null, i.e. only the no-reranker case. The only populated case runs through crates/clio-mcp/src/index_drain_tests.rs:211-218 (in-process MCP dispatch). Developer's own summary states: 'the MCP in-process pipeline (not the CLI binary itself) carried the configured-rerank end-to-end test, with the CLI JSON sharing the same binding'.",
+      "requirement_ref": "phase-100640 §8 Required Tests (E2E bullet, original text); §9 AC-100640-04; task rule 'Never mark complete while such an item is silently skipped'",
+      "recommendation": "Add a CLI recall test with a configured fake reranker sidecar that asserts a populated numeric scores.reranker (clio-lib already has run_state plus fake HTTP server helpers), or restore the original bullet and record the CLI gap explicitly as an owner-approved limitation instead of rewriting the criterion.",
+      "status": "resolved",
+      "resolved_in": "r1",
+      "resolution": "Implemented the recommendation's first branch. New test `recall_json_reranker_is_populated_with_configured_reranker` at crates/clio-lib/src/cli_read_scores_tests.rs:394 (file now 447 lines, <=450) runs the real CLI `recall` verb (`run_state`) against `McpState::open_with_effective` with an effective `rerank` block (`{\"url\": <local double>, \"model\": \"fake-rerank-tei\", \"provider\": \"tei\"}`), so `build_reranker_from`/`set_reranker` attach the second stage exactly as the binary does. Supporting items in the same file: `FakeRerank` double with `read_request` (Content-Length-bounded), `rerank_body` (answers the received `texts` with the reversed permutation, `index = count-1-rank`, `score = 0.9-0.1*rank`), `fake_rerank_server` (non-blocking bounded accept loop, stop flag, 5s stream read timeout, joined with the served count) and `state_with_reranker`. Assertions: `state.pipeline.rerank_active`; exit 0 and empty stderr; `cli[\"reranked\"] == true`; `served >= 1` after join; `hits.len() == texts.len() >= 2`; per hit `scores.reranker` a populated number equal to the exact `0.9-0.1*position` value (`< f64::EPSILON`) in [0,1], the hit's gist contained in `texts[len-1-position]` (provider order applied AND bound to the right document), `scores.final == score`, `scores.semantic` null, `scores.keyword` numeric. The double is stopped and joined, so no listener/thread leaks. The phase §8 Required Tests E2E bullet was rewritten back to the real-CLI wording now that the case exists. Non-vacuity: the worker ran two temporary negative controls (expected score start 0.85 instead of 0.9 -> FAILED with the real payload showing a populated 0.9 bound to the first output hit; flipped provider-index mapping -> FAILED the gist binding assertion), then reverted both and re-ran green. Real output: `cargo test -p clio --locked` -> 'test result: ok. 582 passed; 0 failed' plus all integration/doc targets ok (parent re-ran this independently); worker's focused run: 'test cli_read::tests::scores_tests::recall_json_reranker_is_populated_with_configured_reranker ... ok / test result: ok. 1 passed; 0 failed'. Clippy/fmt clean, 447 lines (<=450).",
+      "evidence_after": "crates/clio-lib/src/cli_read_scores_tests.rs:394-447; `cargo test -p clio --locked` 582 passed / 0 failed (round 1); full `make check` exit 0 with 2455 tests passed / 0 failed (round 2, delivered tree)."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Index-only response bodies that previously reordered now fail the whole rerank, changing the results[]/bare-array compatibility semantics listed under 'Must Not Change'",
+      "evidence": "Pre-change parser accepted index-only entries: deleted test parse_results_order_appends_omitted_documents ran on {\"results\":[{\"index\":2},{\"index\":0}]} and expected order [2,0,1] (staged diff of crates/clio-retrieve/src/rerank_tests.rs). New crates/clio-retrieve/src/rerank_parse.rs:192-198 (entry_score) errors when a present entry lacks a numeric score (call sites at :113-120 and :126-133), and rerank_tests.rs:88 asserts parse_rerank_response(&json!([{\"index\":0}]),2).is_err(). On such input the orchestrator now keeps the fused order and emits the 'rerank unavailable' warning instead of applying the provider order. Phase §2 'Must Not Change' says: 'The results[]/scores[]/bare-array compatibility semantics (now also reading scores)' must hold; §5 Task 2 says a missing score 'fails closed'; §10 says a missing score must 'Emit null'. Completion evidence records the fail-closed choice but does not disclose or resolve the compatibility change, and DoD 'Existing behavior remains intact' is checked [x].",
+      "requirement_ref": "phase-100640 §2 Must Not Change (compatibility semantics); §5 Task 2; §8 T100640-03; §10 Failure Handling",
+      "recommendation": "Owner decides: either keep fail-closed and record the deliberate compatibility break in Known Limitations/Completion Evidence, or preserve compatibility by carrying score: None for a present entry without a numeric score (order preserved, exposed value null, never fabricated). The phase text should then be made internally consistent.",
+      "status": "resolved",
+      "resolved_in": "r1",
+      "resolution": "Took the recommendation's second branch (preserve compatibility), because it is the only option consistent with the frozen constraints: §2 'Must Not Change' (compatibility semantics), §10's failure table ('Missing score becomes 0 -> Emit null; never fabricate'), §8 T100640-03, AC-100640-02 ('omitted score is null'), and DoD 'Existing behavior remains intact'. The alternative (keep fail-closed) would have turned a display-metadata gap into an ordering change, which is exactly the compat break the finding names. Verified against the pre-change code first: `git show HEAD:crates/clio-retrieve/src/rerank.rs` shows the old parser consumed only `index` for bare-array/results[] bodies (any score ignored) and errored only on non-numeric `scores[]` elements. Code: rerank_parse.rs `entry_score` now returns `Option<f64>` (first numeric under the keys, else None) and both shapes use `.map(normalize_rerank_score)`; index validation (missing/non-integer, duplicate, out-of-range) and `scores[]` numeric-element validation are unchanged (still fail-closed). Tests: rerank_tests.rs:92 `parse_keeps_entries_without_a_numeric_score_in_order` pins `[{\"index\":1}]` -> order [1,0,2] with all-None scores and `{\"results\":[{\"index\":2},{\"index\":0}]}` -> order [2,0,1] (the restored pre-change expectation); rerank_score_tests.rs:52 `parse_results_accepts_score_alias_and_keeps_unscored_entries` covers index-only, string, and null score values; rerank_score_tests.rs:138 `http_adapter_results_shape_carries_no_score_when_the_provider_omits_it` exercises the same body through the real HttpReranker over a fake server. Phase text made consistent: §5 Task 2's 'fails closed' sentence replaced with the real rule (index kept, order kept, `score: None`, exposed `null`), Completion Evidence records the decision, and Known Limitations states that a present-but-non-numeric score is treated as `null`, not a parse failure. Real output: `cargo test -p clio-retrieve --locked` -> 'test result: ok. 171 passed; 0 failed', rerank filter -> 46 passed; full `make check` exit 0; `make coverage` exit 0 with rerank_parse.rs at 100% lines / 100% functions. Conservative checks kept: `parse_rejects_malformed_bodies` still fails closed on empty body, out-of-range index, duplicate index, missing index, and non-numeric `scores[]` elements. Remediation round 2 closed the residual this fix left behind: the module-header `## Owns` bullet in `crates/clio-retrieve/src/rerank_parse.rs` still claimed fail-closed score validation, so it now reads \"scores kept when present (`None` otherwise); fail-closed index validation and `scores[]` element validation\" (header at crates/clio-retrieve/src/rerank_parse.rs:10-16), matching the file's own score-contract and `# Errors` sections. Green in the round-2 full runs.",
+      "recommendation_adjusted": "Second branch selected and implemented; recommendation now reads: preserve compatibility by carrying score: None for a present entry without a numeric score (order preserved, exposed value null, never fabricated), and keep the phase text internally consistent (done in §5, §9, §12, and the roadmap index).",
+      "evidence_after": "crates/clio-retrieve/src/rerank_parse.rs:112-175 (parser; `entry_score` at :192-195); rerank_tests.rs:92-107; rerank_score_tests.rs:52-67,138-149; phase §5/§9/§12 and roadmap index updated; module header corrected in round 2.",
+      "residual_closed_in": "r2"
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Mandatory owner approval for the breaking Reranker trait change is asserted but has no verifiable artifact in the run evidence",
+      "evidence": "Phase §3 lists 'Owner approval for the Reranker trait return-shape change is obtained' as a precondition and §6 says the agent 'must obtain owner approval before changing the Reranker trait return shape'. Completion evidence asserts 'Owner approval was granted at phase plan time'. No approval marker or artifact exists under private/clio-private/runs/phase-100640/ (ledger.json records only the developer step with artifacts {}), and the plan-time roadmap/index.md:249 text says the amendment 'requires owner approval and must be recorded in the phase's completion evidence'. The only record is the phase document's own five-word sentence and the index's implementation-time note.",
+      "requirement_ref": "phase-100640 §3 Preconditions; §6 Agent Decision Boundary; §9 Completion Evidence; §12 Required approval is obtained",
+      "recommendation": "Attach or reference the actual owner approval (message, marker, or ledger field) in the completion evidence, or have the owner re-confirm in this review round; a breaking API change cannot rest on a self-asserted precondition.",
+      "status": "resolved",
+      "resolved_in": "r1",
+      "resolution": "Confirmed the finding's factual core myself and did not fabricate an artifact: searched the private tree for any approval marker/message/ledger field (none exists), read runs/phase-100640/ledger.json (developer step artifacts is empty, no approval field), and checked the harness (`harness/next_phase.py`: 'approval' means the DoD checkbox, which the finalize stage flips). Remediation: the unverifiable 'granted' claim was removed from §9 Completion Evidence, added to Known Limitations, and the §12 Human Approver line now records that the plan-time grant is asserted in §3 and the roadmap index with no separate artifact and is pending owner confirmation. The DoD box was set to '- [ ] Required approval is obtained: ... pending owner confirmation at the §12 sign-off', matching the convention this pipeline already used for a premature approval box (phase 100720 finalize log: 'Required approval is obtained' was left unchecked with a pending annotation until the downstream gates ran). The roadmap index sentence was aligned to the same wording. Residual owner action (explicitly recorded, not silently skipped): the owner confirms or rejects the Phase 100300 trait return-shape amendment at the §12 sign-off; the phase is not presented as having a verified approval artifact.",
+      "owner_action_required": "Owner confirmation of the Phase 100300 trait return-shape amendment at the §12 sign-off (phase §9 DoD approval box is unchecked and §12 Human Approver reads 'pending').",
+      "evidence_after": "phase-100640 §9 DoD approval box unchecked with reason; §9 Completion Evidence + Known Limitations + §12 Human Approver updated; roadmap/index.md:251 aligned; no approval artifact invented."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "stage_score.rs documents the normalization function under the wrong module path",
+      "evidence": "crates/clio-retrieve/src/stage_score.rs:30 says 'normalized to [0, 1] (`rerank::normalize_rerank_score`)', but the function is defined in crates/clio-retrieve/src/rerank_parse.rs:84 and re-exported at crates/clio-retrieve/src/lib.rs:86; rerank.rs does not define or re-export it. The path in that doc comment does not resolve.",
+      "requirement_ref": "phase-100640 §9 DoD 'Documentation is updated where required'; AGENTS.md module-doc accuracy",
+      "recommendation": "Change the reference to `rerank_parse::normalize_rerank_score` (or the crate-root path).",
+      "status": "resolved",
+      "resolved_in": "r1",
+      "resolution": "Applied the recommendation literally: crates/clio-retrieve/src/stage_score.rs:31 now reads '(`rerank_parse::normalize_rerank_score`)', which is where the function is defined (rerank_parse.rs) and matches the module's own `## Does not own` wording. Verified by compile + test: `cargo test -p clio-retrieve --locked` -> 171 passed / 0 failed; `cargo clippy -p clio-retrieve --all-targets --locked -- -D warnings` clean. Remediation round 2 closed the residual this fix left behind: `docs/recall-scores.md` still said rerank relevance capture \"is not implemented\" and that the `reranker` key was always `null`. The row now documents the real rules (docs/recall-scores.md:20): the configured reranker's normalized relevance, `null` when no reranker is configured, when the rerank call failed (fail-open keeps the fused order), or when the provider returned no numeric score for that document, including one it omitted.",
+      "evidence_after": "crates/clio-retrieve/src/stage_score.rs:29-35; docs/recall-scores.md:17-24 (round 2).",
+      "residual_closed_in": "r2"
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "rerank_tests.rs violates the mandatory file-header structure with two '## Does not own' sections",
+      "evidence": "crates/clio-retrieve/src/rerank_tests.rs lines 15-19 contain '## Does not own' twice (first '- Score-retention and normalization assertions (`rerank_score_tests`)', then '- End-to-end rerank ordering in the retriever (`hybrid_tests`)'). All other touched files have exactly one of each required section.",
+      "requirement_ref": "AGENTS.md 'File Header' mandatory structure",
+      "recommendation": "Merge the two lists into a single '## Does not own' section.",
+      "status": "resolved",
+      "resolved_in": "r1",
+      "resolution": "Merged into one '## Does not own' section with both bullets (crates/clio-retrieve/src/rerank_tests.rs:15-17), so the header now has exactly one each of `# Responsibility`, `## Owns`, `## Does not own`, `## Boundary`. Also corrected the second bullet's module reference from `hybrid_tests` to `hybrid_rerank_tests`, which is where the retriever rerank ordering tests now live. Verified: `cargo fmt -p clio-retrieve -- --check` clean; clippy clean; tests 171 passed / 0 failed.",
+      "evidence_after": "crates/clio-retrieve/src/rerank_tests.rs:4-17."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Completion evidence names a test that does not exist and cites the wrong file for the trait",
+      "evidence": "Phase §9 AC-100640-02 evidence names 'parse_bare_array_retains_scores_and_appends_omitted'; no such test exists. The actual test is parse_bare_array_trusts_order_and_appends_omitted (crates/clio-retrieve/src/rerank_score_tests.rs:80). AC-100640-01 evidence says '`Reranker::rerank` returns `Vec<RerankedDoc>` (`crates/clio-retrieve/src/rerank_parse.rs`)', but the trait is declared in crates/clio-retrieve/src/rerank.rs:58-71; rerank_parse.rs holds the RerankedDoc type.",
+      "requirement_ref": "phase-100640 §9 Evidence (real results only); §8 Verification Rule",
+      "recommendation": "Correct the test name and the trait's file citation in the evidence.",
+      "status": "resolved",
+      "resolved_in": "r1",
+      "resolution": "Both citations corrected and every test named in §9 Evidence now carries a current file:line. AC-100640-01: trait at crates/clio-retrieve/src/rerank.rs:58-71, RerankedDoc at crates/clio-retrieve/src/rerank_parse.rs:64-75, plus line numbers for the named adapter/retriever tests. AC-100640-02: the nonexistent name was replaced by the real test `parse_bare_array_trusts_order_and_appends_omitted` at crates/clio-retrieve/src/rerank_score_tests.rs:84, with line numbers added for the other shape tests and for the new compatibility tests. AC-100640-04/05 citations updated the same way (cli_read_scores_tests.rs:394, index_drain_tests.rs:165, hybrid_rerank_tests.rs:45/76/110/138). That round-1 claim was itself inaccurate: the previous verdict found six `rerank_score_tests.rs` refs pointing at the first body line instead of the `fn` line, plus a 165-vs-164 line-count error, which is why round 1 was rejected. Remediation round 2 re-resolved every citation against the delivered sources: the six refs now read `:83`, `:69`, `:114`, `:127`, `:90`, `:138` (each the `fn` line, re-checked by grep), the two size claims read 164 lines, and the workspace-suite counts in the phase file state the delivered tree (2455) instead of the pre-remediation snapshot (2451). Round-2 full runs: `make check` exit 0 (2455 passed / 0 failed) and `make coverage` exit 0 (350 files checked, TOTAL 97.88% lines / 98.70% functions).",
+      "evidence_after": "phase-100640 §9 Evidence lines for AC-01..AC-06; six rerank_score_tests.rs `fn`-line refs and the 164-line size claim corrected in round 2; round-2 `make check` + `make coverage` green.",
+      "residual_closed_in": "r2"
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "No hit-level test for a provider-omitted document leaving scores.reranker null while the reranker ran (T100640-03 only covered at parser level)",
+      "evidence": "parse_bare_array_omitted_document_appends_in_original_order (crates/clio-retrieve/src/rerank_score_tests.rs:87) asserts score None at the parser; tei_adapter_posts_query_texts_and_pinned_raw_scores (rerank_tests.rs:135) asserts [Some, Some, None] at the adapter. The live-reranker retriever tests score every document (hybrid_rerank_tests.rs:35, stage_score_tests.rs:262) or fail outright (hybrid_rerank_tests.rs:66); the MCP fake sidecar returns a complete 2-of-2 response (crates/clio-mcp/src/index_drain_tests.rs:186-189). No test asserts a hit's scores.reranker stays null when a configured provider omits that document.",
+      "requirement_ref": "phase-100640 §8 T100640-03; §9 AC-100640-04",
+      "recommendation": "Add a retriever-level test with a live adapter response that omits one document, asserting fused order for the appended document and scores.reranker == null for it.",
+      "status": "resolved",
+      "resolved_in": "r1",
+      "resolution": "Added exactly that test: `t08_omitted_document_appends_in_fused_order_with_null_reranker` at crates/clio-retrieve/src/hybrid_rerank_tests.rs:76. It seeds three lexical documents, captures the fused order with a plain retriever, attaches a live `HttpReranker` pointing at a one-shot fake server whose 200 body scores only shortlist indices 1 and 0 ({{\"index\":1,\"score\":0.8},{\"index\":0,\"score\":0.3}}), and asserts `out.reranked`, `ids(out) == [fused[1], fused[0], fused[2]]`, `hits[0].scores.reranker == Some(0.8)`, `hits[1].scores.reranker == Some(0.3)`, and `hits[2].scores.reranker == None` (the appended document keeps its fused place with a null value, never a fabricated one). The file's `## Owns` header was extended to cover the omitted-document case. Real output: `cargo test -p clio-retrieve --locked rerank` -> 46 passed / 0 failed including 'test hybrid_rerank_tests::t08_omitted_document_appends_in_fused_order_with_null_reranker ... ok'; full `make check` exit 0; `make coverage` exit 0 with hybrid_rerank_tests.rs path-excluded as a *_tests.rs module.",
+      "evidence_after": "crates/clio-retrieve/src/hybrid_rerank_tests.rs:76-105; phase evidence AC-100640-04 updated."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "F-04, F-05, F-06: fix the stale module path, merge the duplicate header section, and correct the two evidence citations (docs/evidence only, no behavior change).",
+    "F-02: state the compatibility decision explicitly in the phase Known Limitations/Completion Evidence (or switch present-entry-missing-score to score: None if the owner prefers the frozen compatibility semantics).",
+    "F-07: add the omitted-document hit-level null test using the existing fake-server fixtures."
+  ],
+  "plan_unlimited": [
+    "F-01: add the real-CLI recall E2E test with a configured fake reranker sidecar asserting a populated numeric scores.reranker, then restore the original required-test wording (or obtain owner sign-off on narrowing it).",
+    "F-03: attach or reference the owner approval artifact for the Phase 300-family trait amendment in the completion evidence.",
+    "Re-run the full gate after the test additions and confirm the per-file floors still pass."
+  ],
+  "remediation": {
+    "round": "r2",
+    "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+    "date": "2026-09-26",
+    "all_findings_resolved": true,
+    "summary": "Round 2 closed the three documentation residuals named by the previous verdict (`REMEDY_REJECTED: F-02, F-04, F-06`) and changed no behavior. F-02 residual: the `rerank_parse.rs` module-header `## Owns` bullet now states the real score rule (scores kept when present with `None` otherwise; fail-closed index validation and `scores[]` element validation) instead of the stale fail-closed-score claim. F-04 residual: `docs/recall-scores.md` documents the real `reranker` null rules instead of the stale \"capture is not implemented / always null\" text. F-06 residual: the phase file's six off-by-one `rerank_score_tests.rs` citations, its two 165-vs-164 size claims, and the pre-remediation workspace-suite count (2451) are corrected to the delivered tree. F-01, F-03, F-05, and F-07 were resolved in round 1, verified by the round-1 remedy approver, and are unchanged; their tests are green in the round-2 full runs. No test, threshold, scanner rule, or coverage gate was weakened.",
+    "verification": {
+      "make_check": "exit 0 - 52 test-result-ok suites, 2455 tests passed, 0 failed (round 2, delivered tree)",
+      "make_coverage": "exit 0 - coverage-guard: 350 file(s) checked against 90.0% floors; coverage-guard: TOTAL lines 97.88% functions 98.70%; all reported files meet the per-file floor",
+      "scoped": "not run: the round-2 delta is comments and docs only, so no scoped test run was needed; the round-2 full runs re-executed the whole workspace suite",
+      "touched_file_coverage": "rerank_parse.rs 100% lines / 100% functions; rerank.rs 100/100; stage_score.rs 100/100; fusion.rs 100/100; finalize.rs 97.87/100; hybrid_rank.rs 96.77/100",
+      "file_sizes": "every touched Rust file <=450 total lines (max 447: crates/clio-lib/src/cli_read_scores_tests.rs); rerank_parse.rs unchanged at 199 lines after the header reword",
+      "citation_check": "every file:line citation in the phase sections that describe the delivered tree re-resolved against the delivered sources with a script: rerank.rs:58-71 (trait), rerank_parse.rs:64-75 (RerankedDoc), rerank_tests.rs:92/110/152/204/260, rerank_score_tests.rs:42/52/69/83/90/114/127/138, stage_score_tests.rs:262, hybrid_rerank_tests.rs:45/76/110/138, cli_read_scores_tests.rs:394, index_drain_tests.rs:165 - each resolves to the named symbol"
+    },
+    "incidental_bugs": "none confirmed outside the assigned findings in round 2; no remediator-bug-*.txt/md written and no ledger entries added. The only bug reported during this run is public issue #30 (flaky clio-write memtree coverage test, filed in round 1 by the remedy approver); clio-write is untouched by this remediation and the test passed in both round-2 full runs.",
+    "issue_candidates": "none - addressed_issues was empty in the adversary report, round 1 added nothing, and no assigned finding names an issue. Issue #30 was reported during this run but is not resolved by this remediation, so it is not added. The array stays [].",
+    "previous_round": {
+      "round": "r1",
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "date": "2026-09-26",
+      "all_findings_resolved": true,
+      "summary": "All seven findings addressed in one batch. Code: the response-shape compatibility semantics were restored (index-only bare-array/results[] entries keep their index and order with score None -> exposed null; see F-02), the CLI recall path now has a configured-reranker E2E test (F-01), and a hit-level omitted-document null test was added (F-07). Docs: stale module path (F-04), duplicate header section (F-05), and §9 evidence citations (F-06) fixed; the unverifiable owner-approval claim was replaced with an explicit pending-owner record and the DoD approval box unchecked (F-03). No test, threshold, scanner rule, or coverage gate was weakened; index validation stays fail-closed and every pre-existing strict assertion was preserved except the two assertions that contradicted the frozen §2 compatibility semantics (replaced by stricter-order, exact-value assertions over the same inputs). No worker other than the single disjoint clio-lib slice; the clio-retrieve slices were done by the orchestrator because they share the parser interface.",
+      "verification": {
+        "make_check": "exit 0 - 52 test-result-ok suites, 2455 tests passed, 0 failed",
+        "make_coverage": "exit 0 - coverage-guard: 350 file(s) checked against 90.0% floors; TOTAL lines 97.88% functions 98.70%; all reported files meet the per-file floor",
+        "scoped": "cargo test -p clio-retrieve --locked -> 171 passed / 0 failed (rerank group 46 passed); cargo test -p clio --locked -> 582 passed / 0 failed + all integration/doc targets; clippy -D warnings and fmt --check clean for both touched crates",
+        "touched_file_coverage": "rerank_parse.rs 100% lines / 100% functions; rerank.rs 100/100; stage_score.rs 100/100; fusion.rs 100/100; finalize.rs 97.87/100; hybrid_rank.rs 96.77/100",
+        "file_sizes": "every touched Rust file <=450 total lines (max 447: crates/clio-lib/src/cli_read_scores_tests.rs)"
+      },
+      "incidental_bugs": "none confirmed outside the assigned findings; nothing filed (no remediator-bug-*.txt/md, no ledger entries).",
+      "issue_candidates": "none - addressed_issues was empty in the adversary report, no bug was reported during this run (runs/phase-100640/reported-bugs.json does not exist), and no assigned finding named an issue, so the array is preserved as []."
+    }
+  }
+}
