@@ -96,6 +96,24 @@ python3 private/clio-private/harness/phase_reservations.py release-publication \
   --reservation-id <id> --generation <n> --confirm
 ```
 
+To record that **you** closed a phase deliberately, without a passing checker,
+use the `accepted` status. It is terminal like `completed`, but it needs no
+publication receipt, because finalize never ran and no receipt with real commit
+SHAs exists. It requires a reason, which is stored on the board so the next
+operator can tell an operator decision from a machine verdict. Record the same
+decision in the phase file's Definition of Done:
+
+```bash
+python3 private/clio-private/harness/phase_reservations.py set-status \
+  --repo-root . --phase <N> --machine-id <host-id> \
+  --reservation-id <id> --generation <n> --status accepted \
+  --accept-reason "why the phase is closed without a passing checker"
+```
+
+Never hand-write a `run.json`, a `FINALIZE_DONE` ledger entry, or a
+`publication.json`: those carry commit SHAs, and a fabricated one asserts a
+publication that did not happen.
+
 ## Halted (blocked / rejected / config error / stop)
 The driver writes `private/clio-private/runs/.driver/halted` and stops. After fixing the cause:
 ```
@@ -123,6 +141,7 @@ A failed send is retried once, then sent to `DISCORD_FALLBACK_CHANNEL` if set. I
 **Notifications are best-effort and never block or halt the run.** Sends are bounded by a timeout, run with stdin closed (a hung or interactive `hermes` cannot stall the pipeline), and after a total failure the channel is marked unavailable for that process so we stop retrying. A dead profile or dead Discord only costs you the messages, never the work.
 
 ## Troubleshooting
+- **`run log missing ... (agent never wrote it)`, or a harness that exits at once with `Interactive mode requires a TTY terminal`:** the step ran without a terminal. Several harness CLIs refuse to start unless stdin and stdout are a TTY, and they exit before writing anything, so the run ends as `config_error` with no run log. The runner prints `attach mode: plain (no console capture)` when this happens. Start `runner.py` from a real terminal, or launch it through `phase-driver.sh`, which runs it inside a tmux session and provides the pty. Do **not** start it through a pipe, a redirect, or `nohup ... > file`; that is what removes the TTY. This is a property of the harness CLIs, not of the phase.
 - **A step sits idle with no signal:** the runner prints the exact `printf ... >> <log>` recovery line to stderr and, for `opencode`/`agy`/`cmd` under a terminal, types a short signal-safe reminder into the harness's own input. Check `<run_dir>/reminders.log` for what was sent, and `runner: attach mode: pty (console capture on)` in `session-<N>.log` to confirm the pty path was used. The reminder never writes the signal; if the work is verified done, use `--mark-done STEP SIGNAL`.
 - **A run dies within seconds:** read `private/clio-private/runs/.driver/session-<N>.log` (the pane
   capture — the traceback lands there). The driver auto-selects a `python3` that has
@@ -154,7 +173,18 @@ STALE_AFTER_SEC=2700
 LOG_KEEP_DAYS=7
 PHASE_MACHINE_ID=server-01
 PHASE_COORDINATION_BRANCH=master
+PHASE_RECOVER_OWN_CLAIM=0
 ```
+
+`PHASE_RECOVER_OWN_CLAIM` defaults to `0`, which is fail-closed: when the
+lowest unfinished phase is blocked by a live claim, the driver logs
+`WAIT_FOR_CLAIM` and stops the line. Set it to `1` to let the driver take back
+a claim that **this host** already owns — the state a crashed, stopped, or
+blocked run of your own phase leaves behind — so the phase can be finished
+without a manual `takeover`. A claim held by any other host is never touched
+in either mode, and the coordination fence still applies. Use it once you are
+sure the old run on this host is really gone; it is the difference between a
+recoverable stall and an operator session.
 
 `PHASE_MACHINE_ID` is stable configuration, not a secret. Set it to the same
 value on every process for one host. The server uses `server-01`; a local
