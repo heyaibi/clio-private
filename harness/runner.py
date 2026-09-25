@@ -71,6 +71,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gitsync  # noqa: E402 - path set just above
 from phase_policy import PARKED_PHASE_FLOOR, is_runnable_phase  # noqa: E402
+import check_incidental_policy  # noqa: E402
 from phase_reservations import (  # noqa: E402
     CoordinationError,
     ReservationConflict,
@@ -4518,6 +4519,7 @@ def self_test(run, live=False):
     # Fail-closed sync: stubbed-remote checks live in gitsync.py so the same
     # gate runs standalone (`gitsync.py --self-test`) and here.
     checks += gitsync.self_test_checks()
+    checks += check_incidental_policy.self_test_checks()
 
     ok = all(c["ok"] for c in checks if c["ok"] is not None)
     print(json.dumps({"self_test": "pass" if ok else "fail", "checks": checks}, indent=2))

@@ -19,7 +19,7 @@ The coordination state is private-only at `private/clio-private/coordination/sta
 
 ## Canary (after stage/worker/helper edits)
 
-First run `python3 private/clio-private/harness/github_issues.py --self-test` and `python3 private/clio-private/harness/check-workers.py`. Then run one phase and prove birth-die compliance from the run logs: each worker spawned with disjoint FILES, no worker signal line (only the main's signal routes), workers left the index alone (`git diff --cached` shows main's staging only), and the main ran the full gate exactly twice (implement) or at most once plus one `make check` (remedy). If any check fails, fix the prompt, not the worker output.
+First run `python3 private/clio-private/harness/github_issues.py --self-test`, `python3 private/clio-private/harness/check-workers.py`, and `python3 private/clio-private/harness/check_incidental_policy.py`. The last check validates the shared policy in `private/clio-private/harness/incidental-bugs.md` and all five stage prompts. Only a confirmed unrelated bug outside the current task scope enters the incidental issue process. Then run one phase and prove birth-die compliance from the run logs: each worker spawned with disjoint FILES, no worker signal line (only the main's signal routes), workers left the index alone (`git diff --cached` shows main's staging only), and the main ran the full gate exactly twice (implement) or at most once plus one `make check` (remedy). If any check fails, fix the prompt, not the worker output.
 
 ## Foreground
 
