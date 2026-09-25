@@ -1,0 +1,28 @@
+start: 2026-09-25T07:34:07Z
+2026-09-25T07:53:54Z open-issue audit: list-open completed; 6 open issues recorded in open-issues.json.
+2026-09-25T07:53:54Z open-issue audit: full views fetched for issues 12, 13, 14, 15, 16, and 17; no issue fully addressed by this staged phase, so addressed_issues is empty.
+2026-09-25T07:53:54Z ledger-list for reported-bugs.json completed; ledger has no entries and no incidental bug was confirmed outside the review scope.
+2026-09-25T07:53:54Z worker review: types/write/belief group completed; reported extraction, belief, validation, and documentation candidates for parent re-verification.
+2026-09-25T07:53:54Z worker review: store/SQL group completed; reported belief, persona, sync, export, erasure, temporal, and audit candidates for parent re-verification.
+2026-09-25T07:53:54Z worker review: MCP/CLI/compliance group completed; reported binding, import/export, dry-run, and test-coverage candidates for parent re-verification.
+2026-09-25T07:53:54Z worker review: history/persona/docs group completed; reported persona lifecycle, validation, retrieval, sync, and documentation candidates for parent re-verification.
+2026-09-25T07:53:54Z staged review scope: git diff --cached contains 111 public files and 8329 diff lines; runs paths were excluded; git status shows all public changes staged and no unstaged public changes.
+2026-09-25T07:53:54Z line-size check: 107 changed Rust files checked; maximum 450 lines; no changed Rust file exceeds the 450-line limit.
+2026-09-25T07:53:54Z roadmap-isolation check: staged public diff contains no private/clio-private, roadmap, phase-number, or baseline/crates references.
+2026-09-25T07:53:54Z lint: timeout 1800s make lint exited 0; cargo clippy --workspace --all-targets --all-features --locked -- -D warnings completed.
+2026-09-25T07:53:54Z test: timeout 1800s make test exited 0; cargo test --locked --workspace completed with all reported test targets passing.
+2026-09-25T07:53:54Z check: timeout 1800s make check exited 0; fmt, clippy, and workspace tests completed.
+2026-09-25T07:53:54Z coverage: timeout 3600s make coverage exited 0; 324 files checked, total lines 97.95%, functions 98.85%, all per-file floors met.
+2026-09-25T07:53:54Z compile: timeout 900s make compile exited 0; the clio binary built successfully.
+2026-09-25T07:53:54Z real CLI documentation probe: remember --category task --dry-run exited 1 with category whitelist error, confirming the migration example category is invalid.
+2026-09-25T07:53:54Z real CLI dry-run probe: triple and belief dry-run JSON echoed the supplied context and accepted a 4097-byte context without validation; both were local preview paths.
+2026-09-25T07:53:54Z real MCP probe: persona_put_stable with context JSON number 123 returned ok=true and wrote a context-free entry, demonstrating malformed context is silently treated as absent.
+2026-09-25T07:53:54Z real export probe: secret-shaped persona context remained verbatim in both dsar_plaintext and ciphertext_backup bundle files.
+2026-09-25T07:53:54Z real erasure probe: erasing a synthetic data subject returned not_found while persona_get still returned the bank-scoped persona context.
+2026-09-25T07:53:54Z real temporal probe: belief context was present in belief_history/create output but absent from temporal_history response.
+2026-09-25T07:53:54Z real belief probe: a second belief_observe with a different context returned outcome=appended and belief_history exposed only the replacement context.
+2026-09-25T07:53:54Z real persona probe: a later preference observation replaced the stored context; persona_get exposed the replacement without a correction audit.
+2026-09-25T08:04:01Z findings: wrote findings.json for r1/phase 100606 with 16 independently verified findings, empty addressed_issues, and prioritized remediation plans; JSON parse and schema checks passed.
+2026-09-25T08:04:01Z attribution: verified the phase file contains exactly `| Adversary | r1 | OpenCode CLI (Go . Space Bunny Free Max) | done |`; no additional phase-file edits were made.
+2026-09-25T08:04:01Z final review verification: staged-diff whitespace check passed; public root changes remain staged with no unstaged public changes; reported-bugs ledger remains empty and no incidental bug was filed.
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100606/findings.json cc964583

@@ -1,0 +1,98 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE c343e24d",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 2,
+      "output_sha256": "c4410f634c65150e4b878f37500858e5409d05b5e4fb3c186e36537591780771",
+      "artifacts": {},
+      "git_head": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3",
+      "superseded_task_files": [
+        "developer-task-r1.md"
+      ],
+      "task_file": "developer-task-r2.md",
+      "task_sha256": "13f25b6845e32a197aa22050614ec3e755058541d377a29d6ba6bdce0befd36f",
+      "stage_sha256": "5dc3b6eed4e9a128e83e3bb18250aeeaa8371392c78d25056e44b4f7f0bfb6c2",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100606/findings.json cc964583",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "fa9f388e9fce49dceed32de87facd192ac0ac4cd899cdafa57be308c812cb778",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 18239,
+          "sha256": "5d2446b844e1ada617425f2bb6add858c0d0a8a4c1058b4ce66efecf8c71afd0"
+        }
+      },
+      "git_head": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "724c5dd0888a133c93ce98a8cf1acddfa7a05929f98215790322bc862445543f",
+      "stage_sha256": "5d7c40a1dcaea7acd7d04bd641547962604a2f989a5dc49ba02eb312a7a55e51",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 44a43b8c",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 3,
+      "output_sha256": "21249e4714ac6abe59650b24d6ac5bbc7f5bfafcf4ad1ff274b13216a7da65cf",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 18239,
+          "sha256": "5d2446b844e1ada617425f2bb6add858c0d0a8a4c1058b4ce66efecf8c71afd0"
+        }
+      },
+      "git_head": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3",
+      "superseded_task_files": [
+        "remediator-task-r1.md",
+        "remediator-task-r2.md"
+      ],
+      "task_file": "remediator-task-r3.md",
+      "task_sha256": "4473069a621cc8ab452ba7b788839f9d76e73e43692eaed5ed6afa6f1da779e3",
+      "stage_sha256": "b9d306a07a58cb49010f82f32331cc8156f1298a46a139c5beda75fd5aacab3d",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    "approver": {
+      "signal": "REMEDY_REJECTED: F-03, F-06, F-10, F-13 b479f6de",
+      "harness": "cmd:deepseek/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "Command Code (DeepSeek V4.1 Flash Max)",
+      "visits": 3,
+      "output_sha256": "a82b7d9595bb986c1c10826bd24fbe99bb0b4982d3ce0b6ba7889f839bc0cea7",
+      "artifacts": {},
+      "git_head": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3",
+      "superseded_task_files": [
+        "approver-task-r1.md",
+        "approver-task-r2.md"
+      ],
+      "task_file": "approver-task-r3.md",
+      "task_sha256": "434755b4f3fe22985e9944139d8e17b43dc5766ac966d84d087112b2f2a19461",
+      "stage_sha256": "faace82d2ce38031c7f480b0ad12ccdaad5620c6902e2cf1be49cc4288ca9929",
+      "via": "exhausted",
+      "routed_to": "rejected"
+    }
+  },
+  "head_repin": {
+    "from": "09679d6878a13a033f25ddab3a7267764747cc52",
+    "to": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3",
+    "reason": "HEAD moved by an operator-driven baseline change after these steps completed: PR #18 and PR #19 were merged and the F-06/F-10/F-13 fixes were committed on top of the preserved round 1-3 tree. Re-pinned so the resume can re-verify. Step outputs and artifacts remain pinned by sha256 and were not altered.",
+    "rejected_at": "2026-09-25"
+  }
+}

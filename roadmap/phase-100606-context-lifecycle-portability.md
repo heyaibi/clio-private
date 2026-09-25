@@ -5,10 +5,14 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
 | Developer | r1 | OpenCode (Space Bunny Free) | proposed |
+| Developer | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
+| Adversary | r1 | OpenCode CLI (Go . Space Bunny Free Max) | done |
 | Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
+| Remediator | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
 | Remedy Approver | r1 | [TBD] | [TBD] |
 | Finalize | r1 | [TBD] | [TBD] |
+| Remediator | r2 | Command Code (DeepSeek V4 Flash (latest) Max) | done |
+| Remediator | r3 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
 
 **Remediation/follow-up phase 100606** · **Effort:** ~4–6 days · **Status:** Plan ready · **Parent:** requirement.md v1.10 and Phase 100601 native context contract
 
@@ -384,13 +388,13 @@ Stop and report if:
 ## 8. Test and Verification Strategy
 
 ### Required Tests
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] Contract tests
-- [ ] End-to-end tests
-- [ ] Regression tests
-- [ ] Security tests
-- [ ] Failure-mode tests
+- [x] Unit tests (extraction seam, record persistence, serde omission, validation fail-closed)
+- [x] Integration tests (SQLite + Postgres store-level context persistence and reads)
+- [x] Contract tests (MCP schema declarations, CLI/MCP parity)
+- [x] End-to-end tests (MCP surface: six record writes with context → domain reads surface it)
+- [x] Regression tests (lexical/dense exclusion; compose budget; carrier-envelope reads)
+- [x] Security tests (egress scrubbing, instruction-like context as data, unreadable/shredded context tolerance)
+- [x] Failure-mode tests (oversized/empty context rejected before any write; no partial propagation)
 
 ### Required Test Scenarios
 
@@ -428,35 +432,37 @@ Implementation claims must be supported by actual test output, runtime evidence,
 
 | AC ID | Acceptance Criterion | Verification Method | Required Evidence |
 |-------|----------------------|---------------------|-------------------|
-| AC-100606-01 | Context propagates through extraction without becoming evidence or instructions | T100606-01, T100606-02, T100606-03 | Test output |
-| AC-100606-02 | Retrieval exposes context safely and preserves budgets | T100606-04, T100606-05 | Retrieval/compose test output |
-| AC-100606-03 | Portability and sync preserve context and evidence identity | T100606-06, T100606-07, T100606-08 | Round-trip and idempotency output |
-| AC-100606-04 | Audit, correction, and erasure honor context lifecycle | T100606-08, T100606-09 | Lifecycle/security output |
-| AC-100606-05 | Context is redacted from unsafe diagnostics and egress | T100606-10 | Security test output |
-| AC-100606-06 | CLI and MCP expose identical semantics | T100606-11 | Contract/parity output |
-| AC-100606-07 | No provider adapter or network dependency is introduced | T100606-12, code inspection | Discovery and test evidence |
-| AC-100606-08 | Migration documentation carries external source identifiers opaquely with no container-parity claim | Documentation review | Approved example |
-| AC-100606-09 | Domain-record writes accept optional `context` (persona_put_stable, persona_observe_preference, task_upsert, failure_record, triple_add, belief_observe) and the domain reads (persona_get, task_get/task_history, temporal_history, belief_history) surface the stored context per record | T100606-13 | Domain-record persistence and read test output |
+| AC-100606-01 | Context propagates through extraction without becoming evidence or instructions | T100606-01, T100606-02, T100606-03 | PASS — `cargo test -p clio-write`: prompt carries `<source_context>` as delimited, neutralized, scrubbed data; fixture extraction outcome identical with instruction-like context; oversized/empty rejected before extraction; stored item retains original context (`extract_chat_tests`, `raw_ingest_tests`, `ingest_tests`) |
+| AC-100606-02 | Retrieval exposes context safely and preserves budgets | T100606-04, T100606-05 | PASS — `RetrieveHit.context` surfaced on item and belief hits; `compose_tests::source_context_is_never_injected_and_never_expands_the_budget` proves context never enters the pack and budgets hold; `embed_tests::source_context_is_excluded_from_dense_and_lexical_text` fixes the lexical/dense default-off policy |
+| AC-100606-03 | Portability and sync preserve context and evidence identity | T100606-06, T100606-07, T100606-08 | PASS — item context round-trips export/import (export scrubs inline secrets; import stays idempotent); record context rides the sealed carrier or a dedicated sealed column and now also replicates as structured sync records: task and failure feeds plus apply effects materialize the structured row on the peer through the atomic history commit paths (two-node TCP test `task_and_failure_records_replicate_end_to_end`), persona stable/preference and belief records replicate with parity, and an authorized belief-context correction bumps the record's change stamp so it replicates through the audited correction path |
+| AC-100606-04 | Audit, correction, and erasure honor context lifecycle | T100606-08, T100606-09 | PASS — record context travels in the sealed carrier or dedicated sealed ciphers; crypto-shredded subjects read back `context: None` (tested on both backends); belief appends never replace a stored context and the authorized correction commits row + audit atomically; erasure also blanks the persona-bearing sync journal and dead-letter copies, and no audit detail retains a sealed prior context (`sqlite/postgres_erase_destroys_persona_derived_sync_copies`) |
+| AC-100606-05 | Context is redacted from unsafe diagnostics and egress | T100606-10 | PASS — chat egress scrubs inline secrets from `<source_context>` (`extract_chat_egress_tests`); audit telemetry records presence/length/hash only; raw context never enters logs or audit detail; `ciphertext_backup` bundles carry no readable record content at all, and the post-scrub length bound is re-checked against `CONTEXT_MAX_BYTES` before any value is written |
+| AC-100606-06 | CLI and MCP expose identical semantics | T100606-11 | PASS — `--context` on `triple add`, `belief observe`, `persona stable/observe`, `task upsert`, `failure record` plus existing `remember/admit/correct`; `context_parity_tests::cli_and_mcp_task_upsert_store_the_same_context` proves identical stored context |
+| AC-100606-07 | No provider adapter or network dependency is introduced | T100606-12, code inspection | PASS — no provider code added; local extraction seam only; all behavior verified without network |
+| AC-100606-08 | Migration documentation carries external source identifiers opaquely with no container-parity claim | Documentation review | PASS — `docs/source-context-and-migration.md` documents `evidence_ref` as identity-only, explicitly defers `doc_id` container semantics, and uses only the native contract |
+| AC-100606-09 | Domain-record writes accept optional `context` (persona_put_stable, persona_observe_preference, task_upsert, failure_record, triple_add, belief_observe) and the domain reads (persona_get, task_get/task_history, temporal_history, belief_history) surface the stored context per record | T100606-13 | PASS — SQLite + Postgres parity (`pg_history_tests`, `pg_triple_tests`, `pg_persona_tests`, `belief_context_pg_tests`); MCP surface tests (`context_domain_record_tests`); the MCP/CLI bindings and the batch pre-flight decode `context` fail closed (non-string, empty and oversized rejected); `temporal_history` attaches the context effective at the requested point via `persona_preferences.context_as_of`, so a context introduced later never appears on an earlier point; key omitted when absent; sealed at rest; unreadable context degrades to `None` |
 
 ### Definition of Done
-- [ ] All in-scope behavior is implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes were introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation is updated where required.
-- [ ] Evidence is collected.
-- [ ] Verification is completed.
-- [ ] Required approval is obtained.
+- [x] All in-scope behavior is implemented.
+- [x] All acceptance criteria pass.
+- [x] Required tests pass (`cargo test --workspace --locked` green; 0 failures).
+- [x] No unauthorized changes were introduced.
+- [x] Existing behavior remains intact (baseline per-file coverage ≥90% before and after; no pre-existing file lost coverage).
+- [x] Security checks pass (egress scrubbing, no raw context in telemetry, fail-closed validation).
+- [x] Documentation is updated where required (`docs/source-context-and-migration.md`, CLI usage text, MCP schemas).
+- [x] Evidence is collected (per-file scoped `cargo llvm-cov` runs plus the final full gate).
+- [x] Verification is completed (final `make check` green: fmt, `clippy -D warnings`, workspace tests; final `make coverage` exit 0 — 345 files checked, all reported files meet the 90% per-file floor, TOTAL lines 97.90%, functions 98.71%; re-run on the frozen round-3 tree after the final test-file edit).
+- [ ] Required approval is obtained (Human Approver sign-off for the public retrieval/portability policy remains open by process).
 
 ### Completion Evidence
-- Context propagation and retrieval policy summary.
-- Portability/audit/sync/erase evidence.
-- CLI/MCP parity output.
-- Security and budget test output.
-- Provider-neutral migration example.
-- Known limitations and deferred dense/provider work.
+- Context propagation and retrieval policy summary: raw ingest validates and carries context to extractors as a delimited, scrubbed, untrusted `<source_context>` section; every public extraction entry point (raw ingest, pipeline, parallel fan-out, and both HTTP adapters) validates the bound before egress; hits expose context as metadata; compose never injects it and budgets cannot expand; lexical/dense exclusion is the documented deterministic default policy (`docs/source-context-and-migration.md`, Retrieval and composition policy).
+- Portability/audit/sync/erase evidence: task/failure/triple context rides the sealed carrier envelope on both backends (no schema change for records with carriers); persona and belief records carry dedicated sealed `context_cipher` columns with guarded SQLite/Postgres convergence; preference context additionally records its effective time (`context_as_of`) so point-in-time reads cannot leak a later value; erasure renders record context unreadable, including the persona-bearing sync journal and dead-letter copies (tests on both backends).
+- Structured sync evidence: `cargo test -p clio-sync` green, including the two-node TCP test `client_feed_tests::task_and_failure_records_replicate_end_to_end` (a pushed task and failure are readable on the peer with their context) plus the Postgres feed/apply parity tests.
+- CLI/MCP parity output: `cargo test -p clio context_parity` (2 passed) plus `context_domain_record_tests` (4 passed).
+- Security and budget test output: `extract_chat_egress_tests`, `context_write_tests`/`context_correct_tests`, `compose_tests::source_context_is_never_injected_and_never_expands_the_budget`.
+- Provider-neutral migration example: `docs/source-context-and-migration.md` §Migration mapping (JSON tool-call example, no provider client); the example's snapshot is executed by the documentation smoke test under native span verification.
+- Known limitations and deferred dense/provider work: see §12 Known Limitations; additionally, task/failure/triple history reads still fail closed for fully crypto-shredded subjects (pre-existing carrier-cipher behavior); context surfacing on those records degrades to `None` only when the carrier body is unreadable but the record itself stays readable; belief `belief_history` returns the belief-level context with the trajectory.
+- Verification sign-off pending: Human Approver required for the public lexical/retrieval policy choice (documented default-off; no ranking change was made).
 
 ---
 
@@ -526,16 +532,25 @@ After this phase is accepted:
 - Dense use of context is not enabled by default.
 - No generic context filter or tag system.
 - Provider-side document upsert semantics are not implemented.
+- Context is not part of lexical or dense matching by default; enabling it is a separately approved, benchmarked policy change (documented in the operator guide).
+- Task/failure/triple domain reads fail closed for fully crypto-shredded subjects (pre-existing carrier-cipher behavior, unchanged); surfaced record context degrades to `None` only when the carrier body is unreadable while the record stays readable.
+- Preference context is stored once per key with its effective time (`persona_preferences.context_as_of`), so a temporal point carries the context effective from its introduction onward; a genuine per-observation context history would need a context column on `continuous_observations` and is not implemented.
+- Persona context is sealed under the bank DEK (subject = bank), so erasure purges persona context for the affected bank rather than for an individual subject within that bank; a bank whose persona purge destroyed rows is tombstoned (`persona_erase_tombstones`) and later persona writes into it fail closed with `ErasedSubject`, because persona rows cannot name the erased subject.
+- A belief point-in-time read between the original context introduction and a later authorized correction returns no context: the prior value is unrecoverable by design (FR-15 forbids retaining it) and the future-corrected value is never leaked (`beliefs.context_as_of` gates the read).
+- The structured-record sync commit and its journal append remain two store writes; a lost journal write no longer freezes relay (every domain-record equal-state apply journals the mutation on the next delivery), but the two writes are not one transaction.
+- A hand-crafted (non-shipped) import bundle could stage a secret-shaped task/failure/triple `context` unscrubbed: shipped bundles are already scrubbed on export and over-bound contexts fail closed at record validation, so this is a defense-in-depth gap, recorded and not silently skipped.
+- Restoring a bundle re-derives a belief's context effective time from `created_at` instead of carrying the exported `context_as_of`, because the store refuses a caller- or wire-supplied stamp so that sync apply cannot forge it. A restored belief whose context was later changed by an authorized correction therefore exposes the corrected context from creation time, where the source store returned none for a point-in-time read between introduction and correction. The source value is authoritative; the restored value is an upper bound on visibility, never a disclosure of a prior value.
+- The item push watermark can step past a row that a concurrent write later inserts with an older business stamp. When a page is not full the cursor advances to the largest packaged close stamp, which is above the rows' ordering stamps; the feed then resumes strictly after it. A row written after that query whose `created_at`/`updated_at` falls inside the gap is never selected. This is reachable because bundle restore preserves an item's original `created_at`/`updated_at`, so a restore issued just after such a push lands below the cursor. Clamping the advance to the last row's own stamp instead makes a post-dated discard re-send its row on every push, so neither bound is sufficient on its own: the real fix is a resume key that is monotone with respect to insertion (the journal sequence the bank-level compound cursor already uses) rather than business time. Recorded, not silently skipped.
 
 ### Downstream Prerequisites
 - Any later migration tooling may rely on context and evidence-reference round trips.
 - Any future provider work must use the native contract; `doc_id` container design belongs to the approval-gated Phase 900611 family and must not be smuggled in as a string alias.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
+- Implementer: OpenCode CLI (Together . GLM-5.3 Flash High), Developer r1
 - Verifier: [TBD]
-- Human Approver: required for public retrieval/portability policy changes
-- Date: [TBD]
+- Human Approver: required for public retrieval/portability policy changes (lexical default-off decision documented; no ranking code changed)
+- Date: 2026-09-25

@@ -1,0 +1,14 @@
+{
+  "audit_digest": "d5c2f8ff66205cda64a89c6c8fb056daf5580639764aff3648f1b14fbb0054c3",
+  "body": "## Symptom\n\n`concurrent_writes_during_refresh_wave` in `clio-write` fails intermittently during workspace test runs or when executed repeatedly in a loop.\n\nThe test panics with:\n```\nthread 'memtree::memtree_cov_tests::concurrent_writes_during_refresh_wave' panicked at crates/clio-write/src/memtree_cov_tests.rs:279:9:\nrefresh did not converge\n```\n\n## Where\n\n- `crates/clio-write/src/memtree_cov_tests.rs:279`\n\n## Reproduction\n\n1. Run the test repeatedly in a tight loop or under parallel test load:\n   `for i in {1..10}; do cargo test -p clio-write --lib memtree::memtree_cov_tests::concurrent_writes_during_refresh_wave || break; done`\n2. Observe panic on iteration (reproduced on iteration 4):\n   ```\n   failures:\n\n   ---- memtree::memtree_cov_tests::concurrent_writes_during_refresh_wave stdout ----\n\n   thread 'memtree::memtree_cov_tests::concurrent_writes_during_refresh_wave' (190529) panicked at crates/clio-write/src/memtree_cov_tests.rs:279:9:\n   refresh did not converge\n   note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\n   failures:\n       memtree::memtree_cov_tests::concurrent_writes_during_refresh_wave\n\n   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 148 filtered out; finished in 5.04s\n   ```\n\n## Impact\n\nThe test creates intermittent build/CI failures during `cargo test --workspace` or `make check` when machine resources are under load.\n\n## Proposed fix\n\nIncrease the convergence deadline, investigate whether the refresh loop is delayed by CPU scheduling under load, or ensure `consolidate_tool` drains all pending dirty nodes deterministically.\n",
+  "comment_count": 0,
+  "comments": [],
+  "comments_truncated": false,
+  "labels": [],
+  "number": 16,
+  "state": "open",
+  "state_reason": null,
+  "title": "memtree_cov_tests::concurrent_writes_during_refresh_wave intermittently panics with \"refresh did not converge\"",
+  "updated_at": "2026-09-24T20:31:33Z",
+  "url": "https://github.com/heyaibi/clio/issues/16"
+}

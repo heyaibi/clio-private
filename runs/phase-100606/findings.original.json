@@ -1,0 +1,149 @@
+{
+  "run": "r1",
+  "phase": "100606",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "title": "TemplateApiExtractor silently drops the source context",
+      "evidence": "crates/clio-write/src/extract.rs:228-243 builds the TemplateApiExtractor request with model, template, scrubbed text, tool payload, and retry feedback, but no `context`, even though `ExtractRequest.context` is declared at crates/clio-write/src/extract.rs:42-45. The chat adapter does include the field at crates/clio-write/src/extract_chat.rs:126-134, so the omission is specific to the template path.",
+      "requirement_ref": "FR-34; phase Task 1 (extractor propagation); AC-100606-01",
+      "recommendation": "Add the bounded, scrubbed context field to the template request and add a transport assertion that every extractor implementation receives the caller's context."
+    },
+    {
+      "id": "F-02",
+      "severity": "high",
+      "title": "Public extraction entry points can send unvalidated context to an extractor",
+      "evidence": "crates/clio-write/src/parallel.rs:102-118 exposes `extract_chunks_parallel` with an unchecked context argument, and crates/clio-write/src/pipeline.rs:196-207 copies that argument into `ExtractRequest` without calling `validate_context`. The hosted chat adapter then interpolates it at crates/clio-write/src/extract_chat.rs:126-134. Only the raw-ingest wrapper validates at crates/clio-write/src/raw_ingest.rs:139-141, so direct callers can send empty or oversized context to the extraction seam.",
+      "requirement_ref": "FR-34; NFR-9; phase Task 1 (validate before extraction)",
+      "recommendation": "Make validation an invariant of every public extraction entry point (or construct `ExtractRequest` through a validating constructor), and add tests for empty, oversized, and instruction-like values on the direct paths."
+    },
+    {
+      "id": "F-03",
+      "severity": "high",
+      "title": "belief_observe append replaces a differing context instead of rejecting it",
+      "evidence": "The belief contract requires an append to omit context or use the byte-identical stored value, but crates/clio-belief/src/observe.rs:234-235 routes an existing identity to `append_to_existing` and :305-311 forwards any supplied context to `append_confidence_with_context`. That API explicitly replaces the sealed context at crates/clio-store/src/belief_store.rs:56-72 and crates/clio-store/src/belief_tx.rs:149-155. A real MCP probe returned `outcome=appended` for a different context, and `belief_history` exposed only the replacement. The documented correction escape is also unavailable: crates/clio-compliance/src/correct.rs:181-186 rejects belief targets.",
+      "requirement_ref": "FR-34; §4.10 belief append rule; phase Task 1/AC-100606-09",
+      "recommendation": "Reject a differing context during belief append, preserve the old value for audit reconstruction, and provide an authorized belief-context correction operation before allowing replacement."
+    },
+    {
+      "id": "F-04",
+      "severity": "high",
+      "title": "Persona updates can replace or clear context without an audited correction",
+      "evidence": "On a normal stable upsert without context, crates/clio-persona/src/stable.rs:163-176 creates a new version with `context: None`; crates/clio-store/src/sqlite_persona.rs:79-103 closes the old version and inserts the context-free new version, so `persona_get` loses the prior context. On a preference observation with a new context, crates/clio-persona/src/observe.rs:178-195 passes it through, and the SQLite upsert at crates/clio-store/src/sqlite_persona.rs:123-131 replaces the stored context. A real probe observed the replacement on a later preference observation, with no correction audit. This conflicts with the ordinary-update preservation rule and the requirement that replacement be explicit and audited.",
+      "requirement_ref": "FR-34; §4.7; phase Task 3/AC-100606-04",
+      "recommendation": "Preserve context on ordinary stable/preference updates, and route any replacement through an explicit audited correction that retains the prior value. Add tests for omitted context, changed context, and the audit trail."
+    },
+    {
+      "id": "F-05",
+      "severity": "high",
+      "title": "Subject erasure does not purge or make persona context unreadable",
+      "evidence": "Persona context is sealed under the bank key at crates/clio-store/src/persona_store.rs:126-147 and crates/clio-store/src/sqlite_persona.rs:156-162. Erasure selection only scans `items` at crates/clio-store/src/sqlite_erase_purge.rs:30-50 (and the PostgreSQL equivalent at crates/clio-store/src/postgres_erase.rs:206-224); it never selects or purges persona tables. A real erasure probe on a bank containing persona context returned `not_found`, while `persona_get` still returned the bank-scoped context.",
+      "requirement_ref": "FR-34; FR-19; §7.4; phase Task 3/AC-100606-04",
+      "recommendation": "Define and implement subject ownership for persona records, then include those rows in erasure selection/propagation on both backends, or fail the erase explicitly when the subject cannot be resolved. Add an end-to-end test proving persona context is unreadable after erase."
+    },
+    {
+      "id": "F-06",
+      "severity": "high",
+      "title": "Domain-record context is exported without secret masking in both content modes",
+      "evidence": "crates/clio-compliance/src/export.rs:283-314 copies triples, tasks, failures, beliefs, and persona preferences into the bundle. The masking at :295-310 and :325-337 covers selected prose/value fields but never the `context` field on those records; persona preferences are copied directly at :338. The same bank-wide collection runs for both `dsar_plaintext` and `ciphertext_backup`. A real export probe found a secret-shaped persona context verbatim in both bundle files. `mask_item` only protects `MemoryItem.context` at crates/clio-compliance/src/export_mask.rs:32-41.",
+      "requirement_ref": "NFR-6; FR-34; phase Task 3/AC-100606-05",
+      "recommendation": "Apply the same defensive secret scrubber to every exported domain-record context, make ciphertext-backup mode keep context inside an opaque body, and add secret-shaped regression fixtures for persona, belief, task, failure, and triple records."
+    },
+    {
+      "id": "F-07",
+      "severity": "high",
+      "title": "Import deduplication ignores persona context",
+      "evidence": "crates/clio-compliance/src/import_apply.rs:329-350 marks a stable persona row identical using only key, value, and as_of. The preference planner at :362-390 compares only value, trend, and as_of. A bundle whose context differs while those fields match is therefore skipped, even though the new context is part of the record identity and must be preserved; the force branch is never reached for the identical case.",
+      "requirement_ref": "FR-34; §4.9.5.B import rule; phase Task 3/AC-100606-03",
+      "recommendation": "Include context in persona import identity/deduplication (or deliberately apply an explicit correction policy), and add a differing-context import test for both stable and preference rows."
+    },
+    {
+      "id": "F-08",
+      "severity": "high",
+      "title": "MCP record tools silently treat non-string context as absent",
+      "evidence": "The six domain write handlers use the permissive `opt_str` helper for context at crates/clio-mcp/src/write_tools.rs:295 and :380 and crates/clio-mcp/src/mutator_record_tools.rs:44, :94, :151, and :202. `opt_str` at crates/clio-mcp/src/write_tools.rs:132-137 returns `None` for numbers, arrays, and empty strings, while the validating `opt_context` helper at :143-155 is not used. A real MCP `persona_put_stable` call with `context: 123` returned `ok=true` and persisted a context-free entry instead of rejecting the malformed value.",
+      "requirement_ref": "FR-34; NFR-9; phase Task 1 (domain-record context contract)",
+      "recommendation": "Use one fail-closed context decoder for every record-write binding, reject present non-string or empty values, and add a schema/runtime contract test covering all six tools."
+    },
+    {
+      "id": "F-09",
+      "severity": "high",
+      "title": "CLI graph dry-runs echo raw context and accept oversized values",
+      "evidence": "The triple and belief CLI builders copy `--context` into the argument map at crates/clio-lib/src/cli_write_graph.rs:141-145 and :212-219, then return the entire map from `dry_run_preview` at :282-289 without calling the core context validator. Real CLI dry-run probes for both verbs echoed the supplied context and accepted a 4097-byte value. This exposes raw context in preview output and bypasses the fail-closed size contract before any MCP/tool dispatch.",
+      "requirement_ref": "FR-34; NFR-9; phase Task 4/AC-100606-06",
+      "recommendation": "Validate and bound context before constructing a dry-run payload, and render only a redacted presence/length summary rather than the raw value. Add CLI tests for empty, oversized, and secret-shaped context."
+    },
+    {
+      "id": "F-10",
+      "severity": "medium",
+      "title": "temporal_history omits context for belief and preference trajectories",
+      "evidence": "The preference and belief variants of `TemporalHistoryOutcome` contain only points/entries at crates/clio-history/src/temporal.rs:89-108, and `temporal_history` constructs them without attaching context at :174-195. The MCP serializer at crates/clio-mcp/src/read_history.rs:187-204 likewise emits no context. `ContinuousPoint` has no context field at crates/clio-types/src/attribute.rs:211-220. A real probe showed belief context in `belief_history` but absent from `temporal_history`, despite the phase naming temporal_history as a required context-bearing read.",
+      "requirement_ref": "FR-34; phase Task 2/AC-100606-09",
+      "recommendation": "Carry the applicable context in the temporal result (including preference observations and belief trajectories) while preserving the bounded point-in-time semantics, and add response-shape tests for present and absent context."
+    },
+    {
+      "id": "F-11",
+      "severity": "medium",
+      "title": "The migration guide uses an invalid semantic category",
+      "evidence": "The provider-neutral example at docs/source-context-and-migration.md:83-101 sets `category` to `task` at :95. The native category whitelist in crates/clio-types/src/item.rs:110-115 contains `task_spec`, not `task`. A real CLI probe using the documented category with `--dry-run` exited 1 with the category whitelist error, so the shipped migration example is not executable under the native contract.",
+      "requirement_ref": "FR-1; phase AC-100606-08",
+      "recommendation": "Change the example to a whitelisted category (or use the correct episodic type), and add a documentation smoke test that parses the example and runs the native command."
+    },
+    {
+      "id": "F-12",
+      "severity": "medium",
+      "title": "The canonical_put CLI binding does not expose the MCP context parameter",
+      "evidence": "MCP canonical_put declares `context` at crates/clio-mcp/src/schema_additive_defs.rs:124-135 and decodes it with `opt_context` at crates/clio-mcp/src/additive_tools.rs:144-167. The CLI `canonical put` flag spec omits context at crates/clio-lib/src/cli_write_workspace.rs:49-59, its builder never forwards context at :146-192, and the usage line at crates/clio-lib/src/cli_help_usage.rs:134-136 omits it. A real CLI probe with `--context` was rejected as an unknown flag, violating identical binding semantics.",
+      "requirement_ref": "FR-20; FR-34; phase Task 4/AC-100606-06",
+      "recommendation": "Add `--context` to the canonical CLI spec, builder, and help, validate it through the shared CLI context decoder, and add a CLI/MCP parity test for canonical_put."
+    },
+    {
+      "id": "F-13",
+      "severity": "high",
+      "title": "Sync has no feed or apply path for persona, task, failure, or belief records",
+      "evidence": "The sync protocol accepts entity kinds `persona`, `task`, `failure`, and `belief` at crates/clio-sync/src/protocol.rs:125-133, but `SyncStore` exposes only item, association, and triple feeds at crates/clio-store/src/sync_store.rs:302-337, and `push_bank` iterates only those three feeds at crates/clio-sync/src/client_feed.rs:53-78. The apply matrix handles only item, association, and triple operations at crates/clio-sync/src/apply.rs:112-130; all other kinds are dead-lettered as not implemented. Dedicated persona/belief context and domain-record mutations therefore cannot synchronize end to end.",
+      "requirement_ref": "FR-31; FR-34; §4.9.5.D; phase Task 3/AC-100606-03",
+      "recommendation": "Add versioned feed and apply effects for each context-bearing domain record, preserving encryption, bank scope, conflict/idempotency rules, and erasure checks; add SQLite/Postgres and client/server contract tests."
+    },
+    {
+      "id": "F-14",
+      "severity": "high",
+      "title": "A legacy sync item upsert can erase an existing context",
+      "evidence": "crates/clio-sync/src/apply.rs:189-230 deserializes an item payload and calls `update_memory_item` for an existing row. `MemoryItem.context` defaults to `None` when the field is absent at crates/clio-types/src/item.rs:295-300, and the update transaction rewrites `content_ciphertext` from that incoming item at crates/clio-store/src/item_update.rs:84-113 and :175-204. There is no preserve-on-absent merge, so a pre-context peer payload can clear a newer stored context.",
+      "requirement_ref": "FR-34; §4.9.5.D context/evidence identity rule; phase Task 3/AC-100606-03",
+      "recommendation": "Distinguish an explicitly absent legacy field from an explicit context replacement during sync apply, preserve the stored context when the wire field is absent, and add a legacy-payload regression test."
+    },
+    {
+      "id": "F-15",
+      "severity": "medium",
+      "title": "Public task, failure, persona, and triple validators omit context validation",
+      "evidence": "`TaskRecord::validate` ends with its score check at crates/clio-types/src/history.rs:176-212, and `FailureRecord::validate` ends at :256-292, without checking `context`. `PersonaStableEntry::validate` and `PersonaPreference::validate` at crates/clio-types/src/persona.rs:141-198 likewise omit it, as does `TripleRecord::validate` at crates/clio-types/src/triple.rs:163-229. The shared validator exists at crates/clio-types/src/item.rs:241-265, but these public record contracts do not call it, leaving direct/import callers with a validator that accepts empty or oversized context even where individual write paths add ad hoc checks.",
+      "requirement_ref": "FR-34; NFR-9; phase Task 1 (fail-closed record context)",
+      "recommendation": "Call the shared context validator from every public record validator, then keep backend write paths and import validation aligned with the same invariant."
+    },
+    {
+      "id": "F-16",
+      "severity": "high",
+      "title": "Domain-record audit telemetry does not record context changes",
+      "evidence": "FR-15 requires context presence, length, and a change-detection hash. The shared history helper at crates/clio-store/src/history_store.rs:239-247 emits only record/key/version/steps, and the task/failure audit inserts use it at crates/clio-store/src/sqlite_history_write.rs:160-180 and :225-244 (with the same PostgreSQL pattern at postgres_history_write.rs:173-193 and :239-259). Triple audit detail at crates/clio-store/src/sqlite_triple.rs:189-212 contains only new/prior edge ids. Persona writes close and insert rows without an audit event at crates/clio-store/src/sqlite_persona.rs:52-149. Thus context changes in these domain records cannot be reconstructed or compared through the audit trail.",
+      "requirement_ref": "FR-15; §4.12; phase Task 3/AC-100606-04",
+      "recommendation": "Add PII-safe context statistics to task/failure/triple audit rows and emit persona context lifecycle events, with audit-trail tests proving prior context remains reconstructable without logging raw values."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "Close the immediate fail-open paths: use the validating context decoder for all MCP record tools, validate direct extraction entry points, and validate/redact CLI dry-runs before building preview JSON.",
+    "Mask context on every exported domain record in both content modes and add secret-shaped export regression tests.",
+    "Make belief and persona context replacement fail closed unless an explicit audited correction path is used; add omitted/differing-context tests.",
+    "Include context in temporal_history responses and domain audit statistics, then add read/audit assertions.",
+    "Include context in persona import identity and preserve legacy item context during sync apply; add focused SQLite tests.",
+    "Correct the migration category and canonical CLI parity, then run the scoped checks before handing the remaining sync/erasure work to the full remediation pass."
+  ],
+  "plan_unlimited": [
+    "Define one bounded, validating context boundary for raw extraction, hosted egress, CLI, MCP, batch, and import paths; ensure every public record validator uses the same contract and every dry-run surface returns only safe metadata.",
+    "Complete the correction/audit model for persona and belief context: preserve ordinary updates, retain prior values, expose an authorized replacement operation, and emit presence/length/hash telemetry for every context-bearing domain write.",
+    "Harden portability and lifecycle handling: scrub all export entity types, make import identity include context, add persona/belief/task/failure sync feeds and apply effects, preserve legacy item context, and extend erasure to every subject-owned context projection on both backends.",
+    "Finish read and binding parity: attach context to belief/preference temporal trajectories, add canonical CLI support, and correct the migration example. Add end-to-end SQLite/Postgres, CLI/MCP, sync, export/import, audit, and erasure tests before the full lint/test/check/coverage/compile gates."
+  ]
+}

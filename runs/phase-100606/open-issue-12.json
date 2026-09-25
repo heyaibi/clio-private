@@ -1,0 +1,14 @@
+{
+  "audit_digest": "9a07e18994af57952ce23a1c2ba1c4d03a89c32ada7439be731e19a4e8eb6014",
+  "body": "## Symptom\nPer-item crypto cost grows with the number of stored items, so any path that decrypts a bounded set of rows still slows down as a bank grows.\n\n## Where\n- `crates/clio-store/src/dek.rs:263` `LocalDevKms::decrypt` calls `self.refresh(&mut slots)` before every lookup.\n- `crates/clio-store/src/dek.rs:184` `refresh` does `*slots = load_slots(path)?` \u2014 reads and parses the entire key JSON file each call.\n- `ensure_dek` (`dek.rs:223`) and `encrypt` (`dek.rs:237`) do the same.\n- The file grows because the CLI creates one DEK per item: `build_item` sets `subject_id` to the item id when the caller omits one, so every `remember` adds a new subject slot.\n\n## Impact\nEach `get_memory_item` decrypt is O(key-file size). Measured on a file-backed SQLite DB with the default profile:\n\n- `clio admit` (bounded scan of 64 rows) at 300 items: ~0.29s; at 600 items: ~0.40s; the delta tracks the key file doubling (33KB -> 67KB).\n- Before the #6 fix the same path decrypted the whole bank twice; that was ~2.2s at 588 items. The #6 fix bounded the decrypt count to 64, but each decrypt is still O(n), so the write path remains linear in bank size.\n\n## Proposed fix\n- Keep the slot map in memory and only reload on a miss, on a version/`mtime` change, or on an explicit invalidation; do not reload on every call.\n- If cross-process freshness is required, gate the reload on file `mtime`/size rather than unconditional reparse.\n- Alternatively, persist DEKs per subject so the file does not grow with item count (for example a fixed per-bank DEK when the caller omits `subject_id`).\n\nDiscovered while fixing #6; not changed there to keep that fix scoped.",
+  "comment_count": 0,
+  "comments": [],
+  "comments_truncated": false,
+  "labels": [],
+  "number": 12,
+  "state": "open",
+  "state_reason": null,
+  "title": "LocalDevKms reloads and reparses the whole key file on every decrypt/encrypt",
+  "updated_at": "2026-09-24T09:24:18Z",
+  "url": "https://github.com/heyaibi/clio/issues/12"
+}
