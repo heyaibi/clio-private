@@ -5,10 +5,15 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
 | Developer | r1 | [TBD] | proposed |
+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash Max) | done |
 | Adversary | r1 | [TBD] | [TBD] |
+| Adversary | r1 | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | done |
 | Remediator | r1 | [TBD] | [TBD] |
+| Remediator | r1 | Command Code (DeepSeek V4 Flash (latest) Max) | done |
 | Remedy Approver | r1 | [TBD] | [TBD] |
+| Remedy Approver | r1 | OpenCode CLI (Go . Space Bunny Free Max) | approved |
 | Finalize | r1 | [TBD] | [TBD] |
+| Finalize | r1 | Command Code (DeepSeek V4 Flash (latest) Max) | done |
 
 **Capability phase 100720** · **Effort:** ~1–2 days · **Status:** Plan ready · **Parent:** gap analysis `gaps/recall-result-fidelity-gap-analysis.md` §5.2, §5.3, §7, §8 decision 6, §10.2; requirement §4.9.2 item 2 (binding syntax may differ; semantics must not)
 
@@ -302,26 +307,45 @@ Implementation claims must be supported by actual test output, inspection result
 | AC-100720-05 | No payload or default change | Regression tests | Test output |
 | AC-100720-06 | No regression; size/coverage gates pass | T100720-09 | Workspace suite; coverage report; size check |
 
+#### Evidence (actual, 2026-09-25)
+
+| AC ID | Result | Evidence |
+|-------|--------|----------|
+| AC-100720-01 | PASS | `-o` is recognized at every `--output` site: `cli_args::parse`, `cli_args::split_leading_globals`, `cli_output::explicit_output`, and `main::parse_flags` (the reserved `clio status` extractor). Unit tests `short_output_alias_accepts_space_and_equals_forms`, `split_leading_globals_moves_the_short_output_alias`, `mode_from_raw_honors_the_short_output_alias`, `short_output_alias_selects_the_same_modes`; e2e `short_output_alias_matches_the_long_flag_end_to_end`. Manual: `recall coffee` with `-o json`, `--output json`, `-o=json`, and before-verb `-o json` returned the same payload (timing metrics excluded); `-o text` on a pipe printed human text; `status … -o json` emitted one JSON line. |
+| AC-100720-02 | PASS | Existing `unknown_single_dash_flag_fails_closed` plus new `attached_short_output_alias_fails_closed` (`-x` and `-ojson` are usage errors); e2e `-x` exits 2 with ``unknown flag `-x` ``. |
+| AC-100720-03 | PASS | `help_documents_the_output_mode_rule_and_short_alias` pins the global-flags line and the rule wording; `clio help` prints `Global flags: --db --backend --bank --actor --output (-o)` and the output-mode paragraph. |
+| AC-100720-04 | PASS | Decision recorded below. `verb_usage_lines_keep_the_canonical_output_spelling` pins `[--output json|text]` for recall/get/inspect/stats/summarize/remember; all 62 entries were counted, 8 of them end in trailing prose (script check), so a blanket replace is unsafe. |
+| AC-100720-05 | PASS | `resolve_output`/TTY detection untouched; `cargo test --package clio --bin clio` → 571 passed / 0 failed; every pre-existing `--output` test stays green. |
+| AC-100720-06 | PASS | `make coverage` → 324 files checked, TOTAL lines 97.96% / functions 98.85%, all files meet the ≥90% per-file floor. Touched files lines/functions: `cli_args.rs` 99.00/100, `cli_output.rs` 100/100, `main.rs` 99.05/100, `cli_help_usage.rs` 100/100, `status_cli.rs` 97.76/93.33. Workspace TOTAL moved from lines 97.95% / functions 98.85% (baseline) to 97.96% / 98.85%; no file regressed. `cargo fmt --all -- --check` clean; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` clean; every touched Rust file ≤450 lines. |
+
+#### `-o` scope and per-verb decision record (2026-09-25)
+
+- Scope: `-o` is a global alias of `--output`, accepted before and after the verb everywhere `--output` is accepted. Discovery found a fourth recognition site beyond the plan's three: `main::parse_flags`, the extractor used by the reserved `clio status` surface (`status_cli.rs:113-121`). `-o` is handled there too, so `clio status -o json` selects JSON like `clio status --output json`.
+- Forms: `-o json` and `-o=json`, mirroring the long flag's space and `=` grammar. An attached `-ojson` is not accepted and stays an unknown-flag usage error (`attached_short_output_alias_fails_closed`).
+- Per-verb usage strings: left as `[--output json|text]` for all 62 entries. Reason: the alias is a global flag, so it is documented once in the global-flags line and the output-mode paragraph; 8 of the 62 entries end in trailing prose, so a partial find/replace would leave the surface inconsistent. The choice is pinned for a representative sample.
+- Output-mode rule unchanged: explicit `--output`/`-o` wins; otherwise text on a TTY and JSON when piped. No default, payload, or TTY change.
+
 ### Definition of Done
-- [ ] All in-scope behavior is implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes were introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation is updated where required.
-- [ ] Evidence is collected.
-- [ ] Verification is completed.
-- [ ] Required approval is obtained.
+- [x] All in-scope behavior is implemented.
+- [x] All acceptance criteria pass.
+- [x] Required tests pass.
+- [x] No unauthorized changes were introduced.
+- [x] Existing behavior remains intact.
+- [x] Security checks pass.
+- [x] Documentation is updated where required.
+- [x] Evidence is collected.
+- [x] Verification is completed.
+- [x] Required approval is obtained (downstream pipeline step).
 
 ### Completion Evidence
-- Implementation summary
-- `-o` scope and per-verb decision record
-- Changed-component summary
-- Test execution output
-- Help output
-- Verification report
-- Known limitations
+- Implementation summary: `-o` is now the short spelling of the global `--output` value flag at every `--output` site: the hand-rolled parser (`cli_args::parse` accepts `-o json` / `-o=json` and reports the established missing-value usage error), leading-global stripping (`cli_args::split_leading_globals`), the raw error-path scanner (`cli_output::explicit_output`), and the reserved `clio status` extractor (`main::parse_flags`). `clio help` lists `-o` on the global-flags line and explains the output-mode rule. No defaults, payloads, TTY behavior, or long-flag behavior changed. The e2e harness runs the real binary through `CARGO_BIN_EXE_clio`.
+- `-o` scope and per-verb decision record: see the section above.
+- Changed-component summary: production — `crates/clio-lib/src/cli_args.rs` (parse + split_leading_globals), `cli_output.rs` (explicit_output), `main.rs` (parse_flags, COMMAND_CATALOG), `cli_help_usage.rs` (decision note). Tests — `cli_args_tests.rs`, `cli_output_tests.rs`, `main_read_tests.rs`, `cli_read_help_tests.rs`, `cli_help_tests.rs`, `status_cli_tests.rs`, `status_cli_fault_tests.rs`; new `cli_read_output_tests.rs` (output-mode tests extracted from the pre-existing oversized `cli_read_tests.rs`, now 391 lines) and new real-binary harness `tests/output_alias_harness.rs`.
+- Test execution output: `cargo test --package clio --bin clio` → 571 passed / 0 failed; `cargo test --package clio --test output_alias_harness` → 1 passed; `cargo fmt --all -- --check` → clean; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` → clean.
+- Help output: `clio help` prints `Global flags: --db --backend --bank --actor --output (-o)` and ``Output mode: an explicit `--output`/`-o` always wins; otherwise text on a terminal (TTY) and JSON when piped. Forms: `--output json`, `--output=json`, `-o json`, `-o=json` ``.
+- Verification report: baseline gate (pre-change) TOTAL lines 97.95% / functions 98.85%, all files green; final `make coverage` TOTAL lines 97.96% / functions 98.85%, guard green; manual real-binary runs in the run log confirm identical payloads for all four spellings, human text for `-o text`, and exit 2 for bare `-o` and `-x`.
+- Incidental bug: GitHub issue #25 (reserved surfaces ignore unknown flags and exit 0) — confirmed, reported, not fixed (outside scope).
+- Known limitations: see §12.
 
 ---
 
@@ -376,18 +400,19 @@ After this phase is accepted:
 - The output-mode rule is discoverable and unambiguous.
 
 ### Known Limitations
-- Only `-o` is added; there is no general short-flag framework.
-- Per-verb usage strings may remain `[--output json|text]` if the recorded decision chose that.
+- Missing: a general short-flag framework and attached short values (`-ojson`). Why: this phase adds exactly one global alias and keeps every other single-dash token fail-closed. Debt owner: no phase; a future CLI phase must add a short-flag framework if attached forms are wanted.
+- Missing: `-o` in the per-verb usage lines; they keep `[--output json|text]`. Why: the alias is a global flag documented once in the global-flags line and the output-mode paragraph; 8 of the 62 entries end in trailing prose, so a partial find/replace would leave the surface inconsistent. Debt owner: none assigned; the pin test `verb_usage_lines_keep_the_canonical_output_spelling` must be changed deliberately if that decision is revisited.
+- Unchanged, pre-existing: reserved surfaces that ignore `--output` (`clio mcp|ops|retention|compose`) also ignore `-o`, matching their handling of the long flag; only `clio status` consumes the value. Their tolerance of unknown flags is pre-existing and tracked as GitHub issue #25. Debt owner: GitHub issue #25; no phase assigned.
 - No payload or behavior change.
 
 ### Downstream Prerequisites
 - No new capability depends on this phase; it is independent.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
+- Implementer: OpenCode CLI (Go . Deepseek V4.1 Flash Max)
 - Verifier: [TBD]
-- Human Approver: [TBD, if required]
-- Date: [TBD]
+- Human Approver: not required
+- Date: 2026-09-25
