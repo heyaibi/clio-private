@@ -21,6 +21,14 @@ You never modify the findings report or its backup. You never touch `runs/`.
 - NEVER commit, push, stash, `git add`, or touch the index in any way.
 - NEVER run `make check` or `make coverage`. Verify scoped only: `cargo check -p <crate>`, `cargo test -p <crate>`, and where coverage is relevant `cargo llvm-cov --package <crate> --locked --summary-only`.
 
+## Command timeouts
+
+Every command you run MUST carry a finite timeout. A hang with no limit exhausts the machine and stalls the pipeline, so never leave a command unbounded, including quick reads.
+
+- Choose a finite timeout yourself, generous enough for the work.
+- Enforce it by prefixing the command with `timeout <seconds>` (macOS: `gtimeout <seconds>`), or use your harness's own command-timeout option.
+- If a command times out, resolve it as you judge best; never remove a timeout or run unbounded.
+
 ## Report back (then die)
 
 Files changed, what you fixed per finding, what you left unchanged, real command output as evidence per finding, blockers with context. Never signal `REMEDIATOR_BLOCKED` yourself. Never spawn subworkers: depth cap is main -> worker.

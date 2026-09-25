@@ -33,6 +33,14 @@ cleanup to this phase. Here's the message from Remedy Approver agent.
 
 {{REMEDY_APPROVER_AGENT_OUTPUT}}
 
+## Command timeouts
+
+Every command you run MUST carry a finite timeout. A command with no timeout can hang for hours, exhaust the machine, and stall the pipeline; nothing below you enforces a limit. This applies to every command, including quick reads and helper calls, and it binds every worker you spawn.
+
+- Choose the timeout yourself, generous enough for the work but finite. Never leave a command unbounded.
+- Enforce it by prefixing the command with `timeout <seconds>` (macOS: `gtimeout <seconds>`), or use your harness's own command-timeout option, so the limit holds even if you stop watching.
+- If a command times out, resolve it as you judge best; never remove a timeout or run unbounded.
+
 ## Sync and publish (mandatory)
 
 The phase began on a synced base, but a remote can move while you work. After

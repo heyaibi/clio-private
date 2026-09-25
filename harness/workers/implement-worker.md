@@ -24,6 +24,14 @@ You never read `private/clio-private/roadmap/` yourself. Parent hands you what y
 - NEVER run the full gate or `make coverage`. Verify scoped only:
   `cargo llvm-cov --package <crate> --locked --no-clean --summary-only` (narrow with `--lib` or `--test <name>`), same `DATABASE_URL` as parent, compare against BASELINE_JSON.
 
+## Command timeouts
+
+Every command you run MUST carry a finite timeout. A hang with no limit exhausts the machine and stalls the pipeline, so never leave a command unbounded, including quick reads.
+
+- Choose a finite timeout yourself, generous enough for the work.
+- Enforce it by prefixing the command with `timeout <seconds>` (macOS: `gtimeout <seconds>`), or use your harness's own command-timeout option.
+- If a command times out, resolve it as you judge best; never remove a timeout or run unbounded.
+
 ## Report back (then die)
 
 Return exactly: files changed, what you implemented and deliberately left out, real command output (build, test, scoped coverage) per owned file, blockers with context. Report blockers to parent; never signal `DEVELOPER_BLOCKED` yourself. Never spawn subworkers: depth cap is main -> worker. If your slice needs splitting, report back and let the parent re-plan.

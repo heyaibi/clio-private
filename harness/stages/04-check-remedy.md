@@ -66,6 +66,14 @@ The Remediator agent says the following, please validate and indicate whether yo
 - Confirm the coverage/size/roadmap-isolation constraints still hold for any
   files the remediator touched.
 
+## Command timeouts
+
+Every command you run MUST carry a finite timeout. A command with no timeout can hang for hours, exhaust the machine, and stall the pipeline; nothing below you enforces a limit. This applies to every command, including quick reads and helper calls, and it binds every worker you spawn.
+
+- Choose the timeout yourself, generous enough for the work but finite. Never leave a command unbounded.
+- Enforce it by prefixing the command with `timeout <seconds>` (macOS: `gtimeout <seconds>`), or use your harness's own command-timeout option, so the limit holds even if you stop watching.
+- If a command times out, resolve it as you judge best; never remove a timeout or run unbounded.
+
 ## Birth-die review workers (many findings only)
 
 Few findings: verify serially yourself. Many findings with disjoint files: stay orchestrator - triage yourself, then read `private/clio-private/harness/workers/review-worker.md` and spawn one ephemeral worker per disjoint file-group in parallel. Workers report per-finding verdicts with evidence and die; they never decide approval or access GitHub. You re-verify, merge, and issue the verdict yourself. A worker-reported pre-existing bug outside the remediation scope is incidental: report it, but do not reject this remedy solely for that unrelated bug. Verdict, Attribution edit (on APPROVE only), run log, and finish signal are never delegated.

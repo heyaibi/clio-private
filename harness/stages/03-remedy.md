@@ -43,6 +43,14 @@ If empty, this is round 1: work from the findings report. If it names unresolved
 - Blocker or vocabulary clash: stop, two options (2 pros, 2 cons each), recommendation first, signal `REMEDIATOR_BLOCKED`.
 - Worker output is your output: every rule here binds any worker you spawn, and you enforce each one at review.
 
+## Command timeouts
+
+Every command you run MUST carry a finite timeout. A command with no timeout can hang for hours, exhaust the machine, and stall the pipeline; nothing below you enforces a limit. This applies to every command, including quick reads and helper calls, and it binds every worker you spawn.
+
+- Choose the timeout yourself, generous enough for the work but finite. Never leave a command unbounded.
+- Enforce it by prefixing the command with `timeout <seconds>` (macOS: `gtimeout <seconds>`), or use your harness's own command-timeout option, so the limit holds even if you stop watching.
+- If a command times out, resolve it as you judge best; never remove a timeout or run unbounded.
+
 ## Coverage efficiency
 
 Full gate (`make coverage`) at most once, as final verification. No worker ever runs `make check` or `make coverage`; your end-of-round full runs are the only full runs. While fixing, verify scoped: `cargo llvm-cov --package <crate> --locked --no-clean --summary-only` (or one workspace JSON whose per-file rows you re-read). Batch, one scoped pass, fix, one scoped pass to confirm.

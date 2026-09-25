@@ -64,6 +64,14 @@ Perform adversarial review of this session per the rules below, and write the re
   that could read as "implemented with boundary X" while it actually means
   "not implemented at all" is itself a finding.
 
+## Command timeouts
+
+Every command you run MUST carry a finite timeout. A command with no timeout can hang for hours, exhaust the machine, and stall the pipeline; nothing below you enforces a limit. This applies to every command, including quick reads and helper calls, and it binds every worker you spawn.
+
+- Choose the timeout yourself, generous enough for the work but finite. Never leave a command unbounded.
+- Enforce it by prefixing the command with `timeout <seconds>` (macOS: `gtimeout <seconds>`), or use your harness's own command-timeout option, so the limit holds even if you stop watching.
+- If a command times out, resolve it as you judge best; never remove a timeout or run unbounded.
+
 ## Open-issue scope audit
 
 Audit every open issue in `heyaibi/clio` in two passes. First triage the light list (titles, bodies, labels, comment counts; no comment bodies, one call per page, never one per issue):
