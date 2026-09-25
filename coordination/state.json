@@ -100,13 +100,19 @@
         "public": "0ec3235352afe14134ecd940e7a661c9392c308d"
       },
       "claimed_at": "2026-09-25T15:46:34.816Z",
+      "completion_receipt": {
+        "path": "/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100720/publication.json",
+        "private_commit": "1a60d7dfde8e1c3062c271d08bdaaa3368b0fa86",
+        "public_commit": "4ed5141e4195ef59effb5baa4c09f7c937e1218b",
+        "published_at": "2026-09-25T16:56:09.769Z"
+      },
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-25T16:51:47.769Z",
+      "heartbeat_at": "2026-09-25T16:56:18.449Z",
       "machine_id": "local-01",
       "reservation_id": "rsv-44f7dec70c6de5f1705ae8ed",
       "run_id": "phase-100720",
-      "status": "running"
+      "status": "completed"
     }
   },
   "version": 1
