@@ -1,111 +1,228 @@
-# Proposal: natural lifecycle notifications for am-bench
+# Proposal: natural, low-noise am-bench notifications
 
-Status: draft. Date: 2026-09-25. Scope: `benchmarks/am_bench` only. No scorer, judge, adapter, or dataset changes.
-
-Note: on implementation, move this file to implemented/ with its implementation record.
+Status: draft. Date: 2026-09-25. Scope: `benchmarks/am_bench` notification wording and notification frequency only. This proposal pairs with `proposal-am-bench-notification-providers.md`, which owns how messages are sent. Neither proposal changes benchmark scoring, datasets, judges, generators, adapters, or report contents.
 
 ## Problem
 
-The am-bench runner has no notification channel today. What it has is noisy when watched:
+The runner currently has no notification sender. If notifications are added directly to `runner.py`, they will likely look like copied log lines:
 
-- `runner.py:413-414` prints one `stderr` line per probe when `--verbose`: `[{suite}] {probe_id} accuracy=...`. A full run floods the log.
-- `runner.py:477-480` prints one `stdout` summary line: `am-bench: suites=... accuracy=...`.
-- `runner.py:237-278` `render_markdown()` writes a full scorecard table.
+```text
+[clio] benchmark starting
+[clio] benchmark finished
+[clio] benchmark failed
+```
 
-Any naive Discord webhook hooked to the per-probe `progress()` callback inherits that flood. It reads as spam: many templated posts, repeated edits, pings, emoji, tables pasted verbatim. The operator still needs start / finish / fail signals, but they should read like one developer posting to a channel.
+That wording is technically clear but not natural. It sounds like a program printing status, not like a developer reporting the result to another developer. Repeated start and finish messages also create notification fatigue.
 
-Verified 2026-09-25: repo-wide case-insensitive search for `discord` and `webhook` returns zero matches. The only outbound HTTP in `benchmarks/am_bench/` is `llm.py:82` (judge/generator chat) and `fetch.py:48` (dataset download). There is no existing notifier to fix. This is a new module.
+The wording must answer the reader's practical questions without making them open the logs or report first:
 
-## Goal
+- What ran?
+- Is it still running?
+- Did it finish cleanly?
+- What happened if it failed?
+- Where is the result?
 
-One run yields at most three short posts: started, finished, failed. Each reads like a developer typed it. Notifications never change the score, the report files, or the exit code.
+## Goals
 
-## Proposal
+- Make each notification read like a short developer update.
+- Keep the message useful when read outside the terminal.
+- Send few enough messages that the channel remains readable.
+- Make success, failure, and incomplete runs visually and semantically clear.
+- Keep notification failure separate from benchmark failure.
+- Keep wording independent from the notification provider.
 
-Add a small separate module, e.g. `benchmarks/am_bench/notify.py`, owned by formatting only. The runner owns orchestration. Call it only from `main()` in `runner.py:377-482`, never from `run_suite()` or the per-probe loop.
+## Non-goals
 
-Three functions:
+- Do not send one notification per probe.
+- Do not add Discord-specific wording or Discord code to `runner.py`.
+- Do not put secrets, profile names, channel IDs, or private configuration into messages.
+- Do not let a notification failure change the score, report, or exit code.
+- Do not use an AI model to generate routine messages.
+- Do not change benchmark execution behavior in this proposal.
 
-- `format_start(run_meta) -> str` — what is running, where, how long it should take.
-- `format_done(report) -> str` — what finished, headline numbers, one notable detail, where the full report lives.
-- `format_failed(error, run_meta) -> str` — what broke, whether a score was written, what happens next.
+## Notification events
 
-Send policy: start once at run start, done once after `_write_outputs()` succeeds, failed once on abort paths (`PinError`, `MissingSnapshotError`, `ChatClientError`, `JudgeError`, `ClioAdapterError`). Batch both suites into one done message. No per-probe sends. No `@everyone`. No table paste. Point to the `.md` / `.json` files instead.
+The first version supports three events:
 
-Delivery is best-effort and out of band: wrap the send in try/except, log to `stderr` on failure, keep the original exit code. A dead channel never fails a benchmark.
+### Started
 
-## Generation method: deterministic templates, not an LLM
+Use this for the beginning of a benchmark run. The message should tell the reader that work has started without sounding like a command-line log.
 
-Do not generate these posts with an LLM.
+Example:
 
-- Numbers must match `build_report()` output exactly. Templates cannot hallucinate. An LLM can round or invent a score.
-- The runner already fails loudly on judge/generator outages. Another model call adds another failure point for a 2-sentence post.
-- Templates are unit-testable with a fixed dict. LLM wording is not.
-- No extra cost or latency on runs that already take minutes.
+```text
+Started the am-bench run for LoCoMo and LongMemEval on the canary partition. I’ll report back when it finishes.
+```
 
-Wording: 2-3 hand-written variants per event, picked by `seed` from `run_meta`, not by a model. That is enough variation to avoid robotic repetition without losing determinism.
+The message may include:
 
-An LLM polish step is allowed later only as an optional second pass: template first, rewrite second, reject the rewrite unless every number from the report still appears verbatim, fall back to the template on any failure. Do not start there.
+- suite names
+- partition
+- adapter name
 
-## Examples from past runs (temporary mockups, never sent)
+It should not include private paths, credentials, or environment details.
 
-Generated 2026-09-25 from real `run` metadata in `benchmarks/reports/baseline-locomo.json` and `benchmarks/reports/baseline-longmemeval.json` using `report["run"]` fields (`suites`, `partition`, `seed`, `max_probes`, `adapter`, `judge.model`).
+### Completed
 
-Start, locomo past config:
+Use this after the runner has written the score report successfully. The message should lead with the result, then include enough context to decide whether to inspect the report.
 
-> kicking off locomo on canary (seed 100480, 5 probes, clio adapter, qwen2.5-1.5b-instruct). ~12 min, will post when done.
+Example:
 
-Start, longmemeval past config:
+```text
+am-bench finished successfully.
 
-> kicking off longmemeval on canary (seed 100480, 6 probes, clio adapter, qwen2.5-1.5b-instruct). ~12 min, will post when done.
+LoCoMo and LongMemEval: 240 probes scored
+Overall accuracy: 0.7421
+Token F1: 0.6814
+Report: benchmarks/reports/2026-09-25-canary.json
+```
 
-Done, same runs (headline numbers from `overall`):
+The runner should use values from the assembled report rather than reconstructing them from partial state. A completion notification must not claim that a report exists unless `_write_outputs` succeeded or no output path was requested.
 
-> done. locomo 0.23 acc / 0.21 F1, longmemeval 0.0 acc / 0.15 F1. temporal still weak on both. full scorecard is in `benchmarks/reports/`. nothing urgent.
+If no report path was requested, the message may omit the report line. It must not invent a path.
 
-Failed:
+### Failed
 
-> failed — judge endpoint timed out after 40s on locomo probe 3/5. no score written. I'll retry with tier1 locally, no action needed from you.
+Use this when the benchmark stops before producing a usable score. The message should state what happened and whether a report was produced.
 
-## What the implementer must validate locally
+Example:
 
-Do not trust this proposal on where things live. Read the code first and confirm or correct each point.
+```text
+am-bench stopped before producing a score.
 
-- Confirm `build_report()` in `runner.py:201-234` is the single source for numbers used in `format_done()`, and that `run_meta` in `runner.py:454-464` has every field the start message needs. List any missing field before adding it.
-- Confirm the only call sites are in `main()`: start before the suite loop, done after `_write_outputs()`, failed on each `return 2` abort path. Confirm `run_suite()`, `select_work()`, and `progress()` stay untouched.
-- Confirm notification failure cannot change behavior: stub the sender to raise, run a passing and a failing suite, and show exit codes and report files are identical with the sender on or off.
-- Confirm batching: a `--suite both` run sends one done message, not one per suite. Confirm `--verbose` per-probe lines stay on `stderr` and never reach the channel.
-- Confirm secrets handling: webhook URL comes from env only, never from `pins.json`, logs, or the report. Confirm the URL never appears in `stdout`, report files, or error text.
+The judge service did not respond after the configured timeout. No score report was written.
+```
 
-## What the implementer must validate externally
+For an unexpected internal error, use a short, safe summary:
 
-Search first. Do not invent alerting behavior.
+```text
+am-bench stopped unexpectedly.
 
-- Search for alert-fatigue guidance on lifecycle vs per-event notifications for batch jobs, and compare a 3-message budget against per-probe updates.
-- Search for webhook best-practice for CI/benchmark bots: single post vs thread updates, when to edit vs post anew, and why `@here`/`@everyone` and emoji floods read as spam.
-- Search for precedent on deterministic status templates with seed-picked variants versus LLM-generated status text, including hallucination and testability trade-offs.
+The run failed while processing the benchmark. The error was recorded in the local run logs; no score report was written.
+```
 
-## Rejected alternative
+Do not send a full traceback in the notification. The notification should help the reader decide what to do. Detailed errors remain in the local log.
 
-Avenue B (single batched digest only, no start/fail posts) was considered: one message per run after all suites finish. It is quieter but leaves long runs silent while they execute and merges failure into silence. Keep it as a config flag (`--notify digest`) later if operators want it, not as the default. Default is Avenue A lifecycle.
+## Writing rules
 
-## Safety properties
+Messages should follow these rules:
 
-- At most three posts per run across all paths, then silence.
-- A failed send never blocks, delays, or changes the run outcome, exit code, or report contents.
-- Posted numbers always equal the written report numbers verbatim.
-- No secrets in posts, logs, or reports. Webhook URL from env only.
-- No per-probe channel traffic under any flag combination.
+1. Use ordinary sentences, not status labels and bracketed prefixes.
+2. Lead with the event: started, finished, or stopped.
+3. Put the result before secondary metadata.
+4. Use plain words such as “failed” and “stopped” rather than vague words such as “encountered an issue.”
+5. State the consequence for the score report.
+6. Include a report path only when the report was actually written.
+7. Keep messages short enough to scan in Discord.
+8. Do not use emojis, decorative punctuation, or fake enthusiasm.
+9. Do not address the reader as if the run is a long-running personal conversation.
+10. Do not claim that the system will do something it will not do.
 
-## Acceptance
+The first version should use deterministic templates. A template is predictable, testable, cheap, and cannot invent benchmark facts. An AI-generated message is unnecessary for these fixed events.
 
-- Automated check with stubbed sender: a two-suite pass yields exactly one start plus one done; a judge outage yields exactly one start plus one failed; per-probe `progress()` calls never invoke the sender.
-- Automated check: `format_done()` output contains the exact `accuracy` and `token_f1` strings from `build_report()` for a fixture report.
-- Manual check: run `locomo --max-probes 5 --verbose` with a stubbed channel, observe one start and one done in natural tone, confirm no per-probe posts and exit code 0. Break the judge URL, observe one failed post and exit code 2 with no score file claimed as valid.
-- State what was verified locally and externally, and list anything that could not be verified.
+## Frequency and anti-spam policy
 
-## Open questions
+The first version sends one notification per event and no per-probe notifications:
 
-- What time estimate should `format_start()` show when duration history is missing for a new suite/adapter pair?
-- Should the sender edit the start post with the result or post anew, given channel threading behavior?
-- Is a `--notify off| lifecycle | digest` flag worth it now, or ship lifecycle-only first?
+- One start notification.
+- One completion notification.
+- One failure notification if the run cannot produce a score.
+- No notification for an individual probe.
+- No automatic notification for every suite when the suites are part of one command.
+
+A multi-suite run therefore produces one start message and one final result, not one start and one result per suite.
+
+Notification delivery has its own retry and dead-channel policy in the provider proposal. Those rules must not turn a single event into repeated visible posts. Retries should use the same deduplication key and should not send the same event as a new message.
+
+Long-running runs do not need repeated progress notifications. If a future stall notification is added, it must have a quiet period and a maximum repeat frequency. That policy belongs in the phase driver or run supervisor, not in the benchmark scorer.
+
+## Proposed module boundary
+
+Add a notification package beside the runner:
+
+```text
+benchmarks/am_bench/notify/
+  __init__.py
+  base.py
+  messages.py
+  hermes.py
+  stdout.py
+  null.py
+```
+
+`messages.py` owns wording. It receives facts from the runner and returns a `Notification` object. It does not send anything and does not know whether the destination is Discord, Hermes, stdout, or a test double.
+
+`runner.py` owns event creation only:
+
+1. Create a run identifier before the work starts.
+2. Create a start message and pass it to the provider.
+3. Run the suites.
+4. Create either a completion or failure message from the result.
+5. Pass that message to the provider.
+6. Close the provider in a `finally` block.
+
+`run_suite()` and `progress()` must not receive the provider and must not send messages themselves.
+
+## Suggested message API
+
+The message layer should use structured facts rather than accepting a preformatted string from arbitrary call sites. A small shape is enough:
+
+```python
+@dataclass(frozen=True)
+class Notification:
+    event: str
+    text: str
+    severity: str
+    run_id: str
+    dedup_key: str
+```
+
+The wording functions should be small and pure:
+
+```python
+def started_message(run_meta: dict, report_hint: str | None = None) -> Notification:
+    ...
+
+def completed_message(report: dict, report_path: Path | None) -> Notification:
+    ...
+
+def failed_message(reason: str, report_written: bool) -> Notification:
+    ...
+```
+
+The exact API may follow the provider proposal's existing `Notification` and `NotificationResult` types. The important boundary is that wording has no network or subprocess calls.
+
+## Safety and failure behavior
+
+Notification delivery is best effort. It must never:
+
+- change the benchmark exit code;
+- change the score report;
+- delay the benchmark without a hard timeout;
+- expose credentials in logs, messages, or reports;
+- cause the runner to retry a benchmark operation;
+- produce a visible duplicate for the same event.
+
+If the provider is unavailable, the runner should log a short notification failure and continue. If the benchmark itself fails, the runner should try to send one failure notification, but the original benchmark error remains authoritative.
+
+## Tests and acceptance
+
+The implementation should add tests for:
+
+- a natural start message containing the suite and partition;
+- a successful completion message containing scored probes, accuracy, token F1, and the real report path;
+- a completion message without a fake report path when no output file was requested;
+- a failure message that says no report was written when appropriate;
+- a failure message that does not include a traceback or secret;
+- one start and one final event for a multi-suite run;
+- no notification calls from `run_suite()` or `progress()`;
+- a provider failure leaving the benchmark exit code and report unchanged;
+- deterministic output for the same report and run metadata.
+
+Manual review should compare the messages with the actual runner output and confirm that each one reads naturally in Discord. The reviewer should be able to understand the status without opening the terminal.
+
+## Decision
+
+Use deterministic, developer-style messages with a strict event limit. Send one start message and one final message for a benchmark command. Keep the wording in `notify/messages.py`, sending in a provider plug, and benchmark facts in `runner.py`.
+
+The separate phase-driver notification wording is not changed by this proposal. If phase-driver messages are also rewritten, they should get their own proposal because they have different events, spam controls, and halt behavior.
