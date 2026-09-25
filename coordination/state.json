@@ -102,11 +102,11 @@
       "claimed_at": "2026-09-25T15:46:34.816Z",
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-25T15:46:34.817Z",
+      "heartbeat_at": "2026-09-25T15:46:39.034Z",
       "machine_id": "local-01",
       "reservation_id": "rsv-44f7dec70c6de5f1705ae8ed",
       "run_id": "phase-100720",
-      "status": "claimed"
+      "status": "running"
     }
   },
   "version": 1
