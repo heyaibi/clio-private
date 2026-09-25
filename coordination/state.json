@@ -82,17 +82,17 @@
     },
     "100606": {
       "base_revisions": {
-        "private": "bfe29119fc909468fee2b703df4fc5b5a7486929",
+        "private": "a74fe796af3140cfea99e23a0cd2185d51c33f8c",
         "public": "09679d6878a13a033f25ddab3a7267764747cc52"
       },
-      "claimed_at": "2026-09-25T00:20:03.675Z",
+      "claimed_at": "2026-09-25T07:26:16.409Z",
       "expires_at": null,
-      "generation": 1,
-      "heartbeat_at": "2026-09-25T05:38:43.440Z",
+      "generation": 2,
+      "heartbeat_at": "2026-09-25T07:26:16.409Z",
       "machine_id": "devserver",
-      "reservation_id": "rsv-4399cefc8e894f129083508d",
+      "reservation_id": "rsv-99e5f5804b82bfbe4920ffce",
       "run_id": "phase-100606",
-      "status": "blocked"
+      "status": "claimed"
     }
   },
   "version": 1
