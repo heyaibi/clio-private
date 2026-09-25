@@ -2176,6 +2176,63 @@ def verify_ledger(run, outputs, current=None):
                        f"({e['git_head'][:8]} -> {head_now[:8]})")
 
 
+def repin_ledger(run, reason):
+    """Re-point every ledger step's ``git_head`` at the current HEAD.
+
+    ``verify_ledger`` compares each step's recorded ``git_head`` to the live
+    HEAD as a plain string, so an operator baseline change (a merge, a rebase)
+    invalidates a resume. The ``head_repin`` key in the ledger has always
+    recorded *why* that happened, but nothing read it: it looked like the
+    mechanism and was only a note. This is the mechanism.
+
+    Every step is re-pinned to the same HEAD, because a single resume runs
+    against one tree. Step outputs and artifacts stay pinned by sha256 and are
+    not touched, so this asserts only that the recorded commit moved; it does
+    not re-verify that the old outputs still describe the new tree. The
+    ``reason`` is required and is stored, so the ledger always says which
+    operator decision authorised the move.
+    """
+    run_dir = Path(run._run_dir)
+    ledger_path = run_dir / "ledger.json"
+    if not ledger_path.is_file():
+        raise Fail("repin: no ledger.json in run directory")
+    if not isinstance(reason, str) or not reason.strip():
+        raise Fail("repin: --repin-reason is required and must say why HEAD moved")
+    try:
+        ledger = json.loads(ledger_path.read_text())
+    except (OSError, ValueError) as exc:
+        raise Fail(f"repin: ledger.json cannot be read ({exc})") from exc
+    steps = ledger.get("steps")
+    if not isinstance(steps, dict) or not steps:
+        raise Fail("repin: ledger.json has no steps mapping")
+    head = git_head(run)
+    if not head:
+        raise Fail("repin: cannot read the current HEAD")
+    previous = sorted({e.get("git_head") for e in steps.values()
+                       if isinstance(e, dict) and e.get("git_head")})
+    changed = []
+    for sid, entry in steps.items():
+        if not isinstance(entry, dict):
+            continue
+        was = entry.get("git_head")
+        if was != head:
+            changed.append({"step": sid, "from": was, "to": head})
+        entry["git_head"] = head
+    ledger["head_repin"] = {
+        "from": previous[0] if len(previous) == 1 else previous,
+        "to": head,
+        "reason": reason.strip(),
+        "rejected_at": time.strftime("%Y-%m-%d"),
+        "note": ("Written by runner.py --repin-ledger. verify_ledger compares "
+                 "each step's git_head string to the current HEAD; this key is "
+                 "the audit record for that move, not the mechanism."),
+    }
+    write_json_atomic(ledger_path, ledger)
+    return {"repin": "ok", "run_dir": str(run_dir), "git_head": head,
+            "steps": sorted(steps), "changed": changed,
+            "unchanged": [c["step"] for c in changed if c["from"] == head]}
+
+
 def audit_or_migrate_ledger(run, migrate=False):
     """Report authority gaps and optionally backfill deterministic entries.
 
@@ -3065,7 +3122,17 @@ def _run_attached_plain(cmd, log_path, when, nonce, cwd, env):
         raise Fail(f"harness binary missing ({cmd[0]} not on PATH)")
     _poll_loop(proc, log_path, when, nonce, lambda: None)
     if not Path(log_path).is_file():
-        raise Fail(f"run log missing: {log_path} (agent never wrote it)")
+        # No log and no terminal is the common shape here: several harness
+        # CLIs refuse to start without a TTY and exit before writing anything,
+        # so the bare "agent never wrote it" sends the operator looking for a
+        # stuck agent instead of at the pipe they started the runner through.
+        hint = ""
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            hint = (". This step ran without a TTY, and some harness CLIs "
+                    "refuse to start in that mode. Start the runner from a "
+                    "real terminal, or launch it through phase-driver.sh, "
+                    "which provides the pty; do not pipe or redirect it")
+        raise Fail(f"run log missing: {log_path} (agent never wrote it){hint}")
     text = Path(log_path).read_text()
     if not text.strip():
         raise Fail(f"run log empty: {log_path}")
@@ -5423,6 +5490,12 @@ def main():
     ap.add_argument("--migrate-ledger", action="store_true",
                     help="backfill deterministic task_file/task hashes for legacy ledger "
                          "entries; ambiguous steps are reported, not guessed")
+    ap.add_argument("--repin-ledger", action="store_true",
+                    help="re-point every ledger step's git_head at the current "
+                         "HEAD so a resume survives an operator baseline "
+                         "change; requires --repin-reason")
+    ap.add_argument("--repin-reason", default=None, metavar="TEXT",
+                    help="why HEAD moved, recorded in the ledger head_repin entry")
     ap.add_argument("--machine-id", default=None,
                     help="stable host ID for the shared phase reservation")
     ap.add_argument("--takeover", action="store_true",
@@ -5433,13 +5506,13 @@ def main():
     if args.customize_harness and (args.fuzz or args.autoexit_test
                                    or args.self_test or args.audit_ledger
                                    or args.migrate_ledger or args.mark_done
-                                   or args.reset_rotation):
+                                   or args.reset_rotation or args.repin_ledger):
         # These paths never start a job, so there is no map to decide. Fail
         # loudly rather than silently ignoring the flag.
         ap.error("--customize-harness applies only to a run that starts "
                  "harnesses: not with --fuzz, --autoexit-test, --self-test, "
-                 "--audit-ledger, --migrate-ledger, --mark-done, or "
-                 "--reset-rotation")
+                 "--audit-ledger, --migrate-ledger, --repin-ledger, "
+                 "--mark-done, or --reset-rotation")
     if args.fuzz:
         fuzz(args.fuzz)
         return
@@ -5514,6 +5587,9 @@ def main():
             report = audit_or_migrate_ledger(run, migrate=args.migrate_ledger)
             print(json.dumps(report, indent=2))
             sys.exit(0 if not report.get("ambiguous") and not report.get("errors") else 1)
+        if args.repin_ledger:
+            print(json.dumps(repin_ledger(run, args.repin_reason), indent=2))
+            return
         had_run_dir = run._run_dir.exists()
         if not args.dry_run:
             run._run_dir.mkdir(parents=True, exist_ok=True)
