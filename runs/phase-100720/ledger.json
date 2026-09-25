@@ -3,7 +3,8 @@
     "developer",
     "adversary",
     "remediator",
-    "approver"
+    "approver",
+    "finalize"
   ],
   "steps": {
     "developer": {
@@ -81,6 +82,22 @@
       "stage_sha256": "5614191ec813108754527ccd42ccc95b4342d3c0f62ee88a20203fdef5db4f34",
       "via": "edge",
       "routed_to": "finalize"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 62b8b664",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "authoritative": true,
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "visits": 1,
+      "output_sha256": "6b0d29978722cc5297dc84c948e9f998bdf909c8fe7058ebbc6982d9299ab080",
+      "artifacts": {},
+      "git_head": "4ed5141e4195ef59effb5baa4c09f7c937e1218b",
+      "superseded_task_files": [],
+      "task_file": "finalize-task-r1.md",
+      "task_sha256": "8fc3677e5085775eb71af82a7132b2c92abd9c9205d1eb881ad94c8779c40ef5",
+      "stage_sha256": "d6a7aced1f5aa3a9e74f54fd84ba87cbfeacf8604a3342cd958e04227b8f8b0c",
+      "via": "end",
+      "routed_to": "completed"
     }
   }
 }
