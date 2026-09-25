@@ -81,6 +81,8 @@
       "status": "completed"
     },
     "100606": {
+      "accepted_at": "2026-09-25T20:29:18.126Z",
+      "accepted_reason": "Operator acceptance without a passing checker, 2026-09-26. The remedy approver rejected three times (14, then 7, then 4 open findings) and a fourth round was aborted before producing a verdict; no machine approval signal was ever emitted for this phase. All seven round-3 grounds were re-derived against the recovery branch. The F-06 ground was real and unfixed, and is fixed in the public repo as 32d905d with four regression tests. Gates on the merged tree: fmt clean, clippy -D warnings clean, 2426 tests pass / 0 fail, make coverage exit 0, 347 files all over the 90% per-file floor. Still open: the Human Approver sign-off for the public lexical/retrieval policy choice, and F-10 plus F-13 part 2 accepted in writing in the phase file's Known Limitations.",
       "base_revisions": {
         "private": "2918d8dcade80097457409cfebd36332b70d3af2",
         "public": "b0b20cc797c1dfd669fa82a8780a4fa4c37c7e0d"
@@ -88,11 +90,11 @@
       "claimed_at": "2026-09-25T19:15:59.628Z",
       "expires_at": null,
       "generation": 6,
-      "heartbeat_at": "2026-09-25T19:16:09.282Z",
+      "heartbeat_at": "2026-09-25T20:29:18.126Z",
       "machine_id": "macbook",
       "reservation_id": "rsv-64fc4002a05afb9079db1699",
       "run_id": "phase-100606",
-      "status": "blocked"
+      "status": "accepted"
     },
     "100720": {
       "base_revisions": {
