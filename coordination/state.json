@@ -136,6 +136,20 @@
       "run_id": "phase-100640",
       "status": "completed"
     },
+    "100660": {
+      "base_revisions": {
+        "private": "0c3aab09ed8ab557f932fd180e1f83736934e1f6",
+        "public": "4f446559417cdd20dc548e351e22c5bc6b5a4471"
+      },
+      "claimed_at": "2026-09-25T23:30:03.957Z",
+      "expires_at": null,
+      "generation": 1,
+      "heartbeat_at": "2026-09-25T23:30:03.957Z",
+      "machine_id": "devserver",
+      "reservation_id": "rsv-b702149b67ed467cfb2086e4",
+      "run_id": "phase-100660",
+      "status": "claimed"
+    },
     "100720": {
       "base_revisions": {
         "private": "f25d04f6b0bc55b547be817bc1e75deda8718def",
