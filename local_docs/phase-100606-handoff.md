@@ -1,5 +1,12 @@
 # Phase 100606 — operator handoff for off-host completion
 
+> **The code for this phase is in pull request
+> [#28](https://github.com/heyaibi/clio/pull/28)** (`phase-100606-recovery` →
+> `master`, 217 files, +22,544/−2,761). That PR is the deliverable to review
+> and merge. This document is the run history, the two defects that PR
+> deliberately leaves open, and the ordered steps to finish the phase without
+> fabricating a verdict.
+
 **Status: NOT complete.** The approver rejected the remedy three times and a
 fourth round was aborted by the operator before it produced a verdict. No
 approval signal was ever emitted for round 4, and no terminal `run.json` was
@@ -7,6 +14,46 @@ written for it. Nothing in this repository asserts that phase 100606 passed.
 
 Read this end to end before touching anything. It exists so that the work can
 be finished honestly on another machine, one real step at a time.
+
+---
+
+## 0. The pull request
+
+**[#28 — Phase 100606: context lifecycle portability (rounds 1-3 fixes) + F-06/F-13 corrections](https://github.com/heyaibi/clio/pull/28)**
+
+| | |
+|---|---|
+| Branch | `phase-100606-recovery` → `master` |
+| Size | 217 files, +22,544 / −2,761 |
+| State | open, rebased onto `master` (`4ed5141`), gates green |
+
+Four commits, and the distinction matters when reviewing:
+
+| Commit | What it is |
+|---|---|
+| `936c0a2` | **Verbatim preservation** of 215 files of rounds 1–3 work that existed only as uncommitted changes on `master`. Not new authorship — this is prior work captured before it could be lost. |
+| `cfb96b4` | F-06 fix — import re-scrubbed an already-scrubbed value (real bug, reproduced end to end) |
+| `96b470c` | F-13 part 1 fix — one dead-letter froze all eight push cursors (real bug), plus the F-10 / F-13-part-2 Known Limitations |
+| `b0b20cc` | Correct stale sync test comments that denied existing regression coverage |
+
+Verified on the rebased tree: `cargo fmt` clean, `clippy -D warnings` clean,
+**2422 tests pass / 0 fail**. Every touched file within the 450-line cap.
+Coverage was last measured on a different host before the abort; re-run
+`make coverage` if you want it fresh.
+
+**Review priorities on that PR**, hardest first:
+
+1. **F-13 part 1 changes sync delivery semantics.** The case that matters: a
+   kind that holds its cursor because one of *its own* mutations was rejected
+   must not be able to skip a row the peer never stored.
+2. **F-06** is the one change with a real before/after reproduction. Verify it
+   yourself rather than trusting the account.
+3. The 215-file bulk is prior work; skim for correctness, do not re-review
+   from scratch.
+
+Two defects are **deliberately not fixed** in that PR — see section 4. They
+are the reason this phase must not be marked complete before someone decides
+their fate on purpose.
 
 ---
 
@@ -53,10 +100,11 @@ wrong and were corrected by hand during the handoff. Assume more remain.
 - `roadmap/phase-100606-context-lifecycle-portability.md` — carries two Known
   Limitations added during the handoff. See section 4.
 
-## 3. Product fixes (public repo, not yet on master)
+## 3. Product fixes — see PR #28
 
-Branch **`phase-100606-recovery`**, 4 commits ahead of `origin/master`. Review
-and merge it; do not re-implement.
+All four fixes are in **[#28](https://github.com/heyaibi/clio/pull/28)**.
+Review and merge that PR; do not re-implement any of it. The summary below is
+so you can verify rather than trust.
 
 - **F-06 — real bug, reproduced end to end.** `scrub_inline_secrets` was not
   idempotent. `mask_secret` returns the literal `[REDACTED]` only for values of
@@ -85,11 +133,9 @@ and merge it; do not re-implement.
   (claimed persona-erase regression coverage was removed or blocked; it exists
   at `apply_records_edge_tests::persona_preference_erased_bank_dead_letters`).
 
-Last verified on the devserver host, before the operator aborted round 4:
-`cargo fmt` clean, `clippy -D warnings` clean, 2409 tests pass / 0 fail,
-coverage 347 files at 97.87% lines and 98.70% functions with every reported
-file over the per-file floor, all touched files within the 450-line cap.
-**Re-run all of it locally.** Those numbers predate any merge you perform.
+**Do not trust `findings.json` resolutions without re-verifying them.** Those
+two false claims were found by hand during the handoff, which means the
+remediator wrote them. Assume more remain.
 
 ## 4. Two defects that are known-open — do not lose these
 
@@ -127,9 +173,11 @@ hand-edited ledger, no fabricated publication receipt.
    git fetch --all --prune && git status
    cd private/clio-private && git pull --rebase
    ```
-2. **Review and merge the public fixes** from `phase-100606-recovery`. Run the
-   full gate set locally first: `make fmt`, `make lint`, `make test`,
-   `make coverage`, and check the per-file 90% floors in the coverage output.
+2. **Review and merge [#28](https://github.com/heyaibi/clio/pull/28)** into
+   `master`. Run the full gate set locally first: `make fmt`, `make lint`,
+   `make test`, `make coverage`, and check the per-file 90% floors in the
+   coverage output. Pay attention to review priority 1 in section 0 — the
+   F-13 part 1 delivery-semantics change.
 3. **Investigate on your own.** Re-derive the four findings' resolutions
    against the merged tree. Verify F-06 and F-13 part 1 yourself rather than
    trusting the account above. Confirm whether more untrue claims remain in
