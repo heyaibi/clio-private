@@ -82,17 +82,17 @@
     },
     "100606": {
       "base_revisions": {
-        "private": "f25d04f6b0bc55b547be817bc1e75deda8718def",
-        "public": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3"
+        "private": "2918d8dcade80097457409cfebd36332b70d3af2",
+        "public": "b0b20cc797c1dfd669fa82a8780a4fa4c37c7e0d"
       },
-      "claimed_at": "2026-09-25T16:01:45.900Z",
+      "claimed_at": "2026-09-25T19:15:46.537Z",
       "expires_at": null,
-      "generation": 4,
-      "heartbeat_at": "2026-09-25T18:28:07.663Z",
-      "machine_id": "devserver",
-      "reservation_id": "rsv-fb3c70d07f327e144708e092",
+      "generation": 5,
+      "heartbeat_at": "2026-09-25T19:15:46.538Z",
+      "machine_id": "macbook",
+      "reservation_id": "rsv-a690a2685b5b076a1f2e3b9e",
       "run_id": "phase-100606",
-      "status": "blocked"
+      "status": "claimed"
     },
     "100720": {
       "base_revisions": {
