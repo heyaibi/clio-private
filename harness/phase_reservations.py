@@ -42,9 +42,15 @@ DEFAULT_REMOTE = "origin"
 COORDINATION_VERSION = 1
 STATUSES = frozenset({
     "claimed", "running", "paused", "blocked", "completed", "rejected",
+    "accepted",
 })
 ACTIVE_STATUSES = frozenset({"claimed", "running", "paused", "blocked"})
-TERMINAL_STATUSES = frozenset({"completed", "rejected"})
+# "completed" means the pipeline's finalize step published the phase.
+# "accepted" means an operator closed it deliberately, without a passing
+# checker, and recorded that decision in the phase file. It is terminal for
+# the same reason, but it must never require a publication receipt: finalize
+# did not run, so no receipt with real commit SHAs exists to point at.
+TERMINAL_STATUSES = frozenset({"completed", "rejected", "accepted"})
 MAX_TRANSACTION_ATTEMPTS = 4
 GIT_TIMEOUT_S = 60
 FETCH_TIMEOUT_S = 180
@@ -553,7 +559,7 @@ class ReservationStore:
             f"phase coordination: reserve {key} for {machine_id}")
 
     def _owned_mutation(self, reservation, next_status=None,
-                        evidence_path=None):
+                        evidence_path=None, accepted_reason=None):
         if not isinstance(reservation, dict):
             raise CoordinationError("reservation must be an object")
         machine_id = _validate_machine_id(reservation.get("machine_id"))
@@ -564,6 +570,19 @@ class ReservationStore:
         key, _number = _phase_key(phase)
         if next_status is not None:
             next_status = _validate_status(next_status)
+        if next_status == "accepted":
+            # An operator close-out is a decision, not a machine verdict, and
+            # the next operator needs to know which it was. Refuse to record
+            # the status without the justification.
+            if not isinstance(accepted_reason, str) or not accepted_reason.strip():
+                raise CoordinationError(
+                    "accepted requires --accept-reason saying why the operator "
+                    "closed the phase without a passing checker")
+            if len(accepted_reason) > 2000:
+                raise CoordinationError("accepted reason is longer than 2000 characters")
+        elif accepted_reason is not None:
+            raise CoordinationError(
+                "an acceptance reason is only valid for accepted status")
         receipt = None
         if next_status == "completed":
             if evidence_path is None:
@@ -591,6 +610,9 @@ class ReservationStore:
                     f"phase {key} is already {record.get('status')}")
             if next_status is not None:
                 record["status"] = next_status
+            if next_status == "accepted":
+                record["accepted_reason"] = accepted_reason.strip()
+                record["accepted_at"] = _now()
             if receipt is not None:
                 record["completion_receipt"] = receipt
             record["heartbeat_at"] = _now()
@@ -605,9 +627,11 @@ class ReservationStore:
             self.private, self.remote, self.branch, mutate,
             f"phase coordination: renew {reservation['phase']}")
 
-    def set_status(self, reservation, status, *, evidence_path=None):
+    def set_status(self, reservation, status, *, evidence_path=None,
+                   accepted_reason=None):
         mutate = self._owned_mutation(
-            reservation, status, evidence_path=evidence_path)
+            reservation, status, evidence_path=evidence_path,
+            accepted_reason=accepted_reason)
         return _transaction(
             self.private, self.remote, self.branch, mutate,
             f"phase coordination: {status} {reservation['phase']}")
@@ -1231,6 +1255,10 @@ def main(argv=None):
             command.add_argument(
                 "--publication-receipt",
                 help="published receipt path; required for completed")
+            command.add_argument(
+                "--accept-reason",
+                help="why an operator closed the phase without a passing "
+                     "checker; required for accepted, and recorded on the board")
 
     takeover = sub.add_parser("takeover", help="explicitly take over a live claim")
     _add_store_args(takeover)
@@ -1285,7 +1313,8 @@ def main(argv=None):
             else:
                 result = store.set_status(
                     reservation, args.status,
-                    evidence_path=args.publication_receipt)
+                    evidence_path=args.publication_receipt,
+                    accepted_reason=args.accept_reason)
         elif args.command == "takeover":
             result = store.takeover(
                 args.phase, args.machine_id, confirm=args.confirm,
