@@ -82,17 +82,17 @@
     },
     "100606": {
       "base_revisions": {
-        "private": "a74fe796af3140cfea99e23a0cd2185d51c33f8c",
-        "public": "09679d6878a13a033f25ddab3a7267764747cc52"
+        "private": "f25d04f6b0bc55b547be817bc1e75deda8718def",
+        "public": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3"
       },
-      "claimed_at": "2026-09-25T07:26:16.409Z",
+      "claimed_at": "2026-09-25T16:00:42.650Z",
       "expires_at": null,
-      "generation": 2,
-      "heartbeat_at": "2026-09-25T15:21:45.203Z",
+      "generation": 3,
+      "heartbeat_at": "2026-09-25T16:00:42.650Z",
       "machine_id": "devserver",
-      "reservation_id": "rsv-99e5f5804b82bfbe4920ffce",
+      "reservation_id": "rsv-794af98c4ac427dd251dbfd3",
       "run_id": "phase-100606",
-      "status": "rejected"
+      "status": "claimed"
     },
     "100720": {
       "base_revisions": {
