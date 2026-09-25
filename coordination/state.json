@@ -88,11 +88,11 @@
       "claimed_at": "2026-09-25T19:15:59.628Z",
       "expires_at": null,
       "generation": 6,
-      "heartbeat_at": "2026-09-25T19:16:03.424Z",
+      "heartbeat_at": "2026-09-25T19:16:09.282Z",
       "machine_id": "macbook",
       "reservation_id": "rsv-64fc4002a05afb9079db1699",
       "run_id": "phase-100606",
-      "status": "running"
+      "status": "blocked"
     },
     "100720": {
       "base_revisions": {
