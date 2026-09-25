@@ -164,6 +164,7 @@ Allow source context to help a future extractor understand a memory's setting wi
 
 #### Required Capability or Behavior
 - Raw ingest accepts the same optional context contract as the core store.
+- Domain-record writes accept the same optional `context` contract: `persona_put_stable`, `persona_observe_preference`, `task_upsert`, `failure_record`, `triple_add`, and `belief_observe` declare an optional bounded `context` parameter and persist it per record (SQLite and Postgres parity); a record written without context stays unchanged.
 - Context is passed to extractors as bounded descriptive metadata.
 - The authoritative evidence haystack remains `source_text`.
 - Context is not concatenated into a prompt as an instruction and cannot override schema, system, or verifier rules.
@@ -179,6 +180,7 @@ The ingest/extraction boundary owns propagation and prompt safety; the span veri
 3. Add explicit prompt delimiters and untrusted-data treatment for context in hosted extraction.
 4. Ensure context is not used as a source span or included in snapshot verification.
 5. Add tests for missing, normal, oversized, and instruction-like context.
+6. Declare the optional bounded `context` parameter on the domain-record write tools (`persona_put_stable`, `persona_observe_preference`, `task_upsert`, `failure_record`, `triple_add`, `belief_observe`) and persist it per record on both backends, rejecting a supplied context only where the record type has no context carrier (fail closed, never silently drop).
 
 #### Implementation Constraints
 - Do not send context to a hosted extractor unless the existing source-egress policy permits the same data class.
@@ -210,6 +212,7 @@ The retrieval/composition owner controls candidate text, result metadata, and bu
 3. Ensure dense/gist behavior is documented and covered by regression tests.
 4. Add budget tests showing context cannot expand `compose_context` beyond its budget.
 5. Add tests for context-only matches, fact/belief preservation, and bank isolation.
+6. Surface the stored context on the FR-34 domain reads (`persona_get`, `task_get`/`task_history`, `temporal_history`, `belief_history`) as optional per-record metadata, omitting the key when the record has none (T100606-13 / AC-100606-09).
 
 #### Implementation Constraints
 - No unbounded context concatenation.
@@ -405,6 +408,7 @@ Stop and report if:
 | T100606-10 | Context contains secret-like text | Logs, samples, and errors redact or omit it |
 | T100606-11 | CLI and MCP equivalent requests | Same stored context/evidence behavior |
 | T100606-12 | No provider/network configured | All local behavior remains available; no provider call occurs |
+| T100606-13 | Domain-record write with optional context (persona_put_stable, persona_observe_preference, task_upsert, failure_record, triple_add, belief_observe) followed by its domain read (persona_get, task_get/task_history, temporal_history, belief_history) | The context persists per record on SQLite and Postgres, the domain read surfaces it as metadata, and records written without context omit the key |
 
 ### Negative Testing
 Verify that:
@@ -432,6 +436,7 @@ Implementation claims must be supported by actual test output, runtime evidence,
 | AC-100606-06 | CLI and MCP expose identical semantics | T100606-11 | Contract/parity output |
 | AC-100606-07 | No provider adapter or network dependency is introduced | T100606-12, code inspection | Discovery and test evidence |
 | AC-100606-08 | Migration documentation carries external source identifiers opaquely with no container-parity claim | Documentation review | Approved example |
+| AC-100606-09 | Domain-record writes accept optional `context` (persona_put_stable, persona_observe_preference, task_upsert, failure_record, triple_add, belief_observe) and the domain reads (persona_get, task_get/task_history, temporal_history, belief_history) surface the stored context per record | T100606-13 | Domain-record persistence and read test output |
 
 ### Definition of Done
 - [ ] All in-scope behavior is implemented.
@@ -489,6 +494,7 @@ If extraction, retrieval, portability, or erasure is incomplete, do not claim na
 | §7.4 | Task 3 | T100606-09, T100606-10 | AC-100606-04, AC-100606-05 |
 | Provider-neutral migration goal | Task 4 | Documentation review | AC-100606-08 |
 | No-provider scope boundary | All tasks | T100606-12 | AC-100606-07 |
+| FR-34 / §4.4 domain records | Task 1 and Task 2 | T100606-13 | AC-100606-09 |
 
 Required chain:
 
