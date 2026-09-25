@@ -2,10 +2,10 @@
 name: am_check_remedy
 description: Clio check-remedy stage - validates remediation; approves or rejects
 role: reviewer
-harness: ['opencode:go/space-bunny-free@max', 'opencode:go/space-bunny-free@max', 'cmd:deepseek/deepseek-v4.1-flash@max']
+harness: ['opencode:go/space-bunny-free@max', 'opencode:go/space-bunny-free@max', 'cmd:stealth/space-bunny-alpha@high']
 harness_names:
   'opencode:go/space-bunny-free@max': "OpenCode CLI (Go . Space Bunny Free Max)"
-  'cmd:deepseek/deepseek-v4.1-flash@max': "Command Code (DeepSeek V4.1 Flash Max)"
+  'cmd:stealth/space-bunny-alpha@high': "Command Code (Space Bunny Alpha High)"
 placeholders:
   FINDINGS_PATH: Absolute path of findings.json.
   BACKUP_PATH: Absolute path of the findings.original.json backup.
