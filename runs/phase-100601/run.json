@@ -1,0 +1,190 @@
+{
+  "run_id": "phase-100601",
+  "phase": "100601",
+  "state": "publishing",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "signal": "DEVELOPER_DONE d526692b"
+    },
+    {
+      "step": "adversary",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/findings.json c3f107f3"
+    },
+    {
+      "step": "remediator",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "signal": "REMEDIATOR_DONE 2dfbc01a"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "signal": "REMEDY_REJECTED: F-02,F-06 4491e906"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "REMEDIATOR_DONE a9b69767"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "signal": "REMEDY_REJECTED: F-02 dd7c387d"
+    },
+    {
+      "step": "remediator",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "signal": "REMEDIATOR_DONE 2711cee4"
+    },
+    {
+      "step": "approver",
+      "harness": "cmd:deepseek/deepseek-v4.1-flash@max",
+      "agent": "Command Code (DeepSeek V4.1 Flash Max)",
+      "signal": "REMEDY_APPROVED 4787a3fc"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "FINALIZE_DONE fc8596ae"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/developer-task-r1.md",
+      "prompt_sha256": "695a0685e237969e23ae4334bb542da10d00aefe9b9f428c0f7023b4332c1e18",
+      "duration_s": 2090.238,
+      "visits": 1,
+      "signal": "DEVELOPER_DONE d526692b",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/developer-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/adversary-task-r1.md",
+      "prompt_sha256": "ff9453e5eb74bfa5e672f0f5d9a733d639ff9bb3937ad1078ef3752b543252d0",
+      "duration_s": 871.767,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/findings.json c3f107f3",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/adversary-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/remediator-task-r1.md",
+      "prompt_sha256": "3cf9618754d0db0d0baf6a03e67e1a5d0bb99495f34c4a75201ad30e462a4eb3",
+      "duration_s": 888.692,
+      "visits": 1,
+      "signal": "REMEDIATOR_DONE 2dfbc01a",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/remediator-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/approver-task-r1.md",
+      "prompt_sha256": "0ee09a690b8693f80207f5d7d9576cef922af862ce4fa4c261a2defd1a07acc3",
+      "duration_s": 939.027,
+      "visits": 1,
+      "signal": "REMEDY_REJECTED: F-02,F-06 4491e906",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/approver-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/remediator-task-r2.md",
+      "prompt_sha256": "9dc7da249a2d261ebd87548d91d1bf3f60d5ceb2b7b40dc43c423ffec43f8d57",
+      "duration_s": 818.525,
+      "visits": 2,
+      "signal": "REMEDIATOR_DONE a9b69767",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/remediator-task-r2.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/approver-task-r2.md",
+      "prompt_sha256": "7035bc823c37a880d68da32dc8f9418d153f6aea8ea2c5e7beb90d21a37177bc",
+      "duration_s": 499.831,
+      "visits": 2,
+      "signal": "REMEDY_REJECTED: F-02 dd7c387d",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/approver-task-r2.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/remediator-task-r3.md",
+      "prompt_sha256": "dca94bed781d440144822dc8fedad54f9241cb1e24a5f6949ad418f09389f233",
+      "duration_s": 349.82,
+      "visits": 3,
+      "signal": "REMEDIATOR_DONE 2711cee4",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/remediator-task-r3.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "cmd:deepseek/deepseek-v4.1-flash@max",
+      "agent": "Command Code (DeepSeek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/approver-task-r3.md",
+      "prompt_sha256": "97a2a676e13a8e39278d705b941696d7b08391e114122dec92b04880049822b9",
+      "duration_s": 315.13,
+      "visits": 3,
+      "signal": "REMEDY_APPROVED 4787a3fc",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/approver-task-r3.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/finalize-task-r1.md",
+      "prompt_sha256": "d5d25c0413a9dd8fab12cca8ece4f16c60043f90ec62f8a4347d0adb23b48bd4",
+      "duration_s": 326.269,
+      "visits": 1,
+      "signal": "FINALIZE_DONE fc8596ae",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100601/finalize-task-r1.tui.log",
+      "attach": "pty",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ],
+  "publication_pending": true
+}
