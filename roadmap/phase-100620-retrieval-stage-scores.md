@@ -5,10 +5,14 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
 | Developer | r1 | [TBD] | proposed |
-| Adversary | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max) | done |
+| Adversary | r1 | OpenCode CLI (Go . Space Bunny Free Max) | done |
 | Remediator | r1 | [TBD] | [TBD] |
+| Remediator | r1 | Command Code (DeepSeek V4 Flash (latest) Max) | done |
 | Remedy Approver | r1 | [TBD] | [TBD] |
+| Remedy Approver | r1 | OpenCode CLI (Go . Space Bunny Free Max) | approved |
 | Finalize | r1 | [TBD] | [TBD] |
+| Finalize | r1 | Command Code (DeepSeek V4 Flash (latest) Max) | done |
 
 **Capability phase 100620** · **Effort:** ~4–5 days · **Status:** Plan ready · **Parent:** gap analysis `gaps/recall-result-fidelity-gap-analysis.md` §3.1–3.4, §7, §10.2; requirement §4.5 item 3, FR-20 / §4.9.2 item 2, P12 / §4.12, §4.9.4.G
 
@@ -141,12 +145,23 @@ Before implementation, the agent must report:
 - The dense distance is available in `dense_leg` and discarded at `hybrid.rs:344`; the lexical score is discarded at `hybrid.rs:362`.
 - `FusedHit` carries a `ranks` vector that is populated but unread outside `fusion_tests.rs`.
 - `finalize` is the single place the final `ScoredHit` is built (`finalize.rs:100-112`); dedup clones fused fields without rewriting them.
-- `score` is treated as volatile by the MCP conformance mask (`crates/clio-mcp/tests/mcp_read_conformance.rs:196-228`), so a new nested field must be considered for that mask.
+- `score` is treated as volatile by the MCP conformance mask (`crates/clio-mcp/tests/mcp_read_conformance.rs:196-228` at plan time; that mask now lives in `crates/clio-mcp/tests/mcp_read_transport_conformance.rs`), so a new nested field must be considered for that mask.
 - `docs/recall-scope-and-dedup.md:35` guarantees that a plain call keeps its pre-scope payload byte-for-byte except for the omitted dedup block; adding `scores` intentionally changes the plain-call payload and that documentation must be updated.
 - `hybrid.rs` is 416 lines; `dedup.rs` 369, `finalize.rs` 146, `types.rs` 192.
 
 ### Repository Adaptation Rule
 The agent must determine concrete implementation locations from the actual repository. The plan does not prescribe file paths, class names, or module names unless they are an externally required contract. The `scores` field names and their relative semantics are the externally required contract for this phase.
+
+### Discovery Output (implementation time, 2026-09-26)
+
+- **Relevant subsystems identified:** `clio-retrieve` legs (`hybrid.rs`), fusion (`fusion.rs`, `hybrid_rank.rs`), dedup (`dedup.rs`), finalize (`finalize.rs`), DTOs (`types.rs`); `clio-store` hit shapes (`KnnHit`, `SearchHit`); `clio-index` search facades; MCP read binding (`clio-mcp/src/read_retrieve.rs`); CLI read path (`clio-lib/src/cli_read_core.rs`, `cli_read.rs`).
+- **Existing implementation approach:** the dense leg mapped `KnnHit` to `item_id` and discarded `distance` (`hybrid.rs:344`); the lexical leg mapped `SearchHit` to `item_id` and discarded `score` (`hybrid.rs:362`). `rrf_fuse` consumed rank lists and computed `FusedHit.score` from ranks only. `finalize` was the single `ScoredHit` construction site. MCP and CLI serialize the whole `RetrieveOutcome` by serde.
+- **Contracts/interfaces:** `RetrieveHit` (clio-types) is frozen and untouched. `ScoredHit` is the placement for `scores`. `FusedHit`/`RankList` are public in `clio-retrieve` but read outside tests nowhere. The MCP `explanation` trace is a hand-written projection and is intentionally unchanged in this phase.
+- **Existing test coverage:** measured before the change with `git grep -c '#[test]' HEAD -- <paths>` (commit `9a0876c`): 150 `clio-retrieve` tests, 343 `clio-mcp` tests, and 63 `clio-lib` read tests (`crates/clio-lib/src/cli_read*_tests.rs`). After the change the same trees (counted with `git grep --untracked -c '#[test]'`) hold 162 `clio-retrieve`, 348 `clio-mcp`, and 65 `clio-lib` read tests, matching the suites that run them (`cargo test -p clio-retrieve --locked` 162 passed, `cargo test -p clio-mcp --locked` 348 passed, `cargo test -p clio --locked cli_read` 65 passed). The conformance volatile mask already treated `score` as non-deterministic.
+- **Architectural constraints discovered:** `hybrid.rs` was 416 lines at plan time. Keeping `retrieve()` within clippy's 100-line function limit plus the 450-line file cap required a small decomposition: the leg fetch calls moved to a new `hybrid_legs.rs` module, and two small private helpers (`newly_expanded`, thin `dense_leg`/`lexical_leg` wrappers) kept `retrieve()` at 95 lines. `mcp_read_conformance.rs` was exactly 450 lines, so the mask edit had to stay net-zero lines (remediation r1 split that file; see AC-100620-07).
+- **Assumptions confirmed:** the raw dense distance and lexical score are available before the id mapping; `FusedHit.ranks` is unread outside `fusion_tests.rs`; dedup and finalize clone fused fields verbatim, so a new field survives that path; all three bindings propagate a new `ScoredHit` field by serde.
+- **Assumptions contradicted:** none material. Two plan-time expectations needed the anticipated small handling: `hybrid.rs` needed the leg decomposition, and the conformance volatile mask needed `"final"` added.
+- **Questions requiring clarification:** none.
 
 ---
 
@@ -287,13 +302,15 @@ Stop and report if: the raw values cannot be carried without changing fusion; `h
 ## 8. Test and Verification Strategy
 
 ### Required Tests
-- [ ] Unit tests (dense transform including negative distance; lexical passthrough; null-when-absent; clamp boundaries)
-- [ ] Integration tests (per-stage values survive fuse → dedup → finalize)
-- [ ] Contract tests (top-level `score` unchanged; `final == score`; MCP/in-process/CLI JSON parity)
-- [ ] End-to-end tests (real CLI/MCP `recall` row shows the `scores` object)
-- [ ] Regression tests (ordering and ranks unchanged; existing suites green)
-- [ ] Security tests (no content/query text in `scores`)
-- [ ] Failure-mode tests (missing arm value → `null`, not `0`; empty recall unchanged)
+- [x] Unit tests (dense transform including negative distance; lexical passthrough; null-when-absent; clamp boundaries)
+- [x] Integration tests (per-stage values survive fuse → dedup → finalize)
+- [x] Contract tests (top-level `score` unchanged; `final == score`; MCP/in-process/CLI JSON parity)
+- [x] End-to-end tests (real CLI/MCP `recall` row shows the `scores` object)
+- [x] Regression tests (ordering and ranks unchanged; existing suites green)
+- [x] Security tests (no content/query text in `scores`)
+- [x] Failure-mode tests (missing arm value → `null`, not `0`; empty recall unchanged)
+
+Evidence per test class is in §9 "Evidence (actual, 2026-09-26)".
 
 ### Required Test Scenarios
 
@@ -328,26 +345,39 @@ Implementation claims must be supported by actual test output, inspection result
 | AC-100620-06 | MCP, in-process, and CLI JSON expose identical `scores` | T100620-06 | Binding parity test output |
 | AC-100620-07 | No regression; size/coverage gates pass | T100620-07, T100620-08 | Workspace suite; coverage report; size check |
 
+#### Evidence (actual, 2026-09-26)
+
+| AC ID | Result | Evidence |
+|-------|--------|----------|
+| AC-100620-01 | PASS | Dense and lexical stage values reach the finalized hit. `per_stage_scores_survive_fuse_dedup_and_finalize` (in `clio-retrieve/src/stage_score_tests.rs`) compares `scores.semantic` to `semantic_from_distance` of the real `dense_search` distance and `scores.keyword` to the real `lexical_search` score, through fuse → dedup → finalize. `absent_arm_scores_are_null_not_zero` covers single-arm hits. `cargo test -p clio-retrieve --locked` → 162 passed / 0 failed. |
+| AC-100620-02 | PASS | `scores {final, reranker, semantic, keyword}` is on every hit and `reranker` is `null`. `scores_object_serializes_the_documented_shape`, `top_level_score_stays_equal_to_final_for_every_hit`, MCP `lexical_only_hits_report_null_semantic_and_numeric_keyword`, CLI `recall_json_scores_match_mcp_retrieve`; the MCP conformance matrix stays green. Real binary run: `./target/debug/clio --db <tmp> --backend sqlite --bank e2e recall "ECONNRESET" --output json` returned `"score":0.011823769943815867,"scores":{"final":0.011823769943815867,"keyword":1e-6,"reranker":null,"semantic":null}`. |
+| AC-100620-03 | PASS | **Before/after test output (real binaries, same store).** A pre-change binary built from HEAD (`9a0876c`, target dir outside the repo at `~/adv-scratch/pre/target/debug/clio`) and the post-change `target/debug/clio` were both run against ONE freshly seeded SQLite store (4 items, item timestamps in the future so the recency term is exactly `1.0` and the fused score is bit-reproducible): `./clio --db <shared.db> --backend sqlite --bank cmpbank recall "deploy retry backoff fusion scoring" --output json --limit 10`. Result: `pre_scores == post_scores == [0.01182377049180328, 0.011609345351043642, 0.011448412698412699]` — byte-identical top-level `score`s, identical hit order, identical `dense_rank`/`lexical_rank`/`consolidated`/`dedup`; `pre_has_scores_object=false`; the new `scores` object is the only payload difference (`"final":0.01182377049180328,"keyword":2.4821624004032445,"reranker":null,"semantic":null`). Two more scenarios agree the same way: `"postgres bm25 ranking fusion"` → 2 hits, identical scores; `"quantum chromodynamics lattice"` → 0 hits. Harness and output kept in this run directory (`remediator-compare-pre-post.py`, `remediator-pre-post-compare.json`, `failures: []`, exit 0). The absolute values differ from the round-1 adversary's run only because a fresh store was seeded (the store-to-store `admission_score` variance reported as issue #29); inside one store the two binaries agree exactly. **Post-change tests:** `final == score` is asserted for every hit in unit, retriever, MCP, and CLI tests. Ordering is unchanged: `reranker_keeps_scores_and_existing_order_behavior` (reverse-reranker order equals the reverse of the plain run; per-id scores identical before/after rerank) and `identical_inputs_produce_identical_scores_and_ranks` (two runs with a frozen clock produce identical ids/scores/ranks). `raw_scores_are_recorded_per_list_and_never_change_the_fused_score` runs `rrf_fuse` with and without score lists and gets identical fused scores and order, proving raw values never enter fusion. |
+| AC-100620-04 | PASS | `semantic_from_distance` unit test pins the transform at 0.0, 0.25, 1.0, 1.5, and 2.0 (clamped, never negative); the end-to-end `dense_distance_above_one_clamps_similarity_to_zero` uses an anti-parallel vector fixture, asserts the measured distance is > 1, and gets `semantic == 0.0`. Absent arm is `null` in `absent_arm_values_serialize_as_null_not_zero` and end to end. Module docs in `stage_score.rs` state `clamp(1 - distance, 0, 1)`. |
+| AC-100620-05 | PASS | `stage_score.rs` module docs and the `keyword` field docs state the SQLite `-bm25(items_fts)` vs Postgres `ts_rank_cd` sign/scale divergence and that no cross-backend comparability is claimed. `keyword` is the store's value as-is: the end-to-end test compares it against `lexical_search`'s own `SearchHit.score`. |
+| AC-100620-06 | PASS | MCP vs in-process parity: `mcp_payload_and_in_process_surface_expose_identical_scores` (same hit set, exact key set, exact `semantic`/`keyword`, `final == score` inside each payload). CLI vs MCP parity: `recall_json_scores_match_mcp_retrieve` (now `cli_read_scores_tests.rs`). Populated-arm parity (remediation r1, deterministic stub embedder): `dense_arm_populates_semantic_in_mcp_payload_with_parity` (MCP payload vs in-process surface, `semantic` numeric on both) and `recall_json_semantic_is_populated_with_live_embedder` (CLI `recall --output json` vs MCP `retrieve`, same `semantic` for the same item). Real Postgres payload: `postgres_retrieve_scores_observes_ts_rank_cd_keyword_end_to_end` observed `keyword=0.10000000149011612`, equal to the `clio_index::lexical_search` value, with `semantic`/`reranker` null and `final == score`. Transport parity kept green by masking the wall-clock-sensitive `scores.final` like `score` in `mask_volatile` (now `crates/clio-mcp/tests/mcp_read_transport_conformance.rs`; the same 10 read-conformance tests pass across the two split binaries). `cargo test -p clio-mcp --locked` → 348 passed / 0 failed. |
+| AC-100620-07 | PASS | `cargo fmt --all --check` clean; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` clean; `make check` (fmt + clippy + `cargo test --locked --workspace`) exit 0 — 36 test binaries plus 16 doc-test suites, 2445 tests passed, 0 failed; final `make coverage` exit 0 → `coverage-guard: 349 file(s) checked against 90.0% floors`, guard-printed `TOTAL lines 97.88% functions 98.70%`, `all reported files meet the per-file floor`. Per-file rows for the files this phase touched (remediation r1 run of the same JSON): `stage_score.rs` 100.00/100.00, `hybrid_legs.rs` 98.28/100.00, `fusion.rs` 100.00/100.00, `hybrid.rs` 99.23/100.00, `hybrid_rank.rs` 97.73/100.00, `hybrid_util.rs` 98.25/100.00, `finalize.rs` 97.87/100.00, `types.rs` 100.00/100.00, `dedup.rs` 99.02/100.00, `read_retrieve.rs` 98.88/100.00; zero files below 90% on either metric. Every touched Rust file ≤ 450 lines (largest: `read_scores_tests.rs` 430, `stage_score_tests.rs` 419, `cli_read_tests.rs` 398; remediation r1 split `mcp_read_conformance.rs` 450 → 177 into `mcp_read_transport_conformance.rs` 259 + `mcp_read_support/mod.rs` 114). |
+
 ### Definition of Done
-- [ ] All in-scope behavior is implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes were introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation is updated where required.
-- [ ] Evidence is collected.
-- [ ] Verification is completed.
-- [ ] Required approval is obtained.
+- [x] All in-scope behavior is implemented.
+- [x] All acceptance criteria pass.
+- [x] Required tests pass.
+- [x] No unauthorized changes were introduced.
+- [x] Existing behavior remains intact.
+- [x] Security checks pass.
+- [x] Documentation is updated where required.
+- [x] Evidence is collected.
+- [x] Verification is completed.
+- [x] Required approval is obtained (downstream pipeline step). (Remedy Approver r1 verdict REMEDY_APPROVED; findings F-01..F-07 resolved and independently reproduced.)
 
 ### Completion Evidence
-- Implementation summary
-- Discovered/affected architectural components
-- Changed-component summary
-- Test execution output
-- API/schema evidence for the `scores` object
-- Verification report
-- Known limitations
+- **Implementation summary:** the dense leg now returns each candidate's raw cosine distance and the lexical leg its raw backend score (`hybrid_legs.rs`, `StageHit`); `FusedHit` carries one `ArmSignal { rank, score }` per arm (`fusion.rs`), replacing the old `ranks: Vec<Option<usize>>` with a `ranks()` rank-only projection; only ranks enter the RRF sum. `finalize` attaches the nested `scores {final, reranker, semantic, keyword}` object to every `ScoredHit`: `final` mirrors the unchanged top-level `score`, `reranker` is always `null`, `semantic` is `clamp(1 - distance, 0, 1)` with `null` when the dense arm did not score the hit, and `keyword` is the backend's raw lexical score with `null` when the lexical arm did not score the hit. `RetrieveHit`, fusion weights, ordering, candidate counts, and the fail-open rerank policy are untouched.
+- **Discovered/affected architectural components:** `clio-retrieve` (`hybrid`, `hybrid_legs`, `hybrid_rank`, `hybrid_util`, `fusion`, `finalize`, `types`, `stage_score`), `clio-mcp` read binding, `clio-lib` CLI read tests, `docs/recall-scope-and-dedup.md`. The `explanation` trace is deliberately unchanged (owned by a later phase).
+- **Changed-component summary:** production — new `crates/clio-retrieve/src/stage_score.rs` (75 lines) and `hybrid_legs.rs` (110); modified `fusion.rs` (135), `hybrid.rs` (398), `hybrid_rank.rs` (142), `hybrid_util.rs` (97), `finalize.rs` (162), `types.rs` (196), `lib.rs` (127); `clio-mcp/src/read_retrieve.rs` (275) gained only the test-module registration. Tests — `stage_score_tests.rs` (419, new), `fusion_tests.rs` (256), `dedup_tests.rs` (415), `clio-mcp/src/read_scores_tests.rs` (430, new), `clio-mcp/tests/mcp_read_conformance.rs` (177), `clio-mcp/tests/mcp_read_transport_conformance.rs` (259, new), `clio-mcp/tests/mcp_read_support/mod.rs` (114, new), `clio-mcp/tests/mcp_read_scores_postgres_test.rs` (243, new), `clio-lib/src/cli_read_tests.rs` (398), `clio-lib/src/cli_read_scores_tests.rs` (258, new). Docs — `docs/recall-scope-and-dedup.md` byte-for-byte sentences corrected (`:31` and `:35`), and `docs/recall-scores.md` added as the operator note for the `scores` object and its `null` rules. Remediation r1 changed only headers, docs, and test files: no production behavior changed.
+- **Test execution output:** `cargo test -p clio-retrieve --locked` → 162 passed / 0 failed; `cargo test -p clio-mcp --locked` → 348 passed / 0 failed; `cargo test -p clio --locked cli_read` → 65 passed / 0 failed; `make check` → exit 0, 2445 tests passed / 0 failed across 36 test binaries plus 16 doc-test suites; all suites also green under the final instrumented `make coverage` run.
+- **API/schema evidence for the `scores` object:** per hit `"scores":{"final":<f64>,"reranker":null,"semantic":<f64|null>,"keyword":<f64|null>}`; the exact key set and the numbers-or-null property are pinned by tests in `clio-retrieve`, `clio-mcp`, and `clio-lib`. Real binary evidence quoted under AC-100620-02.
+- **Verification report:** pre-change baseline (workspace JSON at `/tmp/cov-baseline.json`, guard-printed) TOTAL lines 97.87% / functions 98.70%, 347 files, guard green. Final `make coverage` (remediation r1 re-run) → 349 files, guard-printed TOTAL lines 97.88% / functions 98.70%, `all reported files meet the per-file floor` (zero files below 90% lines or functions). The raw percentages behind those guard lines are 48422/49472 = 97.8796% lines and 98.7010% functions. Per-file rows for every touched file are listed under AC-100620-07.
+- **Verification limits:** three gaps remain. (1) The populated `semantic` in a binding payload is observed with a deterministic stub embedder — a local fake TEI double returning one fixed 384-dim unit vector — not with a real embedding model; the real-binary runs (no embedder configured) still show `semantic: null`, so the real-model scale of `semantic` is not exercised end to end. (2) `scores.reranker` is `null` everywhere by design (rerank relevance capture is not implemented), so no reranker-populated payload exists to check. (3) The Postgres `keyword` scale is observed through the live payload test `postgres_retrieve_scores_observes_ts_rank_cd_keyword_end_to_end`, but only for one query shape, and no cross-backend comparability is claimed or tested.
+- **Known limitations:** see §12.
 
 ---
 
@@ -406,10 +436,11 @@ After this phase is accepted:
 - `final` and ordering are provably unchanged for identical inputs and configuration.
 
 ### Known Limitations
-- `keyword` values are backend-dependent (SQLite `-bm25` vs Postgres `ts_rank_cd`); no cross-backend comparability is claimed.
-- `scores.reranker` is always `null` until Phase 100640.
-- `scores` is on `ScoredHit`, not on the frozen `RetrieveHit`.
-- Scores are not persisted; they exist only in the response.
+- **Missing:** a cross-backend-comparable lexical value. **Why:** SQLite surfaces `-bm25(items_fts)` and Postgres surfaces `ts_rank_cd`; their sign and scale differ, and no floor or threshold exists in this phase that would justify normalizing them. **Debt owner:** none assigned; no phase claims cross-backend `keyword` parity. A later phase that needs comparable lexical values must define the normalization explicitly.
+- **Missing:** rerank relevance capture. **Why:** deliberately out of scope here; the `reranker` key stays present and `null` so the object shape is stable. **Debt owner:** Phase 100640.
+- **Missing:** `scores` on the frozen `RetrieveHit`. **Why:** the placement decision keeps the fact/belief contract unchanged; `scores` live on `ScoredHit`. **Debt owner:** none; if a later decision moves them, this phase must be re-sequenced after Phase 100601 (gap analysis §10.1).
+- **Missing:** `scores` in the `explanation` trace. **Why:** the trace is hand-projected and intentionally left unchanged to avoid de-drift conflicts. **Debt owner:** Phase 100740.
+- **Missing:** persisted scores. **Why:** scores are response metadata only; no storage contract is defined. **Debt owner:** none assigned; persistence is out of scope.
 
 ### Downstream Prerequisites
 - Phase 100640 may rely on the `scores` object shape and the carried per-arm provenance.
@@ -417,10 +448,10 @@ After this phase is accepted:
 - If a later decision moves `scores` onto `RetrieveHit`, this phase must be re-sequenced after Phase 100601 (gap analysis §10.1).
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS WITH DOCUMENTED LIMITATIONS — Remedy Approver r1 approved (REMEDY_APPROVED) with all 7 findings resolved and independently reproduced; the three limits disclosed in §9 `Verification limits` stay open and are the reason for the qualifier.
 
 ### Verification Sign-Off
-- Implementer: [TBD]
+- Implementer: Developer r1 — OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max), 2026-09-26
 - Verifier: [TBD]
 - Human Approver: [TBD, if required]
-- Date: [TBD]
+- Date: 2026-09-26
