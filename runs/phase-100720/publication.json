@@ -1,8 +1,8 @@
 {
   "phase": "100720",
-  "private_commit": "4eb50c653dd69921827d15d3c13714bd51fb7603",
+  "private_commit": "1a60d7dfde8e1c3062c271d08bdaaa3368b0fa86",
   "public_commit": "4ed5141e4195ef59effb5baa4c09f7c937e1218b",
-  "published_at": "2026-09-25T16:54:17.192Z",
+  "published_at": "2026-09-25T16:56:09.769Z",
   "reservation": {
     "generation": 1,
     "machine_id": "local-01",
