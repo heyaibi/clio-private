@@ -1,6 +1,14 @@
 # Proposal: make remedy failure cheap, and make the loop legible
 
-Status: draft. Date: 2026-09-26. Scope: pipeline, driver, `next_phase.py`, `runner.py`, stage files, plus one new read-only report. No change to the approver's standard. No change to product code.
+> **SUPERSEDED — do not implement from this file.** Replaced by
+> `proposal-remedy-loop-escalation-and-evidence.md` after the phase-100606 run
+> records were read. Two conclusions here are wrong and are corrected in that
+> document: raising the approver cap to 5 would not have helped, and the
+> phase-file-size correlation answered the wrong question (the developer-produced
+> diff size is the variable, and it does predict remedy cost). Kept only as the
+> record of what was believed before the run data was available.
+
+Status: superseded. Date: 2026-09-26. Scope: pipeline, driver, `next_phase.py`, `runner.py`, stage files, plus one new read-only report. No change to the approver's standard. No change to product code.
 
 Note: on implementation, move this file to `implemented/` with its implementation record.
 
