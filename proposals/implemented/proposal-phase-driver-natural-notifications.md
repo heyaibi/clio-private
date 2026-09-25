@@ -1,6 +1,6 @@
 # Proposal: natural, low-noise phase-driver notifications
 
-Status: draft. Date: 2026-09-25. Scope: `harness/phase-driver.sh` notification wording and notification frequency only. This proposal does not change phase selection, reservations, runner behavior, pipeline behavior, halt behavior, or the Hermes transport.
+Status: implemented (2026-09-25). Scope: `harness/phase-driver.sh` notification wording and notification frequency only. This proposal does not change phase selection, reservations, runner behavior, pipeline behavior, halt behavior, or the Hermes transport.
 
 The previous `proposal-am-bench-natural-notifications.md` was withdrawn. The words “am-bench” in that filename and in the historical messages identify the phase or feature being worked on at the time. They do not identify a separate benchmark notification system. The notifications shown by the current driver are phase-driver notifications. This proposal describes the notifications that the driver actually sends.
 
@@ -231,3 +231,29 @@ If the current code has a send path that is not listed here, document the event 
 Use deterministic, developer-style messages for phase-driver events. Send one start and one final message for each launched phase, plus one message for each distinct stall episode. Keep event selection in the driver and keep Hermes delivery behavior unchanged.
 
 The am-bench notification proposals do not describe this system and must not be used as the implementation source for these messages. If benchmark notifications are needed later, they require a separate proposal tied to the benchmark runner that actually exists.
+
+---
+
+# Implementation record
+
+## Changes
+
+- Added `harness/phase_notifications.py` to parse phase filenames, build readable titles, preserve common acronyms, and format each event without sending anything itself.
+- Updated `harness/phase-driver.sh` to use the formatter for start, completion, interrupt, halt, signal-stop, and stall messages.
+- Removed the `[clio]` message prefix.
+- Rewrote start, completion, interrupt, halt, signal-stop, and stall messages as short developer updates.
+- Removed the private phase-file path from the start message and the private run path from the halt message.
+- Kept Hermes configuration, retry, fallback, timeout, and dead-channel behavior unchanged.
+- Kept the stall marker as the one-time guard for stall notifications.
+- Removed the notification for a phase that returns `WAIT_FOR_CLAIM`; that path does not launch phase work and the proposal excludes refused launches.
+- Updated the driver self-test for the new wording and added checks for one start message, one final completion message, no old prefix, and one non-repeating stall message.
+- Updated `harness/dev-note.md` to describe the new wording and frequency.
+
+## Verification
+
+- `bash -n harness/phase-driver.sh` passed.
+- `bash harness/phase-driver.sh --self-test` passed. The test used disabled delivery and verified the logged message text and counts.
+- `python3 -m unittest discover -s harness -p 'test_phase_notifications.py'` passed all 5 formatter tests.
+- `python3 -m unittest discover -s benchmarks/tests` passed all 116 tests.
+- `shellcheck` was not installed, so shellcheck lint was not run.
+- No real Hermes or Discord send was performed. The transport path was left unchanged and was not part of this wording-and-frequency change.

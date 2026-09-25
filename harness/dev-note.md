@@ -107,26 +107,20 @@ then use the normal runner with the new token.
 
 ## Stalled (watchdog)
 If a live session writes no output for `STALE_AFTER_SEC` (default 45 min), the driver
-sends one "looks STALLED" message and writes `private/clio-private/runs/.driver/stalled`. It does not
+sends one "looks stalled" message and writes `private/clio-private/runs/.driver/stalled`. It does not
 kill the run (a slow step can be legitimate). Clear the marker once you have looked:
 ```
 rm private/clio-private/runs/.driver/stalled
 ```
 
 ## Notifications (Discord #tech-team)
-Start, end, halt, stop and stall messages go through the Hermes profile:
-```
-hermes -p not-james-gosling send --to discord:1546601332276727828 "[clio] test"
-```
-A failed send is retried once, then sent to `DISCORD_FALLBACK_CHANNEL` if set. If all
-fail, `private/clio-private/runs/.driver/notify-broken` is written — check it if you stop seeing
-messages.
+The driver sends one natural-language update when a phase starts, one final update when it finishes or stops, and one update when a live phase first becomes stalled. It does not send a message for every cron tick. The stall marker prevents later ticks from repeating the same stall update.
 
-**Notifications are best-effort and never block or halt the run.** Sends are bounded
-by a timeout, run with stdin closed (a hung or interactive `hermes` cannot stall the
-pipeline), and after a total failure the channel is marked unavailable for that
-process so we stop retrying. A dead profile or dead Discord only costs you the
-messages, never the work.
+Messages use ordinary sentences. They do not include the `[clio]` prefix, private phase-file paths, profile names, channel IDs, credentials, or traceback text. The phase title is derived from the phase filename, with common names such as CLI, MCP, and HTTP kept in their usual capitalization. A phase number and the driver state are enough to understand the update.
+
+A failed send is retried once, then sent to `DISCORD_FALLBACK_CHANNEL` if set. If all fail, `private/clio-private/runs/.driver/notify-broken` is written — check it if you stop seeing messages.
+
+**Notifications are best-effort and never block or halt the run.** Sends are bounded by a timeout, run with stdin closed (a hung or interactive `hermes` cannot stall the pipeline), and after a total failure the channel is marked unavailable for that process so we stop retrying. A dead profile or dead Discord only costs you the messages, never the work.
 
 ## Troubleshooting
 - **A step sits idle with no signal:** the runner prints the exact `printf ... >> <log>` recovery line to stderr and, for `opencode`/`agy`/`cmd` under a terminal, types a short signal-safe reminder into the harness's own input. Check `<run_dir>/reminders.log` for what was sent, and `runner: attach mode: pty (console capture on)` in `session-<N>.log` to confirm the pty path was used. The reminder never writes the signal; if the work is verified done, use `--mark-done STEP SIGNAL`.

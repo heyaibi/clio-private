@@ -69,6 +69,7 @@ fi
 PRIV="private/clio-private"
 WF="$REPO/$PRIV/runs"
 HARNESS="$REPO/$PRIV/harness"
+NOTIFIER="$HARNESS/phase_notifications.py"
 
 # Optional untracked overrides; keep secrets/ids out of the committed file.
 # shellcheck disable=SC1091
@@ -104,6 +105,7 @@ NOTIFY_BROKEN="$RUN_DIR/notify-broken"
 LOG="$RUN_DIR/driver.log"
 DRY_RUN=0
 CUR_PHASE=""
+CUR_PHASE_FILE=""
 _STOPPED=0
 NOTIFY_DEAD=0
 
@@ -145,11 +147,11 @@ resolve_python || PYTHON="python3"
 # closed, so a hung or interactive hermes can never stall the run.
 send_one() {
   if command -v timeout >/dev/null 2>&1; then
-    timeout 20 hermes -p "$PROFILE" send --to "$1" "[clio] $2" </dev/null >>"$LOG" 2>&1
+    timeout 20 hermes -p "$PROFILE" send --to "$1" "$2" </dev/null >>"$LOG" 2>&1
   elif command -v gtimeout >/dev/null 2>&1; then
-    gtimeout 20 hermes -p "$PROFILE" send --to "$1" "[clio] $2" </dev/null >>"$LOG" 2>&1
+    gtimeout 20 hermes -p "$PROFILE" send --to "$1" "$2" </dev/null >>"$LOG" 2>&1
   else
-    hermes -p "$PROFILE" send --to "$1" "[clio] $2" </dev/null >>"$LOG" 2>&1
+    hermes -p "$PROFILE" send --to "$1" "$2" </dev/null >>"$LOG" 2>&1
   fi
 }
 
@@ -185,6 +187,22 @@ notify() {
   log "notify FAILED (wrote $NOTIFY_BROKEN); further sends skipped this run: $msg"
 }
 
+notify_phase() {
+  local phase_file="$1" event="$2" reason="${3:-}" exit_code="${4:-}"
+  local quiet_minutes="${5:-45}" message phase_number
+  local args=(--phase-file "$phase_file" --event "$event" --quiet-minutes "$quiet_minutes")
+  [ -n "$reason" ] && args+=(--reason "$reason")
+  [ -n "$exit_code" ] && args+=(--exit-code "$exit_code")
+  message="$("$PYTHON" "$NOTIFIER" "${args[@]}" 2>/dev/null || true)"
+  if [ -n "$message" ]; then
+    notify "$message"
+    return 0
+  fi
+  phase_number="${phase_file##*/phase-}"
+  phase_number="${phase_number%%-*}"
+  notify "Phase ${phase_number:-unknown} needs attention."
+}
+
 phase_state() {
   local file="$WF/phase-$(printf '%06d' "$1")/run.json"
   "$PYTHON" -c 'import json,sys;print(json.load(open(sys.argv[1])).get("state",""))' \
@@ -203,7 +221,7 @@ on_stop() {
   if [ -n "$CUR_PHASE" ]; then
     printf 'phase %s stopped by signal (rc=%s) at %s\n' \
       "$CUR_PHASE" "$rc" "$(ts)" >"$HALT"
-    notify "phase $CUR_PHASE STOPPED by signal (rc=$rc). Line stopped; clear $HALT to resume."
+    notify_phase "$CUR_PHASE_FILE" stopped-signal
   fi
   rm -f "$CURRENT" "$PIDFILE"
   exit "$rc"
@@ -212,6 +230,7 @@ on_stop() {
 run_session() {
   local number="$1" rel="$2" rc=0 state
   CUR_PHASE="$number"
+  CUR_PHASE_FILE="$rel"
   mkdir -p "$RUN_DIR"
   trap 'on_stop 129' HUP
   trap 'on_stop 130' INT
@@ -219,7 +238,7 @@ run_session() {
   printf '%s\n' "$$" >"$PIDFILE"
   cd "$REPO"
   export CLIO_MACHINE_ID="${CLIO_MACHINE_ID:-$PHASE_MACHINE_ID}"
-  notify "phase $number starting ($rel)"
+  notify_phase "$rel" started
   if [ -n "${DRIVER_STUB_RC:-}" ]; then
     log "STUB mode: simulating runner.py (rc=$DRIVER_STUB_RC)"
     sleep "${DRIVER_STUB_SLEEP:-2}"
@@ -230,12 +249,12 @@ run_session() {
   fi
   state="$(phase_state "$number")"
   case "$rc" in
-    0)   notify "phase $number finished: ${state:-completed}" ;;
-    3)   notify "phase $number WAIT_FOR_CLAIM; no launch occurred" ;;
-    130) notify "phase $number interrupted; will resume on the next tick" ;;
+    0)   notify_phase "$rel" completed ;;
+    3)   : ;;
+    130) notify_phase "$rel" interrupted "the process received an interrupt signal" ;;
     *)   printf 'phase %s rc=%s state=%s at %s\n' \
            "$number" "$rc" "${state:-unknown}" "$(ts)" >"$HALT"
-          notify "phase $number HALTED: ${state:-exit $rc}. Line stopped; see $PRIV/runs/phase-$(printf '%06d' "$number")/" ;;
+          notify_phase "$rel" stopped "" "$rc" ;;
   esac
   rm -f "$CURRENT" "$PIDFILE"
   exit "$rc"
@@ -265,7 +284,7 @@ newest_mtime() {
 # While a session is live, alert once if its output has gone quiet too long.
 check_stall() {
   [ -f "$STALL" ] && return 0
-  local n phase_dir newest now age
+  local n phase_dir newest now age phase_file
   n="$(cat "$CURRENT" 2>/dev/null || true)"
   [ -n "$n" ] || return 0
   phase_dir="$WF/phase-$(printf '%06d' "$n")"
@@ -275,7 +294,15 @@ check_stall() {
   if [ "$age" -gt "$STALE_AFTER_SEC" ]; then
     printf 'stalled: phase %s no output for %ss at %s\n' \
       "$n" "$age" "$(ts)" >"$STALL"
-    notify "phase $n looks STALLED (no output for $((age / 60)) min). Session still running; inspect it."
+    phase_file="$(find "$REPO/$PRIV/roadmap" -maxdepth 1 -type f \
+      -name "phase-$(printf '%06d' "$n")-*.md" -print -quit)"
+    if [ -n "$phase_file" ]; then
+      notify_phase "$phase_file" stalled "" "" "$((STALE_AFTER_SEC / 60))"
+    else
+      notify "Phase $n looks stalled.
+
+There has been no new output for $STALE_AFTER_SEC seconds. The session is still running; inspect it before stopping the work."
+    fi
   fi
 }
 
@@ -533,9 +560,37 @@ driver_self_test() {
   drive --self-test || true
   grep -q "running; skip" "$LOG" \
     && echo "ok: busy run skipped" || { echo "FAIL: busy run not skipped"; fail=1; }
+  sleep 1
+  start_count="$(grep -c 'Phase .* started\.' "$LOG" || true)"
+  [ "$start_count" = 1 ] \
+    && echo "ok: one start notification logged" || { echo "FAIL: expected one start notification, got $start_count"; fail=1; }
+  grep -q '\[clio\]' "$LOG" \
+    && { echo "FAIL: old notification prefix remains"; fail=1; } \
+    || echo "ok: notification prefix removed"
+
   wait_session_gone
-  grep -q "finished: completed" "$LOG" \
-    && echo "ok: end notification logged" || { echo "FAIL: end notification missing"; fail=1; }
+  grep -q "Phase .* has completed\." "$LOG" \
+    && echo "ok: completion notification logged" || { echo "FAIL: completion notification missing"; fail=1; }
+
+  # Exercise the stall path without waiting for the real threshold. Use this
+  # shell as the live process so the test does not race the short stub run.
+  old_stale_after_sec="$STALE_AFTER_SEC"
+  stall_test_phase=100000
+  printf '%s\n' "$stall_test_phase" >"$CURRENT"
+  printf '%s\n' "$$" >"$PIDFILE"
+  : >"$RUN_DIR/session-$stall_test_phase.log"
+  STALE_AFTER_SEC=0
+  sleep 1
+  check_stall
+  stall_count="$(grep -c 'Phase .* looks stalled\.' "$LOG" || true)"
+  [ "$stall_count" = 1 ] && [ -f "$STALL" ] \
+    && echo "ok: one stall notification logged" || { echo "FAIL: expected one stall notification, got $stall_count"; fail=1; }
+  check_stall
+  stall_count_after="$(grep -c 'Phase .* looks stalled\.' "$LOG" || true)"
+  [ "$stall_count_after" = "$stall_count" ] \
+    && echo "ok: stall notification is not repeated" || { echo "FAIL: stall notification repeated"; fail=1; }
+  rm -f "$STALL" "$CURRENT" "$PIDFILE"
+  STALE_AFTER_SEC="$old_stale_after_sec"
 
   DRIVER_STUB_RC=1; export DRIVER_STUB_RC
   rm -f "$HALT"
@@ -543,7 +598,7 @@ driver_self_test() {
   wait_session_gone
   [ -f "$HALT" ] \
     && echo "ok: halt marker written" || { echo "FAIL: halt marker missing"; fail=1; }
-  grep -q "HALTED" "$LOG" \
+  grep -q "Phase .* stopped\." "$LOG" \
     && echo "ok: halt notification logged" || { echo "FAIL: halt notification missing"; fail=1; }
 
   drive --self-test || true
@@ -561,7 +616,7 @@ driver_self_test() {
   wait_session_gone
   [ -f "$HALT" ] \
     && echo "ok: stop wrote halt marker" || { echo "FAIL: stop marker missing"; fail=1; }
-  grep -q "STOPPED by signal" "$LOG" \
+  grep -q "Phase .* stopped by signal\." "$LOG" \
     && echo "ok: stop notification logged" || { echo "FAIL: stop notification missing"; fail=1; }
 
   # Coordination failure: the normal driver path must refuse before tmux launch.
