@@ -85,12 +85,12 @@
         "private": "2918d8dcade80097457409cfebd36332b70d3af2",
         "public": "b0b20cc797c1dfd669fa82a8780a4fa4c37c7e0d"
       },
-      "claimed_at": "2026-09-25T19:15:46.537Z",
+      "claimed_at": "2026-09-25T19:15:59.628Z",
       "expires_at": null,
-      "generation": 5,
-      "heartbeat_at": "2026-09-25T19:15:46.538Z",
+      "generation": 6,
+      "heartbeat_at": "2026-09-25T19:15:59.628Z",
       "machine_id": "macbook",
-      "reservation_id": "rsv-a690a2685b5b076a1f2e3b9e",
+      "reservation_id": "rsv-64fc4002a05afb9079db1699",
       "run_id": "phase-100606",
       "status": "claimed"
     },
