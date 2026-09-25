@@ -23,36 +23,36 @@ Status values: **Plan ready** (spec only) · **Conditional — approval required
 | 100030 | `1×` | [phase-100030-memory-item-core.md](phase-100030-memory-item-core.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
 | 100040 | `1×` | [phase-100040-taxonomy-admission.md](phase-100040-taxonomy-admission.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
 | 100050 | `1×` | [phase-100050-online-extraction-span-verification.md](phase-100050-online-extraction-span-verification.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
-| 100060 | `1×` | [phase-100060-parallel-write-canonical-consolidation.md](phase-100060-parallel-write-canonical-consolidation.md) | Plan ready |
+| 100060 | `1×` | [phase-100060-parallel-write-canonical-consolidation.md](phase-100060-parallel-write-canonical-consolidation.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
 | 100070 | `1×` | [phase-100070-memtree-dirty-path-maintenance.md](phase-100070-memtree-dirty-path-maintenance.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
-| 100080 | `1×` | [phase-100080-bitemporal-triples-supersession.md](phase-100080-bitemporal-triples-supersession.md) | Plan ready |
-| 100090 | `1×` | [phase-100090-shared-continuous-ema-update-engine.md](phase-100090-shared-continuous-ema-update-engine.md) | Plan ready |
-| 100100 | `1×` | [phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md](phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md) | Plan ready |
-| 100110 | `1×` | [phase-100110-dense-lexical-index-pipelines.md](phase-100110-dense-lexical-index-pipelines.md) | Plan ready |
-| 100120 | `1.5×` | [phase-100120-intent-gate-hybrid-retrieve-compose.md](phase-100120-intent-gate-hybrid-retrieve-compose.md) | Plan ready |
-| 100130 | `1×` | [phase-100130-coactivation-associations-hub-distillation.md](phase-100130-coactivation-associations-hub-distillation.md) | Plan ready |
-| 100140 | `1×` | [phase-100140-persona-companion-object.md](phase-100140-persona-companion-object.md) | Plan ready |
-| 100150 | `1×` | [phase-100150-task-failure-temporal-history.md](phase-100150-task-failure-temporal-history.md) | Plan ready |
-| 100160 | `1.5×` | [phase-100160-mcp-schemas-write-surface.md](phase-100160-mcp-schemas-write-surface.md) | Plan ready |
-| 100170 | `1×` | [phase-100170-mcp-read-retrieve-compose-surface.md](phase-100170-mcp-read-retrieve-compose-surface.md) | Plan ready |
-| 100180 | `1×` | [phase-100180-audit-trail-inspect-correction.md](phase-100180-audit-trail-inspect-correction.md) | Plan ready |
-| 100190 | `1×` | [phase-100190-compliance-erase-path.md](phase-100190-compliance-erase-path.md) | Plan ready |
-| 100200 | `1×` | [phase-100200-additive-harness-workspace-tools.md](phase-100200-additive-harness-workspace-tools.md) | Plan ready |
-| 100210 | `1×` | [phase-100210-hygiene-audit-confirmed-cleanup.md](phase-100210-hygiene-audit-confirmed-cleanup.md) | Plan ready |
-| 100220 | `1×` | [phase-100220-json-export-import.md](phase-100220-json-export-import.md) | Plan ready |
-| 100230 | `1×` | [phase-100230-ops-doctor-repair.md](phase-100230-ops-doctor-repair.md) | Plan ready |
-| 100240 | `1.5×` | [phase-100240-multi-host-sync-protocol.md](phase-100240-multi-host-sync-protocol.md) | Plan ready |
-| 100250 | `1×` | [phase-100250-per-bank-retention-profiles.md](phase-100250-per-bank-retention-profiles.md) | Plan ready |
-| 100260 | `1×` | [phase-100260-retention-mission-coding-defaults.md](phase-100260-retention-mission-coding-defaults.md) | Plan ready |
-| 100270 | `1×` | [phase-100270-consolidated-recall-dedup.md](phase-100270-consolidated-recall-dedup.md) | Plan ready |
-| 100280 | `1×` | [phase-100280-https-transport-config.md](phase-100280-https-transport-config.md) | Plan ready |
-| 100290 | `1.5×` | [phase-100290-multi-model-embeddings.md](phase-100290-multi-model-embeddings.md) | Plan ready |
-| 100300 | `1×` | [phase-100300-rerank-providers.md](phase-100300-rerank-providers.md) | Plan ready |
-| 100310 | `1×` | [phase-100310-default-database-path.md](phase-100310-default-database-path.md) | Plan ready |
-| 100320 | `1×` | [phase-100320-compose-lifecycle.md](phase-100320-compose-lifecycle.md) | Plan ready |
-| 100330 | `1.5×` | [phase-100330-am-setup-wizard.md](phase-100330-am-setup-wizard.md) | Plan ready |
-| 100340 | `1.5×` | [phase-100340-hosted-extraction-adapter.md](phase-100340-hosted-extraction-adapter.md) | Plan ready |
-| 100350 | `1.5×` | [phase-100350-live-index-extraction-wiring.md](phase-100350-live-index-extraction-wiring.md) | Plan ready |
+| 100080 | `1×` | [phase-100080-bitemporal-triples-supersession.md](phase-100080-bitemporal-triples-supersession.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100090 | `1×` | [phase-100090-shared-continuous-ema-update-engine.md](phase-100090-shared-continuous-ema-update-engine.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100100 | `1×` | [phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md](phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100110 | `1×` | [phase-100110-dense-lexical-index-pipelines.md](phase-100110-dense-lexical-index-pipelines.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100120 | `1.5×` | [phase-100120-intent-gate-hybrid-retrieve-compose.md](phase-100120-intent-gate-hybrid-retrieve-compose.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100130 | `1×` | [phase-100130-coactivation-associations-hub-distillation.md](phase-100130-coactivation-associations-hub-distillation.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100140 | `1×` | [phase-100140-persona-companion-object.md](phase-100140-persona-companion-object.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100150 | `1×` | [phase-100150-task-failure-temporal-history.md](phase-100150-task-failure-temporal-history.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100160 | `1.5×` | [phase-100160-mcp-schemas-write-surface.md](phase-100160-mcp-schemas-write-surface.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100170 | `1×` | [phase-100170-mcp-read-retrieve-compose-surface.md](phase-100170-mcp-read-retrieve-compose-surface.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100180 | `1×` | [phase-100180-audit-trail-inspect-correction.md](phase-100180-audit-trail-inspect-correction.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100190 | `1×` | [phase-100190-compliance-erase-path.md](phase-100190-compliance-erase-path.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100200 | `1×` | [phase-100200-additive-harness-workspace-tools.md](phase-100200-additive-harness-workspace-tools.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100210 | `1×` | [phase-100210-hygiene-audit-confirmed-cleanup.md](phase-100210-hygiene-audit-confirmed-cleanup.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100220 | `1×` | [phase-100220-json-export-import.md](phase-100220-json-export-import.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100230 | `1×` | [phase-100230-ops-doctor-repair.md](phase-100230-ops-doctor-repair.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100240 | `1.5×` | [phase-100240-multi-host-sync-protocol.md](phase-100240-multi-host-sync-protocol.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100250 | `1×` | [phase-100250-per-bank-retention-profiles.md](phase-100250-per-bank-retention-profiles.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100260 | `1×` | [phase-100260-retention-mission-coding-defaults.md](phase-100260-retention-mission-coding-defaults.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100270 | `1×` | [phase-100270-consolidated-recall-dedup.md](phase-100270-consolidated-recall-dedup.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100280 | `1×` | [phase-100280-https-transport-config.md](phase-100280-https-transport-config.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100290 | `1.5×` | [phase-100290-multi-model-embeddings.md](phase-100290-multi-model-embeddings.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100300 | `1×` | [phase-100300-rerank-providers.md](phase-100300-rerank-providers.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100310 | `1×` | [phase-100310-default-database-path.md](phase-100310-default-database-path.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100320 | `1×` | [phase-100320-compose-lifecycle.md](phase-100320-compose-lifecycle.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100330 | `1.5×` | [phase-100330-am-setup-wizard.md](phase-100330-am-setup-wizard.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100340 | `1.5×` | [phase-100340-hosted-extraction-adapter.md](phase-100340-hosted-extraction-adapter.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
+| 100350 | `1.5×` | [phase-100350-live-index-extraction-wiring.md](phase-100350-live-index-extraction-wiring.md) | Complete — PASS WITH DOCUMENTED LIMITATIONS |
 
 Phase-scoped appendices (same folder): [phase-100020-appendix-vector-parity.md](phase-100020-appendix-vector-parity.md) · [phase-100040-appendix-admission-factors.md](phase-100040-appendix-admission-factors.md) · [phase-100050-appendix-span-verification.md](phase-100050-appendix-span-verification.md) · [phase-100080-appendix-bitemporal-intervals.md](phase-100080-appendix-bitemporal-intervals.md) · [phase-100090-appendix-ema-formulas.md](phase-100090-appendix-ema-formulas.md) · [phase-100120-appendix-hybrid-fusion-and-budgets.md](phase-100120-appendix-hybrid-fusion-and-budgets.md) · [phase-100130-appendix-association-weight-policy.md](phase-100130-appendix-association-weight-policy.md) · [phase-100210-appendix-noise-scoring.md](phase-100210-appendix-noise-scoring.md) · [phase-100220-appendix-bundle-format.md](phase-100220-appendix-bundle-format.md) · [phase-100240-appendix-sync-cursors-conflict.md](phase-100240-appendix-sync-cursors-conflict.md)
 
@@ -82,7 +82,7 @@ Implement both write gates end to end: closed category whitelist for semantic ty
 
 Build turn/tool extraction into schema-typed snapshots with span-copy verification for entities, numbers, and dates (retry once, then refuse commit). Online path stays a cheap verifier.
 
-## 100060. Parallel write path and canonical consolidation · `1×` · [phase-100060-parallel-write-canonical-consolidation.md](phase-100060-parallel-write-canonical-consolidation.md)
+## 100060. Parallel write path and canonical consolidation · `1×` · **Complete** · [phase-100060-parallel-write-canonical-consolidation.md](phase-100060-parallel-write-canonical-consolidation.md)
 
 Make new memory queryable fast: parallel chunk extraction, merge near-duplicates into a canonical unit, and expose the leaf immediately. Structural maintenance must not block leaf readability.
 
@@ -90,119 +90,119 @@ Make new memory queryable fast: parallel chunk extraction, merge near-duplicates
 
 Organize episodic memory as time-ordered trees and refresh only dirty ancestor paths, with parallel same-depth updates. Expose `maintenance_status` and `consolidate` so agents can see and trigger non-blocking structure work.
 
-## 100080. Bi-temporal triples and supersession · `1×` · [phase-100080-bitemporal-triples-supersession.md](phase-100080-bitemporal-triples-supersession.md)
+## 100080. Bi-temporal triples and supersession · `1×` · **Complete** · [phase-100080-bitemporal-triples-supersession.md](phase-100080-bitemporal-triples-supersession.md)
 
 Implement subject–predicate–object edges with valid-time and transaction-time, supersession via invalidation (not delete), and point-in-time query (`as_of`, `time_axis`). Reject continuous/scalar updates on this path.
 
-## 100090. Shared continuous EMA update engine · `1×` · [phase-100090-shared-continuous-ema-update-engine.md](phase-100090-shared-continuous-ema-update-engine.md)
+## 100090. Shared continuous EMA update engine · `1×` · **Complete** · [phase-100090-shared-continuous-ema-update-engine.md](phase-100090-shared-continuous-ema-update-engine.md)
 
 Implement the continuous/scalar update model (EMA plus slower trend) and enforce `update_rule` declarations so discrete invalidation and continuous smoothing never mix. This slice owns the **shared update engine** and generic `update` rule splitting; persona (slice 100140) calls into it and does not reimplement EMA. Formulas: [phase-100090-appendix-ema-formulas.md](phase-100090-appendix-ema-formulas.md).
 
-## 100100. Fact/belief epistemic kind and confidence trajectories · `1×` · [phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md](phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md)
+## 100100. Fact/belief epistemic kind and confidence trajectories · `1×` · **Complete** · [phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md](phase-100100-fact-belief-epistemic-kind-confidence-trajectories.md)
 
 Tag every item with `epistemic_kind` fact or belief; give beliefs append-only confidence history with `source_type`; expose `belief_observe` / `belief_history`; surface `epistemic_kind` and belief confidence on retrieval responses.
 
-## 100110. Dense and lexical index pipelines · `1×` · [phase-100110-dense-lexical-index-pipelines.md](phase-100110-dense-lexical-index-pipelines.md)
+## 100110. Dense and lexical index pipelines · `1×` · **Complete** · [phase-100110-dense-lexical-index-pipelines.md](phase-100110-dense-lexical-index-pipelines.md)
 
 Wire embedding generation and lexical/BM25 indexing for both backends (Postgres via pgvector; SQLite via the extension chosen in slice 100020), including rebuild hooks. Keep index maintenance separable from leaf write success. Early spike of the SQLite vector path happens here if slice 100020 left integration unfinished. Revisit ANN only per [phase-100020-appendix-vector-parity.md](phase-100020-appendix-vector-parity.md).
 
-## 100120. Intent gate, hybrid retrieve, and compose · `1.5×` · [phase-100120-intent-gate-hybrid-retrieve-compose.md](phase-100120-intent-gate-hybrid-retrieve-compose.md)
+## 100120. Intent gate, hybrid retrieve, and compose · `1.5×` · **Complete** · [phase-100120-intent-gate-hybrid-retrieve-compose.md](phase-100120-intent-gate-hybrid-retrieve-compose.md)
 
 Combine the per-turn intent gate (skip unneeded search; never gate persona), hybrid dense+lexical+optional graph retrieval with reranking, and `compose_context` under fixed token budgets. Honor domain filters and bi-temporal query args. Storage size stays independent of injection size. Fusion/budgets: [phase-100120-appendix-hybrid-fusion-and-budgets.md](phase-100120-appendix-hybrid-fusion-and-budgets.md).
 
-## 100130. Co-activation associations and hub distillation · `1×` · [phase-100130-coactivation-associations-hub-distillation.md](phase-100130-coactivation-associations-hub-distillation.md)
+## 100130. Co-activation associations and hub distillation · `1×` · **Complete** · [phase-100130-coactivation-associations-hub-distillation.md](phase-100130-coactivation-associations-hub-distillation.md)
 
 On co-retrieved sets, update edge weights with saturating growth, lazy decay, pruning below threshold, and hub consolidation into gated semantic items. Expose `associations`, `graph_link`, and `graph_query`. Formulas: [phase-100130-appendix-association-weight-policy.md](phase-100130-appendix-association-weight-policy.md).
 
-## 100140. Persona companion object · `1×` · [phase-100140-persona-companion-object.md](phase-100140-persona-companion-object.md)
+## 100140. Persona companion object · `1×` · **Complete** · [phase-100140-persona-companion-object.md](phase-100140-persona-companion-object.md)
 
 Build the bounded persona document and always-on injection under its own token budget with ranked truncation. Discrete stables use invalidation-style puts; continuous preferences call the shared EMA engine from slice 100090 (`persona_observe_preference` is a thin adapter, not a second EMA implementation).
 
-## 100150. Task, failure, and temporal history · `1×` · [phase-100150-task-failure-temporal-history.md](phase-100150-task-failure-temporal-history.md)
+## 100150. Task, failure, and temporal history · `1×` · **Complete** · [phase-100150-task-failure-temporal-history.md](phase-100150-task-failure-temporal-history.md)
 
 Implement selective history records and tools for tasks, length-capped failure lessons, and temporal trajectories—without full-log replay. Surface prior failures when retrying the same or similar task.
 
-## 100155. Operations `discard` tool (gap remediation) · `1×` · [phase-100155-ops-discard-tool.md](phase-100155-ops-discard-tool.md)
+## 100155. Operations `discard` tool (gap remediation) · `1×` · **Complete** · [phase-100155-ops-discard-tool.md](phase-100155-ops-discard-tool.md)
 
 Remediation insert added 2026-09-19: implement the in-process ops `discard` tool (`discard(item_id, reason)`, §4.9.4.A) writing the existing `discarded_at`/`discard_reason` columns on both backends, with FR-15 telemetry and §4.9.2 confirmation. Closes the phase-100080 scope ambiguity ("`discard` full ops tool if not already present" was skipped) that left slice 100160's minimum write set unbindable. Slice 100160 depends on this being accepted first.
 
-## 100160. MCP schemas and write surface · `1.5×` · [phase-100160-mcp-schemas-write-surface.md](phase-100160-mcp-schemas-write-surface.md)
+## 100160. MCP schemas and write surface · `1.5×` · **Complete** · [phase-100160-mcp-schemas-write-surface.md](phase-100160-mcp-schemas-write-surface.md)
 
 Publish machine-readable schemas for the normative catalog and expose gated write/mutate tools over **stdio and Streamable HTTP** (legacy HTTP+SSE only if a harness still requires it). Cover `store`, triples, invalidate/discard, persona writes, failures, beliefs, and related mutators. Tool semantics must match across transports; gates stay enforced inside tools.
 
-## 100170. MCP read, retrieve, and compose surface · `1×` · [phase-100170-mcp-read-retrieve-compose-surface.md](phase-100170-mcp-read-retrieve-compose-surface.md)
+## 100170. MCP read, retrieve, and compose surface · `1×` · **Complete** · [phase-100170-mcp-read-retrieve-compose-surface.md](phase-100170-mcp-read-retrieve-compose-surface.md)
 
 Complete the same MCP transports for reads and orchestration: intent diagnostics, retrieve/compose, snapshot/gist getters, MemTree queries, temporal/belief history, and day-to-day inspect listing. Semantics stay identical to the write surface.
 
-## 100180. Audit trail, inspect, and correction · `1×` · [phase-100180-audit-trail-inspect-correction.md](phase-100180-audit-trail-inspect-correction.md)
+## 100180. Audit trail, inspect, and correction · `1×` · **Complete** · [phase-100180-audit-trail-inspect-correction.md](phase-100180-audit-trail-inspect-correction.md)
 
 Emit attributable telemetry on mutating operations and expose `audit_trail`, `inspect`, and `correct` as a read/correct path over the same history structures the write path already stores—not a second logging system.
 
-## 100190. Compliance erase path · `1×` · [phase-100190-compliance-erase-path.md](phase-100190-compliance-erase-path.md)
+## 100190. Compliance erase path · `1×` · **Complete** · [phase-100190-compliance-erase-path.md](phase-100190-compliance-erase-path.md)
 
 Ship verified `erase_request`: destroy the subject DEK (keys introduced in slice 100020), regenerate derived structures via dirty-path, and write content-free tombstones. Hygiene and discard must not alias this path. This slice is erase UX and propagation, not first-time encryption plumbing.
 
-## 100200. Additive harness workspace tools · `1×` · [phase-100200-additive-harness-workspace-tools.md](phase-100200-additive-harness-workspace-tools.md)
+## 100200. Additive harness workspace tools · `1×` · **Complete** · [phase-100200-additive-harness-workspace-tools.md](phase-100200-additive-harness-workspace-tools.md)
 
 Deliver coding-agent operability tools: atomic `batch`, ephemeral scratchpad, `canonical_*`, `shared_*`, and `validate`, without bypassing long-term admission rules or treating scratchpad as durable memory.
 
-## 100210. Hygiene audit and confirmed cleanup · `1×` · [phase-100210-hygiene-audit-confirmed-cleanup.md](phase-100210-hygiene-audit-confirmed-cleanup.md)
+## 100210. Hygiene audit and confirmed cleanup · `1×` · **Complete** · [phase-100210-hygiene-audit-confirmed-cleanup.md](phase-100210-hygiene-audit-confirmed-cleanup.md)
 
 Ship ranked `hygiene_audit` and confirmed `hygiene_clean` (`flag` / `archive` / `discard`) with secret masking, a durable hygiene log, and callable `hygiene_log_list`. Operations removal only—not supersession and not compliance erasure. Noise defaults: [phase-100210-appendix-noise-scoring.md](phase-100210-appendix-noise-scoring.md).
 
-## 100220. JSON export and import · `1×` · [phase-100220-json-export-import.md](phase-100220-json-export-import.md)
+## 100220. JSON export and import · `1×` · **Complete** · [phase-100220-json-export-import.md](phase-100220-json-export-import.md)
 
 Ship manifest-backed `export` and idempotent gated `import` with dry-run reports and no plaintext secrets. Default `dsar_plaintext` content mode; optional `ciphertext_backup`. Provider ingest is explicitly later; this slice may leave a stub seam but must not expand into a multi-provider matrix. Bundle format: [phase-100220-appendix-bundle-format.md](phase-100220-appendix-bundle-format.md).
 
-## 100230. Ops doctor and repair · `1×` · [phase-100230-ops-doctor-repair.md](phase-100230-ops-doctor-repair.md)
+## 100230. Ops doctor and repair · `1×` · **Complete** · [phase-100230-ops-doctor-repair.md](phase-100230-ops-doctor-repair.md)
 
 Ship PII-safe `diagnose`, `verify`, `doctor`, `repair`, and `reindex` with confirmation on mutating repair/reindex and non-zero exit status for failed non-interactive runs. `doctor` never mutates.
 
-## 100240. Multi-host sync protocol · `1.5×` · [phase-100240-multi-host-sync-protocol.md](phase-100240-multi-host-sync-protocol.md)
+## 100240. Multi-host sync protocol · `1.5×` · **Complete** · [phase-100240-multi-host-sync-protocol.md](phase-100240-multi-host-sync-protocol.md)
 
 Implement client/server incremental sync alone: `sync_serve`, `sync_push`, `sync_pull`, `sync_status`, cursors, idempotent apply, auth outside dev mode, optional client-side encryption compatible with slice 100020 DEKs, bank scope, and a documented deterministic conflict rule. Trusted peer-admitted creates must not be rejected by local admission θ. Single-host deployments may omit this slice’s runtime, but the protocol remains a full effort unit when multi-host is claimed. Cursors/apply/DLQ/conflict: [phase-100240-appendix-sync-cursors-conflict.md](phase-100240-appendix-sync-cursors-conflict.md).
 
-## 100250. Per-bank retention profiles with verbosity and batch dry-run · `1×` · [phase-100250-per-bank-retention-profiles.md](phase-100250-per-bank-retention-profiles.md)
+## 100250. Per-bank retention profiles with verbosity and batch dry-run · `1×` · **Complete** · [phase-100250-per-bank-retention-profiles.md](phase-100250-per-bank-retention-profiles.md)
 
 Ship per-bank `retention_profile` objects with a `selective`/`balanced`/`permissive` verbosity knob, per-category threshold offsets, split write/read duplicate-tolerance knobs, and a read-only batch `admit_preview` dry-run. Gap remediation for Hindsight-style noise overcapture at the write gate.
 
-## 100260. Retention mission policy and coding-agent first-run defaults · `1×` · [phase-100260-retention-mission-coding-defaults.md](phase-100260-retention-mission-coding-defaults.md)
+## 100260. Retention mission policy and coding-agent first-run defaults · `1×` · **Complete** · [phase-100260-retention-mission-coding-defaults.md](phase-100260-retention-mission-coding-defaults.md)
 
 Ship upgrade-safe per-bank retention missions with keep/drop examples that deterministically steer admission utility, plus a quiet-by-default coding-agent profile that drops routine status chatter. Deterministic policy, not an LLM prompt.
 
-## 100270. Consolidated-only recall preset and prefer-consolidated dedup · `1×` · [phase-100270-consolidated-recall-dedup.md](phase-100270-consolidated-recall-dedup.md)
+## 100270. Consolidated-only recall preset and prefer-consolidated dedup · `1×` · **Complete** · [phase-100270-consolidated-recall-dedup.md](phase-100270-consolidated-recall-dedup.md)
 
 Ship `consolidated_only` recall scope, `prefer_consolidated` supersede-plus-backfill, and a page-local near-duplicate cap with per-request counters. Depends on canonical/hub provenance links (slices 100060/100130) with a documented no-links fallback.
 
-## 100280. HTTPS transport and provider configuration plumbing · `1×` · [phase-100280-https-transport-config.md](phase-100280-https-transport-config.md)
+## 100280. HTTPS transport and provider configuration plumbing · `1×` · **Complete** · [phase-100280-https-transport-config.md](phase-100280-https-transport-config.md)
 
 Replace the `http://`-only hand-rolled transport with one TLS-capable JSON client (ureq, operator-approved) behind the existing `post_json`/`get_ok` contract, and add the config/credential/env plumbing for providers: `embed.provider`, `rerank.provider`, `rerank.url`, `rerank.model`, `credentials.rerank_api_key`, plus `EMBED_*`/`RERANK_*` env knobs and masking. No adapters yet. Gap `gap/zero-deps.md` Phase 100010 + Phase 100030/100040 plumbing. Split from the former single zero-dependency phase.
 
-## 100290. Multi-model embedding storage and embed providers · `1.5×` · [phase-100290-multi-model-embeddings.md](phase-100290-multi-model-embeddings.md)
+## 100290. Multi-model embedding storage and embed providers · `1.5×` · **Complete** · [phase-100290-multi-model-embeddings.md](phase-100290-multi-model-embeddings.md)
 
 Remove the hardcoded 384-dimension pin so any embedding model/provider can be configured (default stays `bge-small-en-v1.5`/384): an active embedding space `(model_id, dims)` in `schema_settings`, dimension-agnostic vector DDL with a purge-and-rebuild on space switch restricted to derived vectors, an index-availability policy by width (HNSW ≤ 2000 dims), and TEI + OpenAI-compatible embed adapters. One active space at a time (operator decision). Operator finding #1 + gap embed portion.
 
-## 100300. Rerank provider adapters · `1×` · [phase-100300-rerank-providers.md](phase-100300-rerank-providers.md)
+## 100300. Rerank provider adapters · `1×` · **Complete** · [phase-100300-rerank-providers.md](phase-100300-rerank-providers.md)
 
 Add the Cohere-compatible rerank adapter (`POST /v1/rerank`, `results[].index`) alongside the existing TEI `POST /rerank`, selected by `rerank.provider`, plus a reranker factory resolving url/model/bearer from effective config. Reuses the Phase 100280 transport; keeps the full-permutation and fail-open contracts. Live attachment is Phase 100340. Split from the former single zero-dependency phase.
 
-## 100310. Zero-config default database path with full precedence · `1×` · [phase-100310-default-database-path.md](phase-100310-default-database-path.md)
+## 100310. Zero-config default database path with full precedence · `1×` · **Complete** · [phase-100310-default-database-path.md](phase-100310-default-database-path.md)
 
 Ship one shared database-path/precedence resolver so `am mcp stdio` persists to `$XDG_DATA_HOME/am/clio.db` (fallback `~/.local/share/am/clio.db`) with no flags, honoring `--db` > `DATABASE_URL`/`AM_DATABASE_URL` > `AM_DATA_DIR` > XDG default, with backend inferred from the URL scheme. Config and CLI agree; help shows the default. Gap `gap/default-sqlite.md`, extended by operator decision.
 
-## 100320. Embedded Docker lifecycle (`am compose up|down`) · `1×` · [phase-100320-compose-lifecycle.md](phase-100320-compose-lifecycle.md)
+## 100320. Embedded Docker lifecycle (`am compose up|down`) · `1×` · **Complete** · [phase-100320-compose-lifecycle.md](phase-100320-compose-lifecycle.md)
 
 Move Docker management into the binary: `am compose up`/`down` with OS/arch detection, embedded compose material materialized at the project root, secure `.env` generation, service selection mapped to Compose profiles, and `docker` CLI invocation. Gap `gap/am-setup.md` Docker portion. Split from the former single `am setup` + compose phase.
 
-## 100330. `am setup` first-run wizard · `1.5×` · [phase-100330-am-setup-wizard.md](phase-100330-am-setup-wizard.md)
+## 100330. `am setup` first-run wizard · `1.5×` · **Complete** · [phase-100330-am-setup-wizard.md](phase-100330-am-setup-wizard.md)
 
 Move first-run configuration into the binary: `am setup` with three install types (zero-dependency, airgapped, custom) writing a backed-up deployment JSON overlay, detecting existing values, orchestrating Phase 100320 for local services, and a default deployment-config path the binary loads without an env var. Gap `gap/am-setup.md` setup portion. Split from the former single `am setup` + compose phase.
 
-## 100340. Hosted extraction adapter · `1.5×` · [phase-100340-hosted-extraction-adapter.md](phase-100340-hosted-extraction-adapter.md)
+## 100340. Hosted extraction adapter · `1.5×` · **Complete** · [phase-100340-hosted-extraction-adapter.md](phase-100340-hosted-extraction-adapter.md)
 
 Add an OpenAI-compatible chat-completions `Extractor` that reproduces the local NuExtract `{snapshot, gist}` contract with a deterministic prompt and fail-closed output validation, reusing the Phase 100280 transport. Wire `extract.provider`, `credentials.extract_api_key`, and `EXTRACT_*` env vars; keep FR-4 span verification and PR-4 gist rules unchanged. Ships the adapter and factory; live wiring is Phase 100350. Deferred from the zero-dependency provider phases by operator decision.
 
-## 100350. Live index, rerank, and extraction wiring · `1.5×` · [phase-100350-live-index-extraction-wiring.md](phase-100350-live-index-extraction-wiring.md)
+## 100350. Live index, rerank, and extraction wiring · `1.5×` · **Complete** · [phase-100350-live-index-extraction-wiring.md](phase-100350-live-index-extraction-wiring.md)
 
 Close the gap between "the pipelines exist" and "the running server uses them": drain the durable `index_pending` outbox (dense + lexical, with a lexical-only fallback when no embedder is configured) off the write path, attach the configured reranker to the retriever, resolve providers from effective config, and run extraction over raw turns through span verification and the gated store. Operator finding #2. Without this, a normally stored item is not retrievable and configured providers have no runtime effect.
 
@@ -214,15 +214,15 @@ Added 2026-09-22 from the gap register in `gap/requirement-gaps.md` (build plan,
 
 | Phase | Scope | Effort | Implementation plan | Gaps |
 |------:|-------|--------|---------------------|------|
-| 100360 | Coverage guard for the per-file lines/functions floor | ~0.5 day | [phase-100360-coverage-guard.md](phase-100360-coverage-guard.md) | G-04 |
-| 100380 | Bind `summarize` and the six FR-32 config/ranking tools; NFR-7 test | ~4–5 days | [phase-100380-binding-closure.md](phase-100380-binding-closure.md) | G-01, G-02, G-17, G-18 |
-| 100400 | Postgres drain, stdio proof, backlog/log assertions, flake closure | ~4–5 days | [phase-100400-live-path-hardening.md](phase-100400-live-path-hardening.md) | G-06a–G-06f |
-| 100420 | Phase 100060 close-out, 100030/100050 adversary pass, open-edge constraint, MemTree decision | ~3–5 days | [phase-100420-history-temporal-invariant.md](phase-100420-history-temporal-invariant.md) | G-05, G-07, G-08, G-09 |
-| 100440 | Extraction fidelity ≥99% held-out; separate latency metrics | ~4–7 days | [phase-100440-fidelity-latency-acceptance.md](phase-100440-fidelity-latency-acceptance.md) | G-11, G-12 |
-| 100460 | Benchmark spike: dataset and judge selection | ~2–3 days | [phase-100460-benchmark-spike.md](phase-100460-benchmark-spike.md) | G-10 (spike) |
-| 100480 | Benchmark runner build: LongMemEval-style and LoCoMo-style | ~6–9 days | [phase-100480-benchmark-runner-build.md](phase-100480-benchmark-runner-build.md) | G-10 (build) |
-| 100500 | First real provider ingest adapter (spike-gated) | ~5–7 days | [phase-100500-first-provider-adapter.md](phase-100500-first-provider-adapter.md) | G-03 |
-| 100520 | Scale ceilings, TLS pooling, deployment docs | ~4–5 days | [phase-100520-scale-ceilings-docs.md](phase-100520-scale-ceilings-docs.md) | G-13, G-14, G-15, G-16 |
+| 100360 | Coverage guard for the per-file lines/functions floor | ~0.5 day | [phase-100360-coverage-guard.md](phase-100360-coverage-guard.md) | G-04 — Complete |
+| 100380 | Bind `summarize` and the six FR-32 config/ranking tools; NFR-7 test | ~4–5 days | [phase-100380-binding-closure.md](phase-100380-binding-closure.md) | G-01, G-02, G-17, G-18 — Complete |
+| 100400 | Postgres drain, stdio proof, backlog/log assertions, flake closure | ~4–5 days | [phase-100400-live-path-hardening.md](phase-100400-live-path-hardening.md) | G-06a–G-06f — Complete |
+| 100420 | Phase 100060 close-out, 100030/100050 adversary pass, open-edge constraint, MemTree decision | ~3–5 days | [phase-100420-history-temporal-invariant.md](phase-100420-history-temporal-invariant.md) | G-05, G-07, G-08, G-09 — Complete |
+| 100440 | Extraction fidelity ≥99% held-out; separate latency metrics | ~4–7 days | [phase-100440-fidelity-latency-acceptance.md](phase-100440-fidelity-latency-acceptance.md) | G-11, G-12 — Complete |
+| 100460 | Benchmark spike: dataset and judge selection | ~2–3 days | [phase-100460-benchmark-spike.md](phase-100460-benchmark-spike.md) | G-10 (spike) — Complete |
+| 100480 | Benchmark runner build: LongMemEval-style and LoCoMo-style | ~6–9 days | [phase-100480-benchmark-runner-build.md](phase-100480-benchmark-runner-build.md) | G-10 (build) — Complete |
+| 100500 | First real provider ingest adapter (spike-gated) | ~5–7 days | [phase-100500-first-provider-adapter.md](phase-100500-first-provider-adapter.md) | G-03 — Complete |
+| 100520 | Scale ceilings, TLS pooling, deployment docs | ~4–5 days | [phase-100520-scale-ceilings-docs.md](phase-100520-scale-ceilings-docs.md) | G-13, G-14, G-15, G-16 — Complete |
 
 Critical path: 100360 → 100380 → 100400 → 100440 → 100460 → 100480. Total 33–47 ideal days plus review latency (see `gap/requirement-gaps.md` §4). The `batch` widening stays in the backlog as an enhancement.
 
@@ -234,7 +234,7 @@ Added 2026-09-24 from GitHub issue #3 (`heyaibi/clio`, a bug report). After the 
 
 | Phase | Scope | Effort | Implementation plan | Source |
 |------:|-------|--------|---------------------|--------|
-| 100421 | TEI rerank wire-contract correction, shared transport error scoping, recall-path regression closure | ~1–2 days | [phase-100421-rerank-contract-retrieval-diagnostics.md](phase-100421-rerank-contract-retrieval-diagnostics.md) | GitHub issue #3 |
+| 100421 | TEI rerank wire-contract correction, shared transport error scoping, recall-path regression closure | ~1–2 days | [phase-100421-rerank-contract-retrieval-diagnostics.md](phase-100421-rerank-contract-retrieval-diagnostics.md) | GitHub issue #3 — Complete |
 
 ---
 
@@ -255,7 +255,7 @@ All CLI-touching phases here (100620, 100660, 100680, 100700, 100720, 100740) bu
 | 100660 | CLI scores breakdown in the recall text view | ~1–1.5 days | [phase-100660-cli-scores-breakdown.md](phase-100660-cli-scores-breakdown.md) | Phases 100620, 100640 |
 | 100680 | Entity names on recall hits (`entities[]`) | ~2–3 days | [phase-100680-entity-names-recall-hits.md](phase-100680-entity-names-recall-hits.md) | Phase 100620 |
 | 100700 | Entity-overlap match reason (display-only) | ~2–3 days | [phase-100700-entity-overlap-match-reason.md](phase-100700-entity-overlap-match-reason.md) | Phases 100680, 100660 |
-| 100720 | CLI `-o` alias and output-mode help | ~1–2 days | [phase-100720-cli-output-alias-help.md](phase-100720-cli-output-alias-help.md) | Independent |
+| 100720 | CLI `-o` alias and output-mode help | ~1–2 days | [phase-100720-cli-output-alias-help.md](phase-100720-cli-output-alias-help.md) | Independent — Complete |
 | 100740 | Read-surface de-drift: derive the `explain` trace from the hit | ~1–1.5 days | [phase-100740-explain-trace-projection.md](phase-100740-explain-trace-projection.md) | Phase 100620 |
 | 100760 | Snapshot leaf verification: reconcile docs and code | ~1–2 days | [phase-100760-snapshot-leaf-verification.md](phase-100760-snapshot-leaf-verification.md) | Independent |
 | 100780 | Score floors and entity inclusion controls (extension) | ~3–4 days | [phase-100780-score-floors-entity-controls.md](phase-100780-score-floors-entity-controls.md) | Phases 100620, 100640, 100680 |
@@ -286,8 +286,8 @@ Added 2026-09-24 to support provider-neutral source context and migration readin
 
 | Phase | Scope | Effort | Implementation plan | Dependencies |
 |------:|-------|--------|---------------------|--------------|
-| 100601 | Native source context and evidence identity in the core memory contract | ~5–7 days | [phase-100601-native-source-context.md](phase-100601-native-source-context.md) | Core item/store, encryption, schema, and binding contracts |
-| 100606 | Context lifecycle, retrieval, portability, audit, sync, and erasure | ~4–6 days | [phase-100606-context-lifecycle-portability.md](phase-100606-context-lifecycle-portability.md) | Phase 100601; existing extraction/retrieval/portability/audit/sync/erase contracts |
+| 100601 | Native source context and evidence identity in the core memory contract | ~5–7 days | [phase-100601-native-source-context.md](phase-100601-native-source-context.md) | Core item/store, encryption, schema, and binding contracts — Complete |
+| 100606 | Context lifecycle, retrieval, portability, audit, sync, and erasure | ~4–6 days | [phase-100606-context-lifecycle-portability.md](phase-100606-context-lifecycle-portability.md) | Phase 100601; existing extraction/retrieval/portability/audit/sync/erase contracts — Complete |
 
 Dependency order: 100601 → 100606. The conditional document track below depends on the accepted Phase 100601 identity boundary but does not turn `evidence_ref` into a document key.
 
@@ -320,14 +320,14 @@ Added 2026-09-22 from the human-facing CLI/UX gap set in `gaps/` (`am-status.md`
 
 | Phase | Scope | Effort | Implementation plan | Gaps |
 |------:|-------|--------|---------------------|------|
-| 100362 | `clio status` unified read-only health command | ~1 day | [phase-100362-clio-status-unified-health.md](phase-100362-clio-status-unified-health.md) | `gaps/am-status.md` |
-| 100364 | `clio mcp http` auto-bind + `34300-34309` port scan | ~1 day | [phase-100364-mcp-http-auto-bind-port-scan.md](phase-100364-mcp-http-auto-bind-port-scan.md) | `gaps/http-bind-auto.md` |
-| 100366 | CLI core plumbing (parser/output/exit/errors, `help --json`) + retrieval reads | ~3 days | [phase-100366-full-cli-core-and-retrieval-reads.md](phase-100366-full-cli-core-and-retrieval-reads.md) | `gaps/full-cli.md` §5, §7 step 1 |
-| 100368 | CLI history/graph/workspace read surface | ~3 days | [phase-100368-full-cli-history-graph-reads.md](phase-100368-full-cli-history-graph-reads.md) | `gaps/full-cli.md` §6, §7 step 1 |
-| 100370 | CLI safe core writes (`remember`, `admit`/`admit --file`, triples, beliefs, graph, summarize, consolidate) | ~3 days | [phase-100370-full-cli-safe-core-writes.md](phase-100370-full-cli-safe-core-writes.md) | `gaps/full-cli.md` §7 step 2 |
-| 100372 | CLI safe workspace/harness writes (persona, task, scratchpad, canonical, shared, batch) | ~3 days | [phase-100372-full-cli-safe-workspace-writes.md](phase-100372-full-cli-safe-workspace-writes.md) | `gaps/full-cli.md` §7 step 2 |
-| 100374 | CLI confirmed memory mutations (`update`, `invalidate`, `discard`, `correct`) | ~2 days | [phase-100374-full-cli-confirmed-memory-mutations.md](phase-100374-full-cli-confirmed-memory-mutations.md) | `gaps/full-cli.md` §7 step 3 |
-| 100376 | CLI hygiene + portability/compliance (`hygiene_*`, `export`, `import`, `erase`) | ~3 days | [phase-100376-full-cli-hygiene-portability-compliance.md](phase-100376-full-cli-hygiene-portability-compliance.md) | `gaps/full-cli.md` §6, §7 step 3 |
-| 100378 | CLI configuration/ranking + sync (`config_*`, `ranking_*`, `sync_*`) | ~2 days | [phase-100378-full-cli-config-ranking-sync.md](phase-100378-full-cli-config-ranking-sync.md) | `gaps/full-cli.md` §6 |
+| 100362 | `clio status` unified read-only health command | ~1 day | [phase-100362-clio-status-unified-health.md](phase-100362-clio-status-unified-health.md) | `gaps/am-status.md` — Complete |
+| 100364 | `clio mcp http` auto-bind + `34300-34309` port scan | ~1 day | [phase-100364-mcp-http-auto-bind-port-scan.md](phase-100364-mcp-http-auto-bind-port-scan.md) | `gaps/http-bind-auto.md` — Complete |
+| 100366 | CLI core plumbing (parser/output/exit/errors, `help --json`) + retrieval reads | ~3 days | [phase-100366-full-cli-core-and-retrieval-reads.md](phase-100366-full-cli-core-and-retrieval-reads.md) | `gaps/full-cli.md` §5, §7 step 1 — Complete |
+| 100368 | CLI history/graph/workspace read surface | ~3 days | [phase-100368-full-cli-history-graph-reads.md](phase-100368-full-cli-history-graph-reads.md) | `gaps/full-cli.md` §6, §7 step 1 — Complete |
+| 100370 | CLI safe core writes (`remember`, `admit`/`admit --file`, triples, beliefs, graph, summarize, consolidate) | ~3 days | [phase-100370-full-cli-safe-core-writes.md](phase-100370-full-cli-safe-core-writes.md) | `gaps/full-cli.md` §7 step 2 — Complete |
+| 100372 | CLI safe workspace/harness writes (persona, task, scratchpad, canonical, shared, batch) | ~3 days | [phase-100372-full-cli-safe-workspace-writes.md](phase-100372-full-cli-safe-workspace-writes.md) | `gaps/full-cli.md` §7 step 2 — Complete |
+| 100374 | CLI confirmed memory mutations (`update`, `invalidate`, `discard`, `correct`) | ~2 days | [phase-100374-full-cli-confirmed-memory-mutations.md](phase-100374-full-cli-confirmed-memory-mutations.md) | `gaps/full-cli.md` §7 step 3 — Complete |
+| 100376 | CLI hygiene + portability/compliance (`hygiene_*`, `export`, `import`, `erase`) | ~3 days | [phase-100376-full-cli-hygiene-portability-compliance.md](phase-100376-full-cli-hygiene-portability-compliance.md) | `gaps/full-cli.md` §6, §7 step 3 — Complete |
+| 100378 | CLI configuration/ranking + sync (`config_*`, `ranking_*`, `sync_*`) | ~2 days | [phase-100378-full-cli-config-ranking-sync.md](phase-100378-full-cli-config-ranking-sync.md) | `gaps/full-cli.md` §6 — Complete |
 
 Critical path: 100366 → 100368 → 100370 → 100372. 100364 is independent; 100362 is parallel but uses interim rendering until 100366 lands, then reconciles to the shared output contract. 100378 depends on Phase 100380 (shared config dispatch) and Phase 100240 (sync tools). Per-command ownership (one command, one phase) is tracked in [command-ownership.md](command-ownership.md).
