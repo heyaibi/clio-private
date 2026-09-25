@@ -82,17 +82,17 @@
     },
     "100606": {
       "base_revisions": {
-        "private": "a74fe796af3140cfea99e23a0cd2185d51c33f8c",
-        "public": "09679d6878a13a033f25ddab3a7267764747cc52"
+        "private": "f25d04f6b0bc55b547be817bc1e75deda8718def",
+        "public": "6169cfa8d577010b1ae9a9e3b390f41449cf17e3"
       },
-      "claimed_at": "2026-09-25T07:26:16.409Z",
+      "claimed_at": "2026-09-25T16:01:45.900Z",
       "expires_at": null,
-      "generation": 2,
-      "heartbeat_at": "2026-09-25T15:21:45.203Z",
+      "generation": 4,
+      "heartbeat_at": "2026-09-25T16:52:13.762Z",
       "machine_id": "devserver",
-      "reservation_id": "rsv-99e5f5804b82bfbe4920ffce",
+      "reservation_id": "rsv-fb3c70d07f327e144708e092",
       "run_id": "phase-100606",
-      "status": "rejected"
+      "status": "running"
     },
     "100720": {
       "base_revisions": {
@@ -102,12 +102,19 @@
       "claimed_at": "2026-09-25T15:46:34.816Z",
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-25T15:46:39.034Z",
+      "heartbeat_at": "2026-09-25T16:51:47.769Z",
       "machine_id": "local-01",
       "reservation_id": "rsv-44f7dec70c6de5f1705ae8ed",
       "run_id": "phase-100720",
       "status": "running"
     }
+  },
+  "publication": {
+    "acquired_at": "2026-09-25T16:54:00.731Z",
+    "generation": 1,
+    "machine_id": "local-01",
+    "phase": "100720",
+    "reservation_id": "rsv-44f7dec70c6de5f1705ae8ed"
   },
   "version": 1
 }
