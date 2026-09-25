@@ -151,12 +151,5 @@
       "status": "completed"
     }
   },
-  "publication": {
-    "acquired_at": "2026-09-25T23:27:46.456Z",
-    "generation": 1,
-    "machine_id": "devserver",
-    "phase": "100640",
-    "reservation_id": "rsv-143954ea33dd85627c9e45d8"
-  },
   "version": 1
 }
