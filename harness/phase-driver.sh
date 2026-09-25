@@ -87,6 +87,13 @@ NOTIFIER="$HARNESS/phase_notifications.py"
 : "${TMUX_HEIGHT:=48}"
 : "${PHASE_MACHINE_ID:=${CLIO_MACHINE_ID:-server-01}}"
 : "${PHASE_COORDINATION_BRANCH:=${CLIO_PHASE_COORDINATION_BRANCH:-master}}"
+# When set to 1, the driver takes back a phase whose blocking claim is this
+# host's own, instead of logging WAIT_FOR_CLAIM and stopping the line. That
+# state is what a crashed, stopped, or blocked run of our own phase leaves
+# behind, and it is recoverable; a claim held by *another* host is never
+# touched, and coordination still fences both cases. Default 0 keeps the
+# fail-closed behaviour: recover deliberately, not by accident.
+: "${PHASE_RECOVER_OWN_CLAIM:=0}"
 export CLIO_MACHINE_ID="$PHASE_MACHINE_ID"
 export CLIO_PHASE_COORDINATION_BRANCH="$PHASE_COORDINATION_BRANCH"
 
@@ -356,7 +363,15 @@ _drive() {
           "$SESSION" "$TMUX_WIDTH" "$TMUX_HEIGHT" "$REPO" "$REPO" "$number" "$rel"
         ;;
       WAIT_FOR_CLAIM)
-        log "dry-run: WAIT_FOR_CLAIM ($(printf '%s' "$selection" | selection_value phase)); no launch"
+        wait_phase="$(printf '%s' "$selection" | selection_value phase)"
+        wait_owner="$(printf '%s' "$selection" | selection_value owner)"
+        if [ "$PHASE_RECOVER_OWN_CLAIM" = 1 ] \
+            && [ "$wait_owner" = "$PHASE_MACHINE_ID" ] \
+            && [ "$wait_phase" != "" ]; then
+          log "dry-run: would recover this host's own claim on phase $wait_phase and launch it"
+        else
+          log "dry-run: WAIT_FOR_CLAIM (phase $wait_phase, owner $wait_owner); no launch"
+        fi
         ;;
       COORDINATION_INCONSISTENT)
         log "dry-run: coordination state conflicts with completion evidence; no launch"
@@ -440,8 +455,33 @@ _drive() {
         log "reserved phase $number ($rel) for $PHASE_MACHINE_ID"
         ;;
       WAIT_FOR_CLAIM)
-        log "WAIT_FOR_CLAIM for phase $(printf '%s' "$selection" | selection_value phase); no launch"
-        return 0
+        wait_phase="$(printf '%s' "$selection" | selection_value phase)"
+        wait_owner="$(printf '%s' "$selection" | selection_value owner)"
+        wait_status="$(printf '%s' "$selection" | selection_value status)"
+        if [ "$PHASE_RECOVER_OWN_CLAIM" = 1 ] \
+            && [ "$wait_owner" = "$PHASE_MACHINE_ID" ] \
+            && [ "$wait_phase" != "" ]; then
+          # Our own claim, left behind by a run that crashed, was stopped, or
+          # ended blocked. Take it back explicitly so the phase can finish.
+          # A claim held by any other host still stops the line.
+          log "recovering own claim on phase $wait_phase (status=$wait_status) for $PHASE_MACHINE_ID"
+          if "$PYTHON" "$HARNESS/phase_reservations.py" takeover \
+              --repo-root "$REPO" --phase "$wait_phase" \
+              --machine-id "$PHASE_MACHINE_ID" \
+              --expected-reservation-id "$(printf '%s' "$selection" | selection_value reservation_id)" \
+              --expected-generation "$(printf '%s' "$selection" | selection_value generation)" \
+              --confirm >"$RUN_DIR/claim-recovery-$wait_phase.json" 2>&1; then
+            number="$wait_phase"
+            rel="private/clio-private/roadmap/$(ls "$REPO/$HARNESS/../roadmap" 2>/dev/null | grep "^phase-$wait_phase-" | head -1)"
+            log "recovered phase $number ($rel); continuing"
+          else
+            log "claim recovery for phase $wait_phase failed; see $RUN_DIR/claim-recovery-$wait_phase.json"
+            return 1
+          fi
+        else
+          log "WAIT_FOR_CLAIM for phase $wait_phase (owner=$wait_owner status=$wait_status); no launch"
+          return 0
+        fi
         ;;
       COORDINATION_INCONSISTENT)
         log "coordination state conflicts with completion evidence; no launch"
