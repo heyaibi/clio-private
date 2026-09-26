@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# Copyright 2026 Agent Memoir Developers (https://agentmemoir.com/)
+# SPDX-License-Identifier: Apache-2.0
+#
+# tmux session and window control for the phase driver.
+#
+# Sourced by scripts/phase-driver.sh. Not executable on its own. Expects the
+# driver to have already set: SESSION, TMUX_WIDTH, TMUX_HEIGHT, REPO, RUN_DIR,
+# LOG, and to run under `set -euo pipefail`.
+#
+# The model is one permanent session with two windows:
+#
+#   idle    created once, shows status. Never exits, so the session persists.
+#   phase   created per launch, runs the phase. Closes itself when done.
+#
+# THE RULE THAT MATTERS: every command below names an explicit window target
+# (`$SESSION:phase`, `$SESSION:idle`, or the session itself only for
+# session-scoped options). tmux resolves a bare session name to that session's
+# *current* window, which becomes ambiguous the moment a second window exists.
+# A retargeted `send-keys` is the difference between Ctrl-C reaching a running
+# agent and Ctrl-C reaching the log tail.
+#
+# Geometry: `new-window` has no -x/-y, so a new window inherits the session
+# size. `window-size manual` holds the session at TMUX_WIDTH x TMUX_HEIGHT even
+# when a smaller client attaches, which keeps the harness pty size stable
+# (runner.py copies the pane size into each harness pty). `resize-window` sets a
+# window explicitly and works on a non-active window.
+
+# The two window names. A window whose command exits closes that window, so the
+# phase window disappearing is the completion signal.
+: "${TMUX_IDLE_WINDOW:=idle}"
+: "${TMUX_PHASE_WINDOW:=phase}"
+: "${TMUX_IDLE_SCRIPT:=phase-tmux-idle.sh}"
+
+tmux_session_exists() {
+  tmux has-session -t "$SESSION" 2>/dev/null
+}
+
+# A window exists only if the session exists and the window is found by name.
+# Matching is exact so a window called "phase-old" never counts as the phase.
+tmux_window_exists() {
+  tmux list-windows -t "$SESSION" -F '#{window_name}' 2>/dev/null \
+    | grep -qx -- "$TMUX_PHASE_WINDOW"
+}
+
+# The phase window's tmux ID (@N), which is stable for the life of the window
+# and does not change when it is renamed. Every lookup goes through this, so a
+# stage label like "phase adversary" never makes the window unfindable. Prints
+# nothing and returns nonzero when there is no phase window.
+tmux_window_id() {
+  tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name}' 2>/dev/null \
+    | awk -v want="$TMUX_PHASE_WINDOW" '$2 == want { print $1; found=1 } END { exit !found }'
+}
+
+# True when a phase is genuinely running: the window exists and its pane is not
+# a dead-but-retained pane. A pane left dead by remain-on-exit must not block the
+# line forever, so it counts as not-running.
+tmux_phase_window_alive() {
+  local wid dead
+  wid="$(tmux_window_id)" || return 1
+  dead="$(tmux list-panes -t "$wid" -F '#{pane_dead}' 2>/dev/null | sort -u)"
+  [ "$dead" = "1" ] && return 1
+  return 0
+}
+
+# Create the session and its idle window if they are missing. Never kills the
+# session: it is meant to outlive every phase.
+tmux_session_ensure() {
+  if tmux_session_exists; then
+    tmux_session_reconcile
+    return 0
+  fi
+  log "creating tmux session '$SESSION' (persistent)"
+  # The idle script must be executable: tmux execs it directly, and a
+  # non-executable file makes the window close instantly, which would take the
+  # whole session with it.
+  [ -x "$SCRIPTS/$TMUX_IDLE_SCRIPT" ] \
+    || { log "idle script $SCRIPTS/$TMUX_IDLE_SCRIPT is not executable"; return 1; }
+  # SESSION_NAME and DRIVER_RUN_DIR go into the session environment so the idle
+  # script knows which session it is displaying and which run dir to read,
+  # without either being hardcoded in it.
+  tmux new-session -d -s "$SESSION" -x "$TMUX_WIDTH" -y "$TMUX_HEIGHT" -c "$REPO" \
+    -e "SESSION_NAME=$SESSION" -e "DRIVER_RUN_DIR=$RUN_DIR" \
+    -n "$TMUX_IDLE_WINDOW" "$SCRIPTS/$TMUX_IDLE_SCRIPT" \
+    || { log "failed to create tmux session '$SESSION'"; return 1; }
+  # Hold the geometry. Without this, a client attaching at any other size
+  # resizes the windows, and the harness pty size changes with them.
+  tmux set-option -t "$SESSION" -w window-size manual 2>/dev/null || true
+  tmux set-option -t "$SESSION" set-titles on 2>/dev/null || true
+  return 0
+}
+
+# Bring an existing session back in line with the current settings.
+#
+# The session outlives every phase, so it is created once and then reused
+# indefinitely. That means a change to TMUX_WIDTH/TMUX_HEIGHT, or a session
+# created by hand, would otherwise keep whatever it was born with and silently
+# disagree with the driver. Re-assert the options and resize the idle window on
+# every tick: it is cheap, and it is the only thing that makes a setting change
+# take effect without the operator killing the session by hand.
+tmux_session_reconcile() {
+  tmux set-option -t "$SESSION" -w window-size manual 2>/dev/null || true
+  tmux set-option -t "$SESSION" set-titles on 2>/dev/null || true
+  local idle_wid idle_geom
+  idle_wid="$(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name}' 2>/dev/null \
+    | awk -v want="$TMUX_IDLE_WINDOW" '$2 == want { print $1 }')"
+  [ -n "$idle_wid" ] || return 0
+  idle_geom="$(tmux display-message -p -t "$idle_wid" '#{window_width}x#{window_height}' 2>/dev/null || true)"
+  if [ "$idle_geom" != "${TMUX_WIDTH}x${TMUX_HEIGHT}" ]; then
+    log "resizing idle window from ${idle_geom:-unknown} to ${TMUX_WIDTH}x${TMUX_HEIGHT}"
+    tmux resize-window -t "$idle_wid" -x "$TMUX_WIDTH" -y "$TMUX_HEIGHT" 2>/dev/null || true
+  fi
+  return 0
+}
+
+# Open the phase window and size it. Fails if a phase window already exists,
+# which the caller must have ruled out via tmux_phase_window_alive.
+tmux_phase_window_open() {
+  local launch="$1" logfile="$2" wid
+  tmux new-window -d -t "$SESSION" -n "$TMUX_PHASE_WINDOW" -c "$REPO" "$launch" || return 1
+  # Resolve by ID right away: the window may be renamed by a stage hook moments
+  # after this, and every later target must still find it.
+  wid="$(tmux_window_id)" || return 1
+  # new-window has no -x/-y; set the size explicitly.
+  tmux resize-window -t "$wid" -x "$TMUX_WIDTH" -y "$TMUX_HEIGHT" 2>/dev/null || true
+  # pipe-pane must name the phase window, not the session.
+  [ -z "$logfile" ] || tmux pipe-pane -t "$wid" -o "cat >> '$logfile'" 2>/dev/null || true
+  return 0
+}
+
+# Drop a dead-but-retained phase window so the next launch can proceed. Only ever
+# touches the phase window; the session and the idle window are left alone.
+tmux_phase_window_close() {
+  local wid
+  wid="$(tmux_window_id)" || return 0
+  tmux kill-window -t "$wid" 2>/dev/null || return 0
+  log "reclaimed dead phase window in '$SESSION'"
+  return 0
+}
+
+# Set the terminal title. A literal string, not a format: set-titles-string is a
+# session option, and a format like #{window_name} would follow whichever window
+# the attached client happens to be viewing. Verified that a literal reaches an
+# attached client on its own, with no refresh-client, in well under a second.
+tmux_set_title() {
+  tmux set-option -t "$SESSION" set-titles-string "$1" 2>/dev/null || true
+}
+
+# Rename the phase window for display. The name is a label, NOT an identity:
+# every lookup here goes through tmux_window_id, so a renamed window is still
+# found. Renaming is safe for that reason; renaming and then looking the window
+# up by name would not be.
+tmux_phase_window_rename() {
+  local wid
+  wid="$(tmux_window_id)" || return 0
+  tmux rename-window -t "$wid" "$1" 2>/dev/null || true
+}
+
+# Interrupt the phase, not the idle window. Targets the window ID so this is
+# correct no matter what the window has been renamed to, and so it can never
+# land on the idle display.
+tmux_phase_window_interrupt() {
+  local wid
+  wid="$(tmux_window_id)" || return 1
+  tmux send-keys -t "$wid" C-c 2>/dev/null || return 1
+  return 0
+}
+
+# Select the phase window so an attached client shows the work, not the tail.
+tmux_phase_window_select() {
+  local wid
+  wid="$(tmux_window_id)" || return 0
+  tmux select-window -t "$wid" 2>/dev/null || true
+}
+
+# Size of the phase window as WxH, for --check and the self-test.
+tmux_phase_window_geometry() {
+  local wid
+  wid="$(tmux_window_id)" || return 0
+  tmux display-message -p -t "$wid" \
+    '#{window_width}x#{window_height}' 2>/dev/null || true
+}

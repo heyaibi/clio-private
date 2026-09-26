@@ -69,6 +69,14 @@
 #   a step with neither/both of when/end; end states outside ends.
 version: 1
 run_dir: private/clio-private/runs/phase-{phase_number:06d}
+# pre_step fires before each stage with GLIDE_STEP set to the step id. The hook
+# renames the tmux phase window and sets the terminal title, so a display shows
+# which stage is running. It must always exit 0: pre_step is a gating point, so
+# a nonzero exit would halt the phase. It needs no session argument of its own;
+# the driver exports CLIO_TMUX_SESSION and CLIO_PHASE_NUMBER into the launch
+# environment, and the hook is a no-op when no session is running.
+hooks:
+  pre_step: ["bash", "private/clio-private/scripts/pipeline/tmux_title.sh"]
 # No attribution inputs: the harness for each step is declared exactly once,
 # in the stage file frontmatter `harness:` list. The runner derives the
 # display name (HARNESS_DISPLAY) per invocation and writes Attribution rows

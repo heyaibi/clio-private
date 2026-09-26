@@ -33,6 +33,15 @@
 # HEARTBEAT_URL, STALE_AFTER_SEC, LOG_KEEP_DAYS, TMUX_WIDTH, TMUX_HEIGHT,
 # PHASE_MACHINE_ID, PHASE_COORDINATION_BRANCH.
 #
+# The tmux session is persistent: it is created once and outlives every phase.
+# It holds an `idle` window (status, created once) and a `phase` window (created
+# per launch, closes itself when the phase ends). "Busy" therefore means the
+# phase window exists, NOT that the session exists. Attach a display with
+# `tmux attach -t development -r`; -r is read-only and ignores the client's
+# size, so the display cannot resize the agent's pane.
+#
+# All tmux window handling lives in scripts/phase-tmux.sh.
+#
 # Local test hooks (never set these in cron):
 #   DISABLE_NOTIFY=1      log notifications instead of sending them
 #   DISABLE_DISCORD=1     alias for disabling Discord sends (same effect today)
@@ -84,7 +93,7 @@ NOTIFIER="$SCRIPTS/pipeline/phase_notifications.py"
 : "${DRIVER_RUN_DIR:=$WF/.driver}"
 : "${SESSION_NAME:=development}"
 : "${TMUX_WIDTH:=164}"
-: "${TMUX_HEIGHT:=48}"
+: "${TMUX_HEIGHT:=56}"
 : "${PHASE_MACHINE_ID:=${CLIO_MACHINE_ID:-server-01}}"
 : "${PHASE_COORDINATION_BRANCH:=${CLIO_PHASE_COORDINATION_BRANCH:-master}}"
 # When set to 1, the driver takes back a phase whose blocking claim is this
@@ -98,7 +107,18 @@ export CLIO_MACHINE_ID="$PHASE_MACHINE_ID"
 export CLIO_PHASE_COORDINATION_BRANCH="$PHASE_COORDINATION_BRANCH"
 
 PIPELINE="private/clio-private/workflow/pipelines/default.yaml"
-SESSION="$SESSION_NAME"
+# SESSION_NAME may also arrive from the environment, which is how a launched
+# phase window learns which session it belongs to. The parent's own name wins
+# for the cron process; the child gets SESSION_NAME exported in its launch
+# environment, so prefer that when this process is itself a phase run.
+if [ -n "${SESSION_NAME:-}" ] && [ -n "${CLIO_TMUX_SESSION:-}" ]; then
+  SESSION="$CLIO_TMUX_SESSION"
+elif [ -n "${SESSION_NAME:-}" ]; then
+  SESSION="$SESSION_NAME"
+else
+  SESSION="development"
+fi
+SESSION_NAME="$SESSION"
 PROFILE="$HERMES_PROFILE_NAME"
 CHANNEL="$DISCORD_CHANNEL"
 FALLBACK="$DISCORD_FALLBACK_CHANNEL"
@@ -110,6 +130,12 @@ CURRENT="$RUN_DIR/current"
 PIDFILE="$RUN_DIR/pid"
 NOTIFY_BROKEN="$RUN_DIR/notify-broken"
 LOG="$RUN_DIR/driver.log"
+
+# Persistent tmux session: idle + phase windows. Sourced after the paths above
+# are defined because the helper uses SCRIPTS, LOG, and REPO at call time.
+# shellcheck disable=SC1091
+. "$SCRIPTS/phase-tmux.sh"
+
 DRY_RUN=0
 CUR_PHASE=""
 CUR_PHASE_FILE=""
@@ -245,6 +271,7 @@ run_session() {
   printf '%s\n' "$$" >"$PIDFILE"
   cd "$REPO"
   export CLIO_MACHINE_ID="${CLIO_MACHINE_ID:-$PHASE_MACHINE_ID}"
+  tmux_set_title "phase $number running"
   notify_phase "$rel" started
   if [ -n "${DRIVER_STUB_RC:-}" ]; then
     log "STUB mode: simulating glide (rc=$DRIVER_STUB_RC)"
@@ -256,26 +283,33 @@ run_session() {
   fi
   state="$(phase_state "$number")"
   case "$rc" in
-    0)   notify_phase "$rel" completed ;;
+    0)   tmux_set_title "phase $number done"
+         notify_phase "$rel" completed ;;
     3)   : ;;
-    130) notify_phase "$rel" interrupted "the process received an interrupt signal" ;;
+    130) tmux_set_title "HALTED phase $number (interrupted)"
+         notify_phase "$rel" interrupted "the process received an interrupt signal" ;;
     *)   printf 'phase %s rc=%s state=%s at %s\n' \
            "$number" "$rc" "${state:-unknown}" "$(ts)" >"$HALT"
+          # The title is set before the window closes, so the halt survives the
+          # phase window going away and the idle display taking over.
+          tmux_set_title "HALTED phase $number (rc=$rc)"
           notify_phase "$rel" stopped "" "$rc" ;;
   esac
   rm -f "$CURRENT" "$PIDFILE"
   exit "$rc"
 }
 
+# Busy means "a phase window is running", not "the session exists". The session
+# is persistent and always exists once created, so testing it would block the
+# line forever. A dead-but-retained phase window is reclaimed, never the
+# session, so a display attached to the idle window is not disturbed.
 tmux_busy() {
-  tmux has-session -t "$SESSION" 2>/dev/null || return 1
-  # A dead-but-retained pane (remain-on-exit) must not block the line forever.
-  if [ "$(tmux list-panes -t "$SESSION" -F '#{pane_dead}' 2>/dev/null | sort -u)" = "1" ]; then
-    log "stale dead session '$SESSION'; reclaiming it"
-    tmux kill-session -t "$SESSION" 2>/dev/null || true
-    return 1
+  tmux_phase_window_alive && return 0
+  if tmux_window_exists; then
+    log "stale dead phase window in '$SESSION'; reclaiming it"
+    tmux_phase_window_close
   fi
-  return 0
+  return 1
 }
 
 newest_mtime() {
@@ -343,8 +377,8 @@ _drive() {
 
   if [ "$DRY_RUN" = 1 ]; then
     [ -f "$HALT" ] && { log "dry-run: halted; would refuse to advance"; return 0; }
-    tmux has-session -t "$SESSION" 2>/dev/null \
-      && { log "dry-run: session '$SESSION' is running; would skip"; return 0; }
+    tmux_phase_window_alive 2>/dev/null \
+      && { log "dry-run: phase window is running; would skip"; return 0; }
     local selection selection_rc=0 state
     selection="$(coordination_select --read-only)" || selection_rc=$?
     if [ "$selection_rc" -ne 0 ] && [ "$selection_rc" -ne 1 ] \
@@ -359,8 +393,8 @@ _drive() {
         number="$(printf '%s' "$selection" | selection_value phase)"
         rel="$(printf '%s' "$selection" | selection_value path)"
         log "dry-run: would reserve and launch phase $number in tmux '$SESSION'"
-        printf 'would launch: tmux new-session -d -s %s -x %s -y %s -c %s "bash %s/private/clio-private/scripts/phase-driver.sh --session %s %s"\n' \
-          "$SESSION" "$TMUX_WIDTH" "$TMUX_HEIGHT" "$REPO" "$REPO" "$number" "$rel"
+        printf 'would launch: tmux new-window -d -t %s -n phase -c %s "bash %s/private/clio-private/scripts/phase-driver.sh --session %s %s"\n' \
+          "$SESSION" "$REPO" "$REPO" "$number" "$rel"
         ;;
       WAIT_FOR_CLAIM)
         wait_phase="$(printf '%s' "$selection" | selection_value phase)"
@@ -400,28 +434,36 @@ _drive() {
 
   if tmux_busy; then
     check_stall
-    log "session '$SESSION' is running; skip"
+    log "phase window is running; skip"
     return 0
   fi
 
-  # No tmux session, but a recorded live PID means an orphaned run (e.g. after
-  # `tmux kill-session`, which does not signal the pane). Halt rather than
-  # start a second, concurrent run.
+  # No phase window, but a recorded live PID means an orphaned run (e.g. after
+  # `tmux kill-window`, which does not signal the pane). The session itself
+  # outlives every phase, so it proves nothing. Halt rather than start a
+  # second, concurrent run.
   if [ -f "$PIDFILE" ]; then
     local opid
     opid="$(cat "$PIDFILE" 2>/dev/null || true)"
     if [ -n "$opid" ] && kill -0 "$opid" 2>/dev/null; then
-      log "orphaned run detected (pid $opid, no session '$SESSION'); halting"
+      log "orphaned run detected (pid $opid, no phase window); halting"
       [ -f "$HALT" ] || printf 'orphaned run pid %s at %s\n' "$opid" "$(ts)" >"$HALT"
-      notify "a phase run (pid $opid) is alive but tmux session '$SESSION' is gone (orphaned). Line stopped; investigate."
+      notify "a phase run (pid $opid) is alive but its tmux phase window is gone (orphaned). Line stopped; investigate."
       return 0
     fi
     rm -f "$PIDFILE"
   fi
 
-  # No live session: clear per-session state a hard kill may have left behind.
+  # No live phase: clear per-session state a hard kill may have left behind.
   rm -f "$CURRENT" "$STALL"
   prune
+  # Keep the display truthful between phases. A halted line says so here too, so
+  # the reason is visible even if the titlebar is not rendered.
+  if [ -f "$HALT" ]; then
+    tmux_set_title "HALTED - $(tr '\n' ' ' <"$HALT" | cut -c1-60)"
+  else
+    tmux_set_title "idle - waiting for next phase"
+  fi
 
   local out rc=0 number rel reservation_id reservation_generation
   if [ "${1:-}" = "--self-test" ]; then
@@ -512,21 +554,36 @@ _drive() {
   [ -z "${CLIO_PHASE_COORDINATION_BRANCH:-}" ] || envs="$envs CLIO_PHASE_COORDINATION_BRANCH='$CLIO_PHASE_COORDINATION_BRANCH'"
   [ -z "$reservation_id" ] || envs="$envs CLIO_RESERVATION_ID='$reservation_id'"
   [ -z "$reservation_generation" ] || envs="$envs CLIO_RESERVATION_GENERATION='$reservation_generation'"
+  # The stage-title hook (pre_step) needs the session and the phase number; glide
+  # passes neither, so both travel through the launch environment. SESSION_NAME
+  # is exported too so the child driver resolves the same session name.
+  envs="$envs CLIO_TMUX_SESSION='$SESSION' CLIO_PHASE_NUMBER='$number' DRIVER_RUN_DIR='$RUN_DIR' SESSION_NAME='$SESSION'"
   local launch="${envs:+$envs }bash '$REPO/$PRIV/scripts/phase-driver.sh' --session '$number' '$rel'"
 
-  # Detached geometry: new sessions start at TMUX_WIDTH x TMUX_HEIGHT
-  # (defaults 164x48, overridable via .driver.env). runner.py copies the
-  # pane size into each harness pty, so opencode inherits it with no
-  # second change. This is the initial detached size only: tmux keeps its
-  # default window-size policy, so attaching with a smaller terminal may
-  # shrink the window, and a session already running keeps its old size
-  # until it is relaunched (kill the session or run
-  # `tmux resize-window -t <session> -x <w> -y <h>` once).
-  9>&- tmux new-session -d -s "$SESSION" -x "$TMUX_WIDTH" -y "$TMUX_HEIGHT" -c "$REPO" "$launch" \
+  # Geometry: the session is created once at TMUX_WIDTH x TMUX_HEIGHT with
+  # `window-size manual`, so it holds that size even when a smaller display
+  # attaches. runner.py copies the pane size into each harness pty, so this is
+  # what the agent actually works at. The phase window is then sized explicitly,
+  # because new-window has no -x/-y and inherits the session size instead.
+  #
+  # The session is ensured first and never killed, so a display attached to the
+  # idle window survives the launch. 9>&- drops the flock fd, as before.
+  9>&- tmux_session_ensure \
+    || { notify "phase $number failed to create tmux session '$SESSION'"; return 1; }
+  # Set the title BEFORE the window opens. The child sets its own titles as it
+  # runs, and anything written after the window opens races with them: a parent
+  # "starting" landing after the child's "done" would leave the display showing
+  # a phase that already finished.
+  tmux_set_title "phase $number starting"
+  9>&- tmux_phase_window_open "$launch" "$RUN_DIR/session-$number.log" \
     || { notify "phase $number failed to launch in tmux"; return 1; }
   printf '%s\n' "$number" >"$CURRENT"
-  tmux pipe-pane -t "$SESSION" -o "cat >> '$RUN_DIR/session-$number.log'" 2>/dev/null || true
-  log "launched phase $number in tmux '$SESSION'"
+  # The window stays named 'phase'. Renaming it to carry the phase number would
+  # break every target string in phase-tmux.sh that looks it up by name, and
+  # the phase number is already in the title and the log. The stage hook
+  # renames it per stage instead, which is the display-facing label.
+  tmux_phase_window_select
+  log "launched phase $number in tmux '$SESSION' window 'phase'"
 }
 
 drive() {
@@ -555,17 +612,23 @@ drive() {
 stop() {
   mkdir -p "$RUN_DIR"
   printf 'stopped by operator at %s\n' "$(ts)" >"$HALT"
-  if tmux has-session -t "$SESSION" 2>/dev/null; then
-    tmux send-keys -t "$SESSION" C-c
-    log "stop: sent Ctrl-C to '$SESSION' and wrote halt marker"
+  # Ctrl-C must reach the phase window. Targeting the session would send it to
+  # whichever window is current, which may be the idle status display.
+  if tmux_phase_window_alive; then
+    tmux_phase_window_interrupt
+    log "stop: sent Ctrl-C to '$SESSION:phase' and wrote halt marker"
+  elif tmux_session_exists; then
+    log "stop: wrote halt marker (session idle, no phase window)"
   else
     log "stop: wrote halt marker (no live session)"
   fi
 }
 
-wait_session_gone() {
+# Wait for the phase window to disappear. The session itself is persistent and
+# is never waited on.
+wait_phase_window_gone() {
   local i=0
-  while tmux has-session -t "$SESSION" 2>/dev/null; do
+  while tmux_window_exists; do
     i=$((i + 1)); [ "$i" -gt 60 ] && break
     sleep 0.25
   done
@@ -581,7 +644,10 @@ driver_self_test() {
   DISABLE_NOTIFY=1
   DISABLE_DISCORD=1
   DRIVER_STUB_RC=0
-  DRIVER_STUB_SLEEP=1
+  # Long enough that the phase window is still open for the checks below. The
+  # phase now lives in a window that closes on exit, so a 1s stub could finish
+  # before the first assertion ran.
+  DRIVER_STUB_SLEEP=6
   export SESSION_NAME DRIVER_RUN_DIR DISABLE_NOTIFY DISABLE_DISCORD DRIVER_STUB_RC DRIVER_STUB_SLEEP
   RUN_DIR="$DRIVER_RUN_DIR"
   LOCK="$RUN_DIR/driver.lock"; HALT="$RUN_DIR/halted"
@@ -591,12 +657,23 @@ driver_self_test() {
   mkdir -p "$RUN_DIR"
   echo "self-test session: $SESSION  state dir: $RUN_DIR"
 
+  title_of() { tmux show-option -t "$SESSION" -v set-titles-string 2>/dev/null || true; }
+
   drive --self-test || true
-  tmux has-session -t "$SESSION" 2>/dev/null \
-    && echo "ok: launched a session" || { echo "FAIL: session not launched"; fail=1; }
-  geom="$(tmux display-message -p -t "$SESSION" '#{window_width}x#{window_height}' 2>/dev/null || true)"
+  tmux_session_exists \
+    && echo "ok: launched a session" || { echo "FAIL: session not created"; fail=1; }
+  tmux_window_exists \
+    && echo "ok: phase window opened" || { echo "FAIL: phase window not opened"; fail=1; }
+  tmux list-windows -t "$SESSION" -F '#{window_name}' 2>/dev/null | grep -qx -- idle \
+    && echo "ok: idle window present" || { echo "FAIL: idle window missing"; fail=1; }
+  geom="$(tmux_phase_window_geometry)"
   [ "$geom" = "${TMUX_WIDTH}x${TMUX_HEIGHT}" ] \
-    && echo "ok: geometry $geom" || { echo "FAIL: geometry ${geom:-gone}, want ${TMUX_WIDTH}x${TMUX_HEIGHT}"; fail=1; }
+    && echo "ok: phase window geometry $geom" \
+    || { echo "FAIL: geometry ${geom:-gone}, want ${TMUX_WIDTH}x${TMUX_HEIGHT}"; fail=1; }
+  case "$(title_of)" in
+    *"starting"*|*"running"*) echo "ok: running title set ($(title_of))" ;;
+    *) echo "FAIL: running title not set, got '$(title_of)'"; fail=1 ;;
+  esac
   drive --self-test || true
   grep -q "running; skip" "$LOG" \
     && echo "ok: busy run skipped" || { echo "FAIL: busy run not skipped"; fail=1; }
@@ -608,9 +685,35 @@ driver_self_test() {
     && { echo "FAIL: old notification prefix remains"; fail=1; } \
     || echo "ok: notification prefix removed"
 
-  wait_session_gone
+  wait_phase_window_gone
   grep -q "Phase .* has completed\." "$LOG" \
     && echo "ok: completion notification logged" || { echo "FAIL: completion notification missing"; fail=1; }
+
+  # The whole point of the change: the session outlives the phase.
+  tmux_session_exists \
+    && echo "ok: session survives phase completion" \
+    || { echo "FAIL: session died with the phase"; fail=1; }
+  tmux_window_exists \
+    && { echo "FAIL: phase window still present after completion"; fail=1; } \
+    || echo "ok: phase window closed on completion"
+  tmux list-windows -t "$SESSION" -F '#{window_name}' 2>/dev/null | grep -qx -- idle \
+    && echo "ok: idle window survives phase" || { echo "FAIL: idle window gone after phase"; fail=1; }
+  case "$(title_of)" in
+    *"done"*) echo "ok: completion title set ($(title_of))" ;;
+    *) echo "FAIL: completion title not set, got '$(title_of)'"; fail=1 ;;
+  esac
+  # An idle session must not block the next tick. Count skips before and after
+  # rather than grepping the whole log: an earlier legitimate skip (while the
+  # first phase ran) is still in there and would mask a real regression.
+  skips_before="$(grep -c 'phase window is running; skip' "$LOG" || true)"
+  drive --self-test || true
+  skips_after="$(grep -c 'phase window is running; skip' "$LOG" || true)"
+  if [ "$skips_after" -gt "$skips_before" ]; then
+    echo "FAIL: idle session blocked the line"; fail=1
+  else
+    echo "ok: idle session does not block the line"
+  fi
+  wait_phase_window_gone
 
   # Exercise the stall path without waiting for the real threshold. Use this
   # shell as the live process so the test does not race the short stub run.
@@ -635,29 +738,39 @@ driver_self_test() {
   DRIVER_STUB_RC=1; export DRIVER_STUB_RC
   rm -f "$HALT"
   drive --self-test || true
-  wait_session_gone
+  wait_phase_window_gone
   [ -f "$HALT" ] \
     && echo "ok: halt marker written" || { echo "FAIL: halt marker missing"; fail=1; }
   grep -q "Phase .* stopped\." "$LOG" \
     && echo "ok: halt notification logged" || { echo "FAIL: halt notification missing"; fail=1; }
+  case "$(title_of)" in
+    *HALTED*) echo "ok: halt title set ($(title_of))" ;;
+    *) echo "FAIL: halt title not set, got '$(title_of)'"; fail=1 ;;
+  esac
 
   drive --self-test || true
   grep -q "refusing to advance" "$LOG" \
     && echo "ok: refuses to advance while halted" || { echo "FAIL: advanced while halted"; fail=1; }
-  tmux has-session -t "$SESSION" 2>/dev/null \
-    && { echo "FAIL: launched a session while halted"; fail=1; }
+  tmux_window_exists \
+    && { echo "FAIL: opened a phase window while halted"; fail=1; } \
+    || echo "ok: no phase window opened while halted"
 
-  # Signal stop: Ctrl-C reaches the trap, which halts and notifies.
+  # Signal stop: Ctrl-C reaches the trap, which halts and notifies. This is the
+  # case that proves Ctrl-C is aimed at the phase window: the idle window is
+  # still there, and a session-scoped send-keys would have hit it instead.
   rm -f "$HALT"
   DRIVER_STUB_RC=0; DRIVER_STUB_SLEEP=20; export DRIVER_STUB_RC DRIVER_STUB_SLEEP
   drive --self-test || true
   sleep 0.5
   stop || true
-  wait_session_gone
+  wait_phase_window_gone
   [ -f "$HALT" ] \
     && echo "ok: stop wrote halt marker" || { echo "FAIL: stop marker missing"; fail=1; }
   grep -q "Phase .* stopped by signal\." "$LOG" \
     && echo "ok: stop notification logged" || { echo "FAIL: stop notification missing"; fail=1; }
+  tmux_session_exists \
+    && echo "ok: session survives an operator stop" \
+    || { echo "FAIL: session died on operator stop"; fail=1; }
 
   # Coordination failure: the normal driver path must refuse before tmux launch.
   old_repo="$REPO"; old_priv="$PRIV"; old_wf="$WF"
@@ -675,7 +788,7 @@ driver_self_test() {
   SESSION="ar-driver-coord-failure-$$"
   drive || true
   if grep -q "coordination checkout sync failed" "$LOG" \
-      && ! tmux has-session -t "$SESSION" 2>/dev/null; then
+      && ! tmux_window_exists 2>/dev/null; then
     echo "ok: coordination failure refuses launch"; coord_fail_ok=1
   else
     echo "FAIL: coordination failure did not refuse launch"; coord_fail_ok=0; fail=1
@@ -686,13 +799,19 @@ driver_self_test() {
   CURRENT="$old_current"; PIDFILE="$old_pid"; NOTIFY_BROKEN="$old_notify_broken"
   LOG="$old_log"; SESSION="$old_session"
 
-  # Orphan: tmux kill-session does not signal the pane, so a live recorded PID
-  # with no session must halt instead of starting a second concurrent run.
+  # Orphan: killing the phase window does not signal the pane, so a live
+  # recorded PID with no phase window must halt instead of starting a second
+  # concurrent run. The session deliberately SURVIVES the kill here, which is
+  # what makes this the real test: a session-scoped existence check would see a
+  # live session, wrongly conclude work is in flight, and skip.
   rm -f "$HALT"
   drive --self-test || true
   sleep 0.5
-  tmux kill-session -t "$SESSION" 2>/dev/null || true
+  tmux kill-window -t "$SESSION:$TMUX_PHASE_WINDOW" 2>/dev/null || true
   sleep 0.3
+  tmux_session_exists \
+    && echo "ok: session outlives a killed phase window (orphan precondition)" \
+    || echo "note: session gone; orphan test ran without the persistent-session case"
   drive --self-test || true
   grep -q "orphaned run detected" "$LOG" \
     && echo "ok: orphan detected" || { echo "FAIL: orphan not detected"; fail=1; }
@@ -700,7 +819,70 @@ driver_self_test() {
     && echo "ok: orphan halts the line" || { echo "FAIL: orphan did not halt"; fail=1; }
   [ -f "$PIDFILE" ] && kill -9 "$(cat "$PIDFILE")" 2>/dev/null || true
 
+  # A session outlives every phase, so it is created once and reused forever.
+  # That means a settings change, or a hand-made session, would otherwise keep
+  # whatever size it was born with. Assert the reconcile path fixes that.
+  tmux resize-window -t "$SESSION:$TMUX_IDLE_WINDOW" -x 100 -y 30 2>/dev/null || true
+  idle_geom_stale="$(tmux display-message -p -t "$SESSION:$TMUX_IDLE_WINDOW" \
+    '#{window_width}x#{window_height}' 2>/dev/null || true)"
+  tmux_session_ensure
+  idle_geom="$(tmux display-message -p -t "$SESSION:$TMUX_IDLE_WINDOW" \
+    '#{window_width}x#{window_height}' 2>/dev/null || true)"
+  if [ "$idle_geom" = "${TMUX_WIDTH}x${TMUX_HEIGHT}" ]; then
+    echo "ok: idle window reconciled ${idle_geom_stale} -> ${idle_geom}"
+  else
+    echo "FAIL: idle window stuck at ${idle_geom:-gone}, want ${TMUX_WIDTH}x${TMUX_HEIGHT}"; fail=1
+  fi
+
+  # The stage-title hook is a GATING pre_step hook: a nonzero exit stops the
+  # run. These assertions exist to fail loudly if that ever changes.
+  title_hook="$SCRIPTS/pipeline/tmux_title.sh"
+  if [ -f "$title_hook" ]; then
+    hook_sess="ar-hook-selftest-$$"
+    tmux new-session -d -s "$hook_sess" -x 80 -y 24 -n phase 'sleep 30' 2>/dev/null || true
+    hook_rc=0
+    for hook_step in developer adversary remediator approver finalize; do
+      GLIDE_STEP="$hook_step" CLIO_TMUX_SESSION="$hook_sess" \
+        bash "$title_hook" >/dev/null 2>&1 || hook_rc=$?
+    done
+    [ "$hook_rc" -eq 0 ] \
+      && echo "ok: stage hook exits 0 for all five steps" \
+      || { echo "FAIL: stage hook exited $hook_rc"; fail=1; }
+    hook_title="$(tmux show-option -t "$hook_sess" -v set-titles-string 2>/dev/null || true)"
+    case "$hook_title" in
+      *finalize*) echo "ok: stage hook set the last title ($hook_title)" ;;
+      *) echo "FAIL: stage hook title unexpected: '$hook_title'"; fail=1 ;;
+    esac
+    hook_win="$(tmux list-windows -t "$hook_sess" -F '#{window_name}' 2>/dev/null | tail -1)"
+    case "$hook_win" in
+      *finalize*) echo "ok: stage hook renamed the phase window ($hook_win)" ;;
+      *) echo "FAIL: stage hook window name unexpected: '$hook_win'"; fail=1 ;;
+    esac
+    # The rename must not make the window unfindable: the driver looks it up by
+    # ID, so a display label like "phase adversary" cannot break a later
+    # interrupt, pipe-pane, or geometry read.
+    hook_wid="$(tmux list-windows -t "$hook_sess" -F '#{window_id} #{window_name}' 2>/dev/null \
+      | awk '$2 ~ /^phase/ { print $1 }')"
+    [ -n "$hook_wid" ] \
+      && echo "ok: renamed phase window still resolvable by id ($hook_wid)" \
+      || { echo "FAIL: renamed phase window is no longer resolvable"; fail=1; }
+    # Missing session and missing step must both be silent and harmless.
+    GLIDE_STEP=developer CLIO_TMUX_SESSION="ar-no-such-session-$$" \
+      bash "$title_hook" >/dev/null 2>&1 \
+      && echo "ok: stage hook tolerates a missing session" \
+      || { echo "FAIL: stage hook failed on a missing session"; fail=1; }
+    GLIDE_STEP="" CLIO_TMUX_SESSION="$hook_sess" \
+      bash "$title_hook" >/dev/null 2>&1 \
+      && echo "ok: stage hook tolerates an empty step" \
+      || { echo "FAIL: stage hook failed on an empty step"; fail=1; }
+    tmux kill-session -t "$hook_sess" 2>/dev/null || true
+  else
+    echo "FAIL: stage hook script missing at $title_hook"; fail=1
+  fi
+
   tmux kill-session -t "$SESSION" 2>/dev/null || true
+  tmux kill-session -t "ar-hook-selftest-$$" 2>/dev/null || true
+  tmux kill-session -t "ar-no-such-session-$$" 2>/dev/null || true
   rm -rf "$tmp"
   echo "driver self-test: $([ "$fail" = 0 ] && echo pass || echo FAIL)"
   return "$fail"
@@ -729,7 +911,17 @@ check() {
   [ -f "$WF/.driver.env" ] && echo "env file: present" || echo "env file: none (defaults in use)"
   echo "heartbeat: ${HEARTBEAT_URL:-unset}"
   echo "stall threshold: ${STALE_AFTER_SEC}s"
-  echo "tmux geometry: ${TMUX_WIDTH}x${TMUX_HEIGHT} (initial detached size; attaches may resize)"
+  echo "tmux geometry: ${TMUX_WIDTH}x${TMUX_HEIGHT} (pinned with window-size manual; a display attached with -r cannot change it)"
+  if tmux_session_exists; then
+    echo "tmux session '$SESSION': present (persistent, outlives every phase)"
+    tmux_window_exists \
+      && echo "  phase window: running, $(tmux_phase_window_geometry)" \
+      || echo "  phase window: absent (idle)"
+    echo "  title: $(tmux show-option -t "$SESSION" -v set-titles-string 2>/dev/null || echo '(unset)')"
+    echo "  attach read-only: tmux attach -t $SESSION -r"
+  else
+    echo "tmux session '$SESSION': not created yet (created on the next launch)"
+  fi
   "$PYTHON" "$SCRIPTS/pipeline/next_phase.py" --self-test
   "$PYTHON" "$SCRIPTS/pipeline/phase_reservations.py" --self-test
 }
