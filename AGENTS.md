@@ -89,6 +89,7 @@ What stays private — the entire `private/` directory:
 
 - `baseline/requirement.md`, `baseline/coverage.md`, `baseline/hardware.md`, this `AGENTS.md`
 - `roadmap/`, `runs/`, `harness/`, `scripts/`, `harness/dev-note.md`, `baseline/benchmark.md`, `baseline/crates.md`
+- `logs/` — command output and exit codes for expensive gates (see **Expensive Commands Write To A Log**)
 - Rotation state, run ledgers, run logs, finalize logs, approval markers
 
 What you must never do:
@@ -167,6 +168,20 @@ The rules:
 - **Fix the cause, then run once.** If a run fails, read the log, decide what is wrong, change it, then run again. Do not re-run unchanged code.
 - **A flaky gate is not a licence to loop.** If an expensive command fails intermittently, that is a bug in its own right. Report it as a bug, say plainly that the gate could not be completed, and move on. Do not spend several runs on a coin flip.
 - **Narrow with a cheap scoped run first.** While iterating, use a per-crate run instead of the full gate. Save the full gate for the final pass.
+- **Strip host paths before keeping a log.** Toolchain paths, temp directories, and `$HOME` appear in command output. These logs get pasted into issues, so replace them with a marker:
+
+  ```bash
+  sed -i '' -E 's#/Users/[^/ ]+#~#g; s#/private/var/folders/[^ ]+#TMPDIR#g' \
+    private/clio-private/logs/<name>.log
+  ```
+
+- **Run scoped tests through the same env the Makefile uses.** `make test` and every coverage target set `CLIO_DEPLOYMENT_CONFIG` to a non-existent overlay so no test reads the host's real `~/.config/clio/deployment.json`. A bare `cargo test` does not, so config-reading tests can fail on a developer machine and pass under `make`. Pass it yourself:
+
+  ```bash
+  CLIO_DEPLOYMENT_CONFIG="$PWD/target/coverage/no-deployment-overlay.json" \
+    DATABASE_URL=postgres://clio:clio@127.0.0.1:34310/clio \
+    cargo test --locked -p clio-store
+  ```
 
 ```bash
 cargo llvm-cov --package <crate> --locked --no-clean --summary-only
