@@ -1,0 +1,41 @@
+{
+  "run": "phase-100660",
+  "phase": "100660",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "low",
+      "title": "Completion Evidence misstates the size of cli_read_output_tests.rs (claims 193 lines; the staged file is 184)",
+      "evidence": "roadmap/phase-100660-cli-scores-breakdown.md: `| Size | touched files | 247 / 295 / 193 / 387 lines |` and Completion Evidence `116 -> 193 lines`. Measured on the staged blob: `git show :crates/clio-lib/src/cli_read_output_tests.rs | wc -l` -> 184; `git diff --cached --numstat` -> 71 insertions, 3 deletions against the 116-line HEAD file (116 + 71 - 3 = 184). The other three figures are correct: cli_read_render.rs 247, cli_read_render_scores_tests.rs 295, main.rs 387.",
+      "requirement_ref": "phase-100660 section 9 AC-100660-05 evidence row and Completion Evidence 'Changed components'",
+      "recommendation": "Correct both places to 184 lines, or re-measure the staged blob with `wc -l` and paste the real number."
+    },
+    {
+      "id": "F-02",
+      "severity": "low",
+      "title": "The required real-CLI end-to-end check for the breakdown is manual only; no automated test asserts the new text through the spawned binary",
+      "evidence": "roadmap/phase-100660-cli-scores-breakdown.md section 8 'Required Tests': '- [ ] End-to-end tests (real CLI `recall` text and `--output json`)' is still unticked, as are the other six Required Tests boxes. The existing real-binary harness crates/clio-lib/tests/output_alias_harness.rs:118-121 spawns `clio recall alias -o text` but asserts only `Results for: alias`. The staged in-process test crates/clio-lib/src/cli_read_output_tests.rs:122 uses run_state, not a spawned process. The real CLI run is evidence in the phase file only: I reproduced it with target/debug/clio and a scratch SQLite db and got `scores: final 0.0118  semantic -  keyword 0.000001  reranker -`; the behavior is correct today, but no committed test fails if the binary wiring regresses.",
+      "requirement_ref": "phase-100660 section 8 Required Tests (end-to-end bullet) and T100660-06",
+      "recommendation": "Add one assertion in crates/clio-lib/tests/output_alias_harness.rs (or a new `*_test.rs` harness within the 450-line cap) that the spawned binary's recall text contains a `scores: final ` line with `-` for an absent arm and that `-o json` stdout carries no `scores: final` line; then tick the section 8 boxes that hold."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Phase doc parent-requirement citation is wrong: PR-4 is about snapshot/gist, and requirement.md states no score-calibration rule",
+      "evidence": "roadmap/phase-100660-cli-scores-breakdown.md:41 cites 'PR-4 / §4.5 (never present a fused/derived score as calibrated)'. requirement.md:128 defines PR-4 as 'Snapshot for truth, gist for flow'; requirement.md §4.5 (lines 207-236) describes the retrieval path with no calibration wording; `grep -i calibrat baseline/requirement.md` returns no matches. Only the §4.9.4.G reference maps to the diagnostic-visibility claim (requirement.md:421, `explain` returns a score/domain/hop trace). The citation predates the implementation and the staged code does not violate any requirement.",
+      "requirement_ref": "requirement.md PR-4 (line 128), §4.5 (lines 207-236), §4.9.4.G (line 421)",
+      "recommendation": "Fix the Parent Requirement line to cite what exists (for example §4.9.4.G / P12 diagnostic visibility plus §4.5 for the stage values), or record an explicit product decision if the 'relative, not calibrated' disclaimer is meant to be a standing rule."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "Correct the two stale size figures in the phase file (F-01).",
+    "Add the real-binary end-to-end assertion for the breakdown and tick the section 8 boxes that hold (F-02).",
+    "Fix the Parent Requirement citation or record the disclaimer as a product decision (F-03).",
+    "Re-run make test and make coverage after the edits and confirm every touched file stays at or below 450 lines."
+  ],
+  "plan_unlimited": [
+    "Move the TEI doubles out of crates/clio-lib/src/cli_read_scores_tests.rs (447 lines) into a sibling `*_tests.rs` helper module, then add the text-mode assertion to `recall_json_reranker_is_populated_with_configured_reranker` so the all-stages-populated case is pinned through the CLI in both text and JSON views.",
+    "Add a golden recall-text fixture shared by the renderer and CLI tests so a future layout change surfaces as an explicit diff instead of scattered substring assertions."
+  ]
+}
