@@ -176,6 +176,20 @@
       "run_id": "phase-100680",
       "status": "completed"
     },
+    "100700": {
+      "base_revisions": {
+        "private": "3f61c2d861f5869256e263ca77643a6b538034e1",
+        "public": "48743c89272e8fa2e93f739957aacb92279f021b"
+      },
+      "claimed_at": "2026-09-26T10:07:49.704Z",
+      "expires_at": null,
+      "generation": 1,
+      "heartbeat_at": "2026-09-26T10:07:49.704Z",
+      "machine_id": "macbook",
+      "reservation_id": "rsv-8772aa9d7f5bb713c83174cd",
+      "run_id": "phase-100700",
+      "status": "running"
+    },
     "100720": {
       "base_revisions": {
         "private": "f25d04f6b0bc55b547be817bc1e75deda8718def",
@@ -196,6 +210,13 @@
       "run_id": "phase-100720",
       "status": "completed"
     }
+  },
+  "publication": {
+    "acquired_at": "2026-09-26T10:17:22.031Z",
+    "generation": 1,
+    "machine_id": "macbook",
+    "phase": "100700",
+    "reservation_id": "rsv-8772aa9d7f5bb713c83174cd"
   },
   "version": 1
 }
