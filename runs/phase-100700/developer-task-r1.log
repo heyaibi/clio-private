@@ -1,0 +1,37 @@
+2026-09-26T07:52:00Z START developer r1 (phase 100700). Read task file, phase file, private AGENTS.md, coverage.md, crates.md, requirement citations. Worked from repo root /Users/aiuser/Documents/projects/agentmemoir/clio on branch master.
+
+2026-09-26T07:52:30Z Step 0 precondition/state inspection (no coding yet):
+- `git branch --show-current` -> master (before any edit, per AGENTS.md).
+- Read private/clio-private/runs/phase-100700/{resume.json,harnesses.json}: fresh attempt, developer visit 1.
+- Checked accepted prerequisite phases 100660 and 100680 against the phase docs and the working tree.
+- `git status`/`git log` were NOT run (default-deny); state read from files: .git/HEAD -> refs/heads/master = 47cbc4e6; .git/logs/refs/heads/master last entry is a pull fast-forward to 47cbc4e6 at 2026-09-25T22:28 local; no MERGE_HEAD/rebase state; private repo had 28 modified harness files (unrelated to this phase; left untouched).
+
+2026-09-26T07:54:00Z Step 1 prerequisite check FAILED — the two products this phase requires are absent from this checkout:
+- Phase 100660 (text slot): accepted evidence says `crates/clio-lib/src/cli_read_render.rs` is 247 lines with `recall_entity_reason_lines` at :142 and a per-stage breakdown. Actual file: 170 lines, `grep -c recall_entity_reason_lines` = 0. The reserved entity-reason slot does not exist here.
+- Phase 100680 (entities[]): accepted evidence says `crates/clio-retrieve/src/entities.rs` and `ScoredHit.entities` exist. Actual: `ls crates/clio-retrieve/src/entities.rs` -> No such file or directory; `grep entity|entities crates/clio-retrieve/src` finds no hit entity projection; `crates/clio-retrieve/src/types.rs` ScoredHit (line 120) has no entities field. `docs/recall-entities.md` does not exist.
+- Consequence: Task 1's required behavior ("hit's entities[]", "match against the hit's names") has no input on this base; Task 2's slot does not exist. Implementing either prerequisite here would duplicate two published phases and collide with their eventual merge.
+
+2026-09-26T07:56:00Z Step 2 launch-path check (why the base is stale, for the operator):
+- This run dir has no `sync-before-start.json` (phase-100720's run dir has one), so the runner's preflight `gitsync.sync_all(root, "start")` did not run for this attempt.
+- Working-tree runner.py:3220-3222 runs preflight only when `resumed is None`; this attempt carries a resume.json, consistent with a `--resume`/recovered launch that skipped the sync.
+- Local origin/master ref is 74757ef (older fetch); the devserver published phases 100660/100680 after this checkout's last pull. Public repo content therefore is not in this tree.
+
+2026-09-26T07:58:00Z Step 3 baseline gate NOT run, deliberately:
+- The stage instructs the coverage baseline "before coding"; coding cannot start because the base is missing the required inputs, and a checkout sync changes the base commit, which would invalidate any baseline numbers taken now. Skipped to avoid ~30+ minutes of instrumented build and laptop heat on numbers that cannot be reused.
+
+2026-09-26T07:59:00Z Step 4 git authorization check: the fix for the stale base is `python3 private/clio-private/scripts/pipeline/gitsync.py --root . --mode start` (the pipeline's own fail-closed sync), but it runs `git fetch` plus a fast-forward or merge. The global AGENTS.md git default-deny (never run `git fetch`/`git pull`/`git merge` without explicit approval) and this task's git bullet (commit/push/stash forbidden; only the exact `git add` calls authorized) do not authorize it. I did not run it. No git fetch/pull/merge/commit/push/stash was run at any point.
+
+2026-09-26T08:00:00Z BLOCKER — preconditions unmet in this checkout. Options for the operator:
+1) (Recommended) Authorize/run the sanctioned sync, then resume this run:
+   `python3 private/clio-private/scripts/pipeline/gitsync.py --root . --mode start`
+   then `python3 private/clio-private/harness/runner.py ... --resume` (same inputs as this run).
+   Pros: uses the pipeline's own fail-closed sync (never force, never rebase, never discards work); the local branch is published history, so a fast-forward is expected and no local commit is created; the run resumes without redoing the harness plan or the phase reservation.
+   Cons: needs your explicit approval because it executes git fetch/merge; if the histories have diverged (not expected) gitsync creates a merge commit, which you should accept first; tree contents I inspected pre-sync are invalidated.
+2) You sync the checkout yourself and start a fresh phase-100700 run.
+   Pros: no agent-run git commands; a non-resume launch runs the normal preflight sync path and exercises the launcher that this attempt skipped; avoids carrying forward any partially-inspected state.
+   Cons: this attempt is wasted and the visit counter advances; `--fresh` archives this run dir and can re-decide the harness plan (rotation moves on).
+
+No incidental bugs reported: the blocker is run-environment state, not a defect in public code, so it does not enter the GitHub issue process. Nothing was implemented, so there is nothing to verify beyond the file-state evidence above. The blocked signal is appended as the final line of this log.
+
+2026-09-26T08:01:00Z Staging: public repo left untouched (no public changes; `git diff --name-only` and `git diff --cached --name-only` both empty). Private repo staged with `cd private/clio-private && git add -- roadmap/ runs/` -> roadmap/phase-100700-entity-overlap-match-reason.md, runs/phase-100700/{developer-task-r1.log,developer-task-r1.md,harnesses.json,resume.json}.
+DEVELOPER_BLOCKED: checkout lacks Phase 100660/100680 products (no recall_entity_reason_lines slot, no ScoredHit.entities); preconditions unmet and git default-deny forbids me from fetching/pulling; operator: run `python3 private/clio-private/scripts/pipeline/gitsync.py --root . --mode start` then resume this run.

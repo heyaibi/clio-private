@@ -9,6 +9,7 @@ Rounds below record plan authorship; implementation sign-off is in §12.
 | Remediator | r1 | [TBD] | [TBD] |
 | Remedy Approver | r1 | [TBD] | [TBD] |
 | Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Go . Deepseek V4.1 Flash Max) | blocked |
 
 **Capability phase 100700** · **Effort:** ~2–3 days · **Status:** Plan ready · **Parent:** gap analysis `gaps/recall-result-fidelity-gap-analysis.md` §4.2, §7, §8 decision 4, §10.2; requirement FR-4 / §4.4, PR-4, §4.5, FR-20 / §4.9.2 item 2
 

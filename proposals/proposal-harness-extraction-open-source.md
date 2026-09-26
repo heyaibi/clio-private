@@ -46,7 +46,7 @@ Evidence: `wc -l` and keyword counts over `harness/` (2026-09-24).
 | `pipelines/default.yaml` | 142 | Yes — Clio phase workflow | Clio private (ship generic example instead) |
 | `stages/01..05*.md` | 637 | Yes — Clio roles, `make check`, 450-line Rust rule, roadmap isolation | Clio private |
 | `workers/*.md` | 99 | Yes — same | Clio private |
-| `preference.md`, `instruction.md`, `dev-note.md`, `runner.md` | 571 | Yes — operator-owned Clio docs | Clio private |
+| `preference.md`, `dev-note.md`, `runner.md` | 517 | Yes — operator-owned Clio docs | Clio private |
 | `roadmap/`, `baseline/`, `coordination/`, `runs/`, `case-studies/`, `gaps/`, `issue-tracker/`, `docs/adr/`, `scripts/`, `proposals/` | — | Yes | Clio private |
 
 The one hard number that drives the work: `runner.py` has ~89 `reservation` references,
@@ -83,7 +83,7 @@ Three layers, three repos.
    Fail-closed: a declared hook that is missing or errors stops the run at the point it
    gates, never proceeds silently. See Hook model.
 3. **Clio layer (private).** Clio's stages, workers, `default.yaml`, `preference.md`,
-   `instruction.md`, `dev-note.md`, `runner.md`, the phase/reservation/sync/GitHub helpers,
+   `dev-note.md`, `runner.md`, the phase/reservation/sync/GitHub helpers,
    its hook declarations, and the hook scripts themselves.
 
 Target public layout (`glide`):
@@ -166,7 +166,7 @@ Clio consumes the **module form from the pinned clone**, not an installed copy:
 
 ```bash
 PYTHONPATH=private/clio-private/glide/src \
-  python3 -m glide --pipeline private/clio-private/harness/pipelines/default.yaml …
+  python3 -m glide --pipeline private/clio-private/workflow/pipelines/default.yaml …
 ```
 
 - A pip-installed glide lives in `site-packages`, where git cannot see it, so the version

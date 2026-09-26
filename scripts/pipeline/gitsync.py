@@ -45,10 +45,10 @@ Hard safety rules, enforced by construction:
 
 Usage (run from the repo root):
 
-    python3 private/clio-private/harness/gitsync.py --root . --mode start
-    python3 private/clio-private/harness/gitsync.py --root . --mode push
-    python3 private/clio-private/harness/gitsync.py --root . --mode publish --phase 100440
-    python3 private/clio-private/harness/gitsync.py --self-test
+    python3 private/clio-private/scripts/pipeline/gitsync.py --root . --mode start
+    python3 private/clio-private/scripts/pipeline/gitsync.py --root . --mode push
+    python3 private/clio-private/scripts/pipeline/gitsync.py --root . --mode publish --phase 100440
+    python3 private/clio-private/scripts/pipeline/gitsync.py --self-test
 
 Exit codes: 0 synced/verified, 1 blocked (operator decision required),
 2 config or usage error. JSON goes to stdout in every case.

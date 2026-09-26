@@ -1,26 +1,26 @@
 # Pipeline runner (`runner.py`)
 
-The runner executes a stage pipeline: it renders each step's stage file by binding its placeholders, invokes the step's harness CLI attached in the operator's terminal, reads the step's final-line signal from its run log, and routes to the next step. Start with `instruction.md` for the operator workflow; this file is the reference for the runner itself.
+The runner executes a stage pipeline: it renders each step's stage file by binding its placeholders, invokes the step's harness CLI attached in the operator's terminal, reads the step's final-line signal from its run log, and routes to the next step. This file is the reference for the runner itself.
 
 ## Commands
 
 ```bash
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --dry-run
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --self-test
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --resume
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --from-step remediator
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --mark-done remediator REMEDIATOR_DONE
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --fresh
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --customize-harness
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --reset-rotation
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --audit-ledger
-python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --migrate-ledger
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --dry-run
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --self-test
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --resume
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --from-step remediator
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --mark-done remediator REMEDIATOR_DONE
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --fresh
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --customize-harness
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --reset-rotation
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --audit-ledger
+python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060.md --migrate-ledger
 python3 private/clio-private/harness/check-retry-authority.py
 python3 private/clio-private/harness/check-cmd-harness.py
 python3 private/clio-private/harness/check-harness-availability.py
 python3 private/clio-private/harness/check-harness-plan.py
-python3 private/clio-private/harness/check_incidental_policy.py --self-test
+python3 private/clio-private/scripts/pipeline/check_incidental_policy.py --self-test
 python3 private/clio-private/harness/runner.py --fuzz 50
 python3 private/clio-private/harness/runner.py --autoexit-test
 ```
@@ -100,9 +100,9 @@ After the signal, `require_file` is verified before routing: for a findings repo
 
 ## Open issues and incidental bugs
 
-The adversary triages every open issue through `harness/github_issues.py list-open` (light records: title, body, labels, comment count, no comment bodies) and fetches the full thread with `view` for every plausibly related issue. It records only fully resolved, directly in-scope issues in `findings.json:addressed_issues`, with the digest taken from `view`. The remediator preserves and revalidates that list; the approver rejects changed, closed, related-only, or partial candidates. Finalize receives `findings.json` through `ISSUE_AUDIT_PATH` and may close only approved candidates, after both repositories push; an empty candidate list is valid and means close nothing. The close helper checks the issue digest, uses a retry-safe public commit marker, and never closes on a mismatch.
+The adversary triages every open issue through `scripts/pipeline/github_issues.py list-open` (light records: title, body, labels, comment count, no comment bodies) and fetches the full thread with `view` for every plausibly related issue. It records only fully resolved, directly in-scope issues in `findings.json:addressed_issues`, with the digest taken from `view`. The remediator preserves and revalidates that list; the approver rejects changed, closed, related-only, or partial candidates. Finalize receives `findings.json` through `ISSUE_AUDIT_PATH` and may close only approved candidates, after both repositories push; an empty candidate list is valid and means close nothing. The close helper checks the issue digest, uses a retry-safe public commit marker, and never closes on a mismatch.
 
-Every main stage applies `harness/incidental-bugs.md`. Only a confirmed unrelated bug outside the current task scope enters the incidental GitHub-issue process; a bug in scope follows the stage's normal workflow and is not filed as an incidental issue. The stage first reads the run-local `reported-bugs.json` ledger (a ledger hit counts as an equivalent even when search misses it), then searches for an equivalent open issue, and never duplicates one. After a successful report it appends to the ledger. Reporting is incidental: stages confirm the trigger and impact, but do not hunt for unrelated root causes or fix unrelated bugs. All public titles, bodies, close comments, and ledger files are kept as run evidence under per-stage filenames and never deleted. `harness/github_issues.py --self-test` is hermetic and does not access credentials or the network.
+Every main stage applies `workflow/incidental-bugs.md`. Only a confirmed unrelated bug outside the current task scope enters the incidental GitHub-issue process; a bug in scope follows the stage's normal workflow and is not filed as an incidental issue. The stage first reads the run-local `reported-bugs.json` ledger (a ledger hit counts as an equivalent even when search misses it), then searches for an equivalent open issue, and never duplicates one. After a successful report it appends to the ledger. Reporting is incidental: stages confirm the trigger and impact, but do not hunt for unrelated root causes or fix unrelated bugs. All public titles, bodies, close comments, and ledger files are kept as run evidence under per-stage filenames and never deleted. `scripts/pipeline/github_issues.py --self-test` is hermetic and does not access credentials or the network.
 
 The helper is the only pipeline boundary to GitHub. It reads the credential through `git credential fill` in a subprocess and keeps it in memory. Stages never run `git credential fill`, authenticated `curl`, or `gh`; they never print, log, or pass the credential. Helper rejection or failure blocks the stage.
 
@@ -114,7 +114,7 @@ Each run dir holds `<step>-task-r<N>.md` prompts with matching `<step>-task-r<N>
 
 ## Sync gate (fail-closed)
 
-Both checkouts must not run on a stale or diverged base. `harness/gitsync.py`
+Both checkouts must not run on a stale or diverged base. `scripts/pipeline/gitsync.py`
 owns this; the runner calls it and the finalize stage calls it directly.
 
 ## Shared phase reservations
@@ -142,7 +142,7 @@ instead of fencing the replacement owner.
 Run-state cleanup and final publication are phase-scoped. Finalize uses:
 
 ```bash
-python3 private/clio-private/harness/gitsync.py --root . --mode publish --phase <N>
+python3 private/clio-private/scripts/pipeline/gitsync.py --root . --mode publish --phase <N>
 ```
 
 That command rechecks the claim, takes the short shared publication lock,
@@ -198,7 +198,7 @@ Standalone check (stubbed remotes, no repo state touched); it also runs inside
 `runner.py --self-test`:
 
 ```bash
-python3 private/clio-private/harness/gitsync.py --self-test
+python3 private/clio-private/scripts/pipeline/gitsync.py --self-test
 ```
 
 ## Verify
@@ -219,6 +219,6 @@ Harness-plan check (hermetic, no inference spend, no repo state): `python3 priva
 
 ## Worker contract (birth-die)
 
-Stage files stay lean orchestrators; execution detail lives in `harness/workers/*.md`, which the runner never loads. Rules: stages reference workers by exact relative path; every referenced file must exist; every worker defines its per-spawn slots under `## You own` and ends with `## Report back`; workers never signal, touch the index, run full gates, or spawn subworkers (depth cap is main -> worker). Static check (dry-run does not cover workers/): `python3 private/clio-private/harness/check-workers.py` and `python3 private/clio-private/harness/check_incidental_policy.py`. Run both after any stage/worker edit.
+Stage files stay lean orchestrators; execution detail lives in `workflow/workers/*.md`, which the runner never loads. Rules: stages reference workers by exact relative path; every referenced file must exist; every worker defines its per-spawn slots under `## You own` and ends with `## Report back`; workers never signal, touch the index, run full gates, or spawn subworkers (depth cap is main -> worker). Static check (dry-run does not cover workers/): `python3 private/clio-private/scripts/pipeline/check-workers.py` and `python3 private/clio-private/scripts/pipeline/check_incidental_policy.py`. Run both after any stage/worker edit.
 
 Baseline 2026-09-24 (dry-run, phase 100060): developer 11982 B, adversary 24349 B, remediator 21900 B, approver 10055 B, finalize 10921 B. Re-capture after stage edits when claiming context savings. The runtime attempt-authority notice adds a fixed prompt section, so current dry-run sizes are authoritative.

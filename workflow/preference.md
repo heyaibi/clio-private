@@ -2,7 +2,7 @@
 
 **🚫 This file is owned by the operator. AI agents must never modify or refactor it.**
 
-The operator does not want to edit the pipeline stages directly (`harness/stages/*.md`). Your task is to keep the pipeline stages synchronized with this document, which serves as the single source of truth.
+The operator does not want to edit the pipeline stages directly (`workflow/stages/*.md`). Your task is to keep the pipeline stages synchronized with this document, which serves as the single source of truth.
 
 ===
 

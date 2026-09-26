@@ -6,7 +6,7 @@
 Canonical layout: roadmap and run state live at
 private/clio-private/roadmap and private/clio-private/runs in the
 nested private repo. Always invoke with the repo root as cwd, e.g.:
-  python3 private/clio-private/harness/next_phase.py --repo .
+  python3 private/clio-private/scripts/pipeline/next_phase.py --repo .
 
 A phase is complete when any of these holds:
   * private/clio-private/runs/phase-<N>/run.json exists with

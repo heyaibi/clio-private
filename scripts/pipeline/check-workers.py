@@ -2,23 +2,23 @@
 """Static contract check for birth-die workers.
 
 Stages reference workers by exact relative path (e.g.
-harness/workers/review-worker.md). The runner never loads workers/,
+workflow/workers/review-worker.md). The runner never loads workers/,
 so this script is the static catch: every referenced worker must exist
 and must carry its slot headings. Run after any stage/worker edit from the
 repo root:
-python3 private/clio-private/harness/check-workers.py
+python3 private/clio-private/scripts/pipeline/check-workers.py
 (see runner.md, Worker contract).
 """
 import re
 import sys
 from pathlib import Path
 
-# This file lives at private/clio-private/harness/check-workers.py, so
-# parents[1] is the private root.
-PRIV_ROOT = Path(__file__).resolve().parents[1]
+# This file lives at private/clio-private/scripts/pipeline/check-workers.py, so
+# parents[2] is the private root.
+PRIV_ROOT = Path(__file__).resolve().parents[2]
 REPO = PRIV_ROOT
-STAGES = sorted((REPO / "harness" / "stages").glob("*.md"))
-REF_RE = re.compile(r"harness/workers/([A-Za-z0-9_.\-]+\.md)")
+STAGES = sorted((REPO / "workflow" / "stages").glob("*.md"))
+REF_RE = re.compile(r"workflow/workers/([A-Za-z0-9_.\-]+\.md)")
 REQUIRED_HEADINGS = ("## You own", "## Report back")
 
 errors = []
@@ -26,7 +26,7 @@ refs = set()
 for stage in STAGES:
     for name in REF_RE.findall(stage.read_text()):
         refs.add(name)
-        fp = REPO / "harness" / "workers" / name
+        fp = REPO / "workflow" / "workers" / name
         if not fp.is_file():
             errors.append(f"{stage.name} references missing worker {name}")
             continue

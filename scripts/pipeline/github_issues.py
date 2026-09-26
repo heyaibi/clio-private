@@ -14,21 +14,21 @@ a different repository from the nested private checkout.
 
 Commands (run from the public repository root):
 
-    python3 private/clio-private/harness/github_issues.py list-open
-    python3 private/clio-private/harness/github_issues.py search-open "error text"
-    python3 private/clio-private/harness/github_issues.py view 123
-    python3 private/clio-private/harness/github_issues.py report-bug \
+    python3 private/clio-private/scripts/pipeline/github_issues.py list-open
+    python3 private/clio-private/scripts/pipeline/github_issues.py search-open "error text"
+    python3 private/clio-private/scripts/pipeline/github_issues.py view 123
+    python3 private/clio-private/scripts/pipeline/github_issues.py report-bug \
       --title-file <public-safe-title.txt> \
       --body-file <public-safe-report.md>
-    python3 private/clio-private/harness/github_issues.py close 123 \
+    python3 private/clio-private/scripts/pipeline/github_issues.py close 123 \
       --expected-digest <sha256> --commit <public-commit-sha> \
       --comment-file <public-safe-comment.md>
-    python3 private/clio-private/harness/github_issues.py ledger-list \
+    python3 private/clio-private/scripts/pipeline/github_issues.py ledger-list \
       --ledger-file <run-dir>/reported-bugs.json
-    python3 private/clio-private/harness/github_issues.py ledger-add \
+    python3 private/clio-private/scripts/pipeline/github_issues.py ledger-add \
       --ledger-file <run-dir>/reported-bugs.json \
       --number 123 --title "Public title" --url "https://github.com/heyaibi/clio/issues/123"
-    python3 private/clio-private/harness/github_issues.py --self-test
+    python3 private/clio-private/scripts/pipeline/github_issues.py --self-test
 
 Read model: ``list-open`` and ``search-open`` return light triage records
 (title, body, labels, state, URL, comment count, no comment bodies) so a full

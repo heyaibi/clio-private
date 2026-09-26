@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import unittest
 
-from harness.phase_notifications import (
+from scripts.pipeline.phase_notifications import (
     display_title,
     format_notification,
     phase_label,

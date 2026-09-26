@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 """Generic stage-pipeline runner.
 
-Reads a pipeline YAML (see private/clio-private/harness/pipelines/default.yaml
+Reads a pipeline YAML (see private/clio-private/workflow/pipelines/default.yaml
 for the contract), renders each step's stage file by binding its {{PLACEHOLDERS}},
 invokes the stage's harness CLI, matches the final-line signal, and routes.
 
 Usage (run from the repo root):
-  python3 private/clio-private/harness/runner.py --pipeline private/clio-private/harness/pipelines/default.yaml \
+  python3 private/clio-private/harness/runner.py --pipeline private/clio-private/workflow/pipelines/default.yaml \
       --input phase_number=100060 --input phase_file=private/clio-private/roadmap/phase-100060-parallel-write-canonical-consolidation.md
 
   --dry-run validates everything and prints rendered prompts without
@@ -38,7 +38,7 @@ Conventions (load-bearing, do not change silently):
 Foreground: every harness runs attached in the operator's terminal with
 inherited stdio; the runner polls the step's run log and closes the
 session ~15 s after the final signal lands. Ctrl-C kills
-the step; rerunning the same command resumes. See instruction.md.
+the step; rerunning the same command resumes. See runner.md.
 """
 import argparse
 import hashlib
@@ -66,9 +66,11 @@ except ImportError:
 
 import yaml
 
-# The fail-closed sync helper lives beside this file. Make its directory
-# importable even when runner.py is imported rather than run as a script.
+# Host helpers moved to ../scripts. Keep both directories importable so the
+# engine still loads when run as a script or imported. Untangling these
+# imports is tracked extraction work, not this change.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "pipeline"))
 import gitsync  # noqa: E402 - path set just above
 from phase_policy import PARKED_PHASE_FLOOR, is_runnable_phase  # noqa: E402
 import check_incidental_policy  # noqa: E402

@@ -5,10 +5,10 @@
 # Clio unattended phase driver.
 #
 # Canonical layout: this script lives at
-# private/clio-private/harness/phase-driver.sh in the nested private repo.
+# private/clio-private/scripts/phase-driver.sh in the nested private repo.
 # Every invocation below runs with the repo root as cwd. Call from the
 # root, e.g.:
-#   bash private/clio-private/harness/phase-driver.sh --check
+#   bash private/clio-private/scripts/phase-driver.sh --check
 #
 #   phase-driver.sh [--dry-run]                  # cron entrypoint
 #   phase-driver.sh --check                      # report environment readiness
@@ -36,7 +36,7 @@
 # Local test hooks (never set these in cron):
 #   DISABLE_NOTIFY=1      log notifications instead of sending them
 #   DISABLE_DISCORD=1     alias for disabling Discord sends (same effect today)
-#   DRIVER_STUB_RC=<n>    skip runner.py; pretend it exited with rc <n>
+#   DRIVER_STUB_RC=<n>    skip glide; pretend it exited with rc <n>
 #   DRIVER_STUB_SLEEP=<s> how long the stub "works" (default 2)
 #   DRIVER_RUN_DIR=<dir>  isolate runtime state (used by --self-test)
 set -euo pipefail
@@ -52,7 +52,7 @@ while [ -L "$_SCRIPT_SRC" ]; do
   esac
 done
 _SCRIPT_DIR="$(cd "$(dirname "$_SCRIPT_SRC")" && pwd)"
-if [ "$(basename "$_SCRIPT_DIR")" = "harness" ] \
+if [ "$(basename "$_SCRIPT_DIR")" = "scripts" ] \
   && [ "$(basename "$(dirname "$_SCRIPT_DIR")")" = "clio-private" ]; then
   REPO="$(cd "$_SCRIPT_DIR/../../.." && pwd)"
 else
@@ -69,7 +69,8 @@ fi
 PRIV="private/clio-private"
 WF="$REPO/$PRIV/runs"
 HARNESS="$REPO/$PRIV/harness"
-NOTIFIER="$HARNESS/phase_notifications.py"
+SCRIPTS="$REPO/$PRIV/scripts"
+NOTIFIER="$SCRIPTS/pipeline/phase_notifications.py"
 
 # Optional untracked overrides; keep secrets/ids out of the committed file.
 # shellcheck disable=SC1091
@@ -97,7 +98,7 @@ NOTIFIER="$HARNESS/phase_notifications.py"
 export CLIO_MACHINE_ID="$PHASE_MACHINE_ID"
 export CLIO_PHASE_COORDINATION_BRANCH="$PHASE_COORDINATION_BRANCH"
 
-PIPELINE="private/clio-private/harness/pipelines/default.yaml"
+PIPELINE="private/clio-private/workflow/pipelines/default.yaml"
 SESSION="$SESSION_NAME"
 PROFILE="$HERMES_PROFILE_NAME"
 CHANNEL="$DISCORD_CHANNEL"
@@ -247,11 +248,11 @@ run_session() {
   export CLIO_MACHINE_ID="${CLIO_MACHINE_ID:-$PHASE_MACHINE_ID}"
   notify_phase "$rel" started
   if [ -n "${DRIVER_STUB_RC:-}" ]; then
-    log "STUB mode: simulating runner.py (rc=$DRIVER_STUB_RC)"
+    log "STUB mode: simulating glide (rc=$DRIVER_STUB_RC)"
     sleep "${DRIVER_STUB_SLEEP:-2}"
     rc="$DRIVER_STUB_RC"
   else
-    "$PYTHON" "$HARNESS/runner.py" --pipeline "$PIPELINE" \
+    PYTHONPATH="$REPO/private/clio-private/glide/src" "$PYTHON" -m glide run --pipeline "$PIPELINE" \
       --input "phase_number=$number" --input "phase_file=$rel" || rc=$?
   fi
   state="$(phase_state "$number")"
@@ -328,7 +329,7 @@ heartbeat() {
 coordination_select() {
   # The JSON result is deliberately consumed instead of parsing the legacy
   # tab output. A failed fetch/push must never turn into an unclaimed launch.
-  "$PYTHON" "$HARNESS/next_phase.py" --repo "$REPO" --server \
+  "$PYTHON" "$SCRIPTS/pipeline/next_phase.py" --repo "$REPO" --server \
     --machine-id "$PHASE_MACHINE_ID" --json "$@"
 }
 
@@ -359,7 +360,7 @@ _drive() {
         number="$(printf '%s' "$selection" | selection_value phase)"
         rel="$(printf '%s' "$selection" | selection_value path)"
         log "dry-run: would reserve and launch phase $number in tmux '$SESSION'"
-        printf 'would launch: tmux new-session -d -s %s -x %s -y %s -c %s "bash %s/private/clio-private/harness/phase-driver.sh --session %s %s"\n' \
+        printf 'would launch: tmux new-session -d -s %s -x %s -y %s -c %s "bash %s/private/clio-private/scripts/phase-driver.sh --session %s %s"\n' \
           "$SESSION" "$TMUX_WIDTH" "$TMUX_HEIGHT" "$REPO" "$REPO" "$number" "$rel"
         ;;
       WAIT_FOR_CLAIM)
@@ -425,7 +426,7 @@ _drive() {
 
   local out rc=0 number rel reservation_id reservation_generation
   if [ "${1:-}" = "--self-test" ]; then
-    out="$("$PYTHON" "$HARNESS/next_phase.py" --repo "$REPO")" || rc=$?
+    out="$("$PYTHON" "$SCRIPTS/pipeline/next_phase.py" --repo "$REPO")" || rc=$?
     if [ "$rc" -ne 0 ]; then
       log "no uncompleted phase (next_phase rc=$rc)"
       return 0
@@ -433,7 +434,7 @@ _drive() {
     number="${out%%$'\t'*}"; rel="${out#*$'\t'}"
     reservation_id=""; reservation_generation=""
   else
-    if ! "$PYTHON" "$HARNESS/gitsync.py" --root "$REPO" --mode start \
+    if ! "$PYTHON" "$SCRIPTS/pipeline/gitsync.py" --root "$REPO" --mode start \
         >"$RUN_DIR/coordination-sync.json" 2>/dev/null; then
       log "coordination checkout sync failed; refusing to launch (see $RUN_DIR/coordination-sync.json)"
       return 1
@@ -465,7 +466,7 @@ _drive() {
           # ended blocked. Take it back explicitly so the phase can finish.
           # A claim held by any other host still stops the line.
           log "recovering own claim on phase $wait_phase (status=$wait_status) for $PHASE_MACHINE_ID"
-          if "$PYTHON" "$HARNESS/phase_reservations.py" takeover \
+          if "$PYTHON" "$SCRIPTS/pipeline/phase_reservations.py" takeover \
               --repo-root "$REPO" --phase "$wait_phase" \
               --machine-id "$PHASE_MACHINE_ID" \
               --expected-reservation-id "$(printf '%s' "$selection" | selection_value reservation_id)" \
@@ -512,7 +513,7 @@ _drive() {
   [ -z "${CLIO_PHASE_COORDINATION_BRANCH:-}" ] || envs="$envs CLIO_PHASE_COORDINATION_BRANCH='$CLIO_PHASE_COORDINATION_BRANCH'"
   [ -z "$reservation_id" ] || envs="$envs CLIO_RESERVATION_ID='$reservation_id'"
   [ -z "$reservation_generation" ] || envs="$envs CLIO_RESERVATION_GENERATION='$reservation_generation'"
-  local launch="${envs:+$envs }bash '$REPO/$PRIV/harness/phase-driver.sh' --session '$number' '$rel'"
+  local launch="${envs:+$envs }bash '$REPO/$PRIV/scripts/phase-driver.sh' --session '$number' '$rel'"
 
   # Detached geometry: new sessions start at TMUX_WIDTH x TMUX_HEIGHT
   # (defaults 164x48, overridable via .driver.env). runner.py copies the
@@ -730,8 +731,8 @@ check() {
   echo "heartbeat: ${HEARTBEAT_URL:-unset}"
   echo "stall threshold: ${STALE_AFTER_SEC}s"
   echo "tmux geometry: ${TMUX_WIDTH}x${TMUX_HEIGHT} (initial detached size; attaches may resize)"
-  "$PYTHON" "$HARNESS/next_phase.py" --self-test
-  "$PYTHON" "$HARNESS/phase_reservations.py" --self-test
+  "$PYTHON" "$SCRIPTS/pipeline/next_phase.py" --self-test
+  "$PYTHON" "$SCRIPTS/pipeline/phase_reservations.py" --self-test
 }
 
 case "${1:-}" in

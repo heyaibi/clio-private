@@ -68,16 +68,24 @@
 #   or sub source steps that do not resolve; non-positive max_rounds;
 #   a step with neither/both of when/end; end states outside ends.
 version: 1
-run_dir: private/clio-private/runs/phase-{phase:06d}
+run_dir: private/clio-private/runs/phase-{phase_number:06d}
 # No attribution inputs: the harness for each step is declared exactly once,
 # in the stage file frontmatter `harness:` list. The runner derives the
 # display name (HARNESS_DISPLAY) per invocation and writes Attribution rows
 # itself. There is deliberately nothing to keep in sync here.
+#
+# This pipeline runs on glide. `phase_number` is typed int so run_dir keeps
+# its zero-padded form without the old runner's `phase` alias.
+# `default_rounds` preserves the old "Round N of 3" wording on steps without
+# their own `max_rounds`, and stages declare their `workers` up front.
+# The old harness runner accepts none of these keys; it is kept in harness/
+# as a backup only.
 inputs:
-  phase_number: {required: true}
+  phase_number: {type: int, required: true}
   phase_file: {required: true}
   max_remedy_rounds: 3
   run_label: phase
+default_rounds: 3
 start: developer
 ends: [completed, rejected, blocked]
 steps:

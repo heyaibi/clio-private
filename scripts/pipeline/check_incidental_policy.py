@@ -10,10 +10,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-PRIV_ROOT = Path(__file__).resolve().parents[1]
+PRIV_ROOT = Path(__file__).resolve().parents[2]
 HARNESS = PRIV_ROOT / "harness"
-STAGE_DIR = HARNESS / "stages"
-POLICY = HARNESS / "incidental-bugs.md"
+WORKFLOW = PRIV_ROOT / "workflow"
+STAGE_DIR = WORKFLOW / "stages"
+POLICY = WORKFLOW / "incidental-bugs.md"
 STAGE_NAMES = (
     "01-implement.md",
     "02-adversarial-analysis.md",
@@ -26,7 +27,7 @@ TRIGGER = (
     "the incidental GitHub-issue process."
 )
 SIGNAL_TRIGGER = "Before signaling, for every confirmed unrelated bug outside the current task scope"
-POLICY_REFERENCE = "private/clio-private/harness/incidental-bugs.md"
+POLICY_REFERENCE = "private/clio-private/workflow/incidental-bugs.md"
 REQUIRED_POLICY_TERMS = (
     "current task's explicitly named requirements",
     "does not expand the task boundary",
@@ -99,8 +100,9 @@ def validate(root: Path = PRIV_ROOT) -> list[dict[str, object]]:
     """Validate policy, stage, and operator-document contracts under root."""
     checks: list[dict[str, object]] = []
     harness = root / "harness"
-    stage_dir = harness / "stages"
-    policy = harness / "incidental-bugs.md"
+    workflow = root / "workflow"
+    stage_dir = workflow / "stages"
+    policy = workflow / "incidental-bugs.md"
 
     policy_ok = policy.is_file()
     _check(checks, "shared policy exists", policy_ok, str(policy))
@@ -173,22 +175,20 @@ def validate(root: Path = PRIV_ROOT) -> list[dict[str, object]]:
             "found: " + ", ".join(forbidden) if forbidden else "none",
         )
 
-    for doc_name in ("instruction.md", "runner.md"):
-        doc = harness / doc_name
-        doc_ok = doc.is_file()
-        _check(checks, f"{doc_name} exists", doc_ok, str(doc))
-        if not doc_ok:
-            continue
+    doc = harness / "runner.md"
+    doc_ok = doc.is_file()
+    _check(checks, "runner.md exists", doc_ok, str(doc))
+    if doc_ok:
         text = doc.read_text()
         _check(
             checks,
-            f"{doc_name} points to shared policy",
-            POLICY_REFERENCE in text or "harness/incidental-bugs.md" in text,
-            "shared policy reference present" if (POLICY_REFERENCE in text or "harness/incidental-bugs.md" in text) else "reference missing",
+            "runner.md points to shared policy",
+            POLICY_REFERENCE in text or "workflow/incidental-bugs.md" in text,
+            "shared policy reference present" if (POLICY_REFERENCE in text or "workflow/incidental-bugs.md" in text) else "reference missing",
         )
         _check(
             checks,
-            f"{doc_name} states out-of-scope trigger",
+            "runner.md states out-of-scope trigger",
             "confirmed unrelated bug outside the current task scope" in text,
             "out-of-scope wording present"
             if "confirmed unrelated bug outside the current task scope" in text
@@ -202,12 +202,12 @@ def self_test_checks() -> list[dict[str, object]]:
     checks = validate()
     with tempfile.TemporaryDirectory(prefix="incidental-policy-") as temp:
         root = Path(temp) / "clio-private"
+        (root / "workflow").mkdir(parents=True)
+        shutil.copytree(WORKFLOW / "stages", root / "workflow" / "stages")
+        shutil.copy2(POLICY, root / "workflow" / "incidental-bugs.md")
         (root / "harness").mkdir(parents=True)
-        shutil.copytree(HARNESS / "stages", root / "harness" / "stages")
-        shutil.copy2(POLICY, root / "harness" / "incidental-bugs.md")
-        for name in ("instruction.md", "runner.md"):
-            shutil.copy2(HARNESS / name, root / "harness" / name)
-        broken = root / "harness" / "stages" / "02-adversarial-analysis.md"
+        shutil.copy2(HARNESS / "runner.md", root / "harness" / "runner.md")
+        broken = root / "workflow" / "stages" / "02-adversarial-analysis.md"
         broken.write_text(
             broken.read_text().replace(TRIGGER, "For every confirmed new bug", 1)
         )
