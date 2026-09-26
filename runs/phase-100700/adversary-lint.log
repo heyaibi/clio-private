@@ -1,0 +1,21 @@
+/Users/aiuser/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+    Checking clio-types v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-types)
+    Checking clio-config v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-config)
+    Checking clio-store v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-store)
+    Checking clio-admission v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-admission)
+    Checking clio-index v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-index)
+    Checking clio-belief v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-belief)
+    Checking clio-sync v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-sync)
+    Checking clio-history v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-history)
+    Checking clio-hygiene v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-hygiene)
+    Checking clio-write v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-write)
+    Checking clio-retrieve v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-retrieve)
+    Checking clio-ops v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-ops)
+    Checking clio-persona v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-persona)
+    Checking clio-compliance v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-compliance)
+    Checking clio-mcp v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-mcp)
+    Checking clio v0.1.0 (/Users/aiuser/Documents/projects/agentmemoir/clio/crates/clio-lib)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 31.54s
+LINT_EXIT=0
+/Users/aiuser/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo fmt --all
+FMT_EXIT=0

@@ -1,0 +1,147 @@
+=== MCP stdio write session exit: 0
+stderr: verify {"operation":"verify_ok","bank":"match-e2e","actor":"agent","source_ref":"","timestamp":"2024-01-01T00:00:00Z","failure_fields":[],"preview":{"diagnostic":null,"gist":"a note that mentions nothing by name","snapshot":{"amount":1,"date":"2024-01-01","entity":"Ada Lovelace"}}}
+admission {"operation":"admit_accept","candidate_key":"task_spec","candidate_kind":"semantic","admission_score":0.7700000000000001,"rejection_reason":null,"bank":"match-e2e","actor":"agent","timestamp":"2024-01-01T00:
+=== MCP stdio reindex+read session exit: 0
+=== MCP reindex --target lexical ===
+{"bank": "match-e2e", "dense_applied": 0, "dense_missing": 1, "dry_run": false, "indexable_items": 1, "lexical_applied": 1, "lexical_missing": 1, "ok": true, "orphans_removed": 0, "target": "lexical"}
+=== MCP retrieve (matching query) ===
+{
+ "dense_candidates": 0,
+ "estimated_tokens": 24,
+ "explanation": {
+  "dense_candidates": 0,
+  "domains": [],
+  "fused_candidates": 1,
+  "graph_expanded": 0,
+  "hits": [
+   {
+    "consolidated": false,
+    "dense_rank": null,
+    "item_id": "e2e-named",
+    "lexical_rank": 1,
+    "score": 0.009774590164126518,
+    "source_ids": []
+   }
+  ],
+  "lexical_candidates": 1,
+  "metrics": {
+   "dense_ms": 15,
+   "expand_ms": 0,
+   "lexical_ms": 0,
+   "rerank_ms": 65,
+   "total_ms": 81
+  },
+  "pairs_reinforced": 0,
+  "reranked": true,
+  "warnings": []
+ },
+ "fused_candidates": 1,
+ "graph_expanded": 0,
+ "hits": [
+  {
+   "bank_id": "match-e2e",
+   "category": "task_spec",
+   "entities": [
+    "Ada Lovelace"
+   ],
+   "entity_match": true,
+   "epistemic_kind": "fact",
+   "gist": "a note that mentions nothing by name",
+   "item_id": "e2e-named",
+   "kind": "semantic",
+   "lexical_rank": 1,
+   "requires_confidence_check": false,
+   "score": 0.009774590164126518,
+   "scores": {
+    "final": 0.009774590164126518,
+    "keyword": 3e-06,
+    "reranker": 0.47318944,
+    "semantic": null
+   },
+   "snapshot_ref": "e2e-named"
+  }
+ ],
+ "lexical_candidates": 1,
+ "metrics": {
+  "dense_ms": 15,
+  "expand_ms": 0,
+  "lexical_ms": 0,
+  "rerank_ms": 65,
+  "total_ms": 81
+ },
+ "ok": true,
+ "pairs_reinforced": 0,
+ "reranked": true,
+ "warnings": []
+}
+MCP ok: flag only on the matching hit; explanation carries no entity_match
+=== MCP retrieve (non-matching query) ===
+{
+ "dense_candidates": 0,
+ "estimated_tokens": 24,
+ "fused_candidates": 1,
+ "graph_expanded": 0,
+ "hits": [
+  {
+   "bank_id": "match-e2e",
+   "category": "task_spec",
+   "entities": [
+    "Ada Lovelace"
+   ],
+   "epistemic_kind": "fact",
+   "gist": "a note that mentions nothing by name",
+   "item_id": "e2e-named",
+   "kind": "semantic",
+   "lexical_rank": 1,
+   "requires_confidence_check": false,
+   "score": 0.009774590164126518,
+   "scores": {
+    "final": 0.009774590164126518,
+    "keyword": 1e-06,
+    "reranker": 0.40290082,
+    "semantic": null
+   },
+   "snapshot_ref": "e2e-named"
+  }
+ ],
+ "lexical_candidates": 1,
+ "metrics": {
+  "dense_ms": 8,
+  "expand_ms": 0,
+  "lexical_ms": 0,
+  "rerank_ms": 61,
+  "total_ms": 70
+ },
+ "ok": true,
+ "pairs_reinforced": 0,
+ "reranked": true,
+ "warnings": []
+}
+MCP ok: a non-matching query omits the key entirely
+=== CLI recall --output json (exit 0 ) ===
+{"dense_candidates":0,"estimated_tokens":24,"fused_candidates":1,"graph_expanded":0,"hits":[{"bank_id":"match-e2e","category":"task_spec","entities":["Ada Lovelace"],"entity_match":true,"epistemic_kind":"fact","gist":"a note that mentions nothing by name","item_id":"e2e-named","kind":"semantic","lexical_rank":1,"requires_confidence_check":false,"score":0.009774590164126518,"scores":{"final":0.009774590164126518,"keyword":3e-6,"reranker":0.47318944,"semantic":null},"snapshot_ref":"e2e-named"}],"lexical_candidates":1,"metrics":{"dense_ms":6,"expand_ms":0,"lexical_ms":0,"rerank_ms":63,"total_ms":71},"ok":true,"pairs_reinforced":0,"query":"Ada Lovelace note","reranked":true,"warnings":[]}
+
+=== CLI recall --output text (exit 0 ) ===
+Results for: Ada Lovelace note
+
+score is relative (rank fusion), not calibrated relevance
+
+  1. a note that mentions nothing by name   [lexical match]   score 0.0098
+     id: e2e-named  category: task_spec  epistemic_kind: fact  kind: semantic
+     scores: final 0.0098  semantic -  keyword 0.000003  reranker 0.47318944
+     [derived] entity match (display-only; not a ranking signal)
+
+CLI ok: JSON flag and text line agree; no entity name outside the query echo
+=== CLI recall text (non-matching query) ===
+Results for: mentions
+
+score is relative (rank fusion), not calibrated relevance
+
+  1. a note that mentions nothing by name   [lexical match]   score 0.0098
+     id: e2e-named  category: task_spec  epistemic_kind: fact  kind: semantic
+     scores: final 0.0098  semantic -  keyword 0.000001  reranker 0.40290082
+
+CLI ok: a non-matching query prints no derived line
+=== CLI ops diagnose (exit 0) entity present: False ===
+=== CLI ops verify (exit 1) entity present: False ===
+ALL REAL-BINARY CHECKS PASSED

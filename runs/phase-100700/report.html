@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Adversarial review report: Clio phase 100700 - entity-overlap match reason (display-only), developer r4 staged diff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Newsreader:opsz,wght@6..72,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to report content</a>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">Adversarial review</p>
+    <h1>Review of: Clio phase 100700 - entity-overlap match reason (display-only), developer r4 staged diff</h1>
+    <div class="vline">
+      <span class="badge b-blue"><i data-lucide="circle-check" class="ic"></i>Good</span>
+      <span class="mono">1 important · 4 minor · 6 dismissed</span>
+    </div>
+    <p class="sum">Every in-scope bullet of the phase has code plus test evidence, and I re-verified the claims myself instead of trusting the developer&#39;s summary: the full coverage gate exits 0 with all 352 files above the per-file floor, clippy and rustfmt are clean, and my own real-binary run against the built `clio` binary passes 17 checks including the dense leg the developer had listed as unverified. The one substantive weakness is that the derived label exists only in the human text view; the machine-readable payload that agents actually read carries a bare `entity_match: true` with nothing marking it as an inference. The remaining items are small: two test gaps against explicit acceptance conditions and one wrong line count in the phase&#39;s own evidence table.</p>
+    <p class="meta mono">
+      <span><b>Generated</b>2026-09-26</span>
+      <span><b>Applies to</b>staged tree on master, ledger step developer r4 (DEVELOPER_DONE 2c3d650d), git_head e6e0b6b</span>
+      <span><b>Source</b>git diff --cached (15 public files) plus surrounding retrieval, MCP, and CLI read code; make coverage, make lint, cargo fmt --check, 3x cargo test -p clio-mcp --lib, 10x read_scores_tests, and an independent real-binary end-to-end script</span>
+    </p>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="no-print">
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <a href="#standard">Standard</a>
+      <a href="#coverage">Coverage</a>
+      <a href="#important">Important</a>
+      <a href="#minor">Minor</a>
+      <a href="#dismissed">Dismissed</a>
+      <a href="#verification">Verification</a>
+      <a href="#unknowns">Unknowns</a>
+      <a href="#strengths">Strengths</a>
+      <a href="#process">Process</a>
+      <a href="#plans">Plans</a>
+    </nav>
+  </aside>
+
+  <main id="content">
+
+    <section id="standard">
+      <h2 class="sh"><i data-lucide="target" class="ic"></i>What this was judged against</h2>
+      <ul class="dash">
+        <li>Phase 100700 doc: every &#39;In Scope&#39; bullet, both Task &#39;Required Changes&#39; lists, the nine &#39;Required Tests&#39; rows, the T100700-01..09 scenario table, AC-100700-01..06, and the &#39;Definition of Done&#39; checkboxes.</li>
+        <li>private/clio-private/AGENTS.md: 450-line source limit, exact file header with truthful ownership, &gt;=90% function and line coverage per Rust file, roadmap isolation, no drive-by scope, evidence claims must be real.</li>
+        <li>private/clio-private/baseline/requirement.md FR-4 / PR-4 (a span-verified value and an inferred overlap must not be confused), FR-20 / 4.9.2 item 2 (same read, same value across bindings), 4.5 (ranking is rank fusion).</li>
+        <li>Phase security constraints: the reason may appear only on the authorized read payload and the reserved text slot, never in warnings, the explanation trace, telemetry, or health.</li>
+      </ul>
+    </section>
+
+    <section id="coverage">
+      <h2 class="sh"><i data-lucide="clipboard-check" class="ic"></i>Requirement coverage</h2>
+      <p class="pre">14 of 17 requirements fully satisfied</p>
+      <div class="card tw">
+        <table>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Evidence</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>In scope: a deterministic entity-overlap match between query text and the hit&#39;s entities[]</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-retrieve/src/entity_match.rs:76-93 (two pure functions, no clock/env/randomness); crates/clio-retrieve/src/entity_match_tests.rs:64-148 (12 tests, exact/case/substring/whitespace/multi-name/empty/Unicode/determinism); my real-binary run adversary-e2e.out.txt.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>In scope: a per-hit derived reason on the authorized read surface and rendered in the reserved text slot</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-retrieve/src/types.rs:155-165 (field), crates/clio-retrieve/src/finalize.rs:116-131 (computed once, reused vector), crates/clio-lib/src/cli_read_render.rs:40-48 and 145-159 (line + slot position); adversary-e2e.out.txt shows &quot;entity_match&quot;:true in CLI JSON and the derived line in CLI text for the same store.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>In scope: documented normalization and case handling</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-retrieve/src/entity_match.rs:34-56 (rule, limits, empty-input rule); docs/recall-entity-match.md &#39;The rule&#39;; Unicode behaviour pinned at entity_match_tests.rs:124-130.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>In scope: tests for determinism and case sensitivity</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">entity_match_tests.rs:78-82 (case), 133-148 (pure-function determinism), 261-289 (two identical retrieves give same order, same score bits, same flag).</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>In scope: a recorded display-only decision and why a rank-based leg is deferred</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">docs/recall-entity-match.md &#39;Why display-only (decision record)&#39; plus the three rank-leg prerequisites; no fusion, weight, boost, or budget code in the diff.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Task 1.5 / Task 2.2: compute the flag once in clio-retrieve, project it identically in every binding, and add a JSON/text parity test</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Single write site crates/clio-retrieve/src/finalize.rs:117; parity tests crates/clio-mcp/src/read_entities_tests.rs:322-352 (MCP dispatch vs in-process) and crates/clio-lib/src/cli_read_entities_tests.rs:212-268 (CLI JSON vs CLI text); crates/clio-mcp/src/additive_tools.rs:277 shows shared_retrieve delegates to the same dispatch, so no binding re-projects the field.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Task 1 constraint: no ranking effect (ordering, scores, hit set, budgets unchanged)</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-retrieve/src/hybrid.rs:250 (dedupe) -&gt; 268 (finalize) shows the flag is computed after fusion, dedup, and page selection; the only reader of the field in the workspace is crates/clio-lib/src/cli_read_render.rs:154; entity_match_tests.rs:200-238 compares two stores and gets identical order and bit-identical scores.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Task 1 constraint: no new dependency; files at or below 450 lines</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">No Cargo.toml in the staged diff; only str::to_lowercase is used. wc -l over all 12 touched Rust files: max 450 (read_dedup_tests.rs), then 445, 415, 400, 367, 289, 268, 262, 224, 172, 134, 96.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Task 2.1: render the reason in the text slot with a derived label</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">The text view labels it: crates/clio-lib/src/cli_read_render.rs:48 &#39;[derived] entity match (display-only; not a ranking signal)&#39;. The machine payload does not: crates/clio-retrieve/src/types.rs:164-165 serializes a bare `entity_match`, and the retrieve tool description at crates/clio-mcp/src/schema_read_defs.rs:100-101 is one line that never mentions the field. See issue 1.</td>
+              <td><span class="badge">Medium</span></td>
+            </tr>
+            <tr>
+              <td>Task 2.3 and section 7: a boundary test proves the reason is absent from warnings, the explain trace, telemetry, and health</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">Covered for warnings and the explain trace: crates/clio-mcp/src/read_entities_tests.rs:341-397. Telemetry and health have no in-repo assertion for the reason; the pre-existing health sweep pins entity names only. Neither surface can leak the flag today (crates/clio-mcp/src/runtime_sinks.rs:178-181 maps hits to item_id only) and my real-binary run found no leak, but the phase names both surfaces explicitly. See issue 2.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Task 2 constraint: do not change provenance reasons or the disclaimer</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">crates/clio-lib/src/cli_read_render.rs:31 and 170-176 untouched; crates/clio-lib/src/cli_read_render_scores_tests.rs:226-262 asserts the disclaimer, the &#39;[lexical match]&#39; reason, and the exact breakdown line still render next to the new line.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Must Not Change: the frozen RetrieveHit contract</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">The field sits on ScoredHit (crates/clio-retrieve/src/types.rs:122-165), not on the flattened RetrieveHit, so no existing hit key changed and no key collides.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Section 8: end-to-end test with a real CLI/MCP recall</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Not a committed test, but real: private/clio-private/runs/phase-100700/developer-e2e-entity-match.out.txt (ALL REAL-BINARY CHECKS PASSED) and my independent runs/phase-100700/adversary-e2e.py (17/17 PASS, exit 0) against target/debug/clio. The in-repo CLI test still pins the exact rendered line, so a regression is caught at the dispatch level.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Definition of Done: nine checked boxes verified against real evidence; the tenth (downstream approval) correctly left open</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Gates re-run by me: make coverage exit 0 (352 files, TOTAL lines 97.89% functions 98.73%), make lint exit 0, cargo fmt --all -- --check exit 0, 3x cargo test -p clio-mcp --lib 318 passed, 10x read_scores_tests ok, real-binary E2E 17/17. The unchecked box names the downstream stages, which is correct for a developer.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Known limitations must not read as &#39;implemented with boundary&#39; when they mean &#39;not implemented&#39;</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Each of the seven limitations in phase section 12 is a real, stated limit of what was built (display-only, substring-only, no full case folding, no NFC, no word boundary, coverage bounded by the earlier phase, rank leg separate). None of them disguises missing work as a boundary.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Downstream guarantee: phase 100780 may build an entity-inclusion toggle on the stable entities[]/reason shape</td>
+              <td><span class="badge b-green"><i data-lucide="check" class="ic"></i>Fully satisfied</span></td>
+              <td class="mut">Both are plain public fields on ScoredHit with no new storage, index, or query; a toggle would add a request parameter and a filter, neither of which this phase&#39;s shape blocks.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+            <tr>
+              <td>Phase section 4: report the eight-item Discovery Output before implementation</td>
+              <td><span class="badge b-amber"><i data-lucide="circle-minus" class="ic"></i>Partially satisfied</span></td>
+              <td class="mut">The substance is in the run log (subsystems, the shared-placement decision, the determinism approach, the size check), but not in the eight named items: &#39;assumptions contradicted&#39; and &#39;questions requiring clarification&#39; never appear. See issue 5.</td>
+              <td><span class="badge">Low</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="important">
+      <h2 class="sh"><i data-lucide="triangle-alert" class="ic c-amber"></i>Important <span class="cnt">01</span></h2>
+      <p class="lede">Usable as is. These would materially improve it.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">01</span>
+          <div>
+            <div class="ihead">
+              <h3>The machine-readable payload carries no derived marker; only the human text view labels the reason</h3>
+              <span class="badge b-amber"><span class="dot"></span>Important</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The phase&#39;s own goal sentence says the reason is &#39;labelled derived everywhere it appears&#39;, and its failure-mode table lists &#39;Reason presented as verified&#39; as a defect to fix by adding the derived label. The label exists in exactly one place: the CLI text line. The MCP and in-process JSON payloads, which are what an agent actually reads, serialize a bare `entity_match: true` sitting next to `entities: [...]`, a value that FR-4 span-verifies at write time. Nothing inside the payload tells the reader which of the two keys is an inference. An agent that trusts the payload can report &#39;the store confirmed the entity matched the query&#39;, which is the exact claim the phase exists to prevent.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Fidelity risk on the primary consumption path. The human CLI user is protected; a programmatic consumer is not. The phase&#39;s Implementation Freedom does permit a boolean flag, so this is a duty to label that was met only in prose, not a wrong implementation.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/types.rs:155-165; crates/clio-mcp/src/schema_read_defs.rs:100-101; crates/clio-lib/src/cli_read_render.rs:48; adversary-e2e.out.txt (real binary: &quot;entities&quot;:[&quot;Grace Hopper&quot;],&quot;entity_match&quot;:true).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High - verified by reading the serializer, the tool schema, and a real payload.</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Carry the label in the payload the agent reads: rename the key to `entity_match_derived`, or add a sibling `&quot;derived&quot;: true`, or extend the `retrieve` tool description to state that `entity_match` is a derived display-only inference and never a verification result. Any of the three closes the gap without changing the rule, the ranking, or the payload&#39;s false-omission behaviour.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="minor">
+      <h2 class="sh"><i data-lucide="info" class="ic c-sky"></i>Minor <span class="cnt">04</span></h2>
+      <p class="lede">Worth considering. Unlikely to change the substantive result.</p>
+      <div class="stack">
+        <article class="card issue">
+          <span class="chip">02</span>
+          <div>
+            <div class="ihead">
+              <h3>Health and telemetry are named in the security acceptance condition but have no in-repo test for the reason</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Task 2 Required Change 3 and section 7 both list four surfaces: warnings, explain trace, telemetry, health. The new boundary test covers two of them. The other two are argued structurally (no sink serializes a hit) rather than pinned by a test, so a future change that starts projecting per-hit data into a health or telemetry surface would not be caught by the reason-specific test.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Test-coverage gap against an explicit acceptance condition. No live leak: runtime_sinks.rs:178-181 reduces hits to item_id, and my real-binary run found no `entity_match` and no entity name in `ops diagnose` or `ops verify`.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-mcp/src/read_entities_tests.rs:341-397 (two surfaces), :238-278 (health sweep pins names only); crates/clio-mcp/src/runtime_sinks.rs:178-181; adversary-e2e.out.txt.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High.</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Extend the health sweep to assert the reason key alongside the names, and note in the test or module header that no telemetry sink receives per-hit data, so the omission reads as deliberate.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">03</span>
+          <div>
+            <div class="ihead">
+              <h3>Dense-leg flag untested in-repo while the fixture for it already exists</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The developer listed the dense leg as a verification limit. The same crate already has the exact fixture needed (a vector-only item plus a fixed embedder) used to prove the sibling `entities` field is leg-independent. Leaving the new flag untested there means leg independence rests on code reading plus a private script that no future run will execute.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Small test gap. I verified the behaviour out of repo with the real binary and the local embed sidecar, so this is not a correctness defect.</dd></div>
+              <div><dt>Evidence</dt><dd>crates/clio-retrieve/src/hit_entities_tests.rs:128-158 (the pattern to mirror); phase Completion Evidence &#39;Verification limits&#39;; adversary-e2e.out.txt (dense_rank=1 with entity_match=true).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High.</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Mirror the existing dense test in entity_match_tests.rs, asserting entity_match on a hit that has dense_rank set and a semantic score.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">04</span>
+          <div>
+            <div class="ihead">
+              <h3>One line count in the phase evidence table is wrong</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>The AC-100700-06 size table is the artifact a reviewer trusts for the 450-line gate. One of its eleven numbers is off by one, which is harmless for the gate but is exactly the sort of drift that makes a reader doubt the numbers that matter.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Cosmetic. No gate depends on it.</dd></div>
+              <div><dt>Evidence</dt><dd>Phase section 9 AC-100700-06 says &#39;cli_read_entities_tests.rs 267&#39;; awk and wc both report 268. All other counts in the table match.</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">High - measured twice with two tools.</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>Change 267 to 268 in the phase file evidence table.</p>
+            </div>
+          </div>
+        </article>
+        <article class="card issue">
+          <span class="chip">05</span>
+          <div>
+            <div class="ihead">
+              <h3>The eight-item Discovery Output was not reported in the required form</h3>
+              <span class="badge b-blue"><span class="dot"></span>Minor</span>
+            </div>
+            <dl>
+              <div><dt>Why it matters</dt><dd>Section 4 of the phase asks for eight named discovery items before implementation, including two negative ones. The run log carries the substance in prose but never states &#39;assumptions contradicted&#39; or &#39;questions requiring clarification&#39;, so a reviewer cannot tell whether the implementer considered them and found none, or skipped them.</dd></div>
+              <div><dt>Impact if unaddressed</dt><dd>Process-record gap only. The discovery itself was done and is visible in the design entry.</dd></div>
+              <div><dt>Evidence</dt><dd>Phase section 4 lines 118-128; private/clio-private/runs/phase-100700/developer-task-r4.log (14:31 design entry).</dd></div>
+              <div><dt>Confidence</dt><dd class="cnt">Medium - the log is a summary, so absence of an item is not proof it was never done.</dd></div>
+            </dl>
+            <div class="fix">
+              <p class="fl">Proposed fix (not yet applied)</p>
+              <p>For future phases, write the eight items into the run log, using &#39;none&#39; for the negative ones. No remediation needed for this phase.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="dismissed">
+      <h2 class="sh"><i data-lucide="circle-check" class="ic"></i>Considered and dismissed</h2>
+      <ul class="dash dim">
+        <li>Substring containment matching a name inside a longer token (&#39;art&#39; in &#39;restart&#39;). Documented in three places (entity_match.rs:26-33, docs/recall-entity-match.md, phase Known Limitations) and pinned by a test. It is a documented design choice, not a defect.</li>
+        <li>Full Unicode case folding is not used, so &#39;ß&#39; does not match &#39;SS&#39;. Verified as a real stdlib limit: str::to_lowercase is the stable mapping and the case-folding API is unstable, so no dependency-free fix exists. Documented and tested.</li>
+        <li>The three clio-mcp test-file edits (ops_tools_tests.rs, read_dedup_tests.rs, read_scores_tests.rs) are outside this phase&#39;s behaviour. Not a finding: the earlier blocked attempt requested them as an explicit unblock, the resume notice listed them as existing tree state, they touch no production file, and they harden test doubles rather than weaken assertions.</li>
+        <li>No committed end-to-end test at process level. The E2E evidence is a run-artifact script, but the in-repo CLI test pins the exact rendered line and I reproduced the binary run independently, so nothing is unpinned.</li>
+        <li>`#[serde(default)]` on entity_match is inert because ScoredHit derives only Serialize. It matches the existing convention on entities/consolidated/source_ids, so it is consistency, not error.</li>
+        <li>docs/recall-scope-and-dedup.md:35 still describes the always-present per-hit fields as scores and entities. Still true, since entity_match is omitted when false; updating it would be optional polish.</li>
+      </ul>
+    </section>
+
+    <section id="verification">
+      <h2 class="sh"><i data-lucide="search-check" class="ic"></i>External verification</h2>
+      <div class="stack">
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>make coverage passes with every Rust file at or above 90% on functions and lines — I ran it: exit 0, &#39;coverage-guard: 352 file(s) checked against 90.0% floors&#39;, TOTAL lines 97.89% functions 98.73%, all per-file floors met (private/clio-private/runs/phase-100700/adversary-coverage-run.log). Per-file rows re-read from target/coverage/coverage.json: entity_match.rs 100.00/100.00, types.rs 100.00/100.00, finalize.rs 100.00/97.96, cli_read_render.rs 100.00/98.87.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>clippy and rustfmt are clean — make lint exit 0; cargo fmt --all -- --check exit 0 (adversary-lint.log).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>The flag never changes ordering or scores — Structural: the field is written at finalize.rs:117 and read only by cli_read_render.rs:154, and finalize runs after dedupe/fusion/page selection (hybrid.rs:250 -&gt; 268). Behavioural: entity_match_tests.rs:200-238 plus my real-binary runs, whose dense and lexical hits carried the same fused score.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>The reason is absent from warnings and the explanation trace — retrieve_explanation (crates/clio-mcp/src/read_retrieve.rs:119-151) hand-picks its fields and never reads the flag; boundary test read_entities_tests.rs:341-397; my real-binary run also confirmed compose_context, ops diagnose, and ops verify are clean.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>The dense-leg variant of the flag works (developer listed this as unverified) — My own script against target/debug/clio with the local embed sidecar: reindex dense_applied 1, hit carries dense_rank=1 and entity_match=true (adversary-e2e.out.txt).</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-blue">Supported</span>
+          <p>The #31 flake is fixed by the staged test-double edits — 10/10 runs of read_scores_tests and 3/3 runs of the full clio-mcp lib suite passed, plus one full instrumented workspace gate. The issue&#39;s original failure rate was about 1 in 3, so this is strong but not proof; I did not run it under the original heavy parallel load for hours.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>A caller cannot inject entity_match through tool arguments — crates/clio-mcp/src/read_retrieve.rs:73-95 builds RetrieveRequest field by field and computes the outcome server-side; nothing merges caller args into the hit.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>str::to_lowercase is locale-independent and deterministic, and does not normalize Unicode — Standard-library semantics; the behaviour the phase depends on is also pinned by entity_match_tests.rs:124-130 and by the documented no-NFC limitation, which I checked against the entities module&#39;s trim-only rule.</p>
+        </div>
+        <div class="card vrow">
+          <span class="badge b-green">Established</span>
+          <p>Every in-scope bullet has code plus test evidence — Bullet-by-bullet audit in requirements[]; each cites file:line in the staged diff or the pre-existing repo.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unknowns">
+      <h2 class="sh"><i data-lucide="circle-help" class="ic"></i>What remains unknown</h2>
+      <div class="stack">
+        <div class="card unk">
+          <p class="t">Whether an agent consuming the MCP payload actually misreads entity_match as verified today</p>
+          <p class="d">I cannot observe downstream model behaviour from this repo, and no acceptance test in the phase covers it. · A consumer-side test or a downstream integration that reads hits[].entity_match without docs and states whether it treats the pair as a verified fact. · Medium - it is the whole reason issue 1 matters, and it is cheap to close defensively.</p>
+        </div>
+        <div class="card unk">
+          <p class="t">Whether the 450-line ceiling on read_dedup_tests.rs (exactly 450) leaves room for the next test that lands there</p>
+          <p class="d">Not this phase&#39;s problem, but the file is now at the hard limit after the unblock edit. · A split of that module before the next addition, decided by whoever next touches it. · Low.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="strengths">
+      <h2 class="sh"><i data-lucide="thumbs-up" class="ic c-green"></i>Strongest aspects</h2>
+      <ul class="dash">
+        <li>The rule lives in one 96-line pure function pair with its normalization and its limits documented in the module header, so there is exactly one place to change the match behaviour.</li>
+        <li>The flag is computed once in the retrieval layer and projected by serde, so JSON and text cannot disagree by construction; the render helper only formats a value it is handed.</li>
+        <li>The payload convention is right: the key is omitted when false, so a non-matching hit keeps exactly the shape it had before the field existed, and a test pins that.</li>
+        <li>The false-positive behaviour of substring matching is documented instead of hidden, with a test that names the consequence (&#39;art&#39; inside &#39;restart&#39;).</li>
+        <li>The decision record explains why display-only was chosen and lists what a future rank-based leg would need, which is what the phase asked for and more than most phases deliver.</li>
+        <li>Coverage and size discipline held: every touched file is at or below 450 lines, the new module is at 100% function and line coverage, and the derived label is asserted against leaks of the entity name in three separate tests plus the real binary.</li>
+      </ul>
+    </section>
+
+    <section id="process" class="cols2">
+      <div>
+        <h2 class="sub"><i data-lucide="rotate-ccw" class="ic"></i>Regrets</h2>
+        <ul class="list">
+          <li>The phase asked for a reason that is labelled derived everywhere it appears, and the implementer read that as satisfied by the text label plus documentation. The machine payload is where the risk actually lives.</li>
+          <li>The dense-leg test was left as a documented limitation when the fixture for it was already in the same crate, used for the sibling field.</li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="sub"><i data-lucide="settings" class="ic"></i>Process changes for next time</h2>
+        <ul class="list">
+          <li>When a phase names a labelling duty, check every surface the value reaches, not only the one the phase&#39;s Implementation Freedom paragraph mentions first.</li>
+          <li>When a phase lists surfaces in a security acceptance condition, treat each named surface as needing its own assertion, even when the current architecture makes a leak impossible.</li>
+          <li>Re-run the developer&#39;s real-binary script only as a cross-check; write an independent one, because that is what found the dense-leg evidence the phase file lacked.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="plans" class="cols2">
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="clock" class="ic"></i>If given one hour</h2>
+        <ol class="list num">
+          <li>Close issue 1: add the derived marker to the machine payload (rename to entity_match_derived, or add a sibling &quot;derived&quot;: true, or extend the retrieve tool description in schema_read_defs.rs), plus one test that pins the marker.</li>
+          <li>Close issue 2: extend the health-surface sweep to assert the reason key as well as the names, and say in the test that no telemetry sink receives per-hit data.</li>
+          <li>Close issue 3: mirror hit_entities_tests.rs:128-158 in entity_match_tests.rs to pin the flag on a dense-leg hit.</li>
+          <li>Close issue 4: correct 267 to 268 in the phase evidence table.</li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="sub"><i data-lucide="telescope" class="ic"></i>With unlimited resources</h2>
+        <ul class="list">
+          <li>Design and validate a rank-based entity leg as its own phase: a fusion weight measured against the benchmark harness, plus an explicit decision on boost versus filter, referencing the display-only decision record rather than retrofitting ranking into this flag.</li>
+          <li>Add word-boundary matching as a documented option next to plain containment, and measure how often each fires on real queries before changing the default.</li>
+          <li>Add a consumer-facing contract test that reads the retrieve payload the way an agent would and asserts the derived field is never presented as a verified value.</li>
+          <li>Review the every-other-45x0-line file in the workspace so the next test addition does not land on a file already at the ceiling.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="closing" class="closing">
+      <i data-lucide="pause-circle" class="ic"></i>
+      <div>
+        <h2>No changes have been made yet.</h2>
+        <p>This report only diagnoses. Tell me which issues to fix: all of them, just the critical ones, specific items by number, or none. I will apply exactly that.</p>
+        <div class="paths">
+          <span><b>Report:</b>/private/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/opencode/adv-review-100700/report.html</span>
+          <span><b>Findings:</b>/private/var/folders/4x/z7mr7nsn4yj_g0m3_388zmzw0000gt/T/opencode/adv-review-100700/findings.json</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+  lucide.createIcons();
+}
+(function () {
+  var links = [].slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var map = {};
+  links.forEach(function (a) { map[a.hash.slice(1)] = a; });
+  var sections = Object.keys(map).map(function (id) { return document.getElementById(id); }).filter(Boolean);
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      links.forEach(function (a) {
+        if (a.hash === '#' + e.target.id) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

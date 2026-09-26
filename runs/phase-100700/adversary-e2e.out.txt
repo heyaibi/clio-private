@@ -1,0 +1,19 @@
+PASS: store accepted the named item
+PASS: reindex all ok
+   reindex report: {"dense_applied": 1, "lexical_applied": 1, "ok": true}
+PASS: dense-leg retrieve returns the item
+PASS: dense leg populated dense_rank (hit came from the dense arm)
+PASS: non-matching query omits entity_match
+PASS: case-different query sets entity_match=true
+PASS: case-different query payload has no entity_match outside hits
+PASS: entity_match on the matching-query hit
+PASS: explanation trace carries no entity_match
+PASS: warnings carry no entity_match
+PASS: compose_context payload carries no entity_match key
+PASS: compose_context payload carries no entity name
+PASS: a partial name is not a match (whole name required)
+PASS: ops diagnose output carries no entity name
+PASS: ops diagnose output carries no entity_match
+PASS: ops verify output carries no entity name
+PASS: ops verify output carries no entity_match
+ADVERSARY E2E: ALL PASSED

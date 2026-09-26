@@ -1,0 +1,1 @@
+{"embed.url": "http://127.0.0.1:34311", "embed.model": "BAAI/bge-small-en-v1.5", "embed.dims": 384, "embed.provider": "tei", "rerank.url": "http://127.0.0.1:34312", "rerank.model": "onnx-community/gte-multilingual-reranker-base", "rerank.provider": "tei"}

@@ -1,0 +1,91 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 2c3d650d",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "visits": 4,
+      "output_sha256": "45fb5eb50bebf757a51ec49c070e7699c012da3f1c9e2269eed68a47d7d7ea4f",
+      "artifacts": {},
+      "git_head": "48743c89272e8fa2e93f739957aacb92279f021b",
+      "superseded_task_files": [
+        "developer-task-r1.md",
+        "developer-task-r2.md",
+        "developer-task-r3.md"
+      ],
+      "task_file": "developer-task-r4.md",
+      "task_sha256": "5f6f1f2df20adbe6a7cf0c6e20aa4a87e33370b123d610aa6763c1562c165cc5",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/Users/aiuser/Documents/projects/agentmemoir/clio/private/clio-private/runs/phase-100700/findings.json 3ef71769",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "16eabe83d8fcdb5cb983d2eb956ae6e60b8be2bd77ffff66fe4126c45e0a1530",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 33192,
+          "sha256": "25303d2cf7e146c6bb3b7d5142c14f8bd56ebc8ded4de106900b81ade34c64b8"
+        }
+      },
+      "git_head": "48743c89272e8fa2e93f739957aacb92279f021b",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "931ee23f421900c04c6d5c9651ff87c5997ce5588d78366478d52f68365e8ec4",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 8b4518b9",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "d0272bf164e3076877c90a65309db1c3245ff3e661cc858a083e7e4e7f605493",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 33192,
+          "sha256": "25303d2cf7e146c6bb3b7d5142c14f8bd56ebc8ded4de106900b81ade34c64b8"
+        }
+      },
+      "git_head": "48743c89272e8fa2e93f739957aacb92279f021b",
+      "superseded_task_files": [],
+      "task_file": "remediator-task-r1.md",
+      "task_sha256": "fab53372c39441b3b9f19693e5e70216f0150944eafb6b974a371c6ea8f851f8",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 7e05bf2d",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "cd360163c38a98a01bfab26379449b7acb7b555ee937e2af27120ebec3e1c111",
+      "artifacts": {},
+      "git_head": "48743c89272e8fa2e93f739957aacb92279f021b",
+      "superseded_task_files": [],
+      "task_file": "approver-task-r1.md",
+      "task_sha256": "3102cf54ac784e4d4d9d439b3c754a5df7ce38aac789a3e2fdcdc0115abfe3fe",
+      "via": "edge",
+      "routed_to": "finalize"
+    }
+  },
+  "head_repin": {
+    "from": "e6e0b6b9da6ed1e4d89ecdb03a3ee461d8cf4010",
+    "to": "48743c89272e8fa2e93f739957aacb92279f021b",
+    "reason": "finalize created local commits for phase 100700",
+    "rejected_at": "2026-09-26",
+    "note": "Written by glide repin-head. verify_ledger compares each step's git_head to the current commit; this key is the audit record for that move, not the mechanism."
+  }
+}
