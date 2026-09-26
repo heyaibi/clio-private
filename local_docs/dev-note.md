@@ -134,6 +134,8 @@ rm private/clio-private/runs/.driver/stalled
 ## Notifications (Discord #tech-team)
 The driver sends one natural-language update when a phase starts, one final update when it finishes or stops, and one update when a live phase first becomes stalled. It does not send a message for every cron tick. The stall marker prevents later ticks from repeating the same stall update.
 
+The completion update also lists each step's time — `Developer r1`, `Remediator r2`, and so on — and the total agent time in decimal minutes. Those numbers come from the run's `run.json`. When there is no usable run record, the update keeps the short `has completed.` line.
+
 Messages use ordinary sentences. They do not include the `[clio]` prefix, private phase-file paths, profile names, channel IDs, credentials, or traceback text. The phase title is derived from the phase filename, with common names such as CLI, MCP, and HTTP kept in their usual capitalization. A phase number and the driver state are enough to understand the update.
 
 A failed send is retried once, then sent to `DISCORD_FALLBACK_CHANNEL` if set. If all fail, `private/clio-private/runs/.driver/notify-broken` is written — check it if you stop seeing messages.

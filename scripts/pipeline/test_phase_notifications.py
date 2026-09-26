@@ -5,10 +5,15 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from scripts.pipeline.phase_notifications import (
+    default_run_json,
     display_title,
+    format_duration,
     format_notification,
     phase_label,
 )
@@ -29,16 +34,99 @@ class PhaseNotificationTests(unittest.TestCase):
             "Full CLI Confirmed Memory Mutations",
         )
 
-    def test_started_and_completed_are_short_updates(self) -> None:
-        phase = "phase-100520-scale-ceilings-docs.md"
+    def test_started_is_a_short_update(self) -> None:
         self.assertEqual(
-            format_notification(phase, "started"),
+            format_notification("phase-100520-scale-ceilings-docs.md", "started"),
             "Phase 100520 (Scale Ceilings Docs) has started.",
         )
-        self.assertEqual(
-            format_notification(phase, "completed"),
-            "Phase 100520 (Scale Ceilings Docs) has completed.",
+
+    def test_completed_without_a_run_record_stays_short(self) -> None:
+        message = format_notification(
+            "phase-100520-scale-ceilings-docs.md",
+            "completed",
+            run_json=Path("/nonexistent/run.json"),
         )
+        self.assertEqual(message, "Phase 100520 (Scale Ceilings Docs) has completed.")
+
+    def test_completed_lists_step_durations_and_total(self) -> None:
+        events = [
+            {"step": "developer", "visits": 1, "duration_s": 1130.855},
+            {"step": "adversary", "visits": 1, "duration_s": 1059.11},
+            {"step": "remediator", "visits": 1, "duration_s": 939.22},
+            {"step": "approver", "visits": 1, "duration_s": 636.953},
+            {"step": "remediator", "visits": 2, "duration_s": 953.683},
+            {"step": "approver", "visits": 2, "duration_s": 395.61},
+            {"step": "finalize", "visits": 1, "duration_s": 347.465},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            run_json = Path(tmp) / "run.json"
+            run_json.write_text(json.dumps({"events": events}), encoding="utf-8")
+            message = format_notification(
+                "phase-100740-explain-trace-projection.md",
+                "completed",
+                run_json=run_json,
+            )
+        self.assertEqual(
+            message,
+            "Phase 100740 (Explain Trace Projection) has completed.\n\n"
+            "Developer r1 - 18 minutes 51 seconds\n"
+            "Adversary r1 - 17 minutes 39 seconds\n"
+            "Remediator r1 - 15 minutes 39 seconds\n"
+            "Approver r1 - 10 minutes 37 seconds\n"
+            "Remediator r2 - 15 minutes 54 seconds\n"
+            "Approver r2 - 6 minutes 36 seconds\n"
+            "Finalizer r1 - 5 minutes 47 seconds\n\n"
+            "Total: 91.05 minutes",
+        )
+
+    def test_run_record_without_usable_durations_stays_short(self) -> None:
+        events = [{"step": "developer"}, {"step": "adversary", "duration_s": None}]
+        with tempfile.TemporaryDirectory() as tmp:
+            run_json = Path(tmp) / "run.json"
+            run_json.write_text(json.dumps({"events": events}), encoding="utf-8")
+            message = format_notification(
+                "phase-100520-scale-ceilings-docs.md",
+                "completed",
+                run_json=run_json,
+            )
+        self.assertEqual(message, "Phase 100520 (Scale Ceilings Docs) has completed.")
+
+    def test_run_record_skips_bad_events_and_defaults_the_visit(self) -> None:
+        events = [
+            "not an event",
+            {"step": "developer", "duration_s": 20.5},
+            {"step": "finalize", "visits": 0, "duration_s": 90},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            run_json = Path(tmp) / "run.json"
+            run_json.write_text(json.dumps({"events": events}), encoding="utf-8")
+            message = format_notification(
+                "phase-100520-scale-ceilings-docs.md",
+                "completed",
+                run_json=run_json,
+            )
+        self.assertEqual(
+            message,
+            "Phase 100520 (Scale Ceilings Docs) has completed.\n\n"
+            "Developer r1 - 20.5 seconds\n"
+            "Finalizer r1 - 1 minute 30 seconds\n\n"
+            "Total: 1.84 minutes",
+        )
+
+    def test_duration_format_ranges(self) -> None:
+        self.assertEqual(format_duration(48.6), "48.6 seconds")
+        self.assertEqual(format_duration(15 * 60 + 22), "15 minutes 22 seconds")
+        self.assertEqual(format_duration(12 * 3600 + 15 * 60), "12 hours 15 minutes")
+        self.assertEqual(format_duration(61), "1 minute 1 second")
+        self.assertEqual(format_duration(59.6), "1 minute")
+        self.assertEqual(format_duration(900), "15 minutes")
+        self.assertEqual(format_duration(3600), "1 hour")
+        self.assertEqual(format_duration(2 * 3600 + 29 * 60), "2 hours 29 minutes")
+
+    def test_default_run_json_points_at_the_phase_run_dir(self) -> None:
+        path = default_run_json("phase-100740-explain-trace-projection.md")
+        self.assertEqual(path.parent.name, "phase-100740")
+        self.assertEqual(path.name, "run.json")
 
     def test_interrupted_reason_is_brief_and_redacted(self) -> None:
         message = format_notification(
