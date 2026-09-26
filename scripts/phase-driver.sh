@@ -832,6 +832,18 @@ driver_self_test() {
     echo "FAIL: idle window stuck at ${idle_geom:-gone}, want ${TMUX_WIDTH}x${TMUX_HEIGHT}"; fail=1
   fi
 
+  # The status bar must stay high-contrast: the tmux default is dim grey on
+  # green, which is unreadable on a display across a room. Also asserts the row
+  # count was NOT touched, because changing it would resize the window and
+  # reach a running agent.
+  case "$(tmux show-option -t "$SESSION" -v status-style 2>/dev/null)" in
+    *colour15*) echo "ok: status bar is high contrast" ;;
+    *) echo "FAIL: status-style not set, got '$(tmux show-option -t "$SESSION" -v status-style 2>/dev/null)'"; fail=1 ;;
+  esac
+  [ "$(tmux show-options -t "$SESSION" -v status 2>/dev/null)" = "" ] \
+    && echo "ok: status bar row count untouched (no resize of a running phase)" \
+    || { echo "FAIL: status row count was changed; that resizes the window"; fail=1; }
+
   # The stage-title hook is a GATING pre_step hook: a nonzero exit stops the
   # run. These assertions exist to fail loudly if that ever changes.
   title_hook="$SCRIPTS/pipeline/tmux_title.sh"
