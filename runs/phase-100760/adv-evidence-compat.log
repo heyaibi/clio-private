@@ -1,0 +1,6 @@
+--- canonical_put with {host,port} snapshot
+    ok=True pass=False reason=span_verify: entity: missing required extractive field; host: unlisted snapshot leaf rejected; port: unlisted snapshot leaf rejected err=None
+--- canonical_put with {entity} snapshot (declared)
+    ok=True pass=True reason=None err=None
+--- store with {entity,owner} snapshot
+    ok=True pass=False reason=span_verify: owner: unlisted snapshot leaf rejected err=None

@@ -1,0 +1,306 @@
+{
+  "run_id": "phase-100740",
+  "state": "completed",
+  "transcript": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "signal": "DEVELOPER_DONE 2043dd0c"
+    },
+    {
+      "step": "adversary",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/findings.json 6a023d92"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "REMEDIATOR_DONE 6d8b7f25"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "signal": "REMEDY_REJECTED: F-01 fdb3f5ce"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "REMEDIATOR_DONE 8ff25ddc"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "signal": "REMEDY_APPROVED 65d13b71"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "signal": "FINALIZE_DONE b519a48a"
+    }
+  ],
+  "events": [
+    {
+      "step": "developer",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/developer-task-r1.md",
+      "prompt_sha256": "bec659cb16888fa57cf043c08f49a32c779dbe85ec8b9a2c0a06e00c687d3d87",
+      "duration_s": 1130.855,
+      "visits": 1,
+      "signal": "DEVELOPER_DONE 2043dd0c",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/developer-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    {
+      "step": "adversary",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/adversary-task-r1.md",
+      "prompt_sha256": "66c96dab9e5a752f06c752d983d15b455e06cb11476acb436a55dd31b11069bd",
+      "duration_s": 1059.11,
+      "visits": 1,
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/findings.json 6a023d92",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/adversary-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/remediator-task-r1.md",
+      "prompt_sha256": "64ec08aef393fd68c8f9c38485f8edf8e83a5eddf9205958ab42e254623ec436",
+      "duration_s": 939.22,
+      "visits": 1,
+      "signal": "REMEDIATOR_DONE 6d8b7f25",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/remediator-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/approver-task-r1.md",
+      "prompt_sha256": "ec47d45cf16dd5bc0e71ca88da2d5ba5e5879ce8162b64b8ba9fb6f6f6e60b73",
+      "duration_s": 636.953,
+      "visits": 1,
+      "signal": "REMEDY_REJECTED: F-01 fdb3f5ce",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/approver-task-r1.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    {
+      "step": "remediator",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/remediator-task-r2.md",
+      "prompt_sha256": "6e78db02ca7432af510dfdb9a721e476172f6aabdcc8f1ab7eb1e278c02f6d72",
+      "duration_s": 953.683,
+      "visits": 2,
+      "signal": "REMEDIATOR_DONE 8ff25ddc",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/remediator-task-r2.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    {
+      "step": "approver",
+      "harness": "opencode:go/space-bunny-free@max",
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/approver-task-r2.md",
+      "prompt_sha256": "fdd6970ec9335bf12aefb871ccb851e2a166ea631f50179bb6574c43de4bdab5",
+      "duration_s": 395.61,
+      "visits": 2,
+      "signal": "REMEDY_APPROVED 65d13b71",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/approver-task-r2.tui.log",
+      "attach": "pty",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    {
+      "step": "finalize",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "task_file": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/finalize-task-r1.md",
+      "prompt_sha256": "c0ef2fa4c870e143832bcea42961e6e299565603497e105d93e55a90606125be",
+      "duration_s": 347.465,
+      "visits": 1,
+      "signal": "FINALIZE_DONE b519a48a",
+      "tui_log": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100740/finalize-task-r1.tui.log",
+      "attach": "pty",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  ],
+  "hooks": [
+    {
+      "point": "pre_run",
+      "command": [],
+      "command_sha256": "e3b0c44298fc1c14",
+      "source": "pipeline",
+      "exit_code": null,
+      "duration_ms": null,
+      "skipped": true
+    },
+    {
+      "point": "pre_step",
+      "command": [
+        "bash",
+        "private/clio-private/scripts/pipeline/tmux_title.sh"
+      ],
+      "command_sha256": "cea61d85154461d8",
+      "source": "pipeline",
+      "exit_code": 0,
+      "duration_ms": 17,
+      "skipped": false
+    },
+    {
+      "point": "post_step",
+      "command": [],
+      "command_sha256": "e3b0c44298fc1c14",
+      "source": "pipeline",
+      "exit_code": null,
+      "duration_ms": null,
+      "skipped": true
+    },
+    {
+      "point": "pre_step",
+      "command": [
+        "bash",
+        "private/clio-private/scripts/pipeline/tmux_title.sh"
+      ],
+      "command_sha256": "cea61d85154461d8",
+      "source": "pipeline",
+      "exit_code": 0,
+      "duration_ms": 23,
+      "skipped": false
+    },
+    {
+      "point": "post_step",
+      "command": [],
+      "command_sha256": "e3b0c44298fc1c14",
+      "source": "pipeline",
+      "exit_code": null,
+      "duration_ms": null,
+      "skipped": true
+    },
+    {
+      "point": "pre_step",
+      "command": [
+        "bash",
+        "private/clio-private/scripts/pipeline/tmux_title.sh"
+      ],
+      "command_sha256": "cea61d85154461d8",
+      "source": "pipeline",
+      "exit_code": 0,
+      "duration_ms": 23,
+      "skipped": false
+    },
+    {
+      "point": "post_step",
+      "command": [],
+      "command_sha256": "e3b0c44298fc1c14",
+      "source": "pipeline",
+      "exit_code": null,
+      "duration_ms": null,
+      "skipped": true
+    },
+    {
+      "point": "pre_step",
+      "command": [
+        "bash",
+        "private/clio-private/scripts/pipeline/tmux_title.sh"
+      ],
+      "command_sha256": "cea61d85154461d8",
+      "source": "pipeline",
+      "exit_code": 0,
+      "duration_ms": 15,
+      "skipped": false
+    },
+    {
+      "point": "post_step",
+      "command": [],
+      "command_sha256": "e3b0c44298fc1c14",
+      "source": "pipeline",
+      "exit_code": null,
+      "duration_ms": null,
+      "skipped": true
+    },
+    {
+      "point": "pre_step",
+      "command": [
+        "bash",
+        "private/clio-private/scripts/pipeline/tmux_title.sh"
+      ],
+      "command_sha256": "cea61d85154461d8",
+      "source": "pipeline",
+      "exit_code": 0,
+      "duration_ms": 23,
+      "skipped": false
+    },
+    {
+      "point": "post_step",
+      "command": [],
+      "command_sha256": "e3b0c44298fc1c14",
+      "source": "pipeline",
+      "exit_code": null,
+      "duration_ms": null,
+      "skipped": true
+    },
+    {
+      "point": "pre_step",
+      "command": [
+        "bash",
+        "private/clio-private/scripts/pipeline/tmux_title.sh"
+      ],
+      "command_sha256": "cea61d85154461d8",
+      "source": "pipeline",
+      "exit_code": 0,
+      "duration_ms": 25,
+      "skipped": false
+    },
+    {
+      "point": "post_step",
+      "command": [],
+      "command_sha256": "e3b0c44298fc1c14",
+      "source": "pipeline",
+      "exit_code": null,
+      "duration_ms": null,
+      "skipped": true
+    },
+    {
+      "point": "pre_step",
+      "command": [
+        "bash",
+        "private/clio-private/scripts/pipeline/tmux_title.sh"
+      ],
+      "command_sha256": "cea61d85154461d8",
+      "source": "pipeline",
+      "exit_code": 0,
+      "duration_ms": 18,
+      "skipped": false
+    },
+    {
+      "point": "post_step",
+      "command": [],
+      "command_sha256": "e3b0c44298fc1c14",
+      "source": "pipeline",
+      "exit_code": null,
+      "duration_ms": null,
+      "skipped": true
+    }
+  ]
+}

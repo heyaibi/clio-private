@@ -1,0 +1,13 @@
+{
+  "phase": "100740",
+  "private_commit": "32c704838041932a4190a06827448990226d1a22",
+  "public_commit": "671e339e42456545c942e8027f8ed5baa6b57bd3",
+  "published_at": "2026-09-26T13:40:40.509Z",
+  "reservation": {
+    "generation": 1,
+    "machine_id": "devserver",
+    "reservation_id": "rsv-fbe6076a99a6153681b016e3"
+  },
+  "state": "published",
+  "version": 1
+}

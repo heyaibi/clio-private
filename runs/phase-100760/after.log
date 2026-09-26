@@ -1,0 +1,8 @@
+initialize -> ok server={'name': 'clio-mcp', 'version': '0.1.0'}
+--- control: declared-valid only: store -> pass=True reason=None id=itm-leaf-control-1
+    get_snapshot -> {"authoritative":true,"item_id":"itm-leaf-control-1","ok":true,"snapshot":{"amount":1000,"entity":"Ada"}}
+--- undeclared TOP-LEVEL leaf: store -> pass=False reason=span_verify: invented_note: unlisted snapshot leaf rejected id=None
+--- undeclared NESTED leaf: store -> pass=False reason=span_verify: invented.deep: unlisted snapshot leaf rejected id=None
+--- undeclared LIST leaf: store -> pass=False reason=span_verify: invented_list.0: unlisted snapshot leaf rejected; invented_list.1: unlisted snapshot leaf rejected id=None
+--- stderr tail: ":["invented_list.0","invented_list.1"],"preview":{"diagnostic":null,"gist":"Ada paid 1,000","snapshot":{"amount":1000,"entity":"Ada","invented_list":["a","b"]}}}
+admission {"operation":"admit_reject","candidate_key":"persona","candidate_kind":"semantic","admission_score":0.0,"rejection_reason":"span_verify: invented_list.0: unlisted snapshot leaf rejected; invented_list.1: unlisted snapshot leaf rejected","bank":"default","actor":"agent","timestamp":"2026-09-26T13:57:07Z","preview":{"diagnostic":null,"gist":"Ada paid 1,000","snapshot":{"amount":1000,"entity":"Ada","invented_list":["a","b"]}}}
