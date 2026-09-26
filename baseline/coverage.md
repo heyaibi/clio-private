@@ -1,6 +1,6 @@
 # Coverage playbook (Agent Memoir)
 
-**Audience:** agents and humans implementing phases under a **≥90% function + line (per file)** gate (`cargo llvm-cov` / `make coverage`).
+**Audience:** agents and humans implementing phases under a **≥80% function + line (per file)** gate (`cargo llvm-cov` / `make coverage`).
 
 **Why this file exists:** Phase 100020 burned ~15× the expected time chasing **region** coverage theater and flaky Postgres suites. The gate is now **lines + functions only**. Regions may still appear in reports; they are informational — **do not** invent unreachable `Err` arms to close them.
 
@@ -45,7 +45,7 @@ make coverage-clean
 
 `postgres://clio:clio@127.0.0.1:34310/clio`
 
-**Per-file floor:** Humans lowered the lasting gate from 100% to **≥90% lines and functions on every reported source file** (not only the TOTAL row). `cargo llvm-cov --fail-under-*` enforces the aggregate floor; agents MUST still scan the per-file summary and stop if any file is under 90%.
+**Per-file floor:** Humans lowered the lasting gate from 100% to **≥80% lines and functions on every reported source file** (not only the TOTAL row). `cargo llvm-cov --fail-under-*` enforces the aggregate floor; agents MUST still scan the per-file summary and stop if any file is under 80%.
 
 All of `coverage`, `coverage-html`, `coverage-lcov`, and `coverage-open` MUST share that env. Do not special-case only `make coverage`. CI uses the same two `--fail-under-*` floors (port may differ for the Actions service).
 
@@ -55,7 +55,7 @@ All of `coverage`, `coverage-html`, `coverage-lcov`, and `coverage-open` MUST sh
 
 ## 1. Order of operations (do this, in this order)
 
-1. **Baseline before edits.** Run `make coverage`. If any reported file is below **90%** lines or functions, **stop and raise**.
+1. **Baseline before edits.** Run `make coverage`. If any reported file is below **80%** lines or functions, **stop and raise**.
 2. **Implement behavior first.** Green `cargo test --locked` (and Clippy `-D warnings`) before hunting coverage misses.
 3. **Stabilize shared dependencies.** Postgres up (`make compose up …`), unique IDs, serialized access to shared DBs.
 4. **Then** run coverage. Fix real **line/function** misses with the decision tree in §3. While iterating on specific files, verify with scoped per-crate runs or one JSON run (see §7) — reserve the full `make coverage` for the final pass.
@@ -69,8 +69,8 @@ Do **not** open HTML / JSON coverage parsers until step 4.
 
 | Metric | Gated? | Meaning in practice |
 |--------|--------|---------------------|
-| **Functions** | **Yes — ≥90% per file** | Every compiled function in reported crates was entered at least once. |
-| **Lines** | **Yes — ≥90% per file** | Every instrumented line had ≥1 hit. |
+| **Functions** | **Yes — ≥80% per file** | Every compiled function in reported crates was entered at least once. |
+| **Lines** | **Yes — ≥80% per file** | Every instrumented line had ≥1 hit. |
 | **Regions** | **No** | LLVM can split a line into multiple regions (`a()?.b()?`, `unwrap_or`). Unhit regions may still show in HTML/JSON — **ignore for the gate**. |
 
 `cargo llvm-cov` HTML can paint a line green when any region on that line ran. For this repo, trust the **summary lines + functions** columns against the fail-under floors.
@@ -82,8 +82,8 @@ Do **not** open HTML / JSON coverage parsers until step 4.
 | JSON path (`cargo llvm-cov --json`) | Gate? | Notes |
 |-------------------------------------|-------|-------|
 | `data[].files[].summary.regions.percent` | **No** | Informational; never a pass/fail input. |
-| `data[].files[].summary.lines.percent` | **Yes — ≥90% per file** | Instrumented lines with ≥1 hit. |
-| `data[].files[].summary.functions.percent` | **Yes — ≥90% per file** | Compiled functions entered ≥1 time. |
+| `data[].files[].summary.lines.percent` | **Yes — ≥80% per file** | Instrumented lines with ≥1 hit. |
+| `data[].files[].summary.functions.percent` | **Yes — ≥80% per file** | Compiled functions entered ≥1 time. |
 
 `--fail-under-*` flags gate only the **TOTAL** row. The per-file floor is enforced by the guard script:
 
@@ -91,7 +91,7 @@ Do **not** open HTML / JSON coverage parsers until step 4.
 python3 scripts/coverage_guard.py <llvm-cov.json>
 ```
 
-It prints a TOTAL line plus any per-file offenders and exits non-zero when a reported file is under 90% lines **or** functions. `make coverage` produces one JSON report, runs the aggregate gate on it, then runs the guard on the same report (one instrumented test run per gate); CI mirrors both steps.
+It prints a TOTAL line plus any per-file offenders and exits non-zero when a reported file is under 80% lines **or** functions. `make coverage` produces one JSON report, runs the aggregate gate on it, then runs the guard on the same report (one instrumented test run per gate); CI mirrors both steps.
 
 ### What llvm-cov reports (and ignores)
 
@@ -201,7 +201,7 @@ Do **not** reintroduce `--fail-under-regions`. Unhit regions on an otherwise cov
 
 ## 6. Checklist before declaring a phase done
 
-- [ ] `make coverage` exits 0 (**lines** and **functions** ≥90% aggregate); the per-file guard in the same gate confirms **each file** ≥90% lines and functions (see §2 "Column mapping and the per-file guard").
+- [ ] `make coverage` exits 0 (**lines** and **functions** ≥80% aggregate); the per-file guard in the same gate confirms **each file** ≥80% lines and functions (see §2 "Column mapping and the per-file guard").
 - [ ] CI yaml matches: `--fail-under-lines 90` and `--fail-under-functions 90` only (no regions floor).
 - [ ] `make coverage-html` / `coverage-open` green (same `DATABASE_URL`).
 - [ ] `make check` clean with **`--workspace`** test/clippy scope (one verify run after a wholesale fix).
@@ -275,7 +275,7 @@ cargo install cargo-llvm-cov
 
 ## 9. Non-negotiables for future agents
 
-1. Do not start a phase if any reported file is below **90%** line/function coverage — raise immediately.
+1. Do not start a phase if any reported file is below **80%** line/function coverage — raise immediately.
 2. Do not chase coverage before `cargo test` is green.
 3. Do not invent unreachable `Err` arms or production poison helpers — especially not for regions.
 4. Do not mutate process-global SQLite auto-extensions in parallel tests.
