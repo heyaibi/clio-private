@@ -162,13 +162,19 @@
         "public": "74757ef94048cf30f702420e75e6b6cee1d28b0f"
       },
       "claimed_at": "2026-09-26T06:15:21.199Z",
+      "completion_receipt": {
+        "path": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100680/publication.json",
+        "private_commit": "263ece133ec73c6d334c0196671f0e6ebb76d9f3",
+        "public_commit": "e6e0b6b9da6ed1e4d89ecdb03a3ee461d8cf4010",
+        "published_at": "2026-09-26T07:43:26.468Z"
+      },
       "expires_at": null,
       "generation": 2,
-      "heartbeat_at": "2026-09-26T07:41:18.139Z",
+      "heartbeat_at": "2026-09-26T07:43:30.994Z",
       "machine_id": "devserver",
       "reservation_id": "rsv-79c6b8bb354173b81524a49e",
       "run_id": "phase-100680",
-      "status": "running"
+      "status": "completed"
     },
     "100720": {
       "base_revisions": {
