@@ -1,0 +1,13 @@
+{
+  "phase": "100700",
+  "private_commit": "3dccfdf6cdf33ff882a776206783fc173f6191de",
+  "public_commit": "48743c89272e8fa2e93f739957aacb92279f021b",
+  "published_at": "2026-09-26T10:17:39.152Z",
+  "reservation": {
+    "generation": 1,
+    "machine_id": "macbook",
+    "reservation_id": "rsv-8772aa9d7f5bb713c83174cd"
+  },
+  "state": "published",
+  "version": 1
+}
