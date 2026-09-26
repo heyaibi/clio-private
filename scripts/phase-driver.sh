@@ -68,7 +68,6 @@ fi
 # Canonical private locations (all invoked with $REPO as cwd).
 PRIV="private/clio-private"
 WF="$REPO/$PRIV/runs"
-HARNESS="$REPO/$PRIV/harness"
 SCRIPTS="$REPO/$PRIV/scripts"
 NOTIFIER="$SCRIPTS/pipeline/phase_notifications.py"
 
@@ -473,7 +472,7 @@ _drive() {
               --expected-generation "$(printf '%s' "$selection" | selection_value generation)" \
               --confirm >"$RUN_DIR/claim-recovery-$wait_phase.json" 2>&1; then
             number="$wait_phase"
-            rel="private/clio-private/roadmap/$(ls "$REPO/$HARNESS/../roadmap" 2>/dev/null | grep "^phase-$wait_phase-" | head -1)"
+            rel="private/clio-private/roadmap/$(ls "$REPO/$PRIV/roadmap" 2>/dev/null | grep "^phase-$wait_phase-" | head -1)"
             log "recovered phase $number ($rel); continuing"
           else
             log "claim recovery for phase $wait_phase failed; see $RUN_DIR/claim-recovery-$wait_phase.json"
@@ -661,7 +660,7 @@ driver_self_test() {
     && echo "ok: stop notification logged" || { echo "FAIL: stop notification missing"; fail=1; }
 
   # Coordination failure: the normal driver path must refuse before tmux launch.
-  old_repo="$REPO"; old_priv="$PRIV"; old_wf="$WF"; old_harness="$HARNESS"
+  old_repo="$REPO"; old_priv="$PRIV"; old_wf="$WF"
   old_run_dir="$RUN_DIR"; old_lock="$LOCK"; old_halt="$HALT"; old_stall="$STALL"
   old_current="$CURRENT"; old_pid="$PIDFILE"; old_notify_broken="$NOTIFY_BROKEN"
   old_log="$LOG"; old_session="$SESSION"
@@ -669,7 +668,7 @@ driver_self_test() {
   coord_run="$tmp/coordination-failure-run"
   mkdir -p "$coord_root" "$coord_run"
   REPO="$coord_root"; PRIV="private/clio-private"; WF="$coord_run"
-  HARNESS="$old_harness"; RUN_DIR="$coord_run"
+  RUN_DIR="$coord_run"
   LOCK="$RUN_DIR/driver.lock"; HALT="$RUN_DIR/halted"; STALL="$RUN_DIR/stalled"
   CURRENT="$RUN_DIR/current"; PIDFILE="$RUN_DIR/pid"
   NOTIFY_BROKEN="$RUN_DIR/notify-broken"; LOG="$RUN_DIR/driver.log"
@@ -682,7 +681,7 @@ driver_self_test() {
     echo "FAIL: coordination failure did not refuse launch"; coord_fail_ok=0; fail=1
   fi
   tmux kill-session -t "$SESSION" 2>/dev/null || true
-  REPO="$old_repo"; PRIV="$old_priv"; WF="$old_wf"; HARNESS="$old_harness"
+  REPO="$old_repo"; PRIV="$old_priv"; WF="$old_wf"
   RUN_DIR="$old_run_dir"; LOCK="$old_lock"; HALT="$old_halt"; STALL="$old_stall"
   CURRENT="$old_current"; PIDFILE="$old_pid"; NOTIFY_BROKEN="$old_notify_broken"
   LOG="$old_log"; SESSION="$old_session"
