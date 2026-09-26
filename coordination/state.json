@@ -191,5 +191,12 @@
       "status": "completed"
     }
   },
+  "publication": {
+    "acquired_at": "2026-09-26T07:42:25.136Z",
+    "generation": 2,
+    "machine_id": "devserver",
+    "phase": "100680",
+    "reservation_id": "rsv-79c6b8bb354173b81524a49e"
+  },
   "version": 1
 }
