@@ -1,0 +1,7 @@
+[
+  {
+    "number": 35,
+    "title": "Diagnostic JSON preview masks secret-looking values but republishes the secret-looking key",
+    "url": "https://github.com/heyaibi/clio/issues/35"
+  }
+]
