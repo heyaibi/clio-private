@@ -3,3 +3,8 @@
 2026-09-26T13:40:16Z make check: exit 0, 53 test binaries all 'test result: ok', no FAILED, no compile error
 2026-09-26T13:40:28Z public commit 671e339e42456545c942e8027f8ed5baa6b57bd3 created (7 clio-mcp files, 853 insertions, 19 deletions); public worktree clean
 2026-09-26T13:40:30Z private commit 0a94eef created (roadmap only); remaining private changes are runs/phase-100740 files left for the publication helper
+2026-09-26T13:40:50Z publication helper gitsync.py --mode publish --phase 100740: exit 0; public push 671e339e42456545c942e8027f8ed5baa6b57bd3 to origin/master; private pushes 32c7048 (run state) and 5d818e1 (publication receipt) to private origin/master; publication.json written and pushed
+2026-09-26T13:40:50Z addressed_issues in findings.json: present, empty list -> no issue to close, no issue-close files needed
+2026-09-26T13:40:50Z incidental bugs: none confirmed; approver non-blocking observation about read_explain_guard_tests.rs:262-266 swept-names == serialized-keys equality is a recorded fail-safe design suggestion in the phase file, not a confirmed defect; nothing filed; reported-bugs.json does not exist in the run dir
+2026-09-26T13:40:50Z close-out complete: attribution rows verified (my Finalize r1 row added), make check exit 0, approval checkbox already [x], both repos committed and pushed, run state published with receipt
+FINALIZE_DONE b519a48a
