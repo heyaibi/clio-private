@@ -164,7 +164,7 @@
       "claimed_at": "2026-09-26T06:15:21.199Z",
       "expires_at": null,
       "generation": 2,
-      "heartbeat_at": "2026-09-26T07:36:15.958Z",
+      "heartbeat_at": "2026-09-26T07:41:18.139Z",
       "machine_id": "devserver",
       "reservation_id": "rsv-79c6b8bb354173b81524a49e",
       "run_id": "phase-100680",
