@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "run_id": "phase-100740",
+  "pipeline": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/workflow/pipelines/default.yaml",
+  "rotation_key": "default-07ab5c61",
+  "created_at": "2026-09-26T12:10:08Z",
+  "source": "auto",
+  "steps": {
+    "developer": {
+      "index": 0,
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "display": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "offset": 0,
+      "next_count": 1,
+      "skipped": [],
+      "options": [
+        {
+          "harness": "opencode:go/deepseek-v4.1-flash@max",
+          "display": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+          "binary": "opencode",
+          "available": true
+        },
+        {
+          "harness": "opencode:together/glm-5.3-flash@high",
+          "display": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+          "binary": "opencode",
+          "available": true
+        },
+        {
+          "harness": "opencode:go/space-bunny-free@max",
+          "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+          "binary": "opencode",
+          "available": true
+        }
+      ],
+      "selected_by": "runner"
+    },
+    "adversary": {
+      "index": 0,
+      "harness": "opencode:go/space-bunny-free@max",
+      "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "offset": 0,
+      "next_count": 1,
+      "skipped": [],
+      "options": [
+        {
+          "harness": "opencode:go/space-bunny-free@max",
+          "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+          "binary": "opencode",
+          "available": true
+        },
+        {
+          "harness": "opencode:go/space-bunny-free@max",
+          "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+          "binary": "opencode",
+          "available": true
+        },
+        {
+          "harness": "opencode:go/deepseek-v4.1-flash@max",
+          "display": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+          "binary": "opencode",
+          "available": true
+        }
+      ],
+      "selected_by": "runner"
+    },
+    "remediator": {
+      "index": 0,
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "display": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "offset": 0,
+      "next_count": 1,
+      "skipped": [],
+      "options": [
+        {
+          "harness": "opencode:together/glm-5.3-flash@high",
+          "display": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+          "binary": "opencode",
+          "available": true
+        },
+        {
+          "harness": "cmd:stealth/space-bunny-alpha@high",
+          "display": "Command Code (Space Bunny Alpha High)",
+          "binary": "cmd",
+          "available": true
+        },
+        {
+          "harness": "opencode:go/space-bunny-free@max",
+          "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+          "binary": "opencode",
+          "available": true
+        }
+      ],
+      "selected_by": "runner"
+    },
+    "approver": {
+      "index": 0,
+      "harness": "opencode:go/space-bunny-free@max",
+      "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "offset": 0,
+      "next_count": 1,
+      "skipped": [],
+      "options": [
+        {
+          "harness": "opencode:go/space-bunny-free@max",
+          "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+          "binary": "opencode",
+          "available": true
+        },
+        {
+          "harness": "opencode:go/space-bunny-free@max",
+          "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+          "binary": "opencode",
+          "available": true
+        },
+        {
+          "harness": "cmd:stealth/space-bunny-alpha@high",
+          "display": "Command Code (Space Bunny Alpha High)",
+          "binary": "cmd",
+          "available": true
+        }
+      ],
+      "selected_by": "runner"
+    },
+    "finalize": {
+      "index": 0,
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "display": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "offset": 0,
+      "next_count": 1,
+      "skipped": [],
+      "options": [
+        {
+          "harness": "opencode:together/glm-5.3-flash@high",
+          "display": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+          "binary": "opencode",
+          "available": true
+        },
+        {
+          "harness": "cmd:deepseek/deepseek-v4-flash@max",
+          "display": "Command Code (DeepSeek V4 Flash (latest) Max)",
+          "binary": "cmd",
+          "available": true
+        },
+        {
+          "harness": "opencode:go/space-bunny-free@max",
+          "display": "OpenCode CLI (Go . Space Bunny Free Max)",
+          "binary": "opencode",
+          "available": true
+        }
+      ],
+      "selected_by": "runner"
+    }
+  }
+}

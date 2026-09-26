@@ -1,0 +1,25 @@
+2026-09-26T12:47:10Z
+[TS] start: branch=master; remediator round 1; backup findings.original.json already existed (12103 bytes, same size as findings.json); triaged 5 findings, all coupled to clio-mcp read_explain surface -> serial self-fix, no workers spawned
+2026-09-26T12:52:46Z
+[TS] reproduced F-01 before fix: serde-skip drift_probe mutation on pre-fix guard -> '6 passed; 0 failed' (gap confirmed); reverted
+[TS] fixes applied: read_explain.rs (tables shipped pub + truthful doc), lib.rs (pub mod read_explain), guard tests (exhaustive field-name sweep hit_field_names + names==serialized-keys + per-field presence), transport conformance (new explain_trace_key_contract_over_stdio_and_http over stdio+HTTP), read_entities_tests.rs comment, read_retrieve.rs header
+[TS] scoped verify: 'cargo test -p clio-mcp --locked --lib read_explain' 6 passed / 0 failed; 'cargo test -p clio-mcp --locked --test mcp_read_transport_conformance' 4 passed / 0 failed incl. new e2e
+[TS] mutation A on fixed code (serde-skip field, mentioned+unclassified): FAILED 'hit field drift_probe is unclassified' at read_explain_guard_tests.rs:275; reverted
+[TS] mutation C ('..' reintroduced + scores classified TraceVisible): 3 FAILED incl 'classification and projection disagree for scores' and wire allowlist assertion; reverted
+[TS] clippy -p clio-mcp -D warnings clean (after removing one redundant clone); cargo fmt --all -- --check clean
+[TS] scoped coverage: read_explain.rs 100.00/100.00, lib.rs 100.00/100.00, read_retrieve.rs 97.66/100.00; sizes read_explain.rs=149 guard=331 tests=281 read_retrieve.rs=277 transport=341 (all <=450)
+2026-09-26T13:01:52Z
+[TS] findings.json updated: F-01..F-05 all marked resolved with quoted real output; plan_unlimited declines recorded with reasons (ScoredHit constructor: full struct literals already break on every new field via E0063/E0027, proven by mutation B; CI citation check: CI cannot read the private roadmap without violating the public/private boundary); addressed_issues left empty (was empty; nothing to re-validate)
+2026-09-26T13:01:52Z
+[TS] phase file updated: citations corrected (mcp_read_transport_conformance.rs:146-163, conformance.rs:326-350), file-size note updated, §8 all seven checkboxes ticked with evidence, AC-100740-01 reworded + remediation evidence block added, Completion Evidence remediation line added, Attribution row appended (Remediator r1 done)
+2026-09-26T13:01:52Z
+[TS] final 'make check' EXIT=0 (fmt + clippy -D warnings + workspace tests; 2527 passed / 0 failed; the 'unknown command recal' lines in the log are expected stderr from the passing CLI typo-suggestion test)
+2026-09-26T13:01:52Z
+[TS] final 'make coverage' EXIT=0: coverage-guard 353 files, TOTAL lines 97.89% functions 98.71%, all per-file floors met; touched files read_explain.rs 100.00/100.00, lib.rs 100.00/100.00, read_retrieve.rs 98.83/100.00; 2527 passed / 0 failed under the gate
+2026-09-26T13:01:52Z
+[TS] incidental bugs: none confirmed, none filed; no reported-bugs.json existed and no new unrelated bug was confirmed
+2026-09-26T13:01:52Z
+[TS] git: nothing committed, pushed, stashed, or staged by remediation; all changes left unstaged for the approver (developer snapshot remains staged)
+2026-09-26T13:01:52Z
+[TS] finish: all five findings addressed and verified; signal follows
+REMEDIATOR_DONE 6d8b7f25
