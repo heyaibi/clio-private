@@ -62,6 +62,15 @@ What you must never do:
 
 Pushing the private repo to its own private remote is fine and expected. Pushing the root repo must only ever carry public content.
 
+## Glide repository
+
+- The `glide` checkout lives at `private/clio-private/glide/`.
+- It is a separate repo. The private repo ignores it with `/glide`.
+- When your task touches files under `glide/`, read `private/clio-private/glide/AGENTS.md` first. Follow it for glide work.
+- Glide is public. Never commit host paths, host names, phase numbers, run state, secrets, or operator docs there. When in doubt, ask.
+- Host Rust rules do not apply inside `glide/`. No 450-line Rust limit, no Rust header, no `make coverage`. Use the Python rules from the glide agent file instead.
+- Run git commands inside `glide/` for glide work. The private repo will not show those changes. Never force-add glide files to the private repo. Never weaken the ignore rule.
+
 ## How you write (always)
 
 - Always use simple English. No exceptions. Not for security. Not for design. Not for onboarding.
