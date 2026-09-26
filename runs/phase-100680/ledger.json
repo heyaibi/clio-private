@@ -1,0 +1,90 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE 6bea90b6",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 2,
+      "output_sha256": "e5c6702f28d1fbe90002cbcd9ca59e22d3b3fdad5a78393919e0511da5299ede",
+      "artifacts": {},
+      "git_head": "74757ef94048cf30f702420e75e6b6cee1d28b0f",
+      "superseded_task_files": [
+        "developer-task-r1.md"
+      ],
+      "task_file": "developer-task-r2.md",
+      "task_sha256": "e4c3742f26f8f7df8144e310c3b4579e8f1e400d8ca9f2201b495109872ebb71",
+      "stage_sha256": "1d25728d16ef32caf86b6652d6219f96112aa16671d614e41b8e1beeb11b1025",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100680/findings.json b07727c5",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "0c89f631d70d19c728fb42b9e28b798c49c5ef988c9afa493163177f21f4c5fb",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 14342,
+          "sha256": "3db9d40034142bc559d4c7e1db291df8874a79af13846403689efab43ca3b946"
+        }
+      },
+      "git_head": "74757ef94048cf30f702420e75e6b6cee1d28b0f",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "635f16e93bd182dc463072edac664bd43372d024de8ea866429bac6e3da8e526",
+      "stage_sha256": "a2bf8963c5b36d6d29820e5a27bb2387b447027d3925be9261da865bbbb1336e",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE dd17260c",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 2,
+      "output_sha256": "3513214f35cb9edc03e6670d0e51d0fdcf74714fb841a7ff703bf00b4e096bbf",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 14342,
+          "sha256": "3db9d40034142bc559d4c7e1db291df8874a79af13846403689efab43ca3b946"
+        }
+      },
+      "git_head": "74757ef94048cf30f702420e75e6b6cee1d28b0f",
+      "superseded_task_files": [
+        "remediator-task-r1.md"
+      ],
+      "task_file": "remediator-task-r2.md",
+      "task_sha256": "26eec54955d0bac21a2a76a97f566029ce2da89080a7e76552823d8c5198d0ef",
+      "stage_sha256": "f7983d28a56aaf5eea00680a1b061dd5f16be40f09d12a1a72976744e4b3ff13",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED fa1e37f8",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 2,
+      "output_sha256": "e78bd4226b1742e2c2e5b8bb8a6a2ed9a9283c3d8c29efece200a8649703cb4d",
+      "artifacts": {},
+      "git_head": "74757ef94048cf30f702420e75e6b6cee1d28b0f",
+      "superseded_task_files": [
+        "approver-task-r1.md"
+      ],
+      "task_file": "approver-task-r2.md",
+      "task_sha256": "d11133ca320e949b4e71f7a9cdf3dce61d040f527ca9e2aa52ad5cbbb26c9cd5",
+      "stage_sha256": "3a20f8d59552d7d538199e13615a5ac291e7332ae84cf412dc3c9b46366d7843",
+      "via": "edge",
+      "routed_to": "finalize"
+    }
+  }
+}

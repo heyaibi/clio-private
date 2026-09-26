@@ -1,0 +1,72 @@
+2026-09-26T06:41:48Z start. Branch `master`.
+2026-09-26T06:41:48Z main repo `git status --porcelain`: 15 staged paths, 0 unstaged, 0 untracked outside runs/.
+2026-09-26T06:42:10Z staged diff read (1275 insertions / 4 deletions, 15 files). Now checking surrounding code.
+2026-09-26T06:43:20Z independent gate: started `make coverage` in background (own log /tmp/opencode/adv-coverage.log). Prior report re-checked by me: guard OK, 351 files, TOTAL lines 97.8851% / functions 98.7073%, touched files entities.rs 100/100, types.rs 100/100, finalize.rs 97.89/100, read_retrieve.rs 98.88/100, telemetry.rs 100/100.
+2026-09-26T06:45:23Z independent `make coverage` run finished: exit 0, guard 351 files, TOTAL lines 97.89% functions 98.71%; suite totals from the log below.
+2026-09-26T06:46:11Z `cargo fmt --all --check` clean; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` clean (0 warnings/errors in my own log).
+- review method: read the whole staged diff (15 files, +1275/-4) plus the surrounding code it depends on
+  (finalize.rs, hybrid.rs fetch_items, types.rs, read_retrieve.rs explanation, compose.rs pack,
+  cli_read_render.rs, clio-write verify/telemetry, clio-compliance import, clio-store correct).
+  `git status --porcelain`: 15 staged paths, 0 unstaged, 0 untracked outside runs/. The private repo
+  also has runs/phase-100660 paths staged (D resume.json, M run.json) that this run did not touch;
+  runs/ is out of scope, so no finding is filed on them.
+- verification I ran myself, with real output:
+  - `make coverage` (own run, log /tmp/opencode/adv-coverage.log): exit 0, 37 test binaries,
+    2499 passed / 0 failed, guard `351 file(s) checked against 90.0% floors`,
+    `TOTAL lines 97.89% functions 98.71%`, `all reported files meet the per-file floor`.
+    Re-read per-file rows from target/coverage/coverage.json myself: entities.rs 100.00/100.00,
+    types.rs 100.00/100.00, finalize.rs 97.89/100.00, read_retrieve.rs 98.88/100.00,
+    telemetry.rs 100.00/100.00. Lowest file in the report is clio-sync/src/apply_records.rs at
+    90.18 lines / 100.00 functions, so nothing sits under the floor.
+  - `cargo fmt --all --check` clean. `cargo clippy --workspace --all-targets --all-features --locked
+    -- -D warnings` clean (0 warning/error lines).
+  - new tests, run by name: clio-retrieve `entities` filter -> 20 passed / 171 filtered out;
+    clio-mcp `read_entities` -> 5; clio-write `telemetry_entity` -> 1; clio `entities` -> 3.
+    29 new tests total, all green.
+- structural checks: every created/modified Rust file <= 450 lines (largest cli_read_tests.rs 411,
+  read_retrieve.rs 280, read_entities_tests.rs 278, hit_entities_tests.rs 265); no `private/`,
+  `roadmap/`, or `baseline/crates.md` string in the staged diff; no Cargo.toml/Cargo.lock/sql change;
+  `T100680-0x` test ids in comments match the pre-existing public convention (40+ such ids already in
+  crates/, e.g. crates/clio-store/src/pg_audit_tests.rs:103), so I did not file that as isolation.
+- open-issue scope audit: `list-open` -> 11 open issues, saved to runs/phase-100680/open-issues.json.
+  Viewed the plausible ones: #20 (plaintext triple SPO survives erasure, digest
+  02a18c3cd97b5637404b969f0a76ab8f0d7b64b60b2ba56f4e2df3a9d167681b), #25 (reserved CLI surfaces ignore
+  unknown flags, digest 85fe98267a342f3c09c2dbdca553dd32de6d3288b786583256108a1cadca3e73), #17
+  (unreadable row blocks writes, digest f2d3fd87f7cc791ed98c42f8a5a2296cb377c0543151917a9eb8d6ea0862c97a).
+  None is resolved by this phase; addressed_issues is empty.
+- findings recorded: F-01 telemetry boundary test asserts a key name, not the name, and the name is in
+  the same payload (telemetry_entity_tests.rs:126 + the real-binary artifact line 3);
+  F-02 the "already span-verified" doc claim holds only for the store-family write paths
+  (verify_snapshot call sites vs import restore and correct_item); F-03 phase evidence says 26/17 new
+  tests, real numbers are 29/20; F-04 verification limit (3) claims a dense-populated in-process test
+  that does not exist; F-05 two new public exports with no out-of-crate consumer; F-06 DoD checkbox
+  "Required approval is obtained" is ticked before the pipeline ran.
+- incidental bugs: none filed. The entity name in the write-path verify preview is in scope for this
+  phase (the phase states the telemetry rule in absolute terms), so it is a finding, not an incidental
+  issue. The `runs/phase-100660` staging is out of scope by task rule.
+- omission audit (phase doc §2 In Scope, §5 Task 1/Task 2, §7, §11): every in-scope bullet has code and
+  test evidence. `entities: Vec<String>` on ScoredHit (types.rs:150), populated in finalize
+  (finalize.rs:127), trim-only rule + empty-coverage table (entities.rs:20-70), three-binding parity
+  (read_entities_tests.rs, cli_read_entities_tests.rs), compose pack and rerank payload proven
+  gist/text-only (hit_entities_tests.rs entity_names_never_enter_the_compose_pack; rerank.rs sends
+  doc_text strings, not the hit JSON). Conditional bullet "Update any conformance volatile mask or
+  fixture" does not hold: the mask at crates/clio-mcp/tests/mcp_read_transport_conformance.rs:147-161
+  lists no hit-content keys and both transports read one store, so the new key matches; the phase
+  says so explicitly at AC-100680-05. Erased-item half of the failure-mode row: an erased item cannot
+  be a hit (hybrid.rs:378-383 skips it with a warning), disclosed at phase doc:260-266 and :332, so
+  not a fudge.
+- no out-of-scope work slipped in: no entity store/index/NER/linking, no triple query, no ranking use
+  (pinned by entities_do_not_affect_hit_order_or_scores), no field on the frozen RetrieveHit, no
+  snapshot/schema/extract change, no new dependency, no SQL, no Cargo.toml/lock change.
+- deliverables: findings.json written and validated (parses, 6 findings, addressed_issues empty, both
+  plan lists present). open-issues.json kept as run evidence. My harness has no
+  `/adversarial-review` skill, so there are no HTML artifacts to copy. Only phase-file edit is the
+  appended Attribution row. No product, test, or requirement file was touched; nothing committed,
+  pushed, or restaged.
+- what I could not verify: I did not rebuild the real binary and re-run the developer's E2E script
+  myself; I read its saved output and confirmed the payload shape from it. I did not exercise a
+  dense-populated retrieve (that is finding F-04). I did not run the Postgres-vs-SQLite parity suites
+  beyond what the workspace suite already ran with DATABASE_URL reachable on 127.0.0.1:34310.
+- finish.
+2026-09-26T06:49:38Z log complete.
+ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100680/findings.json b07727c5

@@ -1,0 +1,129 @@
+2026-09-26T06:16:05Z # Developer run log — phase 100680 (entity names on recall hits), attempt r2
+ - start. Branch `master` (git branch --show-current). Working tree clean, no partial edits from r1.
+- r1 left a finished pre-change baseline coverage JSON at /tmp/cov-baseline.json (350 files, TOTAL lines 97.88% / functions 98.71%, all files over the per-file floor). Re-read that JSON instead of re-running the gate. 
+- 2026-09-26 discovery (my own inspection, plan-time claims re-verified):
+  - `ScoredHit` is built in exactly one place: `crates/clio-retrieve/src/finalize.rs:111`. The decrypted
+    `MemoryItem` is in hand there (`args.items`), so no new fetch, store, or index is needed.
+  - `ScoredHit` (crates/clio-retrieve/src/types.rs:120) flattens the frozen `RetrieveHit` and adds
+    score/display fields. Adding `entities` there keeps `RetrieveHit` untouched.
+  - Bindings all serialize the outcome/type wholesale, so the new field propagates by serde:
+    MCP `clio-mcp/src/read_retrieve.rs:90` (`to_value(&outcome)`), in-process
+    `clio-retrieve/src/surface.rs:166-208` (`ToolResult<RetrieveOutcome>`), CLI
+    `clio-lib/src/cli_read.rs:378` routes through the in-process MCP `tools/call` dispatcher.
+  - Disallowed surfaces do NOT derive from ScoredHit: the `explanation` trace is hand-written
+    (read_retrieve.rs:118-150), warnings are built in `hybrid.rs` from leg failures, telemetry is
+    write-path only (`clio-write/src/telemetry.rs`), health is `clio-ops` (`diagnose`/`verify`).
+  - `compose` packs only gist / snapshot_ref / item_id text (`compose.rs:356-364`), so the PR-1
+    budget contract is unchanged by this field.
+  - `clio-lib/src/cli_read_render.rs:142` already holds a reserved, currently empty
+    `recall_entity_reason_lines` slot; that is Phase 100700's entity-match reason, not this phase's
+    `entities[]` array. Left untouched.
+  - Write side re-verified: default extractive fields are `entity` (required, ExtractiveKind::Entity),
+    `amount`, `date` (`clio-write/src/schema.rs:59-65`); `match_entity` requires a contiguous NFC
+    source substring and rejects an empty value (`clio-write/src/verify_entity.rs:28-48`).
+- 2026-09-26 research (one pass, by me): serde's `skip_serializing_if` on an empty `Vec` removes the
+  key entirely (docs.rs/attr-skip-serializing, serde-rs issue #1737), which would break the phase rule
+  that `entities[]` is present (possibly empty) on every hit for the downstream match phase. Decision:
+  serialize `entities` unconditionally; no `skip_serializing_if`.
+- 2026-09-26 plan (no worker fan-out): the change is one field on one type, populated in one
+  constructor, propagating to three bindings by serde. The test modules share `fixtures_tests`,
+  `read_retrieve.rs`/`lib.rs` registrations and one type, so slices would share files. Doing it serially.
+- 2026-09-26 implemented (me, no workers):
+  - new `crates/clio-retrieve/src/entities.rs` (snapshot -> `entities[]`, trim-only, coverage table in module docs)
+  - `types.rs` `ScoredHit.entities: Vec<String>` (always serialized, `#[serde(default)]`, no skip_serializing_if)
+  - `finalize.rs` populates it from the fetched item; `lib.rs` module + re-export + test registration
+  - tests: `clio-retrieve/src/entities_tests.rs` (unit), `clio-retrieve/src/hit_entities_tests.rs` (finalize/pack/ranking)
+  - tests: `clio-mcp/src/read_entities_tests.rs` (payload, in-process parity, explain+warnings sweep, health sweep)
+  - tests: `clio-write/src/telemetry_entity_tests.rs` (no read-side entities array in verify telemetry)
+  - tests: `clio-lib/src/cli_read_entities_tests.rs` (CLI JSON parity + text-view omission)
+- 2026-09-26 scoped results: `cargo test -p clio-retrieve --locked` 190 passed / 0 failed;
+  `cargo test -p clio-mcp --locked read_entities` 5 passed; `cargo test -p clio-write --locked telemetry` 4 passed;
+  `cargo test -p clio --locked entities` 3 passed.
+- 2026-09-26 finding (needs reviewer attention, not fixed here): the pre-existing write-path verify telemetry
+  preview already carries the masked snapshot including its `entity` value
+  (`clio-write/src/telemetry.rs:76` `redact_preview`, asserted by the pre-existing test
+  `redact_masks_api_key_in_gist_and_json`). I read the phase rule as binding the new read-side `entities[]`
+  projection, so I did not change that pre-existing behavior (changing it would contradict an existing passing
+  test and belongs to the write-path telemetry owner). Disclosed in the phase file's Known Limitations.
+- 2026-09-26 real-binary E2E (real entry point, not an in-process test): `make compile`, then
+  `developer-e2e-entities.py` drives the built `clio` binary: MCP stdio `store` (span-verified snapshot
+  entity "Ada Lovelace") + `triple_add`, `clio ops reindex --target lexical --confirm`, then MCP stdio
+  `retrieve(explain=true)` / `diagnose` / `verify`, then CLI `recall --output json`, `recall --output text`,
+  and CLI `ops diagnose` / `ops verify`. Output: `developer-e2e-entities.out.txt` (exit 0, last line
+  `ALL REAL-BINARY CHECKS PASSED`).
+  - MCP payload: `"entities":["Ada Lovelace"]`; `explanation.hits[]` carries no `entities` key and no name.
+  - CLI `recall --output json`: `"entities":["Ada Lovelace"]`; `--output text`: no name anywhere.
+  - CLI `ops diagnose` / `ops verify`: no name. (`ops verify` exit 1 is a pre-existing DENSE/LEXICAL
+    coverage finding: no embedder configured and the triple carrier has no lexical doc.)
+  - `clio recall --explain` is a pre-existing usage error (exit 2, "unknown flag"): the CLI recall verb has
+    no explain flag, so the explain trace exists only on the MCP tool. Not changed by this phase.
+- 2026-09-26 gates so far: `cargo fmt --all --check` clean;
+  `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` clean;
+  `cargo test --workspace --locked` 2498 passed / 0 failed (Postgres reachable on 127.0.0.1:34310, so the
+  pg suites really ran); `cargo test -p clio-retrieve --locked` 190 passed.
+- 2026-09-26 docs: new `docs/recall-entities.md`; `docs/recall-scores.md` and
+  `docs/recall-scope-and-dedup.md` updated so the "always-present per-hit field" sentences name both fields.
+- 2026-09-26 final full gate (second and last `make coverage` of this phase):
+  `make coverage` exit 0 → `coverage-guard: 351 file(s) checked against 90.0% floors`,
+  `TOTAL lines 97.89% functions 98.71%`, `all reported files meet the per-file floor`.
+  Raw: 48506/49554 = 97.8851% lines, 4276/4332 = 98.7073% functions. Zero files below 90% lines or
+  functions. Report files 350 (baseline) -> 351 (the one new production file `entities.rs`).
+  Per-file rows, read from `target/coverage/coverage.json`:
+  `crates/clio-retrieve/src/entities.rs` 100.00/100.00, `types.rs` 100.00/100.00,
+  `finalize.rs` 97.89/100.00, `crates/clio-mcp/src/read_retrieve.rs` 98.88/100.00,
+  `crates/clio-write/src/telemetry.rs` 100.00/100.00. `clio-retrieve/src/lib.rs` has no report row
+  (module declarations and re-exports only).
+  In-between check was scoped only: `cargo llvm-cov --package clio-retrieve --locked --no-clean
+  --summary-only` (entities.rs 100.00/100.00 there too). Note: a scoped run reports `types.rs` at
+  85.19% lines because other crates' tests exercise its code; the workspace gate is the authority.
+- 2026-09-26 final re-verify after the last doc-comment edits: `cargo fmt --all --check` clean;
+  `cargo test --workspace --locked` 2498 passed / 0 failed.
+- 2026-09-26 file-size check (450-line limit): every created/modified Rust file is under it. Largest is
+  `cli_read_tests.rs` 411; the six new files are 278, 265, 210, 179, 128, 85 lines.
+- 2026-09-26 incidental bugs: none filed. Observations considered and rejected as unconfirmed (the
+  policy says a speculative bug is not an incidental bug):
+  (1) `clio recall --explain` returns usage error "unknown flag `--explain`" (exit 2). Trigger confirmed,
+     but no requirement in scope says the CLI recall verb must expose `explain`, so it is speculative and
+     is not filed. Recorded here only.
+  (2) `clio ops verify` exit 1 on the E2E store: pre-existing DENSE/LEXICAL coverage findings, working as
+     documented.
+  (3) The write-path verify telemetry snapshot preview carrying the snapshot's own `entity` value: this is
+     asserted as intended by a pre-existing passing test, so it is a contract question for the requirement
+     owner, not a confirmed defect. Disclosed in the phase file's Known Limitations for the reviewer.
+- 2026-09-26 phase file updated: Attribution row appended, §8 checkboxes, §9 "Evidence (actual,
+  2026-09-26)" per-AC table, Definition of Done, Completion Evidence (incl. Verification limits), §12 Known
+  Limitations rewritten as what/why/debt-owner, Final Status, Verification Sign-Off implementer line.
+- 2026-09-26 staging (no commit, no push, no stash):
+  - main repo: `git add -- . ':!private/clio-private/runs/'` from the repo root. Git printed the
+    "path is ignored" hint for `private` (it is globally ignored) and exited 1, but the add itself
+    succeeded: 15 paths staged, zero under `private/`.
+  - private repo: `cd private/clio-private && git add -- roadmap/ runs/` staged 13 paths, including the
+    updated phase file, this run's logs, the task files, and the two E2E artifacts.
+  - Note for the reviewer: that private-repo command also picked up two pre-existing pipeline changes I
+    did not make: `runs/phase-100660/resume.json` is staged as deleted and `runs/phase-100660/run.json` is
+    staged as modified. They were already in the working tree when this run started; the prescribed
+    `git add -- runs/` swept them in. Nothing in this run touched phase-100660 files.
+- 2026-09-26 two edits after the final gate (disclosed in the phase file too): a doc paragraph in
+  `entities.rs` stating the Unicode consequence of trim-only, plus one new test
+  `a_decomposed_entity_is_exposed_as_stored_not_re_normalized` (a name stored decomposed is exposed as
+  stored, not re-normalized — re-normalizing would need a `unicode-normalization` dependency in this
+  crate, which is a forbidden action for this phase). Neither edit adds or removes an instrumented
+  production statement.
+  - re-verified after them: `cargo fmt --all --check` clean; `cargo test -p clio-retrieve --locked`
+    191 passed / 0 failed; `cargo test --workspace --locked` 2499 passed / 0 failed; scoped
+    `cargo llvm-cov --package clio-retrieve --locked --no-clean --summary-only` → `entities.rs`
+    100.00/100.00, `types.rs` 100.00/100.00, `finalize.rs` 97.89/100.00.
+  - the full `make coverage` gate was NOT re-run for these two edits (the phase runs the full gate exactly
+    twice: baseline + final). Stated plainly in the phase file's Verification report.
+  - note on numbers: a scoped `--package` report attributes more lines/functions to `entities.rs` than the
+    workspace report (24/4 vs 12/2) because the `#[cfg(test)]` module is declared inside that file; both
+    report 100.00/100.00. The guard and the gate use the workspace report.
+- 2026-09-26 finish. Nothing left running: no background worker, no background command. Both repos are
+  staged (main repo 15 paths, zero under `private/`; private repo 13 paths) and nothing was committed,
+  pushed, or stashed.
+- 2026-09-26 one thing the next reviewer should decide, not a blocker: the write-path verify telemetry
+  snapshot preview carries the snapshot's own `entity` value, and an existing passing test asserts that
+  as intended. This phase's rule is about the new read-side `entities[]` projection, which provably never
+  reaches that surface. Whether the preview should stop carrying entity names is a requirement-owner
+  decision, recorded in the phase file's Known Limitations.
+DEVELOPER_DONE 6bea90b6

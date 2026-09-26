@@ -10,10 +10,10 @@
       "stage": "../stages/01-implement.md",
       "name": "am_implement",
       "record_as": "Developer",
-      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
-      "display": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "harness": "opencode:go/space-bunny-free@max",
+      "display": "OpenCode CLI (Go . Space Bunny Free Max)",
       "offset": 23,
-      "index": 3,
+      "index": 2,
       "next_count": 24,
       "skipped": [],
       "options": [
@@ -32,12 +32,6 @@
         {
           "harness": "opencode:go/space-bunny-free@max",
           "display": "OpenCode CLI (Go . Space Bunny Free Max)",
-          "binary": "opencode",
-          "available": true
-        },
-        {
-          "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
-          "display": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
           "binary": "opencode",
           "available": true
         }
@@ -64,12 +58,6 @@
         {
           "harness": "opencode:go/space-bunny-free@max",
           "display": "OpenCode CLI (Go . Space Bunny Free Max)",
-          "binary": "opencode",
-          "available": true
-        },
-        {
-          "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
-          "display": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
           "binary": "opencode",
           "available": true
         },

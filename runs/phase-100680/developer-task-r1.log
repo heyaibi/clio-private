@@ -1,0 +1,6 @@
+# Developer run log — phase 100680 (entity names on recall hits)
+
+- 2026-09-26 start. Branch `master` (confirmed with `git branch --show-current`).
+- 2026-09-26 read task file, phase file, coverage.md, crates.md.
+- 2026-09-26 started pre-change baseline coverage in background:
+  `DATABASE_URL=postgres://clio:clio@127.0.0.1:34310/clio CLIO_DEPLOYMENT_CONFIG=target/coverage/no-deployment-overlay.json timeout 10800 cargo llvm-cov --workspace --locked --no-clean --json --output-path /tmp/cov-baseline.json`- 2026-09-26 baseline gate finished: exit 0. Guard: 350 files, TOTAL lines 97.88% / functions 98.71%, all files meet per-file floor. JSON at /tmp/cov-baseline.json.
