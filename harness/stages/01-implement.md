@@ -2,12 +2,11 @@
 name: am_implement
 description: Clio implement stage - implements roadmap phases
 role: developer
-harness: ['opencode:go/deepseek-v4.1-flash@max', 'opencode:together/glm-5.3-flash@high', 'opencode:go/space-bunny-free@max', 'opencode:openrouter/deepseek-v4.1-flash@max']
+harness: ['opencode:go/deepseek-v4.1-flash@max', 'opencode:together/glm-5.3-flash@high', 'opencode:go/space-bunny-free@max']
 harness_names:
   'opencode:go/deepseek-v4.1-flash@max': "OpenCode CLI (Go . Deepseek V4.1 Flash Max)"
   'opencode:together/glm-5.3-flash@high': "OpenCode CLI (Together . GLM-5.3 Flash High)"
   'opencode:go/space-bunny-free@max': "OpenCode CLI (Go . Space Bunny Free Max)"
-  'opencode:openrouter/deepseek-v4.1-flash@max': "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)"
 placeholders:
   PHASE_NUMBER: Phase number being implemented.
   TASK_REQUIREMENTS: Requirements source for this phase run.

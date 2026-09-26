@@ -2,10 +2,9 @@
 name: am_adversarial_analysis
 description: Clio adversarial-analysis stage - adversarial review of implement output
 role: reviewer
-harness: ['opencode:go/space-bunny-free@max', 'opencode:go/space-bunny-free@max', 'opencode:openrouter/deepseek-v4.1-flash@max', 'opencode:go/deepseek-v4.1-flash@max']
+harness: ['opencode:go/space-bunny-free@max', 'opencode:go/space-bunny-free@max', 'opencode:go/deepseek-v4.1-flash@max']
 harness_names:
   'opencode:go/space-bunny-free@max': "OpenCode CLI (Go . Space Bunny Free Max)"
-  'opencode:openrouter/deepseek-v4.1-flash@max': "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)"
   'opencode:go/deepseek-v4.1-flash@max': "OpenCode CLI (Go . Deepseek V4.1 Flash Max)"
 placeholders:
   ORIGINAL_PROMPT: Developer task text plus the developer completion summary.

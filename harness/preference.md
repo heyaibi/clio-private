@@ -14,12 +14,10 @@ Implementation
 - Opencode Go Deepseek v4.1 Flash Max
 - Opencode Together AI GLM 5.3 Flash High
 - Opencode Go Space Bunny Free Max
-- Opencode OpenRouter Deepseek v4.1 Flash Max
 
 Adversarial Analysis
 
 - Opencode Go Space Bunny Free Max - 2x weight
-- Opencode OpenRouter Deepseek v4.1 Flash Max
 - Opencode Go Deepseek v4.1 Flash Max
 
 Remedy
