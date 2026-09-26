@@ -1,0 +1,73 @@
+{
+  "run": "phase-100640",
+  "phase": "100640",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "high",
+      "title": "Required E2E test bullet was rewritten after implementation to drop the real-CLI configured-reranker case; no test runs the CLI recall with a configured reranker and observes a populated scores.reranker",
+      "evidence": "Staged phase-doc diff (roadmap/phase-100640-rerank-relevance-normalization.md): the Required Tests bullet '- [ ] End-to-end tests (real CLI/MCP `recall` with a configured reranker shows `scores.reranker`)' was replaced by '- [x] End-to-end tests (MCP in-process `retrieve` ... ; CLI JSON shares the same binding and asserts the `scores` key contract)'. Repo scan: no test under crates/clio-lib configures a reranker (grep 'set_reranker|build_reranker_from|rerank_active' matches only clio-retrieve and clio-mcp); crates/clio-lib/src/cli_read_scores_tests.rs:155 and :231 assert scores[\"reranker\"] == null, i.e. only the no-reranker case. The only populated case runs through crates/clio-mcp/src/index_drain_tests.rs:211-218 (in-process MCP dispatch). Developer's own summary states: 'the MCP in-process pipeline (not the CLI binary itself) carried the configured-rerank end-to-end test, with the CLI JSON sharing the same binding'.",
+      "requirement_ref": "phase-100640 §8 Required Tests (E2E bullet, original text); §9 AC-100640-04; task rule 'Never mark complete while such an item is silently skipped'",
+      "recommendation": "Add a CLI recall test with a configured fake reranker sidecar that asserts a populated numeric scores.reranker (clio-lib already has run_state plus fake HTTP server helpers), or restore the original bullet and record the CLI gap explicitly as an owner-approved limitation instead of rewriting the criterion."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "title": "Index-only response bodies that previously reordered now fail the whole rerank, changing the results[]/bare-array compatibility semantics listed under 'Must Not Change'",
+      "evidence": "Pre-change parser accepted index-only entries: deleted test parse_results_order_appends_omitted_documents ran on {\"results\":[{\"index\":2},{\"index\":0}]} and expected order [2,0,1] (staged diff of crates/clio-retrieve/src/rerank_tests.rs). New crates/clio-retrieve/src/rerank_parse.rs:192-198 (entry_score) errors when a present entry lacks a numeric score (call sites at :113-120 and :126-133), and rerank_tests.rs:88 asserts parse_rerank_response(&json!([{\"index\":0}]),2).is_err(). On such input the orchestrator now keeps the fused order and emits the 'rerank unavailable' warning instead of applying the provider order. Phase §2 'Must Not Change' says: 'The results[]/scores[]/bare-array compatibility semantics (now also reading scores)' must hold; §5 Task 2 says a missing score 'fails closed'; §10 says a missing score must 'Emit null'. Completion evidence records the fail-closed choice but does not disclose or resolve the compatibility change, and DoD 'Existing behavior remains intact' is checked [x].",
+      "requirement_ref": "phase-100640 §2 Must Not Change (compatibility semantics); §5 Task 2; §8 T100640-03; §10 Failure Handling",
+      "recommendation": "Owner decides: either keep fail-closed and record the deliberate compatibility break in Known Limitations/Completion Evidence, or preserve compatibility by carrying score: None for a present entry without a numeric score (order preserved, exposed value null, never fabricated). The phase text should then be made internally consistent."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "title": "Mandatory owner approval for the breaking Reranker trait change is asserted but has no verifiable artifact in the run evidence",
+      "evidence": "Phase §3 lists 'Owner approval for the Reranker trait return-shape change is obtained' as a precondition and §6 says the agent 'must obtain owner approval before changing the Reranker trait return shape'. Completion evidence asserts 'Owner approval was granted at phase plan time'. No approval marker or artifact exists under private/clio-private/runs/phase-100640/ (ledger.json records only the developer step with artifacts {}), and the plan-time roadmap/index.md:249 text says the amendment 'requires owner approval and must be recorded in the phase's completion evidence'. The only record is the phase document's own five-word sentence and the index's implementation-time note.",
+      "requirement_ref": "phase-100640 §3 Preconditions; §6 Agent Decision Boundary; §9 Completion Evidence; §12 Required approval is obtained",
+      "recommendation": "Attach or reference the actual owner approval (message, marker, or ledger field) in the completion evidence, or have the owner re-confirm in this review round; a breaking API change cannot rest on a self-asserted precondition."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "title": "stage_score.rs documents the normalization function under the wrong module path",
+      "evidence": "crates/clio-retrieve/src/stage_score.rs:30 says 'normalized to [0, 1] (`rerank::normalize_rerank_score`)', but the function is defined in crates/clio-retrieve/src/rerank_parse.rs:84 and re-exported at crates/clio-retrieve/src/lib.rs:86; rerank.rs does not define or re-export it. The path in that doc comment does not resolve.",
+      "requirement_ref": "phase-100640 §9 DoD 'Documentation is updated where required'; AGENTS.md module-doc accuracy",
+      "recommendation": "Change the reference to `rerank_parse::normalize_rerank_score` (or the crate-root path)."
+    },
+    {
+      "id": "F-05",
+      "severity": "low",
+      "title": "rerank_tests.rs violates the mandatory file-header structure with two '## Does not own' sections",
+      "evidence": "crates/clio-retrieve/src/rerank_tests.rs lines 15-19 contain '## Does not own' twice (first '- Score-retention and normalization assertions (`rerank_score_tests`)', then '- End-to-end rerank ordering in the retriever (`hybrid_tests`)'). All other touched files have exactly one of each required section.",
+      "requirement_ref": "AGENTS.md 'File Header' mandatory structure",
+      "recommendation": "Merge the two lists into a single '## Does not own' section."
+    },
+    {
+      "id": "F-06",
+      "severity": "low",
+      "title": "Completion evidence names a test that does not exist and cites the wrong file for the trait",
+      "evidence": "Phase §9 AC-100640-02 evidence names 'parse_bare_array_retains_scores_and_appends_omitted'; no such test exists. The actual test is parse_bare_array_trusts_order_and_appends_omitted (crates/clio-retrieve/src/rerank_score_tests.rs:80). AC-100640-01 evidence says '`Reranker::rerank` returns `Vec<RerankedDoc>` (`crates/clio-retrieve/src/rerank_parse.rs`)', but the trait is declared in crates/clio-retrieve/src/rerank.rs:58-71; rerank_parse.rs holds the RerankedDoc type.",
+      "requirement_ref": "phase-100640 §9 Evidence (real results only); §8 Verification Rule",
+      "recommendation": "Correct the test name and the trait's file citation in the evidence."
+    },
+    {
+      "id": "F-07",
+      "severity": "low",
+      "title": "No hit-level test for a provider-omitted document leaving scores.reranker null while the reranker ran (T100640-03 only covered at parser level)",
+      "evidence": "parse_bare_array_omitted_document_appends_in_original_order (crates/clio-retrieve/src/rerank_score_tests.rs:87) asserts score None at the parser; tei_adapter_posts_query_texts_and_pinned_raw_scores (rerank_tests.rs:135) asserts [Some, Some, None] at the adapter. The live-reranker retriever tests score every document (hybrid_rerank_tests.rs:35, stage_score_tests.rs:262) or fail outright (hybrid_rerank_tests.rs:66); the MCP fake sidecar returns a complete 2-of-2 response (crates/clio-mcp/src/index_drain_tests.rs:186-189). No test asserts a hit's scores.reranker stays null when a configured provider omits that document.",
+      "requirement_ref": "phase-100640 §8 T100640-03; §9 AC-100640-04",
+      "recommendation": "Add a retriever-level test with a live adapter response that omits one document, asserting fused order for the appended document and scores.reranker == null for it."
+    }
+  ],
+  "addressed_issues": [],
+  "plan_1hr": [
+    "F-04, F-05, F-06: fix the stale module path, merge the duplicate header section, and correct the two evidence citations (docs/evidence only, no behavior change).",
+    "F-02: state the compatibility decision explicitly in the phase Known Limitations/Completion Evidence (or switch present-entry-missing-score to score: None if the owner prefers the frozen compatibility semantics).",
+    "F-07: add the omitted-document hit-level null test using the existing fake-server fixtures."
+  ],
+  "plan_unlimited": [
+    "F-01: add the real-CLI recall E2E test with a configured fake reranker sidecar asserting a populated numeric scores.reranker, then restore the original required-test wording (or obtain owner sign-off on narrowing it).",
+    "F-03: attach or reference the owner approval artifact for the Phase 300-family trait amendment in the completion evidence.",
+    "Re-run the full gate after the test additions and confirm the per-file floors still pass."
+  ]
+}

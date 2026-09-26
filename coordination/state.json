@@ -122,12 +122,52 @@
         "public": "47cbc4e6307c9414ed4af4d5ceb96bd809de26c7"
       },
       "claimed_at": "2026-09-25T22:10:04.761Z",
+      "completion_receipt": {
+        "path": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100640/publication.json",
+        "private_commit": "1e73e975de644d614e76b7bf4bf3e5548724b3f3",
+        "public_commit": "4f446559417cdd20dc548e351e22c5bc6b5a4471",
+        "published_at": "2026-09-25T23:28:49.105Z"
+      },
       "expires_at": null,
       "generation": 1,
-      "heartbeat_at": "2026-09-25T22:15:14.048Z",
+      "heartbeat_at": "2026-09-25T23:28:53.830Z",
       "machine_id": "devserver",
       "reservation_id": "rsv-143954ea33dd85627c9e45d8",
       "run_id": "phase-100640",
+      "status": "completed"
+    },
+    "100660": {
+      "base_revisions": {
+        "private": "0c3aab09ed8ab557f932fd180e1f83736934e1f6",
+        "public": "4f446559417cdd20dc548e351e22c5bc6b5a4471"
+      },
+      "claimed_at": "2026-09-25T23:30:03.957Z",
+      "completion_receipt": {
+        "path": "/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100660/publication.json",
+        "private_commit": "c20468d418afdbcaa71aa7065f39e6f7da143c97",
+        "public_commit": "74757ef94048cf30f702420e75e6b6cee1d28b0f",
+        "published_at": "2026-09-26T00:32:32.693Z"
+      },
+      "expires_at": null,
+      "generation": 1,
+      "heartbeat_at": "2026-09-26T00:32:37.325Z",
+      "machine_id": "devserver",
+      "reservation_id": "rsv-b702149b67ed467cfb2086e4",
+      "run_id": "phase-100660",
+      "status": "completed"
+    },
+    "100680": {
+      "base_revisions": {
+        "private": "9f03dfe93963a40b40d039946b166c3cb1c86cf2",
+        "public": "74757ef94048cf30f702420e75e6b6cee1d28b0f"
+      },
+      "claimed_at": "2026-09-26T00:40:04.235Z",
+      "expires_at": null,
+      "generation": 1,
+      "heartbeat_at": "2026-09-26T06:02:38.241Z",
+      "machine_id": "devserver",
+      "reservation_id": "rsv-effd80b76288376b8dd99043",
+      "run_id": "phase-100680",
       "status": "running"
     },
     "100720": {

@@ -1,0 +1,105 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver",
+    "finalize"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE d9df156e",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "73f31099b79f3c569c5a7461dccfce7f4e241186742234ae14a8661e3f0b2464",
+      "artifacts": {},
+      "git_head": "47cbc4e6307c9414ed4af4d5ceb96bd809de26c7",
+      "superseded_task_files": [],
+      "task_file": "developer-task-r1.md",
+      "task_sha256": "494036805a84ec9241e569b149df1362f96de8271190a05e083d031affecd9ee",
+      "stage_sha256": "4eff2593fbb8e60b6a5df5396396f86ee0b180a75aeefab3ea421b709222c63a",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100640/findings.json 7eb1b817",
+      "harness": "opencode:openrouter/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (OpenRouter . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "8492155eb43cd570e28f51aec30a20a6c4991c2efc8adfbb3ed17c187cca74e1",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 9310,
+          "sha256": "a81c5771d446c45f605452af4e152010f5d60589bb7b8bcba4bb0168cfb3e7f2"
+        }
+      },
+      "git_head": "47cbc4e6307c9414ed4af4d5ceb96bd809de26c7",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "2c878238ccdf85ff0293736505908b9703cdf910e1106ab4243006a7a8d67b84",
+      "stage_sha256": "927cf816f3cc00ddf8a06e9a847a737016e188b7c97f7aec674f5fe4d77a6686",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE 26797abe",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "authoritative": true,
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "visits": 2,
+      "output_sha256": "4fc38ad1375a215aa87eecb1a4b8aa13322f1cd1ad652c3fd693a78dc52d575d",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 9310,
+          "sha256": "a81c5771d446c45f605452af4e152010f5d60589bb7b8bcba4bb0168cfb3e7f2"
+        }
+      },
+      "git_head": "47cbc4e6307c9414ed4af4d5ceb96bd809de26c7",
+      "superseded_task_files": [
+        "remediator-task-r1.md"
+      ],
+      "task_file": "remediator-task-r2.md",
+      "task_sha256": "e5ea8ba0308212c3560459e0517e7f6334e6c789cd282cb15e7eee607d374bbc",
+      "stage_sha256": "d11f767fef64028ec534e90fefed81ecd93cdf865484159b62b95f485ce73784",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 746f841d",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 2,
+      "output_sha256": "c77026c2210017b2d58e5a00c32424e82b2b35ea87038b69285e7b71085064e2",
+      "artifacts": {},
+      "git_head": "47cbc4e6307c9414ed4af4d5ceb96bd809de26c7",
+      "superseded_task_files": [
+        "approver-task-r1.md"
+      ],
+      "task_file": "approver-task-r2.md",
+      "task_sha256": "1cc3f1a57c999a1d32222ceeadc1e5a03dad247a53f4a7ef9d1f3ce49484b972",
+      "stage_sha256": "5614191ec813108754527ccd42ccc95b4342d3c0f62ee88a20203fdef5db4f34",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 989d22bf",
+      "harness": "opencode:together/glm-5.3-flash@high",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Together . GLM-5.3 Flash High)",
+      "visits": 1,
+      "output_sha256": "e40e0ed9064db253fc8ae9604e58140c50a10bdf6315787998edbfc5e1c4c1d3",
+      "artifacts": {},
+      "git_head": "4f446559417cdd20dc548e351e22c5bc6b5a4471",
+      "superseded_task_files": [],
+      "task_file": "finalize-task-r1.md",
+      "task_sha256": "a734c9a1ca11dd1230b91c8a163e53dceffb9c8939a0de221725f3527f90a756",
+      "stage_sha256": "b72e2e15880899a653cb2519eb0f953ee1a9f23c173d2660441a361a80e6ab29",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  }
+}

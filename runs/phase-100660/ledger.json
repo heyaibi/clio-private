@@ -1,0 +1,101 @@
+{
+  "order": [
+    "developer",
+    "adversary",
+    "remediator",
+    "approver",
+    "finalize"
+  ],
+  "steps": {
+    "developer": {
+      "signal": "DEVELOPER_DONE e714e0ab",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "7196a551aaffd40e3350f776c105bd2b8b55d431c578639462974f2179982911",
+      "artifacts": {},
+      "git_head": "4f446559417cdd20dc548e351e22c5bc6b5a4471",
+      "superseded_task_files": [],
+      "task_file": "developer-task-r1.md",
+      "task_sha256": "c181d75ab4f60e24f6b054db753a5cdbc9b9c2355bb59c791433181f02bc9a70",
+      "stage_sha256": "4eff2593fbb8e60b6a5df5396396f86ee0b180a75aeefab3ea421b709222c63a",
+      "via": "edge",
+      "routed_to": "adversary"
+    },
+    "adversary": {
+      "signal": "ADVERSARY_DONE findings=/home/e1rcv4ogdmzught4sw9be5k2/clio/private/clio-private/runs/phase-100660/findings.json 900d00c8",
+      "harness": "opencode:go/deepseek-v4.1-flash@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Deepseek V4.1 Flash Max)",
+      "visits": 1,
+      "output_sha256": "08cb1cd2a6bd3b8666deb5636aa467406bfdda54cec4a3074a029b34878fc439",
+      "artifacts": {
+        "findings.json": {
+          "bytes": 4601,
+          "sha256": "947b7acd0c06ca1f3f7200796ad776dbd4bc83955a74dbc82ad2147d53aec5d0"
+        }
+      },
+      "git_head": "4f446559417cdd20dc548e351e22c5bc6b5a4471",
+      "superseded_task_files": [],
+      "task_file": "adversary-task-r1.md",
+      "task_sha256": "b24d5b49b5f8ac2617f041660e89b352e71c35a866d859900e4a099ce9b9779f",
+      "stage_sha256": "927cf816f3cc00ddf8a06e9a847a737016e188b7c97f7aec674f5fe4d77a6686",
+      "via": "edge",
+      "routed_to": "remediator"
+    },
+    "remediator": {
+      "signal": "REMEDIATOR_DONE b74318c8",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "bc31303b18c9767171b41299ebc925a15c96ceed9b3d94e6971bc6e2bd280ed1",
+      "artifacts": {
+        "findings.original.json": {
+          "bytes": 4601,
+          "sha256": "947b7acd0c06ca1f3f7200796ad776dbd4bc83955a74dbc82ad2147d53aec5d0"
+        }
+      },
+      "git_head": "4f446559417cdd20dc548e351e22c5bc6b5a4471",
+      "superseded_task_files": [],
+      "task_file": "remediator-task-r1.md",
+      "task_sha256": "5f7e5ffd708d59496d6da30a2441d873410e547fe56804fdb660f37a27d37174",
+      "stage_sha256": "f7983d28a56aaf5eea00680a1b061dd5f16be40f09d12a1a72976744e4b3ff13",
+      "via": "edge",
+      "routed_to": "approver"
+    },
+    "approver": {
+      "signal": "REMEDY_APPROVED 86a9ffef",
+      "harness": "cmd:stealth/space-bunny-alpha@high",
+      "authoritative": true,
+      "agent": "Command Code (Space Bunny Alpha High)",
+      "visits": 1,
+      "output_sha256": "16de23b20992cd8740e1c37a43cf40c957953ccce88d974c1ced0b7c53309911",
+      "artifacts": {},
+      "git_head": "4f446559417cdd20dc548e351e22c5bc6b5a4471",
+      "superseded_task_files": [],
+      "task_file": "approver-task-r1.md",
+      "task_sha256": "0a103116c129da8c07b9bb613aecf937dc4da86e6682453c10f5170aab952b00",
+      "stage_sha256": "3a20f8d59552d7d538199e13615a5ac291e7332ae84cf412dc3c9b46366d7843",
+      "via": "edge",
+      "routed_to": "finalize"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE 74670a11",
+      "harness": "cmd:deepseek/deepseek-v4-flash@max",
+      "authoritative": true,
+      "agent": "Command Code (DeepSeek V4 Flash (latest) Max)",
+      "visits": 1,
+      "output_sha256": "ccd35fb26875c5494c76e28a73f9234af1f7fdccbed2e9abaedef50c67c3ff2c",
+      "artifacts": {},
+      "git_head": "74757ef94048cf30f702420e75e6b6cee1d28b0f",
+      "superseded_task_files": [],
+      "task_file": "finalize-task-r1.md",
+      "task_sha256": "0a40ffefa77909f5ea7e982dbfc8da81dc71e088db4186a10827cc9058590d28",
+      "stage_sha256": "b72e2e15880899a653cb2519eb0f953ee1a9f23c173d2660441a361a80e6ab29",
+      "via": "end",
+      "routed_to": "completed"
+    }
+  }
+}
