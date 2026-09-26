@@ -101,6 +101,7 @@ tmux_session_ensure() {
 tmux_session_reconcile() {
   tmux set-option -t "$SESSION" -w window-size manual 2>/dev/null || true
   tmux set-option -t "$SESSION" set-titles on 2>/dev/null || true
+  tmux_apply_status_style
   local idle_wid idle_geom
   idle_wid="$(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name}' 2>/dev/null \
     | awk -v want="$TMUX_IDLE_WINDOW" '$2 == want { print $1 }')"
@@ -111,6 +112,25 @@ tmux_session_reconcile() {
     tmux resize-window -t "$idle_wid" -x "$TMUX_WIDTH" -y "$TMUX_HEIGHT" 2>/dev/null || true
   fi
   return 0
+}
+
+# Status-bar contrast. The tmux default is dim grey text on a green bar, which
+# is close to unreadable on a television viewed from across a room.
+#
+# These are COLOUR options only. Nothing here changes the status-bar row count,
+# the window size, or anything written to a pane, so applying it to a session
+# with a phase in flight delivers no SIGWINCH and does not disturb the running
+# agent. Verified: pane geometry stayed 164x56 and the pane kept producing
+# output across the change. Do not add the `status` row-count option here; that
+# would resize the window and reach the running agent.
+tmux_apply_status_style() {
+  # Black on white: the highest contrast ratio available (21:1).
+  tmux set-option -t "$SESSION" status-style 'fg=colour0,bg=colour15' 2>/dev/null || true
+  # The window in use is a solid white block, so which one is live is obvious
+  # from a distance. The idle window is black on light grey: still high
+  # contrast, but visibly secondary.
+  tmux set-option -t "$SESSION" window-status-current-style 'fg=colour0,bg=colour15,bold' 2>/dev/null || true
+  tmux set-option -t "$SESSION" window-status-style 'fg=colour0,bg=colour7' 2>/dev/null || true
 }
 
 # Open the phase window and size it. Fails if a phase window already exists,
