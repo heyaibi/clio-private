@@ -33,12 +33,51 @@ A test that exercises a helper inside one process is not the same as the reporte
 
 When a fix cannot restore data that was already lost (for example, a key that was never persisted), say that explicitly and immediately. Never present a fix as making the old case work when it only changes future behavior.
 
+## Bug Detection and Reporting (mandatory)
+
+Finding and reporting bugs is part of every task. Do not limit bug detection to the exact code you were asked to change.
+
+While working, actively pay attention to incorrect behavior, broken assumptions, missing validation, unsafe behavior, data corruption or loss, race conditions, error handling failures, security problems, regressions, and inconsistencies with documented behavior.
+
+When you encounter behavior that may be a bug:
+
+1. **Investigate it.** Do not dismiss it merely because it is outside the task.
+2. **Determine whether it is actually a bug.** Check the relevant code, requirements, tests, documentation, and runtime behavior as needed.
+3. **Reproduce it when practical.** Use the real entry point and realistic state. Do not claim reproduction unless you actually reproduced it.
+4. **Separate facts from conclusions.** Record what you observed separately from what you believe causes it.
+5. **Report confirmed unrelated bugs immediately.** Do not defer reporting until the end of the task.
+6. **Report credible but unconfirmed bugs as unconfirmed.** If you cannot establish the behavior, say exactly what you observed and what remains unverified.
+7. **Do not suppress a bug because fixing it would expand the task.** The scope rule controls whether you fix it, not whether you report it.
+8. **Do not fix unrelated bugs.** Create the issue and continue with the assigned task unless the bug blocks the task.
+9. **Do not manufacture bugs to satisfy this requirement.** Every issue must be supported by actual evidence.
+
+### Required bug report contents
+
+Every reported bug MUST include:
+
+- **Summary:** one sentence describing the incorrect behavior.
+- **Observed behavior:** what actually happened.
+- **Expected behavior:** what should have happened and why.
+- **Evidence:** the relevant command, input, output, error, test result, code path, or other evidence.
+- **Reproduction:** exact steps when reproduction was possible.
+- **Verification status:** clearly state whether the bug was reproduced, inferred from code, or remains unconfirmed.
+- **Location:** exact file and line or the smallest relevant code location.
+- **Impact:** what can go wrong and under what conditions. Do not exaggerate impact.
+- **Cause:** the cause when established. If unknown, say that it is unknown.
+- **Proposed fix:** the likely fix when one is reasonably clear. Do not present a guess as an established solution.
+
+Never claim that a bug was reproduced, tested, verified, or understood when it was not.
+
+If the evidence is insufficient to establish that the behavior is a bug, do not present it as a confirmed bug. Report it as unconfirmed only when there is enough concrete evidence to justify further investigation.
+
 ## Stay on the Task (mandatory)
 
-Work only on the task you were given. Do not turn it into a bug-hunting session.
+Work only on the task you were given. Do not turn it into a bug-fixing session.
 
-- When you find an unrelated bug, **do not fix it**. Immediately create a GitHub issue that records the symptom, the exact file and line, how to reproduce it, the impact, and the proposed fix. Then carry on with the task at hand.
-- Do not expand scope to chase the bug, add tests for it, or refactor around it.
+Bug detection and bug reporting are not scope expansion. Fixing an unrelated bug is scope expansion; reporting it is not.
+
+- When you find an unrelated bug, **do not fix it**. Immediately create a GitHub issue that records the observed symptom, the exact file and line, how to reproduce it or clearly states that reproduction was not possible, the impact, the evidence supporting the report, and the proposed fix or investigation path.
+- Do not expand scope to fix the bug, add tests for it, or refactor around it.
 - If the bug blocks the task, say so and ask before changing scope.
 - Keep the branch scoped to the task. A deferred bug belongs in its issue, not in this change. Revert in-progress edits for a bug you are deferring.
 
@@ -60,8 +99,6 @@ What you must never do:
 4. Never create root symlinks into `private/`. The root currently has exactly one — the git-ignored `AGENTS.md` convenience link. Keep it at one.
 5. This `AGENTS.md` itself is private. Never copy it to the repo root.
 
-Pushing the private repo to its own private remote is fine and expected. Pushing the root repo must only ever carry public content.
-
 ## Glide repository
 
 - The `glide` checkout lives at `private/clio-private/glide/`.
@@ -80,7 +117,7 @@ Pushing the private repo to its own private remote is fine and expected. Pushing
 - Say what happened in plain words. Do not hide it behind a hard name.
 - Say why it happened in plain words when you know why.
 - Explain what the numbers mean. Do not just report numbers, percentages, or metrics.
-- If you must use a hard word, explain it the first time in plain words.
+- If you must use a hard word, explain it the first time in plain language.
 - Do not use corporate, managerial, or AI-sounding language when a normal word works.
 - Avoid phrases like `leverage`, `optimize the workflow`, `drive alignment`, `unlock efficiency`, `operationalize`, `surface area`, `moving forward`, `the key takeaway`, and `this suggests an opportunity to`.
 - Say the actual problem directly. Do not soften it with vague language.
@@ -177,43 +214,48 @@ Every Rust source file MUST use the following header structure:
 //! Changes to <other concern> should not require changes here.
 //!
 //! Keep this module focused on <a single responsibility>.
-```
+````
 
- The responsibility and ownership statements MUST accurately describe the actual module. Do not copy placeholder text into production files.
+The responsibility and ownership statements MUST accurately describe the actual module. Do not copy placeholder text into production files.
 
- ## Editing `baseline/requirement.md`
+## Editing `baseline/requirement.md`
 
- The normative requirements live in `private/clio-private/baseline/requirement.md` (singular). Treat every edit as a consistency change, not a local append.
+The normative requirements live in `private/clio-private/baseline/requirement.md` (singular). Treat every edit as a consistency change, not a local append.
 
- ### Before adding or changing a requirement
+### Before adding or changing a requirement
 
- 1. **Locate related material.** Search for related requirements, terminology, and cross-references under:
-     Read the relevant passages before drafting.
-   - Problem IDs (`P*`)
-   - Principles (`PR-*`)
-   - Sections such as `§2` tensions and `§4` mechanisms, where present
-   - Functional requirements (`FR-*`)
-   - Non-functional requirements (`NFR-*`)
-   - Risks, glossary entries, and other referenced sections
+1. **Locate related material.** Search for related requirements, terminology, and cross-references under:
+   Read the relevant passages before drafting.
+
+   * Problem IDs (`P*`)
+   * Principles (`PR-*`)
+   * Sections such as `§2` tensions and `§4` mechanisms, where present
+   * Functional requirements (`FR-*`)
+   * Non-functional requirements (`NFR-*`)
+   * Risks, glossary entries, and other referenced sections
 2. **Detect conflicts.** A conflict exists if the new text would force an implementer to violate an existing `MUST`, `MUST NOT`, `SHALL`, or `SHALL NOT`, or if two requirements prescribe incompatible behavior for the same case.
 3. **Do not silently override.** Never add a contradictory `MUST` or `SHALL` while leaving the old requirement standing. Do not make one rule appear to override another merely by placing it later in the document.
 4. **Resolve conflicts explicitly.** Prefer one of:
-   - Amend or narrow the older requirement in the same change.
-   - Add a `§2` governing principle that explicitly scopes which rule applies and when, such as by attribute type, layer, automatic versus explicit tool call, or other relevant condition.
-   - Ask me which rule should win, quoting the two conflicting requirements and identifying the case that creates the conflict.
+
+   * Amend or narrow the older requirement in the same change.
+   * Add a `§2` governing principle that explicitly scopes which rule applies and when, such as by attribute type, layer, automatic versus explicit tool call, or other relevant condition.
+   * Ask me which rule should win, quoting the two conflicting requirements and identifying the case that creates the conflict.
 5. **Keep IDs coherent.** If you change the meaning of a `PR`, `FR`, or `NFR`, update every affected cross-reference, including references in `§9` risks and the glossary. Do not cite a requirement as establishing a property that it does not state.
 6. **Keep examples consistent.** Examples are illustrative, but they MUST comply with the normative requirements. Examples MUST obey `PR-2`, `§4.10`/`§4.11` `epistemic_kind` rules, and other applicable constraints. A contradictory example is a defect.
 7. **Report leftovers.** After an edit, list any remaining tensions or inconsistencies you noticed but did not fix.
 
- ## Final Verification
+## Final Verification
 
- Before declaring a phase complete:
+Before declaring a phase complete:
 
- - Verify the relevant tests and checks.
-- Verify the Rust source-file size constraint for every Rust file created or refactored.
-- If the phase touched Rust crates, complete the required `private/clio-private/baseline/coverage.md` procedure and verify both aggregate coverage and the per-file ≥90% function and line thresholds.
-- For `private/clio-private/baseline/requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
-- Clearly state what was verified and identify anything that could not be verified.
+* Verify the relevant tests and checks.
+* Verify the Rust source-file size constraint for every Rust file created or refactored.
+* If the phase touched Rust crates, complete the required `private/clio-private/baseline/coverage.md` procedure and verify both aggregate coverage and the per-file ≥90% function and line thresholds.
+* For `private/clio-private/baseline/requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
+* Review the work for bugs encountered during implementation, testing, review, and verification.
+* Verify that every unrelated bug discovered during the phase has a GitHub issue, unless it was fixed within the requested scope.
+* Clearly state what was verified and identify anything that could not be verified.
+* If no additional bugs were found, state that no additional bugs were found during the work and briefly state what was checked.
 
 ## Agent skills
 
