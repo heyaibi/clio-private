@@ -3,7 +3,8 @@
     "developer",
     "adversary",
     "remediator",
-    "approver"
+    "approver",
+    "finalize"
   ],
   "steps": {
     "developer": {
@@ -85,6 +86,22 @@
       "stage_sha256": "3a20f8d59552d7d538199e13615a5ac291e7332ae84cf412dc3c9b46366d7843",
       "via": "edge",
       "routed_to": "finalize"
+    },
+    "finalize": {
+      "signal": "FINALIZE_DONE fe132ad5",
+      "harness": "opencode:go/space-bunny-free@max",
+      "authoritative": true,
+      "agent": "OpenCode CLI (Go . Space Bunny Free Max)",
+      "visits": 1,
+      "output_sha256": "a00db2ac859e1b7fcf4b222ecfed3fc87fcc1783e1c8631b399cf90c1b264f49",
+      "artifacts": {},
+      "git_head": "e6e0b6b9da6ed1e4d89ecdb03a3ee461d8cf4010",
+      "superseded_task_files": [],
+      "task_file": "finalize-task-r1.md",
+      "task_sha256": "fd29ad61e74c5d74562595c2987dc06a3e3570e4074ed872a7bef2bce99c71d1",
+      "stage_sha256": "b72e2e15880899a653cb2519eb0f953ee1a9f23c173d2660441a361a80e6ab29",
+      "via": "end",
+      "routed_to": "completed"
     }
   }
 }
