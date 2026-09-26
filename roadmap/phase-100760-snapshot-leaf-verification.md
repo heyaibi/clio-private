@@ -4,11 +4,11 @@
 Rounds below record plan authorship; implementation sign-off is in §12.
 | Role | Round | Actual Agent | Status |
 |------|-------|--------------|--------|
-| Developer | r1 | [TBD] | proposed |
-| Adversary | r1 | [TBD] | [TBD] |
-| Remediator | r1 | [TBD] | [TBD] |
-| Remedy Approver | r1 | [TBD] | [TBD] |
-| Finalize | r1 | [TBD] | [TBD] |
+| Developer | r1 | OpenCode CLI (Together . GLM-5.3 Flash High) | done |
+| Adversary | r1 | OpenCode CLI (Go . Space Bunny Free Max) | done |
+| Remediator | r1 | Command Code (Space Bunny Alpha High) | done |
+| Remedy Approver | r1 | OpenCode CLI (Go . Space Bunny Free Max) | approved |
+| Finalize | r1 | Command Code (DeepSeek V4 Flash (latest) Max) | done |
 
 **Capability phase 100760** · **Effort:** ~1–2 days · **Status:** Plan ready · **Parent:** gap analysis `gaps/recall-result-fidelity-gap-analysis.md` §9.7, §7, §10.2; requirement FR-4 / §4.4, PR-4
 
@@ -294,25 +294,100 @@ Implementation claims must be supported by actual test output, inspection result
 | AC-100760-06 | No regression; size/coverage gates pass | T100760-08 | Workspace suite; coverage report; size check |
 
 ### Definition of Done
-- [ ] All in-scope behavior is implemented.
-- [ ] All acceptance criteria pass.
-- [ ] Required tests pass.
-- [ ] No unauthorized changes were introduced.
-- [ ] Existing behavior remains intact.
-- [ ] Security checks pass.
-- [ ] Documentation is updated where required.
-- [ ] Evidence is collected.
-- [ ] Verification is completed.
-- [ ] Required approval is obtained.
+- [x] All in-scope behavior is implemented.
+- [x] All acceptance criteria pass.
+- [x] Required tests pass.
+- [x] No unauthorized changes were introduced.
+- [x] Existing behavior remains intact.
+- [x] Security checks pass.
+- [x] Documentation is updated where required.
+- [x] Evidence is collected.
+- [x] Verification is completed.
+- [x] Required approval is obtained.
+
+### Rule Decision Record (AC-100760-02)
+
+The owner was asked directly during the Developer r1 run (2026-09-26), with both
+options and their consequences stated, and chose **reject (fail closed)**:
+every non-empty undeclared snapshot leaf — top-level, nested, or list — fails
+verification, and the snapshot is not committed. This matches the pre-existing
+doc claim and FR-4/§4.4 (an unverified snapshot MUST NOT be committed). The
+implemented reason string is `unlisted snapshot leaf rejected`, identical to the
+reference harness in `scripts/extract_quality.py`, so the cross-language
+verifier contract stays aligned. Declared-field span verification, the
+retry-once-then-refuse behavior, and admission are unchanged.
+
+### Evidence (recorded r1; remedy r1 revised the rejection label, test names, and parity cases)
+
+- **Before reproduction (AC-100760-01):** real entry point `clio mcp stdio`
+  (SQLite database, existing-store runs), driver `store` tool call with
+  `item.snapshot = {"entity":"Ada","amount":1000,"invented_note":"unverified
+  paraphrase"}` and matching `source_text`. Result: `verify_ok`, admitted
+  (`pass=true`), and `get_snapshot` returned the authoritative snapshot
+  **including** `invented_note` — the undeclared leaf was ignored and committed
+  unverified; the doc claim was false. Saved output: run evidence
+  `before.log` alongside this phase's run record.
+- **After reproduction (AC-100760-03, T100760-06):** same driver, same entry
+  point: control (declared-valid only) still stored; top-level, nested
+  (`invented.deep`), and list (`invented_list.0`, `invented_list.1`) undeclared
+  leaves each rejected with `span_verify: <unlisted leaf #N>: unlisted snapshot
+  leaf rejected` — the failure names the walk position, never the caller-supplied
+  key or path, so a caller-controlled key cannot ride the rejection surface;
+  nothing committed; rejection logged through the existing admission event path.
+- **Tests (AC-100760-03/04/05):** `cargo test -p clio-write` 182 passed;
+  `cargo test -p clio-mcp` 329+ passed (no regression). New rule coverage:
+  `verify_tests.rs` — `unlisted_top_level_leaf_rejected`,
+  `unlisted_nested_leaf_rejected`, `unlisted_list_leaf_rejected`,
+  `unlisted_leaf_failure_never_echoes_caller_key`,
+  `empty_unlisted_leaves_ignored`, `non_object_snapshot_fails`,
+  `mixed_declared_and_unlisted_failures`; `ingest_tests.rs` —
+  `spo_candidates_refused_under_default_fields`; `clio-mcp`
+  `write_scope_tests.rs` — `store_rejects_unlisted_snapshot_leaf_and_writes_nothing`,
+  `admit_preview_rejects_unlisted_snapshot_leaf`,
+  `canonical_put_rejects_unlisted_snapshot_leaf`,
+  `batch_store_rejects_unlisted_snapshot_leaf`,
+  `tool_response_and_rejection_never_echo_the_caller_snapshot_key`; `clio-write`
+  `store_path_scope_tests.rs` — `unlisted_leaf_rejection_carries_no_caller_key`.
+  Declared-field matcher tests (`verify_tests.rs`, `verify_edge_tests.rs`)
+  unchanged and green.
+- **Parity (T100760-07):** `python3 scripts/extract_quality.py --parity` →
+  20/20 cases match (both the Rust verifier and the Python reference evaluate
+  every case); `--unit-only` → PASS (fidelity 1.0000). The parity cases are
+  metadata only; the numbering of the positional labels is not machine-pinned
+  across languages, only the pass/fail verdict is.
+- **Workspace and coverage (AC-100760-06, T100760-08):** `make coverage`
+  (aggregate + per-file guard) green on the committed tree — remedy r1 gate log
+  `logs/remediator-coverage.log`, approver r1 re-run on the identical tree
+  `logs/approver-coverage.log` (353 reported files, all ≥90% lines and
+  functions; TOTAL lines 97.89%, functions 98.71%). Largest touched files:
+  `write_tools.rs` 418 lines, `extract_chat.rs` 322, `verify_tests.rs` 318,
+  `ingest_tests.rs` 313, `verify.rs` 230 — all ≤450. Clippy `-D warnings` and
+  `cargo fmt --check` clean for the touched crates.
 
 ### Completion Evidence
-- Before/after reproduction (exact commands, saved output)
-- Rule decision record
-- Changed-component summary
-- Test execution output
-- Doc diff
-- Verification report
-- Known limitations
+- Before/after reproduction (exact commands, saved output): see "Evidence
+  (recorded r1)" above.
+- Rule decision record: see "Rule Decision Record (AC-100760-02)" above.
+- Changed-component summary: `crates/clio-write/src/verify.rs` (undeclared-leaf
+  scope check + non-object snapshot guard + positional failure label),
+  `verify_tests.rs` (rule tests), `ingest_tests.rs` (fields parameter on the
+  test helper; SPO fixture declared via test-only fields; new refusal test under
+  production default fields), `store_path.rs` + `store_path_scope_tests.rs`
+  (gated-store rejection surface), `extract_chat.rs` + `extract_chat_egress_tests.rs`
+  (verify feedback scrubbed before hosted egress), `docs/extraction-fidelity.md`
+  (scope paragraph aligned to implemented rule; snapshot trust level and the
+  unverified correct/import tier stated), `crates/clio-mcp/src/schema_defs.rs` +
+  `schema_additive_defs.rs` (snapshot description names the three allowed
+  leaves), `write_tools.rs` + `write_scope_tests.rs` (tool-layer rule tests),
+  `scripts/extract_quality.py` (Python mirror of the rule and the label), and
+  `scripts/verifier_parity.json` (6 undeclared-leaf cases).
+- Test execution output: `cargo test -p clio-write`, `cargo test -p clio-mcp`,
+  parity and unit-only harness runs, `make check`, `make coverage` — all recorded
+  in run logs.
+- Doc diff: `docs/extraction-fidelity.md` scope and trust paragraphs.
+- Verification report: this section plus the Developer r1 run log.
+- Known limitations: unchanged from §12 (only snapshot leaf scope reconciled;
+  the unchosen ignore behavior is explicitly not the contract).
 
 ---
 
@@ -369,16 +444,35 @@ After this phase is accepted:
 ### Known Limitations
 - Only snapshot leaf scope is reconciled; other doc/code disagreements are out of scope.
 - The rule choice (reject vs ignore) is recorded; whichever is chosen, the other behavior is explicitly documented as not the contract.
+- A caller-supplied snapshot on a span-verifying tool is limited to the declared
+  extractive field set, which for the public memory-event tools is exactly
+  `entity`, `amount`, and `date`. This rejects snapshots that were accepted before
+  the rule, and it is a deliberate fail-closed break rather than a regression.
+  There is no way for a caller to declare an extra key: a per-bank or per-tool
+  field policy, or an explicit declared-path tool parameter, would be the fix and
+  is not owned by this phase. Until it exists, extra content belongs in `gist`.
+- Two write paths remain outside the guarantee by design: an operator correction
+  (`correct`/`update`) and a bundle import commit the caller's snapshot without a
+  span check. Their tier is documented rather than changed.
+- An unlisted-leaf rejection identifies the offending leaf by walk position
+  (`<unlisted leaf #N>`), never by its key or path, because a snapshot key is
+  caller-controlled and can be sensitive. The cost is that the rejection no
+  longer names the offending key, so diagnosing which leaf was refused needs the
+  caller's own snapshot.
 
 ### Downstream Prerequisites
 - Phase 100680 may rely on the documented snapshot trust level.
 - Any future write that depends on undeclared snapshot content must use the implemented rule.
 
 ### Final Status
-PASS | PASS WITH DOCUMENTED LIMITATIONS | BLOCKED | FAILED
+PASS
 
 ### Verification Sign-Off
-- Implementer: [TBD]
-- Verifier: [TBD]
-- Human Approver: required for the rule decision
-- Date: [TBD]
+- Implementer: Developer r1 (OpenCode CLI, GLM-5.3 Flash High); remedy r1
+  (Command Code, Space Bunny Alpha High)
+- Verifier: Adversary r1 (6 findings) and Remedy Approver r1 (approved; owned
+  `make check` and `make coverage` runs on the identical tree, plus a fresh
+  `clio mcp stdio` reproduction of the rejection and the no-key-echo property)
+- Human Approver: rule decision obtained during the r1 run (owner chose
+  reject/fail-closed); remedy approval recorded in approver r1
+- Date: 2026-09-26
