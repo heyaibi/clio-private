@@ -25,6 +25,10 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 PRIV="private/clio-private"
+
+# Portable mtime helper, shared with the driver so the fix lives in one place.
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/lib-stat.sh"
 RUN_DIR="${DRIVER_RUN_DIR:-$REPO/$PRIV/runs/.driver}"
 LOG="$RUN_DIR/driver.log"
 HALT="$RUN_DIR/halted"
@@ -50,23 +54,12 @@ human_age() {
 }
 
 file_age() {
-  local f="$1" now mtime=''
+  local f="$1" now mtime
   [ -f "$f" ] || { printf 'never'; return 0; }
-  # Pick the form for THIS platform first, then use only that one. Chaining
-  # them with `stat -f %m ... || stat -c %Y ...` is wrong: on GNU coreutils
-  # `stat -f` means --file-system, so `%m` is read as a device name, the
-  # command prints nothing and still exits 0, the `||` fallback never runs, and
-  # $mtime ends up empty. An empty value then breaks the arithmetic below.
-  # BSD/macOS uses -f %m; GNU/Linux uses -c %Y.
-  if stat -c %Y "$f" >/dev/null 2>&1; then
-    mtime="$(stat -c %Y "$f" 2>/dev/null)"
-  else
-    mtime="$(stat -f %m "$f" 2>/dev/null)"
-  fi
-  # Never do arithmetic on an unchecked value.
-  case "$mtime" in
-    ''|*[!0-9]*) mtime=0 ;;
-  esac
+  # stat_epoch picks the right `stat` form for this platform and always
+  # returns a bare integer. See scripts/lib-stat.sh for why the obvious
+  # `stat -f %m || stat -c %Y` chain is wrong on Linux.
+  mtime="$(stat_epoch "$f")"
   now="$(date +%s)"
   human_age "$((now - mtime))"
 }

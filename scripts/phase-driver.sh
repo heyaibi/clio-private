@@ -135,6 +135,9 @@ LOG="$RUN_DIR/driver.log"
 # are defined because the helper uses SCRIPTS, LOG, and REPO at call time.
 # shellcheck disable=SC1091
 . "$SCRIPTS/phase-tmux.sh"
+# Portable mtime helpers (BSD stat vs GNU/uutils stat). See lib-stat.sh.
+# shellcheck disable=SC1091
+. "$SCRIPTS/lib-stat.sh"
 
 DRY_RUN=0
 CUR_PHASE=""
@@ -313,13 +316,8 @@ tmux_busy() {
 }
 
 newest_mtime() {
-  local newest=0 f m
-  for f in "$@"; do
-    [ -f "$f" ] || continue
-    m="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || echo 0)"
-    [ "$m" -gt "$newest" ] && newest="$m"
-  done
-  printf '%s\n' "$newest"
+  stat_newest_epoch "$@"
+  printf '\n'
 }
 
 # While a session is live, alert once if its output has gone quiet too long.
