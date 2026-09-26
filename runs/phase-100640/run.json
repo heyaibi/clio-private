@@ -1,7 +1,7 @@
 {
   "run_id": "phase-100640",
   "phase": "100640",
-  "state": "publishing",
+  "state": "completed",
   "transcript": [
     {
       "step": "developer",
@@ -146,5 +146,10 @@
       "routed_to": "completed"
     }
   ],
-  "publication_pending": true
+  "reservation": {
+    "machine_id": "devserver",
+    "reservation_id": "rsv-143954ea33dd85627c9e45d8",
+    "generation": 1,
+    "state": "completed"
+  }
 }
