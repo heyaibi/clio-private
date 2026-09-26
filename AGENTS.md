@@ -25,8 +25,8 @@ A passing test is not proof that a reported bug is fixed. Reproduce the report f
 1. **Read the report and restate the symptom.** Quote the exact command and the exact error from the issue or message.
 2. **Reproduce with the real entry point.** Build and run the actual binary or service, not only an in-process unit test. For this CLI: `make compile` (or `make install`) and run the reported commands.
 3. **Use realistic state.** If the report can occur against existing data, reproduce against an existing database too. A fix that only works on a fresh install is not a fix.
-4. **See the failure before editing.** Save the before output. Do not start refactoring or expanding scope before you have reproduced it.
-5. **Re-run the same reproduction after the change.** Show before and after from the same commands and the same kind of data. Do not substitute an easier scenario and call it done.
+4. **See the failure before editing.** Save the before output to a log file under `private/clio-private/logs/`. Do not start refactoring or expanding scope before you have reproduced it.
+5. **Re-run the same reproduction after the change.** Show before and after from the same commands and the same kind of data, with both outputs in the log. Do not substitute an easier scenario and call it done.
 6. **Say exactly what you ran and what you did not.** If you did not reproduce the report end to end, say so plainly and do not call the issue fixed.
 
 A test that exercises a helper inside one process is not the same as the reported cross-process or persisted-state path. Prove the reported path.
@@ -140,16 +140,52 @@ What you must never do:
 - Simple words beat clever words.
 - Before sending, ask: `Could a busy engineer understand what happened, why it happened, and what should change after reading this once?` If not, rewrite it.
 
+## Expensive Commands Write To A Log (mandatory)
+
+`make coverage`, `make check`, `make coverage-clean`, `cargo test --workspace`, and any other command that takes more than about a minute must send its whole output to a log file. Never run one of these a second time just to see whether it passed.
+
+Send the output to `private/clio-private/logs/<name>.log` and the exit code to `private/clio-private/logs/<name>.exit`:
+
+```bash
+mkdir -p private/clio-private/logs
+{ make coverage; echo $? > private/clio-private/logs/coverage.exit; } \
+  > private/clio-private/logs/coverage.log 2>&1
+```
+
+Then read the log. Do not re-run the command:
+
+```bash
+tail -40 private/clio-private/logs/coverage.log
+cat private/clio-private/logs/coverage.exit
+```
+
+The rules:
+
+- **Read the log before you report.** Every claim about a test, lint, or coverage result comes from a log file you have read in this session, not from memory and not from an earlier run of the same command.
+- **Name the log you read.** When you report a result, give the log path.
+- **One run, one log.** Each run overwrites its log, so the file on disk is always the newest result.
+- **Fix the cause, then run once.** If a run fails, read the log, decide what is wrong, change it, then run again. Do not re-run unchanged code.
+- **A flaky gate is not a licence to loop.** If an expensive command fails intermittently, that is a bug in its own right. Report it as a bug, say plainly that the gate could not be completed, and move on. Do not spend several runs on a coin flip.
+- **Narrow with a cheap scoped run first.** While iterating, use a per-crate run instead of the full gate. Save the full gate for the final pass.
+
+```bash
+cargo llvm-cov --package <crate> --locked --no-clean --summary-only
+```
+
+Logs live under `private/` on purpose. They contain host paths and test output, and CI output is public.
+
 ## Coverage Gate
 
 Before starting and after completing any phase that modifies Rust crates, follow **`private/clio-private/baseline/coverage.md`**.
+
+Run the gate through the logging rule above: one run, output in `private/clio-private/logs/coverage.log`, result read from that log.
 
 The workspace Makefile enforces **≥90% aggregate LLVM coverage** for functions and lines. Agents must additionally verify that **every reported Rust source file** has:
 
 - ≥90% function coverage
 - ≥90% line coverage
 
-Run `make coverage` and follow any additional procedure required by `private/clio-private/baseline/coverage.md`.
+Run `make coverage` and follow any additional procedure required by `private/clio-private/baseline/coverage.md`. Log it as described in **Expensive Commands Write To A Log**.
 
 `make coverage` is incremental (`cargo llvm-cov --no-clean`): it keeps the warm instrumented build in `target/llvm-cov-target`, so repeated gates reuse unchanged crates. Run `make coverage-clean` for an authoritative from-scratch gate after large refactors, or when per-file numbers look wrong. Raw `cargo llvm-cov` commands must also pass `--no-clean`.
 
@@ -248,7 +284,8 @@ The normative requirements live in `private/clio-private/baseline/requirement.md
 
 Before declaring a phase complete:
 
-* Verify the relevant tests and checks.
+* Verify the relevant tests and checks. Read the result from a log file under `private/clio-private/logs/`, as **Expensive Commands Write To A Log** requires, and name the log you read.
+* Do not re-run an expensive command to obtain a second result. If a gate is flaky, report the flake and say the gate could not be completed.
 * Verify the Rust source-file size constraint for every Rust file created or refactored.
 * If the phase touched Rust crates, complete the required `private/clio-private/baseline/coverage.md` procedure and verify both aggregate coverage and the per-file ≥90% function and line thresholds.
 * For `private/clio-private/baseline/requirement.md` changes, verify related requirements, cross-references, IDs, examples, risks, and glossary entries for consistency.
